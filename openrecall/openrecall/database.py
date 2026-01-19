@@ -1,12 +1,9 @@
 import sqlite3
-from collections import namedtuple
 import numpy as np
-from typing import Any, List, Optional, Tuple
+from typing import List, Optional
 
 from openrecall.config import settings
-
-# Define the structure of a database entry using namedtuple
-Entry = namedtuple("Entry", ["id", "app", "title", "text", "timestamp", "embedding"])
+from openrecall.models import RecallEntry
 
 
 def create_db() -> None:
@@ -38,38 +35,35 @@ def create_db() -> None:
         print(f"Database error during table creation: {e}")
 
 
-def get_all_entries() -> List[Entry]:
+def _row_to_entry(row: sqlite3.Row) -> RecallEntry:
+    """Convert a database row to RecallEntry (embedding auto-deserialized by Pydantic)."""
+    return RecallEntry(
+        id=row["id"],
+        app=row["app"],
+        title=row["title"],
+        text=row["text"],
+        timestamp=row["timestamp"],
+        embedding=row["embedding"],
+    )
+
+
+def get_all_entries() -> List[RecallEntry]:
     """
     Retrieves all entries from the database.
 
     Returns:
-        List[Entry]: A list of all entries as Entry namedtuples.
-                     Returns an empty list if the table is empty or an error occurs.
+        List[RecallEntry]: A list of all entries as RecallEntry objects.
+                           Returns an empty list if the table is empty or an error occurs.
     """
-    entries: List[Entry] = []
+    entries: List[RecallEntry] = []
     try:
         with sqlite3.connect(str(settings.db_path)) as conn:
-            conn.row_factory = sqlite3.Row  # Return rows as dictionary-like objects
+            conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
             cursor.execute(
                 "SELECT id, app, title, text, timestamp, embedding FROM entries ORDER BY timestamp DESC"
             )
-            results = cursor.fetchall()
-            for row in results:
-                # Deserialize the embedding blob back into a NumPy array
-                embedding = np.frombuffer(
-                    row["embedding"], dtype=np.float32
-                )  # Assuming float32, adjust if needed
-                entries.append(
-                    Entry(
-                        id=row["id"],
-                        app=row["app"],
-                        title=row["title"],
-                        text=row["text"],
-                        timestamp=row["timestamp"],
-                        embedding=embedding,
-                    )
-                )
+            entries = [_row_to_entry(row) for row in cursor.fetchall()]
     except sqlite3.Error as e:
         print(f"Database error while fetching all entries: {e}")
     return entries
@@ -139,7 +133,7 @@ def insert_entry(
     return last_row_id
 
 
-def get_entries_by_time_range(start_time: int, end_time: int) -> List[Entry]:
+def get_entries_by_time_range(start_time: int, end_time: int) -> List[RecallEntry]:
     """Retrieves entries within a specified time range.
 
     Args:
@@ -147,9 +141,9 @@ def get_entries_by_time_range(start_time: int, end_time: int) -> List[Entry]:
         end_time: Unix timestamp for range end.
 
     Returns:
-        List[Entry]: Entries within the time range, ordered by timestamp DESC.
+        List[RecallEntry]: Entries within the time range, ordered by timestamp DESC.
     """
-    entries: List[Entry] = []
+    entries: List[RecallEntry] = []
     try:
         with sqlite3.connect(str(settings.db_path)) as conn:
             conn.row_factory = sqlite3.Row
@@ -159,20 +153,7 @@ def get_entries_by_time_range(start_time: int, end_time: int) -> List[Entry]:
                 "WHERE timestamp BETWEEN ? AND ? ORDER BY timestamp DESC",
                 (start_time, end_time),
             )
-            results = cursor.fetchall()
-            for row in results:
-                # Deserialize embedding to ensure consistent return type
-                embedding = np.frombuffer(row["embedding"], dtype=np.float32)
-                entries.append(
-                    Entry(
-                        id=row["id"],
-                        app=row["app"],
-                        title=row["title"],
-                        text=row["text"],
-                        timestamp=row["timestamp"],
-                        embedding=embedding,
-                    )
-                )
+            entries = [_row_to_entry(row) for row in cursor.fetchall()]
     except sqlite3.Error as e:
         print(f"Database error while fetching entries by time range: {e}")
     return entries
