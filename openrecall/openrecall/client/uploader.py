@@ -21,15 +21,15 @@ class HTTPUploader:
         timeout: Request timeout in seconds.
     """
     
-    def __init__(self, api_url: Optional[str] = None, timeout: int = 120):
+    def __init__(self, api_url: Optional[str] = None, timeout: Optional[int] = None):
         """Initialize the uploader.
         
         Args:
             api_url: Override the default API URL from settings.
-            timeout: Request timeout in seconds (default: 120, for slow OCR).
+            timeout: Request timeout in seconds. Defaults to settings.upload_timeout.
         """
         self.api_url = api_url or settings.api_url
-        self.timeout = timeout
+        self.timeout = timeout or settings.upload_timeout
     
     def health_check(self) -> bool:
         """Check if the server is healthy.

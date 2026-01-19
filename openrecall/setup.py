@@ -15,6 +15,8 @@ install_requires = [
     "sentence-transformers==3.0.0",
     "torch==2.6.0",
     "torchvision>=0.17.0",
+    "transformers>=4.45.0",
+    "qwen-vl-utils",
     "shapely==2.0.4",
     "h5py==3.11.0",
     "rapidfuzz==3.9.3",

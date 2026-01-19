@@ -1,28 +1,25 @@
-"""OpenRecall main entry point.
+"""OpenRecall Server entry point.
 
-Launch modes:
-- Combined:     python -m openrecall.main    (starts both server and client)
-- Server only:  python -m openrecall.server  (API + Web UI)
-- Client only:  python -m openrecall.client  (screenshot capture + upload)
+Launch with: python -m openrecall.server
 
-Architecture (Producer-Consumer):
-- Producer (recorder): Captures screenshots → enqueues to LocalBuffer (disk)
-- Consumer (uploader): Reads from buffer → uploads to server via HTTP
-- Server (Flask): Receives uploads → OCR → AI analysis → embeddings → database
+The server handles:
+- REST API for screenshot uploads
+- OCR processing
+- AI-powered image analysis (Qwen3-VL)
+- Embedding generation (Qwen3-Embedding)
+- Database storage and semantic search
 """
 
 import signal
 import sys
-from threading import Thread
 
 from openrecall.shared.config import settings
 from openrecall.shared.logging_config import configure_logging
 
-logger = configure_logging("openrecall.main")
+logger = configure_logging("openrecall.server")
 
 from openrecall.server.database import create_db
 from openrecall.server.app import app
-from openrecall.client.recorder import get_recorder
 
 
 def preload_ai_models():
@@ -51,63 +48,46 @@ def preload_ai_models():
 
 
 def main():
-    """Start OpenRecall with graceful shutdown support.
-    
-    Starts both server and client in the same process.
-    For separate processes, use:
-    - python -m openrecall.server
-    - python -m openrecall.client
-    """
+    """Start the OpenRecall server."""
     # Initialize database
     create_db()
 
     logger.info("=" * 50)
-    logger.info("OpenRecall Starting (Combined Mode)")
+    logger.info("OpenRecall Server Starting")
     logger.info("=" * 50)
     logger.info(f"Data folder: {settings.base_path}")
     logger.info(f"Screenshots: {settings.screenshots_path}")
-    logger.info(f"Buffer path: {settings.buffer_path}")
     logger.info(f"Database: {settings.db_path}")
-    logger.info(f"API URL: {settings.api_url}")
+    logger.info(f"API URL: http://localhost:{settings.port}/api")
     logger.info(f"Web UI: http://localhost:{settings.port}")
+    logger.info(f"Device: {settings.device}")
     logger.info("=" * 50)
 
     # Preload AI models to avoid first-request timeout
     preload_ai_models()
 
-    # Get recorder (manages Producer + Consumer)
-    recorder = get_recorder()
-    
     # Flag to prevent duplicate signal handling
     _shutting_down = False
-    
-    # Signal handler for graceful shutdown
+
     def shutdown_handler(signum, frame):
         nonlocal _shutting_down
         if _shutting_down:
-            return  # Ignore duplicate signals
+            return
         _shutting_down = True
         
         logger.info("")
-        logger.info("Received shutdown signal, stopping...")
-        recorder.stop()
-        logger.info("Shutdown complete")
+        logger.info("Received shutdown signal, stopping server...")
+        logger.info("Server shutdown complete")
         sys.exit(0)
     
     signal.signal(signal.SIGINT, shutdown_handler)
     signal.signal(signal.SIGTERM, shutdown_handler)
 
-    # Start the recorder thread (Producer + Consumer manager)
-    recorder_thread = Thread(target=recorder.run_capture_loop, daemon=True)
-    recorder_thread.start()
-
-    # Start the Flask server on main thread
+    # Start the Flask server
     try:
-        app.run(port=settings.port, use_reloader=False)
+        app.run(port=settings.port, use_reloader=False, threaded=True)
     except KeyboardInterrupt:
         pass
-    finally:
-        recorder.stop()
 
 
 if __name__ == "__main__":

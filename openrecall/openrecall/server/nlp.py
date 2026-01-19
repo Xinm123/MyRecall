@@ -1,111 +1,99 @@
-import numpy as np
-import os
-import logging
+"""NLP engine for semantic embeddings using Qwen3-Embedding."""
 
+import logging
+from typing import Optional
+
+import numpy as np
 from sentence_transformers import SentenceTransformer
 
 from openrecall.shared.config import settings
 
-# Configure logging
-logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Constants
-MODEL_NAME: str = "all-MiniLM-L6-v2"
-EMBEDDING_DIM: int = 384  # Dimension for all-MiniLM-L6-v2
 
-
-def get_model(model_name: str) -> SentenceTransformer:
-    """Load or download the SentenceTransformer model.
+class NLPEngine:
+    """Embedding engine using Qwen3-Embedding-0.6B.
     
-    Args:
-        model_name: Name of the model to load.
-        
-    Returns:
-        Loaded SentenceTransformer model.
+    Provides semantic embeddings for text search and similarity.
     """
-    cache_path = settings.model_cache_path / model_name
-    if cache_path.is_dir():
-        return SentenceTransformer(str(cache_path))
-    else:
-        model = SentenceTransformer(model_name)
-        model.save(str(cache_path))
-        return model
+    
+    def __init__(self) -> None:
+        """Initialize the NLP engine with the configured embedding model."""
+        logger.info(f"Loading embedding model: {settings.embedding_model_name}")
+        logger.info(f"Using device: {settings.device}")
+        
+        self.model = SentenceTransformer(
+            settings.embedding_model_name,
+            trust_remote_code=True,
+            device=settings.device,
+        )
+        self.dim = settings.embedding_dim
+        
+        logger.info(f"Embedding model loaded (dim={self.dim})")
+    
+    def encode(self, text: str) -> np.ndarray:
+        """Generate embedding for the given text.
+        
+        Args:
+            text: Input text to embed.
+            
+        Returns:
+            Normalized embedding vector of shape (embedding_dim,).
+        """
+        if not text or text.isspace():
+            logger.warning("Empty text provided, returning zero vector")
+            return np.zeros(self.dim, dtype=np.float32)
+        
+        try:
+            embedding = self.model.encode(
+                text,
+                normalize_embeddings=True,
+            )
+            return embedding.astype(np.float32)
+        except Exception as e:
+            logger.error(f"Embedding generation failed: {e}")
+            return np.zeros(self.dim, dtype=np.float32)
 
 
-# Load the model globally to avoid reloading it on every call
-try:
-    model = get_model(MODEL_NAME)
-    logger.info(f"SentenceTransformer model '{MODEL_NAME}' loaded successfully.")
-except Exception as e:
-    logger.error(f"Failed to load SentenceTransformer model '{MODEL_NAME}': {e}")
-    model = None
+# Lazy-loaded singleton
+_engine: Optional[NLPEngine] = None
+
+
+def get_nlp_engine() -> NLPEngine:
+    """Get or create the singleton NLPEngine instance."""
+    global _engine
+    if _engine is None:
+        _engine = NLPEngine()
+    return _engine
 
 
 def get_embedding(text: str) -> np.ndarray:
-    """
-    Generates a sentence embedding for the given text.
-
-    Splits the text into lines, encodes each line using the pre-loaded
-    SentenceTransformer model, and returns the mean of the embeddings.
-    Handles empty input text by returning a zero vector.
-
+    """Convenience function to get embedding for text.
+    
     Args:
-        text: The input string to embed.
-
+        text: Input text to embed.
+        
     Returns:
-        A numpy array representing the mean embedding of the text lines,
-        or a zero vector if the input is empty, whitespace only, or the
-        model failed to load. The array type is float32.
+        Embedding vector of shape (embedding_dim,).
     """
-    if model is None:
-        logger.error("SentenceTransformer model is not loaded. Returning zero vector.")
-        return np.zeros(EMBEDDING_DIM, dtype=np.float32)
-
-    if not text or text.isspace():
-        logger.warning("Input text is empty or whitespace. Returning zero vector.")
-        return np.zeros(EMBEDDING_DIM, dtype=np.float32)
-
-    # Split text into non-empty lines
-    sentences = [line for line in text.split("\n") if line.strip()]
-
-    if not sentences:
-        logger.warning(
-            "No non-empty lines found after splitting. Returning zero vector."
-        )
-        return np.zeros(EMBEDDING_DIM, dtype=np.float32)
-
-    try:
-        sentence_embeddings = model.encode(sentences)
-        # Calculate the mean embedding
-        mean_embedding = np.mean(sentence_embeddings, axis=0, dtype=np.float32)
-        return mean_embedding
-    except Exception as e:
-        logger.error(f"Error generating embedding: {e}")
-        return np.zeros(EMBEDDING_DIM, dtype=np.float32)
+    return get_nlp_engine().encode(text)
 
 
 def cosine_similarity(a: np.ndarray, b: np.ndarray) -> float:
-    """
-    Calculates the cosine similarity between two numpy vectors.
-
+    """Calculate cosine similarity between two vectors.
+    
     Args:
-        a: The first numpy array.
-        b: The second numpy array.
-
+        a: First vector.
+        b: Second vector.
+        
     Returns:
-        The cosine similarity score (float between -1 and 1),
-        or 0.0 if either vector has zero magnitude.
+        Cosine similarity score between -1 and 1.
     """
     norm_a = np.linalg.norm(a)
     norm_b = np.linalg.norm(b)
-
+    
     if norm_a == 0 or norm_b == 0:
-        logger.warning(
-            "One or both vectors have zero magnitude. Returning 0 similarity."
-        )
         return 0.0
-
+    
     similarity = np.dot(a, b) / (norm_a * norm_b)
-    # Clip values to handle potential floating-point inaccuracies slightly outside [-1, 1]
     return float(np.clip(similarity, -1.0, 1.0))

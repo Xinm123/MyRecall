@@ -20,6 +20,7 @@ class RecallEntry(BaseModel):
     app: str
     title: str | None = None
     text: str
+    description: str | None = None  # AI-generated semantic description
     embedding: Any  # Will be np.ndarray after validation
     
     @field_validator("embedding", mode="before")

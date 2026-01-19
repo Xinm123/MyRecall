@@ -1,8 +1,11 @@
+import logging
 import sqlite3
 import numpy as np
 from typing import List, Optional
 
 from openrecall.shared.config import settings
+
+logger = logging.getLogger(__name__)
 from openrecall.shared.models import RecallEntry
 
 
@@ -31,8 +34,26 @@ def create_db() -> None:
                 "CREATE INDEX IF NOT EXISTS idx_timestamp ON entries (timestamp)"
             )
             conn.commit()
+            # Run migrations for schema updates
+            _migrate_db(conn)
     except sqlite3.Error as e:
         print(f"Database error during table creation: {e}")
+
+
+def _migrate_db(conn: sqlite3.Connection) -> None:
+    """Run database migrations to update schema.
+    
+    Checks for missing columns and adds them if needed.
+    """
+    cursor = conn.cursor()
+    cursor.execute("PRAGMA table_info(entries)")
+    columns = {row[1] for row in cursor.fetchall()}
+    
+    # Migration: Add description column for MLLM integration (Phase 6)
+    if "description" not in columns:
+        cursor.execute("ALTER TABLE entries ADD COLUMN description TEXT")
+        conn.commit()
+        logger.info("Database schema updated: added 'description' column.")
 
 
 def _row_to_entry(row: sqlite3.Row) -> RecallEntry:
@@ -42,6 +63,7 @@ def _row_to_entry(row: sqlite3.Row) -> RecallEntry:
         app=row["app"],
         title=row["title"],
         text=row["text"],
+        description=row["description"],
         timestamp=row["timestamp"],
         embedding=row["embedding"],
     )
@@ -61,7 +83,7 @@ def get_all_entries() -> List[RecallEntry]:
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
             cursor.execute(
-                "SELECT id, app, title, text, timestamp, embedding FROM entries ORDER BY timestamp DESC"
+                "SELECT id, app, title, text, description, timestamp, embedding FROM entries ORDER BY timestamp DESC"
             )
             entries = [_row_to_entry(row) for row in cursor.fetchall()]
     except sqlite3.Error as e:
@@ -91,7 +113,12 @@ def get_timestamps() -> List[int]:
 
 
 def insert_entry(
-    text: str, timestamp: int, embedding: np.ndarray, app: str, title: str
+    text: str,
+    timestamp: int,
+    embedding: np.ndarray,
+    app: str,
+    title: str,
+    description: str | None = None,
 ) -> Optional[int]:
     """
     Inserts a new entry into the database.
@@ -102,6 +129,7 @@ def insert_entry(
         embedding (np.ndarray): The embedding vector for the text.
         app (str): The name of the active application.
         title (str): The title of the active window.
+        description (str | None): AI-generated semantic description of the image.
 
     Returns:
         Optional[int]: The ID of the newly inserted row, or None if insertion fails.
@@ -115,10 +143,10 @@ def insert_entry(
         with sqlite3.connect(str(settings.db_path)) as conn:
             cursor = conn.cursor()
             cursor.execute(
-                """INSERT INTO entries (text, timestamp, embedding, app, title)
-                   VALUES (?, ?, ?, ?, ?)
+                """INSERT INTO entries (text, timestamp, embedding, app, title, description)
+                   VALUES (?, ?, ?, ?, ?, ?)
                    ON CONFLICT(timestamp) DO NOTHING""",  # Avoid duplicates based on timestamp
-                (text, timestamp, embedding_bytes, app, title),
+                (text, timestamp, embedding_bytes, app, title, description),
             )
             conn.commit()
             if cursor.rowcount > 0:  # Check if insert actually happened
@@ -149,7 +177,7 @@ def get_entries_by_time_range(start_time: int, end_time: int) -> List[RecallEntr
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
             cursor.execute(
-                "SELECT id, app, title, text, timestamp, embedding FROM entries "
+                "SELECT id, app, title, text, description, timestamp, embedding FROM entries "
                 "WHERE timestamp BETWEEN ? AND ? ORDER BY timestamp DESC",
                 (start_time, end_time),
             )

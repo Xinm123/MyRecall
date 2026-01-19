@@ -16,10 +16,13 @@ class Settings(BaseSettings):
     - OPENRECALL_PRIMARY_MONITOR_ONLY: Only record primary monitor
     - OPENRECALL_API_URL: Server API URL for client communication
     - OPENRECALL_CAPTURE_INTERVAL: Screenshot capture interval in seconds
+    - OPENRECALL_DEVICE: Device for AI inference (cpu, cuda, mps)
+    - OPENRECALL_UPLOAD_TIMEOUT: Client upload timeout in seconds
+    - OPENRECALL_EMBEDDING_MODEL: Embedding model name for semantic search
     """
     
     debug: bool = Field(default=False, alias="OPENRECALL_DEBUG")
-    capture_interval: int = Field(default=5, alias="OPENRECALL_CAPTURE_INTERVAL")
+    capture_interval: int = Field(default=30, alias="OPENRECALL_CAPTURE_INTERVAL")
     port: int = Field(default=8083, alias="OPENRECALL_PORT")
     primary_monitor_only: bool = Field(
         default=True, 
@@ -32,6 +35,31 @@ class Settings(BaseSettings):
     api_url: str = Field(
         default="http://localhost:8083/api",
         alias="OPENRECALL_API_URL"
+    )
+    device: str = Field(
+        default="cpu",
+        alias="OPENRECALL_DEVICE",
+        description="Device for AI inference (cpu, cuda, mps)"
+    )
+    upload_timeout: int = Field(
+        default=180,
+        alias="OPENRECALL_UPLOAD_TIMEOUT",
+        description="Client upload timeout in seconds (needs to be long for CPU AI inference)"
+    )
+    preload_models: bool = Field(
+        default=True,
+        alias="OPENRECALL_PRELOAD_MODELS",
+        description="Preload AI models at startup to avoid first-request latency"
+    )
+    embedding_model_name: str = Field(
+        default="/Users/tiiny/models/Qwen3-Embedding-0.6B",
+        alias="OPENRECALL_EMBEDDING_MODEL",
+        description="Embedding model for semantic search"
+    )
+    embedding_dim: int = Field(
+        default=1024,
+        alias="OPENRECALL_EMBEDDING_DIM",
+        description="Embedding vector dimension (must match model output)"
     )
     
     model_config = {
