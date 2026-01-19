@@ -6,6 +6,7 @@ from flask import Flask, render_template_string, request, send_from_directory
 from jinja2 import BaseLoader
 
 from openrecall.shared.config import settings
+from openrecall.server.api import api_bp
 from openrecall.server.database import (
     create_db,
     get_all_entries,
@@ -16,6 +17,9 @@ from openrecall.server.nlp import cosine_similarity, get_embedding
 from openrecall.shared.utils import human_readable_time, timestamp_to_human_readable
 
 app = Flask(__name__)
+
+# Register API Blueprint
+app.register_blueprint(api_bp)
 
 app.jinja_env.filters["human_readable_time"] = human_readable_time
 app.jinja_env.filters["timestamp_to_human_readable"] = timestamp_to_human_readable

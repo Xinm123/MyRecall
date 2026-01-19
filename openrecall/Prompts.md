@@ -188,3 +188,82 @@ Create a new file `openrecall/main.py` to act as the new entry point.
 -   **No Circular Imports**: Ensure `Shared` never imports from `Client` or `Server`.
 -   **Launch Command**: The new standard launch command is `python -m openrecall.main`. You do NOT need to maintain backward compatibility for `openrecall.app`.
 -   **避免过度设计和重构整个 codebase**：Think carefully and only action the specific task I have given you with the most concise and elegant solution that changes as little code as possible. 
+
+# Role: Python Systems Architect
+# Phase: 4 - API Implementation (The "Cut-Over")
+
+# Context
+We are transitioning **OpenRecall** to a Client-Server architecture.
+**Current State**: We have physically separated folders (`client/`, `server/`), but the Client still imports Server modules directly.
+**Goal**: Sever the direct code dependency. The Client must communicate with the Server **exclusively via HTTP**.
+
+# Task 1: Update Configuration (`openrecall/shared/config.py`)
+1.  **Add Config**: Add `API_URL` to the `Settings` class (default: `"http://127.0.0.1:8082"`).
+2.  **Verify Path**: Ensure `SCREENSHOTS_PATH` is accessible to the Server module.
+
+# Task 2: Implement Server API (`openrecall/server/api.py`)
+Create a Flask Blueprint to handle uploads and health checks.
+1.  **Create File**: `openrecall/server/api.py`.
+2.  **Define Blueprint**: Create a `api_bp` Blueprint.
+3.  **Endpoint 1**: `GET /health` -> JSON `{ "status": "ok" }`.
+4.  **Endpoint 2**: `POST /upload`
+    -   **Input**: `multipart/form-data`
+        -   File: `image` (binary).
+        -   Form Fields: `timestamp` (float), `app_name` (str), `window_title` (str).
+    -   **Logic (The Pipeline)**:
+        1.  **Filename Gen**: Generate a safe filename **server-side** using the `timestamp` (e.g., `20240120_120000.webp`). **Constraint**: Do NOT rely on the client-provided filename.
+        2.  **Save Image**: Write binary data to `settings.screenshots_path / filename`.
+        3.  **Processing**:
+            -   `ocr.extract_text(image_path_or_obj)`
+            -   `nlp.get_embedding(text)`
+        4.  **Persist**: `database.insert_entry(...)`.
+    -   **Response**: JSON `{ "status": "success", "id": <new_entry_id> }`.
+    -   **Error Handling**: Wrap logic in try/except; return 500 JSON on failure.
+
+# Task 3: Integrate API into Server App (`openrecall/server/app.py`)
+1.  **Register Blueprint**: `app.register_blueprint(api_bp, url_prefix='/api')`.
+2.  **Config**: Ensure `MAX_CONTENT_LENGTH` is set (e.g., 16MB) to handle large 4K screenshots.
+
+# Task 4: Implement Client Uploader (`openrecall/client/uploader.py`)
+Create a clean abstraction for network communication.
+1.  **Create File**: `openrecall/client/uploader.py`.
+2.  **Class `HTTPUploader`**:
+    -   `__init__(self, base_url)`
+    -   `is_server_alive(self) -> bool`: Checks `GET /api/health` with `timeout=2`.
+    -   `upload_snapshot(self, image: Image, metadata: dict) -> bool`:
+        -   **In-Memory Convert**: Save PIL Image to `io.BytesIO` (format='WebP') to avoid disk writes.
+        -   **Request**: Send via `requests.post` to `/api/upload`.
+        -   **Crucial Constraint**: Must set `timeout=5` to prevent hanging the recorder loop.
+        -   **Error Handling**: Catch `requests.exceptions.RequestException` (connection, timeout, etc.), print a warning log, and return `False`.
+
+# Task 5: Refactor Client Recorder (`openrecall/client/recorder.py`)
+**Crucial Step**: Strip out all Server logic to achieve physical decoupling.
+1.  **Remove Imports**: **DELETE** all imports related to `openrecall.server` (`ocr`, `nlp`, `database`). The Client MUST NOT know these modules exist.
+2.  **Init**: Initialize `self.uploader = HTTPUploader(settings.api_url)`.
+3.  **Update Loop**:
+    -   Keep Screenshot capture & SSIM check.
+    -   **Replace** old saving/database logic with:
+        ```python
+        success = self.uploader.upload_snapshot(image, metadata)
+        if not success:
+            # Placeholder for Phase 5 buffering
+            print("Warning: Upload failed, skipping frame.")
+        ```
+
+# Task 6: Verification (E2E Test)
+Create `tests/test_api_e2e.py`.
+1.  **Setup**: Start Flask server in a `threading.Thread(target=..., daemon=True)` so it doesn't block the test.
+2.  **Wait**: Poll `/api/health` loop until 200 OK.
+3.  **Action**: Use `requests` to POST a generated red PIL image + metadata.
+4.  **Assert**: Response code 200.
+5.  **Assert**: Use `sqlite3` to query the actual DB file and verify the row exists.
+
+
+# Constraints
+-   **Runnability (Primary)**: The project MUST remain runnable via `python -m openrecall.main`. 
+    -   Ensure `main.py` starts both Flask and Recorder threads.
+    -   **Startup Grace**: The Recorder MUST wait/retry until the Server's `/health` endpoint is ready before starting its main loop.
+-   **Dependency**: Add `requests` to requirements.
+-   **Performance**: Use `io.BytesIO` for image transmission (no intermediate files).
+-   **Stability**: All network calls (`requests.post/get`) MUST have explicit `timeout` settings.
+-   **Debuggability**: Network failures (e.g., timeouts, connection refused) MUST be logged with clear error messages to aid debugging.

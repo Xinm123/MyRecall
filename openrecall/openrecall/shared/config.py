@@ -13,6 +13,7 @@ class Settings(BaseSettings):
     - OPENRECALL_DATA_DIR: Base directory for all data storage
     - OPENRECALL_PORT: Web server port
     - OPENRECALL_PRIMARY_MONITOR_ONLY: Only record primary monitor
+    - OPENRECALL_API_URL: Server API URL for client communication
     """
     
     port: int = Field(default=8083, alias="OPENRECALL_PORT")
@@ -23,6 +24,10 @@ class Settings(BaseSettings):
     base_path: Path = Field(
         default_factory=lambda: Path.home() / ".myrecall_data",
         alias="OPENRECALL_DATA_DIR"
+    )
+    api_url: str = Field(
+        default="http://localhost:8083/api",
+        alias="OPENRECALL_API_URL"
     )
     
     model_config = {

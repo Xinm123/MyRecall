@@ -7,10 +7,7 @@ import numpy as np
 from PIL import Image
 
 from openrecall.shared.config import settings
-# TODO: Phase 4 - Replace with API call
-from openrecall.server.database import insert_entry
-from openrecall.server.nlp import get_embedding
-from openrecall.server.ocr import extract_text_from_image
+from openrecall.client.uploader import get_uploader
 from openrecall.shared.utils import (
     get_active_app_name,
     get_active_window_title,
@@ -113,14 +110,21 @@ def take_screenshots() -> List[np.ndarray]:
 
 def record_screenshots_thread() -> None:
     """
-    Continuously records screenshots, processes them, and stores relevant data.
+    Continuously records screenshots, processes them, and uploads to server.
 
-    Checks for user activity and image similarity before processing and saving
-    screenshots, associated OCR text, embeddings, and active application info.
+    Checks for user activity and image similarity before capturing and uploading
+    screenshots with active application info. Server handles OCR and embedding.
     Runs in an infinite loop, intended to be executed in a separate thread.
     """
     # Prevents a warning/error from the huggingface/tokenizers library
     os.environ["TOKENIZERS_PARALLELISM"] = "false"
+
+    uploader = get_uploader()
+    
+    # Wait for server to be ready before starting
+    print("Waiting for server to be ready...")
+    if not uploader.wait_for_server(max_retries=30, retry_delay=1.0):
+        print("Warning: Server not available, continuing anyway...")
 
     last_screenshots: List[np.ndarray] = take_screenshots()
 
@@ -150,17 +154,17 @@ def record_screenshots_thread() -> None:
                     format="webp",
                     lossless=True,
                 )
-                text: str = extract_text_from_image(screenshot)
-                # Only proceed if OCR actually extracts text
-                if text.strip():
-                    embedding: np.ndarray = get_embedding(text)
-                    active_app_name: str = get_active_app_name() or "Unknown App"
-                    active_window_title: str = (
-                        get_active_window_title() or "Unknown Title"
-                    )
-                    insert_entry(
-                        text, timestamp, embedding, active_app_name, active_window_title
-                    )
+                
+                active_app_name: str = get_active_app_name() or "Unknown App"
+                active_window_title: str = get_active_window_title() or "Unknown Title"
+                
+                # Upload to server via HTTP API
+                uploader.upload_screenshot(
+                    screenshot,
+                    timestamp,
+                    active_app_name,
+                    active_window_title,
+                )
 
         time.sleep(3)  # Wait before taking the next screenshot
 

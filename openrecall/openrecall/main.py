@@ -1,6 +1,10 @@
 """OpenRecall main entry point.
 
 Launch with: python -m openrecall.main
+
+Architecture:
+- Client (recorder thread): Captures screenshots, sends via HTTP to server
+- Server (Flask main thread): Receives uploads, processes OCR/embeddings, stores data
 """
 
 from threading import Thread
@@ -12,18 +16,24 @@ from openrecall.client.recorder import record_screenshots_thread
 
 
 def main():
-    """Start OpenRecall: recorder thread + Flask server."""
+    """Start OpenRecall: Flask server + recorder client.
+    
+    The server starts first to ensure API is available when the client
+    recorder thread begins uploading screenshots.
+    """
     # Initialize database
     create_db()
 
     print(f"Data folder: {settings.base_path}")
+    print(f"API URL: {settings.api_url}")
     print(f"Starting OpenRecall on http://localhost:{settings.port}")
 
-    # Start the recorder thread (Producer)
+    # Start the recorder thread (Client - Producer)
+    # The recorder will wait for server health check before processing
     recorder_thread = Thread(target=record_screenshots_thread, daemon=True)
     recorder_thread.start()
 
-    # Start the Flask server (Consumer/UI) on main thread
+    # Start the Flask server (Server - Consumer/UI) on main thread
     app.run(port=settings.port)
 
 
