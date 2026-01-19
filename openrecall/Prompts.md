@@ -123,69 +123,68 @@ Create a new test file `tests/test_database_strict.py`:
 -   **Backward Compatibility**: The application must still be launchable via `python -m openrecall.app`.
 -   **避免过度设计和重构整个 codebase**：Think carefully and only action the specific task I have given you with the most concise and elegant solution that changes as little code as possible. 
 
+
 # Role: Python Refactoring Expert
 # Phase: 3 - Physical Separation (Modular Monolith)
 
 # Context
 We are refactoring **OpenRecall** to prepare for a Client-Server architecture.
-**Current State**: The project is a flat directory (`openrecall/*.py`). `app.py` (UI), `screenshot.py` (Capture), `database.py` (Storage), and `nlp.py` (Processing) are all mixed together.
+**Current State**: The project is a flat directory (`openrecall/*.py`). All logic is mixed.
 **Goal**: Restructure the codebase into three distinct domains: `client/` (Capture), `server/` (Storage & UI), and `shared/` (Config & Models).
-**Constraint**: This is a structural refactor only. The application must still run as a single process (Modular Monolith) for now. Do not introduce HTTP APIs yet.
+**Constraint**: This is a structural refactor only. The application must still run as a single process (Modular Monolith).
 
-# Task 1: Restructure Directories
-1.  **Create Directories**: Inside `openrecall/`, create:
+# Task 1: Restructure Directories & Move Files
+1.  **Create Domain Directories** inside `openrecall/` (ensure each has an empty `__init__.py`):
     -   `openrecall/client/`
     -   `openrecall/server/`
     -   `openrecall/shared/`
-    -   Ensure each has an empty `__init__.py`.
-2.  **Move Files** (Refactor & Move):
-    -   **Shared Domain**:
-        -   Move `config.py` -> `openrecall/shared/config.py`
-        -   Move `models.py` -> `openrecall/shared/models.py`
-        -   Move `utils.py` -> `openrecall/shared/utils.py`
-    -   **Client Domain**:
-        -   Move `screenshot.py` -> `openrecall/client/recorder.py` (Rename for clarity).
-    -   **Server Domain**:
-        -   Move `database.py` -> `openrecall/server/database.py`
-        -   Move `nlp.py` -> `openrecall/server/nlp.py`
-        -   Move `ocr.py` -> `openrecall/server/ocr.py`
-        -   Move `app.py` -> `openrecall/server/app.py`
-        -   Move `templates/` folder -> `openrecall/server/templates/`
 
-# Task 2: Fix Imports (The Heavy Lifting)
-You must update all import statements to reflect the new structure.
-1.  **Update `shared/`**:
-    -   `config.py`: Should not import from client or server.
-2.  **Update `server/`**:
-    -   `server/database.py`: Update imports to `from openrecall.shared.models import RecallEntry` and `from openrecall.shared.config import settings`.
-    -   `server/app.py`: Update imports to find `database`, `nlp`, and `settings` in their new locations.
-3.  **Update `client/`**:
-    -   `client/recorder.py`:
-        -   Import `settings` from `openrecall.shared.config`.
-        -   Import `utils` from `openrecall.shared.utils`.
-        -   **Note**: For Phase 3, it is acceptable for the client to directly import `openrecall.server.database` to call `insert_entry`. We will sever this link in Phase 4 (API).
+2.  **Move & Rename Files**:
+    * **Shared Domain** (Pure Logic, No Dependencies on Client/Server):
+        -   `config.py` -> `openrecall/shared/config.py`
+        -   `models.py` -> `openrecall/shared/models.py`
+        -   `utils.py`  -> `openrecall/shared/utils.py`
+    * **Client Domain** (Capture Logic):
+        -   `screenshot.py` -> `openrecall/client/recorder.py` (**Note Rename**)
+    * **Server Domain** (Storage & UI Logic):
+        -   `database.py` -> `openrecall/server/database.py`
+        -   `nlp.py`      -> `openrecall/server/nlp.py`
+        -   `ocr.py`      -> `openrecall/server/ocr.py`
+        -   `app.py`      -> `openrecall/server/app.py`
+        -   `templates/` folder -> `openrecall/server/templates/`
+
+# Task 2: Fix Imports & Paths (Crucial)
+Update all import statements to reflect the new structure.
+1.  **Update `shared/*.py`**: Ensure `config.py` and `models.py` do NOT import from client or server.
+2.  **Update `server/*.py`**:
+    -   `server/database.py`: Fix imports from `openrecall.shared`.
+    -   `server/app.py`:
+        -   Fix imports for `database`, `nlp`, and `settings`.
+        -   **CRITICAL**: Since `app.py` moved, you MUST update the `Flask` app initialization to point to the correct template folder location.
+        -   *Example*: `app = Flask(__name__, template_folder='templates')` (Relative path works because it's inside `server/`).
+3.  **Update `client/recorder.py`**:
+    -   Fix imports from `openrecall.shared`.
+    -   **Temporary Coupling**: It is acceptable for `client` to import `openrecall.server.database` directly for now. Add a comment: `# TODO: Phase 4 - Replace with API call`.
 
 # Task 3: Create Unified Entry Point
-Since `app.py` moved, we need a new way to start the application.
-1.  **Create `openrecall/main.py`**:
-    -   This script should act as the orchestrator.
-    -   It should import the Flask app from `openrecall.server.app`.
-    -   It should import the recording thread logic from `openrecall.client.recorder`.
-    -   **Logic**:
-        -   Start the recorder thread (Producer).
-        -   Start the Flask server (Consumer/UI).
-        -   Keep the logic similar to the original `if __name__ == "__main__":` block in the old `app.py`.
+Create a new file `openrecall/main.py` to act as the new entry point.
+-   **Responsibilities**:
+    1.  Import `app` (Flask) from `openrecall.server.app`.
+    2.  Import the recording logic from `openrecall.client.recorder`.
+    3.  Start the recorder thread (Producer).
+    4.  Start the Flask server (Consumer/UI) on the main thread.
+-   **Note**: This logic replaces the `if __name__ == "__main__":` block from the old `app.py`.
 
-# Task 4: Verify & Clean up
-1.  **Delete Old Files**: Ensure the original files in the root `openrecall/` are removed after moving.
-2.  **Test**:
-    -   Run `python -m openrecall.main`.
-    -   Verify that the web UI loads (Server works).
-    -   Verify that screenshots are being taken and saved (Client works).
-    -   Verify that data is written to the DB (Shared logic works).
+# Task 4: Cleanup & Verification Plan
+1.  **Cleanup**: Delete the original files (`app.py`, `database.py`, etc.) from the root `openrecall/` directory after moving them.
+2.  **Verification Steps** (Include these in your response):
+    -   **New Launch Command**: `python -m openrecall.main`
+    -   Check 1: Does the UI load at the configured port?
+    -   Check 2: Does the screenshot loop start without `ModuleNotFoundError`?
+    -   Check 3: Are new entries appearing in the database?
 
 # Constraints
--   **No HTTP API yet**: Do not implement FastAPI or HTTP requests. Keep using direct function calls between modules.
--   **Preserve Logic**: Do not rewrite the logic inside `take_screenshots` or `insert_entry`. Just move them and fix imports.
--   **Backward Compatibility**: The application must still be launchable via `python -m openrecall.app`.
+-   **No HTTP API yet**: Keep using direct function calls between modules.
+-   **No Circular Imports**: Ensure `Shared` never imports from `Client` or `Server`.
+-   **Launch Command**: The new standard launch command is `python -m openrecall.main`. You do NOT need to maintain backward compatibility for `openrecall.app`.
 -   **避免过度设计和重构整个 codebase**：Think carefully and only action the specific task I have given you with the most concise and elegant solution that changes as little code as possible. 

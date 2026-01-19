@@ -16,7 +16,7 @@ class TestSettingsDefaults:
         # Import with clean environment to get defaults
         with mock.patch.dict(os.environ, {}, clear=True):
             # Need to reimport to get fresh Settings instance
-            from openrecall.config import Settings
+            from openrecall.shared.config import Settings
             
             # Create new Settings instance with defaults
             new_settings = Settings()
@@ -25,7 +25,7 @@ class TestSettingsDefaults:
 
     def test_default_port(self):
         """Verify default port is 8083."""
-        from openrecall.config import Settings
+        from openrecall.shared.config import Settings
         
         with mock.patch.dict(os.environ, {}, clear=True):
             test_settings = Settings()
@@ -33,7 +33,7 @@ class TestSettingsDefaults:
 
     def test_default_primary_monitor_only(self):
         """Verify primary_monitor_only defaults to False."""
-        from openrecall.config import Settings
+        from openrecall.shared.config import Settings
         
         with mock.patch.dict(os.environ, {}, clear=True):
             test_settings = Settings()
@@ -49,7 +49,7 @@ class TestSettingsAutoCreation:
             custom_path = Path(tmp_dir) / "test_myrecall"
             
             with mock.patch.dict(os.environ, {"OPENRECALL_DATA_DIR": str(custom_path)}):
-                from openrecall.config import Settings
+                from openrecall.shared.config import Settings
                 
                 test_settings = Settings()
                 
@@ -83,7 +83,7 @@ class TestSettingsAutoCreation:
             custom_path = Path(tmp_dir) / "test_myrecall"
             
             with mock.patch.dict(os.environ, {"OPENRECALL_DATA_DIR": str(custom_path)}):
-                from openrecall.config import Settings
+                from openrecall.shared.config import Settings
                 
                 test_settings = Settings()
                 
@@ -107,7 +107,7 @@ class TestSettingsEnvOverride:
             custom_path = Path(tmp_dir) / "custom_data"
             
             with mock.patch.dict(os.environ, {"OPENRECALL_DATA_DIR": str(custom_path)}):
-                from openrecall.config import Settings
+                from openrecall.shared.config import Settings
                 
                 test_settings = Settings()
                 assert test_settings.base_path == custom_path
@@ -119,7 +119,7 @@ class TestSettingsEnvOverride:
                 "OPENRECALL_DATA_DIR": tmp_dir,
                 "OPENRECALL_PORT": "9999"
             }):
-                from openrecall.config import Settings
+                from openrecall.shared.config import Settings
                 
                 test_settings = Settings()
                 assert test_settings.port == 9999
@@ -131,7 +131,7 @@ class TestSettingsEnvOverride:
                 "OPENRECALL_DATA_DIR": tmp_dir,
                 "OPENRECALL_PRIMARY_MONITOR_ONLY": "true"
             }):
-                from openrecall.config import Settings
+                from openrecall.shared.config import Settings
                 
                 test_settings = Settings()
                 assert test_settings.primary_monitor_only is True
@@ -144,7 +144,7 @@ class TestSettingsComputedProperties:
         """Verify screenshots_path is base_path / 'screenshots'."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             with mock.patch.dict(os.environ, {"OPENRECALL_DATA_DIR": tmp_dir}):
-                from openrecall.config import Settings
+                from openrecall.shared.config import Settings
                 
                 test_settings = Settings()
                 expected = Path(tmp_dir) / "screenshots"
@@ -154,7 +154,7 @@ class TestSettingsComputedProperties:
         """Verify db_path is base_path / 'db' / 'recall.db'."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             with mock.patch.dict(os.environ, {"OPENRECALL_DATA_DIR": tmp_dir}):
-                from openrecall.config import Settings
+                from openrecall.shared.config import Settings
                 
                 test_settings = Settings()
                 expected = Path(tmp_dir) / "db" / "recall.db"
@@ -164,7 +164,7 @@ class TestSettingsComputedProperties:
         """Verify buffer_path is base_path / 'buffer'."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             with mock.patch.dict(os.environ, {"OPENRECALL_DATA_DIR": tmp_dir}):
-                from openrecall.config import Settings
+                from openrecall.shared.config import Settings
                 
                 test_settings = Settings()
                 expected = Path(tmp_dir) / "buffer"
@@ -174,7 +174,7 @@ class TestSettingsComputedProperties:
         """Verify model_cache_path is base_path / 'models'."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             with mock.patch.dict(os.environ, {"OPENRECALL_DATA_DIR": tmp_dir}):
-                from openrecall.config import Settings
+                from openrecall.shared.config import Settings
                 
                 test_settings = Settings()
                 expected = Path(tmp_dir) / "models"

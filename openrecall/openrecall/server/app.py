@@ -5,16 +5,15 @@ import numpy as np
 from flask import Flask, render_template_string, request, send_from_directory
 from jinja2 import BaseLoader
 
-from openrecall.config import settings
-from openrecall.database import (
+from openrecall.shared.config import settings
+from openrecall.server.database import (
     create_db,
     get_all_entries,
     get_timestamps,
     get_entries_by_time_range,
 )
-from openrecall.nlp import cosine_similarity, get_embedding
-from openrecall.screenshot import record_screenshots_thread
-from openrecall.utils import human_readable_time, timestamp_to_human_readable
+from openrecall.server.nlp import cosine_similarity, get_embedding
+from openrecall.shared.utils import human_readable_time, timestamp_to_human_readable
 
 app = Flask(__name__)
 
@@ -204,15 +203,3 @@ def search():
 @app.route("/static/<filename>")
 def serve_image(filename):
     return send_from_directory(str(settings.screenshots_path), filename)
-
-
-if __name__ == "__main__":
-    create_db()
-
-    print(f"Data folder: {settings.base_path}")
-
-    # Start the thread to record screenshots
-    t = Thread(target=record_screenshots_thread)
-    t.start()
-
-    app.run(port=settings.port)

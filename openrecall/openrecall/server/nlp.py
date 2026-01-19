@@ -4,7 +4,7 @@ import logging
 
 from sentence_transformers import SentenceTransformer
 
-from openrecall.config import settings
+from openrecall.shared.config import settings
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)

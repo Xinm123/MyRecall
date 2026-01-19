@@ -2,8 +2,8 @@ import sqlite3
 import numpy as np
 from typing import List, Optional
 
-from openrecall.config import settings
-from openrecall.models import RecallEntry
+from openrecall.shared.config import settings
+from openrecall.shared.models import RecallEntry
 
 
 def create_db() -> None:

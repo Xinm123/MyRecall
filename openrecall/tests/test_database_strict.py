@@ -8,7 +8,7 @@ from unittest import mock
 import numpy as np
 import pytest
 
-from openrecall.models import RecallEntry
+from openrecall.shared.models import RecallEntry
 
 
 class TestRecallEntryModel:
@@ -58,13 +58,13 @@ class TestDatabaseTypeConsistency:
             with mock.patch.dict(os.environ, {"OPENRECALL_DATA_DIR": tmp_dir}):
                 # Reimport to get fresh settings
                 import importlib
-                import openrecall.config
-                importlib.reload(openrecall.config)
-                import openrecall.database
-                importlib.reload(openrecall.database)
+                import openrecall.shared.config
+                importlib.reload(openrecall.shared.config)
+                import openrecall.server.database
+                importlib.reload(openrecall.server.database)
                 
-                from openrecall.database import create_db, insert_entry, get_all_entries
-                from openrecall.models import RecallEntry
+                from openrecall.server.database import create_db, insert_entry, get_all_entries
+                from openrecall.shared.models import RecallEntry
                 
                 create_db()
                 
@@ -91,13 +91,13 @@ class TestDatabaseTypeConsistency:
         with tempfile.TemporaryDirectory() as tmp_dir:
             with mock.patch.dict(os.environ, {"OPENRECALL_DATA_DIR": tmp_dir}):
                 import importlib
-                import openrecall.config
-                importlib.reload(openrecall.config)
-                import openrecall.database
-                importlib.reload(openrecall.database)
+                import openrecall.shared.config
+                importlib.reload(openrecall.shared.config)
+                import openrecall.server.database
+                importlib.reload(openrecall.server.database)
                 
-                from openrecall.database import create_db, insert_entry, get_entries_by_time_range
-                from openrecall.models import RecallEntry
+                from openrecall.server.database import create_db, insert_entry, get_entries_by_time_range
+                from openrecall.shared.models import RecallEntry
                 
                 create_db()
                 
@@ -124,12 +124,12 @@ class TestDatabaseTypeConsistency:
         with tempfile.TemporaryDirectory() as tmp_dir:
             with mock.patch.dict(os.environ, {"OPENRECALL_DATA_DIR": tmp_dir}):
                 import importlib
-                import openrecall.config
-                importlib.reload(openrecall.config)
-                import openrecall.database
-                importlib.reload(openrecall.database)
+                import openrecall.shared.config
+                importlib.reload(openrecall.shared.config)
+                import openrecall.server.database
+                importlib.reload(openrecall.server.database)
                 
-                from openrecall.database import create_db, insert_entry, get_all_entries, get_entries_by_time_range
+                from openrecall.server.database import create_db, insert_entry, get_all_entries, get_entries_by_time_range
                 
                 create_db()
                 
