@@ -258,7 +258,6 @@ Create `tests/test_api_e2e.py`.
 4.  **Assert**: Response code 200.
 5.  **Assert**: Use `sqlite3` to query the actual DB file and verify the row exists.
 
-
 # Constraints
 -   **Runnability (Primary)**: The project MUST remain runnable via `python -m openrecall.main`. 
     -   Ensure `main.py` starts both Flask and Recorder threads.
@@ -267,3 +266,85 @@ Create `tests/test_api_e2e.py`.
 -   **Performance**: Use `io.BytesIO` for image transmission (no intermediate files).
 -   **Stability**: All network calls (`requests.post/get`) MUST have explicit `timeout` settings.
 -   **Debuggability**: Network failures (e.g., timeouts, connection refused) MUST be logged with clear error messages to aid debugging.
+
+
+
+
+# Role: Python Concurrency Expert
+# Phase: 5 - Client Buffering & Offline Resilience
+
+# Context
+We have established a basic Client-Server connection via HTTP (Phase 4).
+**Current Problem**: The Client `Recorder` is synchronous. If the network is slow or down, the `upload_snapshot` call blocks the main recording loop, causing frame drops and UI lag.
+**Goal**: Decouple "Capture" from "Upload" using a **Producer-Consumer** architecture with a **Persistent Local Buffer**. This ensures Zero Data Loss.
+
+# Task 1: Implement Persistent Buffer (`openrecall/client/buffer.py`)
+Create a thread-safe, file-system-backed queue mechanism.
+1.  **Create Class**: `LocalBuffer`.
+2.  **Init**: specify `storage_dir` (use `settings.buffer_path`). Ensure dir exists.
+3.  **Method `enqueue(image: Image, metadata: dict)`**:
+    -   **Logic (Atomic Write Pattern)**:
+        1.  Generate a unique ID (e.g., timestamp string + uuid4).
+        2.  **Image**: Save `image` to `{storage_dir}/{id}.webp`.
+        3.  **Meta (Critical)**:
+            -   Convert `metadata` values (like datetimes) to strings (ISO format).
+            -   Write JSON to temporary file `{storage_dir}/{id}.json.tmp`.
+        4.  **Commit**: Rename `{id}.json.tmp` -> `{id}.json`.
+        -   *Rationale*: The Consumer scans for `.json`. Renaming is atomic on POSIX/Windows, ensuring the consumer never sees a partial file.
+4.  **Method `get_next_batch(limit=1)`**:
+    -   **Logic**:
+        1.  Scan `{storage_dir}` for `*.json` files.
+        2.  Sort by filename/timestamp (FIFO: oldest first).
+        3.  Take the first `limit` files.
+        4.  **Validation**: Check if the corresponding `.webp` file exists. If missing (corruption), log warning and delete the orphan JSON, then continue scanning.
+        5.  **Return**: A list of objects/namedtuples containing `{id, image_path, meta_dict}`. Do NOT load the image into memory here; let the consumer do it.
+5.  **Method `commit(file_ids: List[str])`**:
+    -   **Logic**: Delete the `{id}.webp` and `{id}.json` files for the given IDs.
+
+# Task 2: Implement Uploader Thread (`openrecall/client/consumer.py`)
+Create the "Consumer" background thread.
+1.  **Create Class**: `UploaderConsumer(threading.Thread)`.
+2.  **Dependencies**: `LocalBuffer` and `HTTPUploader`.
+3.  **Control**: Use `self._stop_event = threading.Event()` to manage lifecycle.
+4.  **Run Loop Logic**:
+    -   `while not self._stop_event.is_set():`
+        -   **Peek**: `items = buffer.get_next_batch(limit=1)`
+        -   **If Empty**: `self._stop_event.wait(1)` (Wait 1s, but wake immediately if stopped).
+        -   **If Data**:
+            -   Load image from `item.image_path`.
+            -   Attempt: `success = uploader.upload_snapshot(image, item.meta_dict)`.
+            -   **Success (200 OK)**:
+                -   `buffer.commit([item.id])` (Delete from disk).
+                -   `retry_count = 0`.
+            -   **Failure**:
+                -   **Preserve Files**: Do NOT call commit.
+                -   `retry_count += 1`.
+                -   **Smart Backoff**: `wait_time = min(2 ** retry_count, 60)`.
+                -   Log warning: f"Upload failed. Backing off for {wait_time}s".
+                -   **Interruptible Sleep**: `self._stop_event.wait(wait_time)`. (Critical: Allows app to exit instantly during backoff).
+
+# Task 3: Refactor Recorder (`openrecall/client/recorder.py`)
+Transform the Recorder into a pure "Producer".
+1.  **Init**:
+    -   Init `self.buffer`.
+    -   Init `self.consumer` (daemon=False, we want to control it manually) and start it.
+    -   **Stop**: Implement `stop()`:
+        -   `self.consumer.stop()` (sets event).
+        -   `self.consumer.join()` (waits for thread to finish).
+2.  **Capture Loop**:
+    -   **Replace** `upload_snapshot` with `self.buffer.enqueue(image, metadata)`.
+    -   **Constraint**: This call must be blocking ONLY on Disk IO (fast), never on Network.
+
+# Task 4: Integration (`openrecall/main.py`)
+1.  Update `main.py` to ensure `recorder.stop()` is called on `KeyboardInterrupt` or system exit signals.
+
+# Task 5: Verification (Resilience Tests)
+1.  **Weak Network**: Point `API_URL` to a closed port. Verify `buffer/` folder fills up with `.webp` and `.json` pairs. UI should remain smooth (high FPS).
+2.  **Offline Accumulation**: Disconnect network, record 10 frames. Check disk.
+3.  **Recovery**: Reconnect network. Verify consumer drains the buffer (files disappear one by one).
+4.  **Process Restart**: Kill app while buffer has files. Restart app. Verify it uploads the old files first (FIFO check).
+
+# Constraints
+-   **No Data Loss**: Files are deleted ONLY after confirmed upload.
+-   **Atomic Writes**: Use the `.tmp` rename strategy.
+-   **Responsiveness**: The app must exit instantly (`join()` returns quickly) because we use `Event.wait()` instead of `time.sleep()`.

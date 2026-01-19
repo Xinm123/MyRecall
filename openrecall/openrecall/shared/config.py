@@ -10,15 +10,19 @@ class Settings(BaseSettings):
     """Application settings with automatic directory creation.
     
     Settings can be configured via environment variables:
+    - OPENRECALL_DEBUG: Enable debug mode (verbose logging)
     - OPENRECALL_DATA_DIR: Base directory for all data storage
     - OPENRECALL_PORT: Web server port
     - OPENRECALL_PRIMARY_MONITOR_ONLY: Only record primary monitor
     - OPENRECALL_API_URL: Server API URL for client communication
+    - OPENRECALL_CAPTURE_INTERVAL: Screenshot capture interval in seconds
     """
     
+    debug: bool = Field(default=False, alias="OPENRECALL_DEBUG")
+    capture_interval: int = Field(default=5, alias="OPENRECALL_CAPTURE_INTERVAL")
     port: int = Field(default=8083, alias="OPENRECALL_PORT")
     primary_monitor_only: bool = Field(
-        default=False, 
+        default=True, 
         alias="OPENRECALL_PRIMARY_MONITOR_ONLY"
     )
     base_path: Path = Field(

@@ -1,18 +1,28 @@
+"""Screenshot recorder (Producer) for OpenRecall client.
+
+Captures screenshots, detects changes, and queues them to the local buffer.
+The Consumer thread (UploaderConsumer) handles uploading to server.
+"""
+
+import logging
 import os
 import time
-from typing import List
+from typing import List, Optional
 
 import mss
 import numpy as np
 from PIL import Image
 
 from openrecall.shared.config import settings
-from openrecall.client.uploader import get_uploader
+from openrecall.client.buffer import LocalBuffer, get_buffer
+from openrecall.client.consumer import UploaderConsumer
 from openrecall.shared.utils import (
     get_active_app_name,
     get_active_window_title,
     is_user_active,
 )
+
+logger = logging.getLogger(__name__)
 
 
 def mean_structured_similarity_index(
@@ -74,7 +84,7 @@ def is_similar(
 def take_screenshots() -> List[np.ndarray]:
     """Takes screenshots of all connected monitors or just the primary one.
 
-    Depending on the `args.primary_monitor_only` flag, captures either
+    Depending on the `settings.primary_monitor_only` flag, captures either
     all monitors or only the primary monitor (index 1 in mss.monitors).
 
     Returns:
@@ -100,73 +110,9 @@ def take_screenshots() -> List[np.ndarray]:
                 screenshot = np.array(sct_img)[:, :, [2, 1, 0]]
                 screenshots.append(screenshot)
             else:
-                # Handle case where primary_monitor_only is True but only one monitor exists (all monitors view)
-                # This case might need specific handling depending on desired behavior.
-                # For now, we just skip if the index is out of bounds.
                 print(f"Warning: Monitor index {i} out of bounds. Skipping.")
 
     return screenshots
-
-
-def record_screenshots_thread() -> None:
-    """
-    Continuously records screenshots, processes them, and uploads to server.
-
-    Checks for user activity and image similarity before capturing and uploading
-    screenshots with active application info. Server handles OCR and embedding.
-    Runs in an infinite loop, intended to be executed in a separate thread.
-    """
-    # Prevents a warning/error from the huggingface/tokenizers library
-    os.environ["TOKENIZERS_PARALLELISM"] = "false"
-
-    uploader = get_uploader()
-    
-    # Wait for server to be ready before starting
-    print("Waiting for server to be ready...")
-    if not uploader.wait_for_server(max_retries=30, retry_delay=1.0):
-        print("Warning: Server not available, continuing anyway...")
-
-    last_screenshots: List[np.ndarray] = take_screenshots()
-
-    while True:
-        if not is_user_active():
-            time.sleep(3)
-            continue
-
-        screenshots = take_screenshots()
-
-        # Handle case where monitor count might change
-        if len(last_screenshots) != len(screenshots):
-            last_screenshots = screenshots
-            time.sleep(3)
-            continue
-
-        for i, screenshot in enumerate(screenshots):
-            last_screenshot = last_screenshots[i]
-
-            if not is_similar(screenshot, last_screenshot):
-                last_screenshots[i] = screenshot
-                image = Image.fromarray(screenshot)
-                timestamp = int(time.time())
-                filepath = settings.screenshots_path / f"{timestamp}.webp"
-                image.save(
-                    str(filepath),
-                    format="webp",
-                    lossless=True,
-                )
-                
-                active_app_name: str = get_active_app_name() or "Unknown App"
-                active_window_title: str = get_active_window_title() or "Unknown Title"
-                
-                # Upload to server via HTTP API
-                uploader.upload_screenshot(
-                    screenshot,
-                    timestamp,
-                    active_app_name,
-                    active_window_title,
-                )
-
-        time.sleep(3)  # Wait before taking the next screenshot
 
 
 def resize_image(image: np.ndarray, max_dim: int = 800) -> np.ndarray:
@@ -181,3 +127,113 @@ def resize_image(image: np.ndarray, max_dim: int = 800) -> np.ndarray:
     pil_image = Image.fromarray(image)
     pil_image.thumbnail((max_dim, max_dim), Image.Resampling.LANCZOS)
     return np.array(pil_image)
+
+
+class ScreenRecorder:
+    """Producer: captures screenshots and enqueues to local buffer.
+    
+    Manages the consumer thread lifecycle and provides graceful shutdown.
+    """
+    
+    def __init__(
+        self,
+        buffer: Optional[LocalBuffer] = None,
+        consumer: Optional[UploaderConsumer] = None,
+    ):
+        """Initialize the recorder.
+        
+        Args:
+            buffer: LocalBuffer instance. Defaults to global singleton.
+            consumer: UploaderConsumer instance. Creates new if not provided.
+        """
+        self.buffer = buffer or get_buffer()
+        self.consumer = consumer or UploaderConsumer(buffer=self.buffer)
+        self._stop_requested = False
+    
+    def start(self) -> None:
+        """Start the consumer thread."""
+        if not self.consumer.is_alive():
+            self.consumer.start()
+    
+    def stop(self) -> None:
+        """Stop the recorder and consumer thread gracefully."""
+        self._stop_requested = True
+        self.consumer.stop()
+        if self.consumer.is_alive():
+            self.consumer.join(timeout=2.0)  # Wait up to 2s for clean exit
+    
+    def run_capture_loop(self) -> None:
+        """Main capture loop. Runs until stop() is called.
+        
+        Captures screenshots, detects changes, and enqueues to buffer.
+        Blocks only on disk I/O, never on network.
+        """
+        os.environ["TOKENIZERS_PARALLELISM"] = "false"
+        
+        # Start the consumer thread
+        self.start()
+        
+        logger.info("🎥 Recorder started (Producer-Consumer mode)")
+        logger.info(f"   Monitors: {'Primary only' if settings.primary_monitor_only else 'All'}")
+        
+        last_screenshots: List[np.ndarray] = take_screenshots()
+        logger.info(f"   Tracking {len(last_screenshots)} monitor(s)")
+
+        while not self._stop_requested:
+            if not is_user_active():
+                time.sleep(settings.capture_interval)
+                continue
+
+            screenshots = take_screenshots()
+
+            if len(last_screenshots) != len(screenshots):
+                last_screenshots = screenshots
+                time.sleep(settings.capture_interval)
+                continue
+
+            for i, screenshot in enumerate(screenshots):
+                last_screenshot = last_screenshots[i]
+
+                if not is_similar(screenshot, last_screenshot):
+                    last_screenshots[i] = screenshot
+                    
+                    # Create PIL Image
+                    image = Image.fromarray(screenshot)
+                    timestamp = int(time.time())
+                    
+                    # Also save to screenshots folder (for UI)
+                    filepath = settings.screenshots_path / f"{timestamp}.webp"
+                    image.save(str(filepath), format="webp", lossless=True)
+                    
+                    # Prepare metadata
+                    metadata = {
+                        "timestamp": timestamp,
+                        "active_app": get_active_app_name() or "Unknown App",
+                        "active_window": get_active_window_title() or "Unknown Title",
+                    }
+                    
+                    # Enqueue to buffer (disk I/O only, fast)
+                    self.buffer.enqueue(image, metadata)
+
+            time.sleep(settings.capture_interval)
+
+
+# Module-level singleton for backwards compatibility
+_recorder: Optional[ScreenRecorder] = None
+
+
+def get_recorder() -> ScreenRecorder:
+    """Get or create the global ScreenRecorder instance."""
+    global _recorder
+    if _recorder is None:
+        _recorder = ScreenRecorder()
+    return _recorder
+
+
+def record_screenshots_thread() -> None:
+    """Legacy function for backwards compatibility.
+    
+    Wraps the new ScreenRecorder class.
+    """
+    recorder = get_recorder()
+    recorder.run_capture_loop()

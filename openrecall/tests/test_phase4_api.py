@@ -293,11 +293,13 @@ class TestClientRecorderNoServerImports:
         assert "import openrecall.server.ocr" not in recorder_source
 
     def test_recorder_uses_uploader(self):
-        """Test recorder imports uploader module."""
+        """Test recorder uses buffer/consumer pattern (Phase 5 upgrade)."""
         import openrecall.client.recorder as recorder_module
         
         recorder_source = open(recorder_module.__file__).read()
-        assert "from openrecall.client.uploader" in recorder_source
+        # Phase 5: recorder now uses buffer and consumer instead of direct uploader
+        assert "from openrecall.client.buffer" in recorder_source
+        assert "from openrecall.client.consumer" in recorder_source
 
 
 class TestAPIBlueprintRegistration:
