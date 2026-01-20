@@ -3,6 +3,7 @@
 import logging
 import sqlite3
 import threading
+import time
 import traceback
 from pathlib import Path
 from typing import Optional
@@ -14,6 +15,7 @@ from openrecall.server import database as db
 from openrecall.server.nlp import get_nlp_engine
 from openrecall.server.ocr import extract_text_from_image
 from openrecall.server.ai_engine import get_ai_engine
+from openrecall.server.config_runtime import runtime_settings
 from openrecall.shared.config import settings
 from openrecall.shared.models import RecallEntry
 
@@ -55,6 +57,12 @@ class ProcessingWorker(threading.Thread):
         try:
             while not self._stop_event.is_set():
                 try:
+                    # Phase 8.2: Check if AI processing is enabled
+                    if not runtime_settings.ai_processing_enabled:
+                        # AI processing disabled - wait and continue without processing
+                        self._stop_event.wait(1)
+                        continue
+                    
                     # Check queue size and determine processing order
                     pending_count = db.get_pending_count(conn)
                     

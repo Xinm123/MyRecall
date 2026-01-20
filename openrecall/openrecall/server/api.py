@@ -14,6 +14,7 @@ from flask import Blueprint, jsonify, request
 from PIL import Image
 
 from openrecall.server.database import insert_pending_entry, get_pending_count
+from openrecall.server.config_runtime import runtime_settings
 from openrecall.shared.config import settings
 
 logger = logging.getLogger(__name__)
@@ -165,4 +166,100 @@ def upload():
             
     except Exception as e:
         logger.exception("Upload ingestion error")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+@api_bp.route("/config", methods=["GET"])
+def get_config():
+    """Get current runtime configuration.
+    
+    Returns:
+        JSON with all runtime settings plus client_online status.
+        client_online is True if heartbeat was within last 15 seconds.
+    """
+    with runtime_settings._lock:
+        config = runtime_settings.to_dict()
+        client_online = (time.time() - runtime_settings.last_heartbeat) < 15
+        config["client_online"] = client_online
+    
+    return jsonify(config), 200
+
+
+@api_bp.route("/config", methods=["POST"])
+def update_config():
+    """Update runtime configuration.
+    
+    Accepts JSON payload with any subset of runtime settings:
+    {
+        "recording_enabled": bool,
+        "upload_enabled": bool,
+        "ai_processing_enabled": bool,
+        "ui_show_ai": bool
+    }
+    
+    Returns:
+        JSON with updated configuration.
+    """
+    data = request.get_json()
+    
+    if not data or not isinstance(data, dict):
+        return jsonify({"status": "error", "message": "Invalid JSON payload"}), 400
+    
+    valid_fields = {
+        "recording_enabled",
+        "upload_enabled",
+        "ai_processing_enabled",
+        "ui_show_ai"
+    }
+    
+    try:
+        with runtime_settings._lock:
+            for field, value in data.items():
+                if field not in valid_fields:
+                    return jsonify({
+                        "status": "error",
+                        "message": f"Unknown field: {field}"
+                    }), 400
+                
+                if not isinstance(value, bool):
+                    return jsonify({
+                        "status": "error",
+                        "message": f"Field {field} must be boolean"
+                    }), 400
+                
+                setattr(runtime_settings, field, value)
+            
+            # Return updated config
+            config = runtime_settings.to_dict()
+            client_online = (time.time() - runtime_settings.last_heartbeat) < 15
+            config["client_online"] = client_online
+        
+        return jsonify(config), 200
+    
+    except Exception as e:
+        logger.exception("Error updating config")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+@api_bp.route("/heartbeat", methods=["POST"])
+def heartbeat():
+    """Register client heartbeat.
+    
+    Updates the last_heartbeat timestamp and returns current config.
+    Called by client to signal it's alive and online.
+    
+    Returns:
+        JSON with status "ok" and current configuration.
+    """
+    try:
+        with runtime_settings._lock:
+            runtime_settings.last_heartbeat = time.time()
+            config = runtime_settings.to_dict()
+            client_online = (time.time() - runtime_settings.last_heartbeat) < 15
+            config["client_online"] = client_online
+        
+        return jsonify({"status": "ok", "config": config}), 200
+    
+    except Exception as e:
+        logger.exception("Error processing heartbeat")
         return jsonify({"status": "error", "message": str(e)}), 500

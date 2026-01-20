@@ -4,9 +4,12 @@ Captures screenshots, detects changes, and queues them to the local buffer.
 The Consumer thread (UploaderConsumer) handles uploading to server.
 """
 
+import json
 import logging
 import os
 import time
+import urllib.error
+import urllib.request
 from typing import List, Optional
 
 import mss
@@ -149,11 +152,40 @@ class ScreenRecorder:
         self.buffer = buffer or get_buffer()
         self.consumer = consumer or UploaderConsumer(buffer=self.buffer)
         self._stop_requested = False
+        
+        # Phase 8.2: Runtime configuration state
+        self.recording_enabled = True
+        self.upload_enabled = True
+        self.last_heartbeat_time = 0
     
     def start(self) -> None:
         """Start the consumer thread."""
         if not self.consumer.is_alive():
             self.consumer.start()
+    
+    def _send_heartbeat(self) -> None:
+        """Send heartbeat to server and sync runtime configuration.
+        
+        Phase 8.2: Periodically registers client activity and fetches current
+        runtime settings (recording_enabled, upload_enabled, etc.) from server.
+        """
+        try:
+            url = f"http://localhost:{settings.port}/api/heartbeat"
+            req = urllib.request.Request(url, method="POST")
+            with urllib.request.urlopen(req, timeout=2) as response:
+                data = json.loads(response.read().decode())
+                config = data.get("config", {})
+                self.recording_enabled = config.get("recording_enabled", True)
+                self.upload_enabled = config.get("upload_enabled", True)
+                if settings.debug:
+                    logger.debug(
+                        f"Heartbeat synced: recording={self.recording_enabled}, "
+                        f"upload={self.upload_enabled}"
+                    )
+        except urllib.error.URLError as e:
+            logger.warning(f"Heartbeat failed (network): {e}")
+        except Exception as e:
+            logger.warning(f"Heartbeat failed: {e}")
     
     def stop(self) -> None:
         """Stop the recorder and consumer thread gracefully."""
@@ -180,6 +212,18 @@ class ScreenRecorder:
         logger.info(f"   Tracking {len(last_screenshots)} monitor(s)")
 
         while not self._stop_requested:
+            # Phase 8.2: Sync runtime configuration every 5 seconds
+            current_time = time.time()
+            if current_time - self.last_heartbeat_time > 5:
+                self._send_heartbeat()
+                self.last_heartbeat_time = current_time
+            
+            # Phase 8.2: Rule 1 - Stop recording if recording_enabled=False
+            if not self.recording_enabled:
+                logger.info("⏸️  Recording paused (recording_enabled=False)")
+                time.sleep(1)
+                continue
+            
             if not is_user_active():
                 time.sleep(settings.capture_interval)
                 continue
@@ -212,8 +256,15 @@ class ScreenRecorder:
                         "active_window": get_active_window_title() or "Unknown Title",
                     }
                     
-                    # Enqueue to buffer (disk I/O only, fast)
-                    self.buffer.enqueue(image, metadata)
+                    # Phase 8.2: Rule 2 - Check upload_enabled before enqueueing
+                    if self.upload_enabled:
+                        # Normal flow: enqueue to buffer for processing/upload
+                        self.buffer.enqueue(image, metadata)
+                    else:
+                        # Local-only mode: save but don't queue
+                        logger.debug(
+                            f"Saved locally only (upload disabled): {filepath}"
+                        )
 
             time.sleep(settings.capture_interval)
 
