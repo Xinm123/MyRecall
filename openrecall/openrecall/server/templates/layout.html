@@ -8,6 +8,9 @@
   <!-- Alpine.js -->
   <script src="//unpkg.com/alpinejs" defer></script>
   
+  <!-- Icons Module Import -->
+  {% import 'icons.html' as icons %}
+  
   <style>
     /* Global Reset */
     *, *::before, *::after {
@@ -29,6 +32,10 @@
       --border-color: rgba(0, 0, 0, 0.08);
       --glass-bg: rgba(255, 255, 255, 0.72);
       --font-stack: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      --toolbar-bg: rgba(245, 245, 247, 0.85);
+      --toolbar-border: rgba(0, 0, 0, 0.08);
+      --icon-color: #5c5c5e;
+      --icon-hover: rgba(0, 0, 0, 0.05);
     }
     
     /* Global Styles */
@@ -44,16 +51,110 @@
     header {
       position: sticky;
       top: 0;
-      z-index: 100;
-      height: 60px;
+      z-index: 1000;
+      height: 52px;
       width: 100%;
       backdrop-filter: blur(20px);
       -webkit-backdrop-filter: blur(20px);
-      background-color: var(--glass-bg);
-      border-bottom: 1px solid var(--border-color);
+      background-color: var(--toolbar-bg);
+      border-bottom: 1px solid var(--toolbar-border);
       display: flex;
       align-items: center;
-      padding: 0 20px;
+      justify-content: space-between;
+      padding: 0 16px;
+      user-select: none;
+    }
+    
+    /* Left Group: Navigation + Title */
+    .toolbar-left-group {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      min-width: 180px;
+    }
+    
+    .toolbar-nav-btn {
+      background: transparent;
+      border: none;
+      padding: 6px 10px;
+      border-radius: 6px;
+      color: var(--icon-color);
+      cursor: pointer;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    
+    .toolbar-nav-btn:hover {
+      background-color: var(--icon-hover);
+      color: #000;
+    }
+    
+    .toolbar-nav-btn:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+    
+    .toolbar-title {
+      font-weight: 600;
+      font-size: 15px;
+      color: var(--text-primary);
+      letter-spacing: -0.3px;
+    }
+    
+    /* Toolbar Spacer */
+    .toolbar-spacer {
+      flex: 1;
+    }
+    
+    /* Icons Container */
+    .toolbar-icons-container {
+      display: flex;
+      gap: 0;
+      align-items: center;
+    }
+    
+    .toolbar-icon-link {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 32px;
+      height: 32px;
+      border-radius: 6px;
+      color: var(--icon-color);
+      text-decoration: none;
+      transition: all 0.2s;
+      background: transparent;
+    }
+    
+    .toolbar-icon-link:hover {
+      background-color: var(--icon-hover);
+      color: #000;
+    }
+    
+    /* Highlight current view icon */
+    html[data-current-view="grid"] a[href="/"] {
+      background-color: rgba(0, 0, 0, 0.12);
+      color: #1D1D1F;
+    }
+    
+    html[data-current-view="timeline"] a[href="/timeline"] {
+      background-color: rgba(0, 0, 0, 0.12);
+      color: #1D1D1F;
+    }
+
+    html[data-current-view="search"] a[href="/search"] {
+      background-color: rgba(0, 0, 0, 0.12);
+      color: #1D1D1F;
+    }
+    
+    /* Right Group: Icons */
+    .toolbar-right-group {
+      display: flex;
+      gap: 0;
+      align-items: center;
+      justify-content: flex-end;
     }
     
     /* Main Content Container */
@@ -62,30 +163,40 @@
       margin: 0 auto;
       padding: 20px;
     }
-    
-    /* Header Content */
-    header .logo {
-      font-size: 20px;
-      font-weight: 600;
-      color: var(--text-primary);
-      margin-right: auto;
+
+    /* Tooltip Styles */
+    .toolbar-icon-link[title],
+    .toolbar-nav-btn[title] {
+      position: relative;
     }
-    
-    header nav {
-      display: flex;
-      gap: 20px;
-      align-items: center;
+
+    .toolbar-icon-link[title]:hover::after,
+    .toolbar-nav-btn[title]:hover::after {
+      content: attr(title);
+      position: absolute;
+      bottom: -28px;
+      left: 50%;
+      transform: translateX(-50%);
+      background-color: rgba(0, 0, 0, 0.8);
+      color: white;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 12px;
+      white-space: nowrap;
+      pointer-events: none;
+      animation: tooltipShow 0.15s ease-out forwards;
+      z-index: 1001;
     }
-    
-    header nav a {
-      color: var(--text-primary);
-      text-decoration: none;
-      font-size: 14px;
-      transition: color 0.2s;
-    }
-    
-    header nav a:hover {
-      color: var(--accent-color);
+
+    @keyframes tooltipShow {
+      from {
+        opacity: 0;
+        transform: translateX(-50%) translateY(-2px);
+      }
+      to {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0);
+      }
     }
   </style>
   
@@ -93,19 +204,45 @@
 </head>
 <body>
   <header>
-    <div class="logo">MyRecall</div>
-    {% block header_content %}
-    <nav>
-      <a href="/">Grid</a>
-      <a href="/timeline">Timeline</a>
-      <a href="/search">Search</a>
-    </nav>
-    {% endblock %}
+    <!-- Left Group: Title -->
+    <div class="toolbar-left-group">
+      <span class="toolbar-title">MyRecall</span>
+    </div>
+    
+    <!-- Spacer -->
+    <div class="toolbar-spacer"></div>
+    
+    <!-- Right Group: Icons + Search -->
+    <div class="toolbar-right-group" id="toolbarRightGroup">
+      <div class="toolbar-icons-container">
+        <a href="/" class="toolbar-icon-link" title="Grid View">
+          {{ icons.icon_grid() }}
+        </a>
+        <a href="/timeline" class="toolbar-icon-link" title="Timeline View">
+          {{ icons.icon_timeline() }}
+        </a>
+      </div>
+      <a href="/search" class="toolbar-icon-link" title="Search">
+        {{ icons.icon_search() }}
+      </a>
+    </div>
   </header>
   
   <main>
     {% block content %}{% endblock %}
   </main>
+  
+  <script>
+    // Detect current page
+    const currentPath = window.location.pathname;
+    let currentView = 'grid'; // default
+    if (currentPath === '/timeline') {
+      currentView = 'timeline';
+    } else if (currentPath === '/search') {
+      currentView = 'search';
+    }
+    document.documentElement.setAttribute('data-current-view', currentView);
+  </script>
   
   {% block extra_body %}{% endblock %}
 </body>

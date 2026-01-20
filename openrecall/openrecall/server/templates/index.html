@@ -2,8 +2,47 @@
 
 {% block title %}MyRecall{% endblock %}
 
+{% block toolbar_center %}
+<div class="form-group">
+  <label for="start_time">Start Time</label>
+  <input type="datetime-local" id="start_time" name="start_time">
+</div>
+<div class="form-group">
+  <label for="end_time">End Time</label>
+  <input type="datetime-local" id="end_time" name="end_time">
+</div>
+{% endblock %}
+
 {% block extra_head %}
 <style>
+  /* Form groups for toolbar */
+  .form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+  }
+  
+  .form-group label {
+    font-size: 12px;
+    color: var(--text-secondary);
+    font-weight: 500;
+  }
+  
+  .form-group input {
+    padding: 8px 12px;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    font-size: 14px;
+    font-family: var(--font-stack);
+    background: var(--bg-body);
+    color: var(--text-primary);
+  }
+  
+  .form-group input:focus {
+    outline: none;
+    border-color: var(--accent-color);
+  }
+
   /* Spinner Animation */
   @keyframes spin {
     0% { transform: rotate(0deg); }
