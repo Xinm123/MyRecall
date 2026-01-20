@@ -111,7 +111,8 @@ def main():
         app.run(
             port=settings.port, 
             debug=settings.debug,  # Enable Flask debug mode
-            use_reloader=False
+            use_reloader=False,
+            threaded=True  # Enable multi-threading to handle concurrent requests
         )
     except KeyboardInterrupt:
         pass

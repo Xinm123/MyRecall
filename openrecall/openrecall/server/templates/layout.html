@@ -198,6 +198,112 @@
         transform: translateX(-50%) translateY(0);
       }
     }
+
+    /* Control Center Popover Styles */
+    .control-center-btn {
+      position: relative;
+    }
+
+    .control-center-popover {
+      position: absolute;
+      top: 44px;
+      right: 0;
+      width: 280px;
+      background: rgba(255, 255, 255, 0.95);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(0, 0, 0, 0.1);
+      border-radius: 12px;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
+      padding: 12px;
+      z-index: 1002;
+      animation: popoverIn 0.2s ease-out forwards;
+    }
+
+    @keyframes popoverIn {
+      from {
+        opacity: 0;
+        transform: translateY(-8px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .control-section {
+      padding: 8px 0;
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    .control-section:last-child {
+      border-bottom: none;
+    }
+
+    .control-section-title {
+      font-size: 11px;
+      font-weight: 600;
+      color: #666;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      padding: 4px 8px;
+      margin-bottom: 6px;
+    }
+
+    .control-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 8px;
+      border-radius: 6px;
+      transition: background-color 0.15s;
+    }
+
+    .control-item:hover {
+      background-color: rgba(0, 0, 0, 0.04);
+    }
+
+    .control-item-label {
+      font-size: 13px;
+      color: #333;
+      font-weight: 500;
+    }
+
+    /* Toggle Switch Styles */
+    .toggle-switch {
+      position: relative;
+      width: 44px;
+      height: 24px;
+      background-color: #E0E0E0;
+      border-radius: 12px;
+      cursor: pointer;
+      transition: background-color 0.2s;
+    }
+
+    .toggle-switch.active {
+      background-color: var(--accent-color);
+    }
+
+    .toggle-switch-thumb {
+      position: absolute;
+      top: 2px;
+      left: 2px;
+      width: 20px;
+      height: 20px;
+      background-color: white;
+      border-radius: 10px;
+      transition: left 0.2s;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+
+    .toggle-switch.active .toggle-switch-thumb {
+      left: 22px;
+    }
+
+    /* Hide AI text when disabled */
+    body.hide-ai .ai-insight-text {
+      display: none;
+    }
   </style>
   
   {% block extra_head %}{% endblock %}
@@ -212,7 +318,7 @@
     <!-- Spacer -->
     <div class="toolbar-spacer"></div>
     
-    <!-- Right Group: Icons + Search -->
+    <!-- Right Group: Icons + Control Center -->
     <div class="toolbar-right-group" id="toolbarRightGroup">
       <div class="toolbar-icons-container">
         <a href="/" class="toolbar-icon-link" title="Grid View">
@@ -225,6 +331,71 @@
       <a href="/search" class="toolbar-icon-link" title="Search">
         {{ icons.icon_search() }}
       </a>
+      
+      <!-- Control Center Button & Popover -->
+      <div x-data="controlCenter()" class="control-center-btn">
+        <button 
+          @click="toggle()" 
+          class="toolbar-icon-link" 
+          title="Control Center"
+          style="position: relative; margin-left: 8px;">
+          {{ icons.icon_sliders() }}
+        </button>
+        
+        <!-- Popover Menu -->
+        <div x-show="open" @click.away="open = false" class="control-center-popover">
+          <!-- Privacy Section -->
+          <div class="control-section">
+            <div class="control-section-title">Privacy</div>
+            <div class="control-item">
+              <span class="control-item-label">Recording</span>
+              <div 
+                @click="toggleSetting('recording_enabled')"
+                :class="{ 'toggle-switch': true, 'active': config.recording_enabled }"
+                class="toggle-switch">
+                <div class="toggle-switch-thumb"></div>
+              </div>
+            </div>
+            <div class="control-item">
+              <span class="control-item-label">Upload</span>
+              <div 
+                @click="toggleSetting('upload_enabled')"
+                :class="{ 'toggle-switch': true, 'active': config.upload_enabled }"
+                class="toggle-switch">
+                <div class="toggle-switch-thumb"></div>
+              </div>
+            </div>
+          </div>
+          
+          <!-- Intelligence Section -->
+          <div class="control-section">
+            <div class="control-section-title">Intelligence</div>
+            <div class="control-item">
+              <span class="control-item-label">AI Processing</span>
+              <div 
+                @click="toggleSetting('ai_processing_enabled')"
+                :class="{ 'toggle-switch': true, 'active': config.ai_processing_enabled }"
+                class="toggle-switch">
+                <div class="toggle-switch-thumb"></div>
+              </div>
+            </div>
+          </div>
+          
+          <!-- View Section -->
+          <div class="control-section">
+            <div class="control-section-title">View</div>
+            <div class="control-item">
+              <span class="control-item-label">Show AI</span>
+              <div 
+                @click="toggleSetting('ui_show_ai')"
+                :class="{ 'toggle-switch': true, 'active': config.ui_show_ai }"
+                class="toggle-switch">
+                <div class="toggle-switch-thumb"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   </header>
   
@@ -233,6 +404,82 @@
   </main>
   
   <script>
+    function controlCenter() {
+      return {
+        open: false,
+        config: {
+          recording_enabled: true,
+          upload_enabled: true,
+          ai_processing_enabled: true,
+          ui_show_ai: true
+        },
+        
+        init() {
+          console.log('Control Center initializing...');
+          // Fetch initial config
+          fetch('/api/config')
+            .then(response => response.json())
+            .then(data => {
+              this.config = data;
+              this.updateBodyClass();
+              console.log('Initial config loaded:', this.config);
+            })
+            .catch(error => {
+              console.error('Failed to fetch config:', error);
+            });
+        },
+        
+        toggle() {
+          this.open = !this.open;
+          console.log('Popover toggled:', this.open);
+        },
+        
+        toggleSetting(key) {
+          const previousValue = this.config[key];
+          this.config[key] = !this.config[key];
+          console.log(`Toggle ${key}: ${previousValue} -> ${this.config[key]}`);
+          
+          // Update body class immediately for ui_show_ai
+          this.updateBodyClass();
+          
+          // Send to server
+          fetch('/api/config', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ [key]: this.config[key] })
+          })
+          .then(response => {
+            if (!response.ok) {
+              throw new Error('Failed to update setting');
+            }
+            return response.json();
+          })
+          .then(data => {
+            console.log('Config updated on server:', data);
+          })
+          .catch(error => {
+            console.error('Failed to update setting:', error);
+            // Revert on error
+            this.config[key] = previousValue;
+            this.updateBodyClass();
+          });
+        },
+        
+        updateBodyClass() {
+          if (!this.config.ui_show_ai) {
+            document.body.classList.add('hide-ai');
+            console.log('Added hide-ai class');
+          } else {
+            document.body.classList.remove('hide-ai');
+            console.log('Removed hide-ai class');
+          }
+          // Debug: Check if AI elements exist
+          const aiElements = document.querySelectorAll('.ai-insight-text');
+          console.log(`Found ${aiElements.length} .ai-insight-text elements:`, aiElements);
+        }
+      };
+    }
+    
     // Detect current page
     const currentPath = window.location.pathname;
     let currentView = 'grid'; // default
