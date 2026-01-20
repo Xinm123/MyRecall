@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>{% block title %}MyRecall{% endblock %}</title>
+  
+  <!-- Alpine.js -->
+  <script src="//unpkg.com/alpinejs" defer></script>
+  
+  <style>
+    /* Global Reset */
+    *, *::before, *::after {
+      box-sizing: border-box;
+    }
+    
+    body {
+      margin: 0;
+      padding: 0;
+    }
+    
+    /* CSS Variables - macOS Light Theme */
+    :root {
+      --bg-body: #F5F5F7;
+      --bg-card: #FFFFFF;
+      --text-primary: #1D1D1F;
+      --text-secondary: #86868B;
+      --accent-color: #007AFF;
+      --border-color: rgba(0, 0, 0, 0.08);
+      --glass-bg: rgba(255, 255, 255, 0.72);
+      --font-stack: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+    
+    /* Global Styles */
+    body {
+      font-family: var(--font-stack);
+      background-color: var(--bg-body);
+      color: var(--text-primary);
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+    
+    /* Sticky Frosted Glass Header */
+    header {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      height: 60px;
+      width: 100%;
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      background-color: var(--glass-bg);
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      align-items: center;
+      padding: 0 20px;
+    }
+    
+    /* Main Content Container */
+    main {
+      max-width: 1600px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+    
+    /* Header Content */
+    header .logo {
+      font-size: 20px;
+      font-weight: 600;
+      color: var(--text-primary);
+      margin-right: auto;
+    }
+    
+    header nav {
+      display: flex;
+      gap: 20px;
+      align-items: center;
+    }
+    
+    header nav a {
+      color: var(--text-primary);
+      text-decoration: none;
+      font-size: 14px;
+      transition: color 0.2s;
+    }
+    
+    header nav a:hover {
+      color: var(--accent-color);
+    }
+  </style>
+  
+  {% block extra_head %}{% endblock %}
+</head>
+<body>
+  <header>
+    <div class="logo">MyRecall</div>
+    {% block header_content %}
+    <nav>
+      <a href="/">Grid</a>
+      <a href="/timeline">Timeline</a>
+      <a href="/search">Search</a>
+    </nav>
+    {% endblock %}
+  </header>
+  
+  <main>
+    {% block content %}{% endblock %}
+  </main>
+  
+  {% block extra_body %}{% endblock %}
+</body>
+</html>

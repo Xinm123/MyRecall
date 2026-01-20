@@ -2,20 +2,19 @@
 
 Provides HTTP endpoints for client-server communication:
 - Health check endpoint
-- Screenshot upload endpoint with parallel OCR + AI processing
+- Fast screenshot ingestion endpoint (async processing)
 """
 
 import logging
-from concurrent.futures import ThreadPoolExecutor
+import time
+from pathlib import Path
 
 import numpy as np
 from flask import Blueprint, jsonify, request
 from PIL import Image
 
-from openrecall.server.database import insert_entry
-from openrecall.server.nlp import get_embedding
-from openrecall.server.ocr import extract_text_from_image
-from openrecall.server.ai_engine import get_ai_engine
+from openrecall.server.database import insert_pending_entry, get_pending_count
+from openrecall.shared.config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -32,9 +31,56 @@ def health():
     return jsonify({"status": "ok"}), 200
 
 
+@api_bp.route("/queue/status", methods=["GET"])
+def queue_status():
+    """Get current processing queue status (debug endpoint).
+    
+    Returns:
+        JSON with queue statistics and processing mode.
+    """
+    try:
+        from openrecall.server.database import get_pending_count
+        import sqlite3
+        
+        pending = get_pending_count()
+        
+        # Get count by status
+        with sqlite3.connect(str(settings.db_path)) as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT status, COUNT(*) FROM entries GROUP BY status")
+            status_counts = dict(cursor.fetchall())
+        
+        processing_mode = "LIFO" if pending > settings.processing_lifo_threshold else "FIFO"
+        
+        response = {
+            "queue": {
+                "pending": pending,
+                "processing": status_counts.get("PROCESSING", 0),
+                "completed": status_counts.get("COMPLETED", 0),
+                "failed": status_counts.get("FAILED", 0),
+            },
+            "config": {
+                "lifo_threshold": settings.processing_lifo_threshold,
+                "current_mode": processing_mode,
+            },
+            "system": {
+                "debug": settings.debug,
+                "device": settings.device,
+            }
+        }
+        
+        return jsonify(response), 200
+    except Exception as e:
+        logger.exception("Error getting queue status")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
 @api_bp.route("/upload", methods=["POST"])
 def upload():
-    """Upload screenshot data for processing.
+    """Fast screenshot ingestion endpoint (Fire-and-Forget).
+    
+    Accepts screenshot data, saves to disk, inserts PENDING entry.
+    Returns immediately without processing (OCR/AI done by worker).
     
     Expects JSON payload:
     {
@@ -47,8 +93,9 @@ def upload():
     }
     
     Returns:
-        JSON response with status and optional message.
+        HTTP 202 Accepted with task ID.
     """
+    start_time = time.perf_counter()
     data = request.get_json()
     
     if not data:
@@ -66,65 +113,56 @@ def upload():
         active_app = str(data["active_app"])
         active_window = str(data["active_window"])
         
-        # Convert to PIL Image for AI engine
+        if settings.debug:
+            logger.debug(f"📥 Upload request: app={active_app}, timestamp={timestamp}")
+        
+        # Save image to disk
+        image_filename = f"{timestamp}.png"
+        image_path = settings.screenshots_path / image_filename
         pil_image = Image.fromarray(image_array)
+        pil_image.save(image_path)
         
-        # Parallel processing: OCR + AI description
-        with ThreadPoolExecutor(max_workers=2) as executor:
-            ocr_future = executor.submit(extract_text_from_image, image_array)
-            ai_future = executor.submit(_safe_analyze_image, pil_image)
+        # Fast ingestion: Insert PENDING entry (no processing)
+        task_id = insert_pending_entry(
+            timestamp=timestamp,
+            app=active_app,
+            title=active_window,
+            image_path=str(image_path),
+        )
+        
+        elapsed_ms = (time.perf_counter() - start_time) * 1000
+        
+        if task_id:
+            # Get current queue status for debug info
+            pending_count = get_pending_count() if settings.debug else 0
             
-            text: str = ocr_future.result()
-            description: str | None = ai_future.result()
-        
-        # Store entry if OCR extracts meaningful text OR AI provides description
-        if text.strip() or description:
-            # Fusion Strategy: Combine visual description + OCR for richer embedding
-            combined_text = _build_fusion_text(description, text)
-            embedding: np.ndarray = get_embedding(combined_text)
-            insert_entry(text, timestamp, embedding, active_app, active_window, description=description)
-            return jsonify({"status": "ok", "message": "Entry stored"}), 200
+            if settings.debug:
+                logger.debug(f"✅ HTTP 202 Accepted | task_id={task_id} | {elapsed_ms:.1f}ms | queue={pending_count}")
+            else:
+                logger.debug(f"Ingestion complete: {elapsed_ms:.1f}ms (task_id={task_id})")
+            
+            response_data = {
+                "status": "accepted",
+                "task_id": task_id,
+                "message": "Queued for processing",
+                "elapsed_ms": round(elapsed_ms, 1)
+            }
+            
+            # Add queue info in debug mode
+            if settings.debug:
+                response_data["debug"] = {
+                    "queue_size": pending_count,
+                    "processing_mode": "LIFO" if pending_count > settings.processing_lifo_threshold else "FIFO"
+                }
+            
+            return jsonify(response_data), 202  # HTTP 202 Accepted
         else:
-            return jsonify({"status": "ok", "message": "No text or description, skipped"}), 200
+            logger.warning(f"⚠️  Duplicate timestamp rejected: {timestamp}")
+            return jsonify({
+                "status": "error",
+                "message": "Failed to insert entry (possibly duplicate)"
+            }), 409  # Conflict
             
     except Exception as e:
-        logger.exception("Upload processing error")
+        logger.exception("Upload ingestion error")
         return jsonify({"status": "error", "message": str(e)}), 500
-
-
-def _safe_analyze_image(image: Image.Image) -> str | None:
-    """Safely run AI analysis with fault tolerance.
-    
-    If AI fails, logs the error and returns None instead of crashing.
-    This ensures OCR data is still saved even if AI has issues.
-    """
-    try:
-        ai_engine = get_ai_engine()
-        return ai_engine.analyze_image(image)
-    except Exception as e:
-        logger.error(f"AI analysis failed: {e}")
-        return None
-
-
-def _build_fusion_text(description: str | None, ocr_text: str) -> str:
-    """Build combined text for embedding using fusion strategy.
-    
-    Combines visual description (semantic context) with OCR text (precise content)
-    to create a rich embedding input. Description comes first to establish context.
-    
-    Args:
-        description: AI-generated visual description (may be None).
-        ocr_text: OCR-extracted text content.
-        
-    Returns:
-        Combined text suitable for embedding.
-    """
-    desc_part = description or ""
-    text_part = ocr_text.strip()
-    
-    if desc_part and text_part:
-        return f"Visual Summary: {desc_part}\n\nDetailed Content: {text_part}"
-    elif desc_part:
-        return f"Visual Summary: {desc_part}"
-    else:
-        return text_part

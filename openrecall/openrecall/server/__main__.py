@@ -8,8 +8,10 @@ The server handles:
 - AI-powered image analysis (Qwen3-VL)
 - Embedding generation (Qwen3-Embedding)
 - Database storage and semantic search
+- Background task processing worker
 """
 
+import atexit
 import signal
 import sys
 
@@ -55,16 +57,22 @@ def main():
     logger.info("=" * 50)
     logger.info("OpenRecall Server Starting")
     logger.info("=" * 50)
+    logger.info(f"Debug mode: {'ON' if settings.debug else 'OFF'}")
     logger.info(f"Data folder: {settings.base_path}")
     logger.info(f"Screenshots: {settings.screenshots_path}")
     logger.info(f"Database: {settings.db_path}")
     logger.info(f"API URL: http://localhost:{settings.port}/api")
     logger.info(f"Web UI: http://localhost:{settings.port}")
     logger.info(f"Device: {settings.device}")
+    logger.info(f"Processing: LIFO threshold = {settings.processing_lifo_threshold}")
     logger.info("=" * 50)
 
     # Preload AI models to avoid first-request timeout
     preload_ai_models()
+    
+    # Start background processing worker AFTER preloading models
+    from openrecall.server.app import init_background_worker
+    init_background_worker(app)
 
     # Flag to prevent duplicate signal handling
     _shutting_down = False
@@ -77,15 +85,33 @@ def main():
         
         logger.info("")
         logger.info("Received shutdown signal, stopping server...")
+        
+        # Stop worker gracefully if it was initialized
+        try:
+            if hasattr(app, 'worker') and app.worker:
+                logger.info("Stopping background worker...")
+                app.worker.stop()
+                app.worker.join(timeout=5)
+                logger.info("Background worker stopped")
+        except Exception as e:
+            logger.warning(f"Error stopping worker: {e}")
+        
         logger.info("Server shutdown complete")
         sys.exit(0)
     
+    # Register shutdown handlers
     signal.signal(signal.SIGINT, shutdown_handler)
     signal.signal(signal.SIGTERM, shutdown_handler)
+    atexit.register(lambda: app.worker.stop() if hasattr(app, 'worker') and app.worker else None)
 
     # Start the Flask server
     try:
-        app.run(port=settings.port, use_reloader=False, threaded=True)
+        app.run(
+            port=settings.port, 
+            debug=settings.debug,  # Enable Flask debug mode based on config
+            use_reloader=False, 
+            threaded=True
+        )
     except KeyboardInterrupt:
         pass
 

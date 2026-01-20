@@ -19,16 +19,20 @@ class RecallEntry(BaseModel):
     timestamp: int
     app: str
     title: str | None = None
-    text: str
-    description: str | None = None  # AI-generated semantic description
-    embedding: Any  # Will be np.ndarray after validation
+    text: str | None = None  # OCR result (None when PENDING)
+    description: str | None = None  # AI-generated semantic description (None when PENDING)
+    embedding: Any | None = None  # Embedding vector (None when PENDING)
+    status: str = "PENDING"  # Task status: PENDING, PROCESSING, COMPLETED, FAILED
+    similarity_score: float | None = None  # Similarity score for search results (0.0 to 1.0)
     
     @field_validator("embedding", mode="before")
     @classmethod
-    def deserialize_embedding(cls, v: Any) -> np.ndarray:
+    def deserialize_embedding(cls, v: Any) -> np.ndarray | None:
         """Convert bytes to numpy array if necessary."""
+        if v is None:
+            return None
         if isinstance(v, bytes):
             return np.frombuffer(v, dtype=np.float32)
         if isinstance(v, np.ndarray):
             return v
-        raise ValueError(f"embedding must be bytes or np.ndarray, got {type(v)}")
+        raise ValueError(f"embedding must be bytes, np.ndarray or None, got {type(v)}")

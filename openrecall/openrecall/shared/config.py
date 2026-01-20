@@ -21,8 +21,8 @@ class Settings(BaseSettings):
     - OPENRECALL_EMBEDDING_MODEL: Embedding model name for semantic search
     """
     
-    debug: bool = Field(default=False, alias="OPENRECALL_DEBUG")
-    capture_interval: int = Field(default=30, alias="OPENRECALL_CAPTURE_INTERVAL")
+    debug: bool = Field(default=True, alias="OPENRECALL_DEBUG")
+    capture_interval: int = Field(default=10, alias="OPENRECALL_CAPTURE_INTERVAL")
     port: int = Field(default=8083, alias="OPENRECALL_PORT")
     primary_monitor_only: bool = Field(
         default=True, 
@@ -60,6 +60,16 @@ class Settings(BaseSettings):
         default=1024,
         alias="OPENRECALL_EMBEDDING_DIM",
         description="Embedding vector dimension (must match model output)"
+    )
+    processing_lifo_threshold: int = Field(
+        default=10,
+        alias="OPENRECALL_PROCESSING_LIFO_THRESHOLD",
+        description="When pending tasks > threshold, use LIFO (newest first) instead of FIFO"
+    )
+    show_ai_description: bool = Field(
+        default=True,
+        alias="OPENRECALL_SHOW_AI_DESCRIPTION",
+        description="Toggle visibility of AI text on the frontend"
     )
     
     model_config = {

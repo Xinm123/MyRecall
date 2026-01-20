@@ -1,0 +1,102 @@
+{% extends "layout.html" %}
+
+{% block title %}Timeline - MyRecall{% endblock %}
+
+{% block extra_head %}
+<style>
+  .slider-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 20px;
+    background: var(--bg-card);
+    border-radius: 12px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+    margin-bottom: 20px;
+  }
+  
+  .slider {
+    width: 80%;
+    margin: 10px 0;
+  }
+  
+  .slider-value {
+    margin-top: 10px;
+    font-size: 1.2em;
+    color: var(--text-primary);
+  }
+  
+  .image-container {
+    margin-top: 20px;
+    text-align: center;
+    background: var(--bg-card);
+    border-radius: 12px;
+    padding: 20px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  }
+  
+  .image-container img {
+    max-width: 100%;
+    height: auto;
+    border-radius: 8px;
+  }
+  
+  .alert {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 20px;
+    color: var(--text-primary);
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+{% if timestamps|length > 0 %}
+  <div class="slider-container">
+    <input type="range" class="slider" id="discreteSlider" min="0" max="{{timestamps|length - 1}}" step="1" value="{{timestamps|length - 1}}">
+    <div class="slider-value" id="sliderValue">{{timestamps[0] | timestamp_to_human_readable }}</div>
+  </div>
+  <div class="image-container">
+    <img id="timestampImage" src="/static/{{timestamps[0]}}.png" alt="Image for timestamp">
+  </div>
+{% else %}
+  <div class="alert" role="alert">
+    Nothing recorded yet, wait a few seconds.
+  </div>
+{% endif %}
+{% endblock %}
+
+{% block extra_body %}
+{% if timestamps|length > 0 %}
+<script>
+  const timestamps = {{ timestamps|tojson }};
+  const slider = document.getElementById('discreteSlider');
+  const sliderValue = document.getElementById('sliderValue');
+  const timestampImage = document.getElementById('timestampImage');
+
+  // Format date to 24-hour format (YYYY-MM-DD HH:MM:SS)
+  function formatDate24Hour(date) {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    const seconds = String(date.getSeconds()).padStart(2, '0');
+    return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+  }
+
+  slider.addEventListener('input', function() {
+    const reversedIndex = timestamps.length - 1 - slider.value;
+    const timestamp = timestamps[reversedIndex];
+    sliderValue.textContent = formatDate24Hour(new Date(timestamp * 1000));
+    timestampImage.src = `/static/${timestamp}.png`;
+  });
+
+  // Initialize the slider with a default value
+  slider.value = timestamps.length - 1;
+  sliderValue.textContent = formatDate24Hour(new Date(timestamps[0] * 1000));
+  timestampImage.src = `/static/${timestamps[0]}.png`;
+</script>
+{% endif %}
+{% endblock %}

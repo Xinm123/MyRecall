@@ -64,6 +64,7 @@ def main():
     logger.info("=" * 50)
     logger.info("OpenRecall Starting (Combined Mode)")
     logger.info("=" * 50)
+    logger.info(f"Debug mode: {'ON' if settings.debug else 'OFF'}")
     logger.info(f"Data folder: {settings.base_path}")
     logger.info(f"Screenshots: {settings.screenshots_path}")
     logger.info(f"Buffer path: {settings.buffer_path}")
@@ -74,6 +75,10 @@ def main():
 
     # Preload AI models to avoid first-request timeout
     preload_ai_models()
+    
+    # Start background processing worker AFTER preloading models
+    from openrecall.server.app import app, init_background_worker
+    init_background_worker(app)
 
     # Get recorder (manages Producer + Consumer)
     recorder = get_recorder()
@@ -103,7 +108,11 @@ def main():
 
     # Start the Flask server on main thread
     try:
-        app.run(port=settings.port, use_reloader=False)
+        app.run(
+            port=settings.port, 
+            debug=settings.debug,  # Enable Flask debug mode
+            use_reloader=False
+        )
     except KeyboardInterrupt:
         pass
     finally:

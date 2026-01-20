@@ -1,20 +1,25 @@
+import os
+import logging
 from threading import Thread
 from datetime import datetime
 
 import numpy as np
-from flask import Flask, render_template_string, request, send_from_directory
-from jinja2 import BaseLoader
+from flask import Flask, render_template, request, send_from_directory
 
 from openrecall.shared.config import settings
 from openrecall.server.api import api_bp
 from openrecall.server.database import (
     create_db,
     get_all_entries,
+    get_all_entries_with_status,
     get_timestamps,
     get_entries_by_time_range,
+    reset_stuck_tasks,
 )
 from openrecall.server.nlp import cosine_similarity, get_embedding
 from openrecall.shared.utils import human_readable_time, timestamp_to_human_readable
+
+logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 
@@ -24,131 +29,36 @@ app.register_blueprint(api_bp)
 app.jinja_env.filters["human_readable_time"] = human_readable_time
 app.jinja_env.filters["timestamp_to_human_readable"] = timestamp_to_human_readable
 
-base_template = """
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>OpenRecall</title>
-  <!-- Bootstrap CSS -->
-  <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.3.0/font/bootstrap-icons.css">
-  <style>
-    .slider-container {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      padding: 20px;
-    }
-    .slider {
-      width: 80%;
-    }
-    .slider-value {
-      margin-top: 10px;
-      font-size: 1.2em;
-    }
-    .image-container {
-      margin-top: 20px;
-      text-align: center;
-    }
-    .image-container img {
-      max-width: 100%;
-      height: auto;
-    }
-  </style>
-</head>
-<body>
-<nav class="navbar navbar-light bg-light">
-  <div class="container">
-    <form class="form-inline my-2 my-lg-0 w-100 d-flex justify-content-between" action="/search" method="get">
-      <div class="form-group">
-        <input type="text" class="form-control" name="q" placeholder="Search" value="{{ request.args.get('q', '') }}">
-      </div>
-      <div class="form-group mx-sm-3">
-        <label for="start_time" class="mr-2">Start Time</label>
-        <input type="datetime-local" class="form-control" name="start_time" value="{{ request.args.get('start_time', '') }}">
-      </div>
-      <div class="form-group mx-sm-3">
-        <label for="end_time" class="mr-2">End Time</label>
-        <input type="datetime-local" class="form-control" name="end_time" value="{{ request.args.get('end_time', '') }}">
-      </div>
-      <button class="btn btn-outline-secondary my-2 my-sm-0" type="submit">
-        <i class="bi bi-search"></i>
-      </button>
-    </form>
-  </div>
-</nav>
-{% block content %}
 
-{% endblock %}
-
-  <!-- Bootstrap and jQuery JS -->
-  <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.5.3/dist/umd/popper.min.js"></script>
-  <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
-</body>
-</html>
-"""
+def format_time(timestamp):
+    """Format timestamp to readable time string."""
+    dt = datetime.fromtimestamp(timestamp)
+    return dt.strftime("%Y-%m-%d %H:%M:%S")
 
 
-class StringLoader(BaseLoader):
-    def get_source(self, environment, template):
-        if template == "base_template":
-            return base_template, None, lambda: True
-        return None, None, None
+app.jinja_env.filters["datetime"] = format_time
 
 
-app.jinja_env.loader = StringLoader()
+@app.context_processor
+def inject_settings():
+    """Make settings available to all templates automatically."""
+    return {"settings": settings}
 
 
 @app.route("/")
+def index():
+    """Grid view - default landing page."""
+    entries = get_all_entries_with_status()
+    # Sort by timestamp descending (newest first)
+    entries.sort(key=lambda x: x.timestamp, reverse=True)
+    return render_template("index.html", entries=entries)
+
+
+@app.route("/timeline")
 def timeline():
-    # connect to db
+    """Timeline slider view - preserved from original."""
     timestamps = get_timestamps()
-    return render_template_string(
-        """
-{% extends "base_template" %}
-{% block content %}
-{% if timestamps|length > 0 %}
-  <div class="container">
-    <div class="slider-container">
-      <input type="range" class="slider custom-range" id="discreteSlider" min="0" max="{{timestamps|length - 1}}" step="1" value="{{timestamps|length - 1}}">
-      <div class="slider-value" id="sliderValue">{{timestamps[0] | timestamp_to_human_readable }}</div>
-    </div>
-    <div class="image-container">
-      <img id="timestampImage" src="/static/{{timestamps[0]}}.webp" alt="Image for timestamp">
-    </div>
-  </div>
-  <script>
-    const timestamps = {{ timestamps|tojson }};
-    const slider = document.getElementById('discreteSlider');
-    const sliderValue = document.getElementById('sliderValue');
-    const timestampImage = document.getElementById('timestampImage');
-
-    slider.addEventListener('input', function() {
-      const reversedIndex = timestamps.length - 1 - slider.value;
-      const timestamp = timestamps[reversedIndex];
-      sliderValue.textContent = new Date(timestamp * 1000).toLocaleString();  // Convert to human-readable format
-      timestampImage.src = `/static/${timestamp}.webp`;
-    });
-
-    // Initialize the slider with a default value
-    slider.value = timestamps.length - 1;
-    sliderValue.textContent = new Date(timestamps[0] * 1000).toLocaleString();  // Convert to human-readable format
-    timestampImage.src = `/static/${timestamps[0]}.webp`;
-  </script>
-{% else %}
-  <div class="container">
-      <div class="alert alert-info" role="alert">
-          Nothing recorded yet, wait a few seconds.
-      </div>
-  </div>
-{% endif %}
-{% endblock %}
-""",
-        timestamps=timestamps,
-    )
+    return render_template("timeline.html", timestamps=timestamps)
 
 
 @app.route("/search")
@@ -171,39 +81,50 @@ def search():
     similarities = [cosine_similarity(query_embedding, emb) for emb in embeddings]
     indices = np.argsort(similarities)[::-1]
     sorted_entries = [entries[i] for i in indices]
+    sorted_similarities = [similarities[i] for i in indices]
+    
+    # Add similarity score to each entry
+    for entry, similarity in zip(sorted_entries, sorted_similarities):
+        entry.similarity_score = similarity
 
-    return render_template_string(
-        """
-{% extends "base_template" %}
-{% block content %}
-    <div class="container">
-        <div class="row">
-            {% for entry in entries %}
-                <div class="col-md-3 mb-4">
-                    <div class="card">
-                        <a href="#" data-toggle="modal" data-target="#modal-{{ loop.index0 }}">
-                            <img src="/static/{{ entry.timestamp }}.webp" alt="Image" class="card-img-top">
-                        </a>
-                    </div>
-                </div>
-                <div class="modal fade" id="modal-{{ loop.index0 }}" tabindex="-1" role="dialog" aria-labelledby="exampleModalLabel" aria-hidden="true">
-                    <div class="modal-dialog modal-xl" role="document" style="max-width: none; width: 100vw; height: 100vh; padding: 20px;">
-                        <div class="modal-content" style="height: calc(100vh - 40px); width: calc(100vw - 40px); padding: 0;">
-                            <div class="modal-body" style="padding: 0;">
-                                <img src="/static/{{ entry.timestamp }}.webp" alt="Image" style="width: 100%; height: 100%; object-fit: contain; margin: 0 auto;">
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            {% endfor %}
-        </div>
-    </div>
-{% endblock %}
-""",
-        entries=sorted_entries,
-    )
+    return render_template("search.html", entries=sorted_entries)
 
 
 @app.route("/static/<filename>")
 def serve_image(filename):
     return send_from_directory(str(settings.screenshots_path), filename)
+
+
+@app.route("/screenshots/<path:filename>")
+def serve_screenshot(filename):
+    """Serve screenshot images from the screenshots directory."""
+    return send_from_directory(str(settings.screenshots_path), filename)
+
+
+def init_background_worker(app_instance):
+    """Initialize the background processing worker with crash recovery.
+    
+    This function:
+    1. Recovers 'zombie' tasks stuck in PROCESSING state from crashes
+    2. Starts the background worker thread
+    3. Attaches worker to app instance to prevent garbage collection
+    
+    Args:
+        app_instance: Flask app instance to attach worker to
+    """
+    # Import here to avoid circular dependency
+    from openrecall.server.worker import ProcessingWorker
+    
+    # Step 1: Zombie Recovery - Fix tasks left in PROCESSING from previous crash
+    count = reset_stuck_tasks()
+    if count > 0:
+        logger.warning(f"⚠️ Recovered {count} stuck tasks (Zombies) from previous session.")
+    
+    # Step 2: Start the Engine
+    worker = ProcessingWorker()
+    worker.daemon = True  # Ensure it dies when main process dies
+    worker.start()
+    
+    # Step 3: Attach to App (Crucial: Prevents Garbage Collection)
+    app_instance.worker = worker
+    logger.info("🚀 Background Processing Worker started successfully.")

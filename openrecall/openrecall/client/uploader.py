@@ -100,7 +100,8 @@ class HTTPUploader:
                 timeout=self.timeout
             )
             
-            if response.status_code == 200:
+            # Accept both 200 (old sync) and 202 (new async) as success
+            if response.status_code in (200, 202):
                 return True
             else:
                 print(f"Upload failed: {response.status_code} - {response.text}")

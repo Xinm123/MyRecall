@@ -107,7 +107,7 @@ class AIEngine:
                     {"type": "image", "image": image},
                     {
                         "type": "text",
-                        "text": "Briefly describe: 1) the application being used, 2) what the user is doing. Do not list visible text."
+                        "text": "In one sentence: What app is this and what is the user doing?"
                     }
                 ]
             }

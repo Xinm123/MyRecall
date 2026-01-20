@@ -25,6 +25,7 @@ def main():
     logger.info("=" * 50)
     logger.info("OpenRecall Client Starting")
     logger.info("=" * 50)
+    logger.info(f"Debug mode: {'ON' if settings.debug else 'OFF'}")
     logger.info(f"Buffer path: {settings.buffer_path}")
     logger.info(f"Server API: {settings.api_url}")
     logger.info(f"Capture interval: {settings.capture_interval}s")

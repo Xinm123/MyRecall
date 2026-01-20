@@ -40,7 +40,7 @@ class TestRecallEntryModel:
 
     def test_invalid_embedding_type_raises(self):
         """Verify invalid embedding types raise ValueError."""
-        with pytest.raises(ValueError, match="must be bytes or np.ndarray"):
+        with pytest.raises(ValueError, match="must be bytes, np.ndarray or None"):
             RecallEntry(
                 timestamp=123,
                 app="test",
