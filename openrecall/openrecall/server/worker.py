@@ -59,16 +59,18 @@ class ProcessingWorker(threading.Thread):
                 try:
                     # Phase 8.2: Check if AI processing is enabled
                     if not runtime_settings.ai_processing_enabled:
-                        # AI processing disabled - wait and continue without processing
-                        self._stop_event.wait(1)
+                        if self._stop_event.wait(0.1):
+                            continue
+                        runtime_settings.wait_for_change(0.4)
                         continue
                     
                     # Check queue size and determine processing order
                     pending_count = db.get_pending_count(conn)
                     
                     if pending_count == 0:
-                        # No work to do, wait briefly
-                        self._stop_event.wait(1)
+                        if self._stop_event.wait(0.1):
+                            continue
+                        runtime_settings.wait_for_change(0.4)
                         continue
                     
                     # Determine LIFO vs FIFO mode
@@ -80,7 +82,9 @@ class ProcessingWorker(threading.Thread):
                     
                     if task is None:
                         # Race condition: task was taken by another process
-                        self._stop_event.wait(0.1)
+                        if self._stop_event.wait(0.05):
+                            continue
+                        runtime_settings.wait_for_change(0.05)
                         continue
                     
                     # Log processing start
@@ -91,10 +95,14 @@ class ProcessingWorker(threading.Thread):
                         )
                     
                     # Mark as PROCESSING
-                    db.mark_task_processing(conn, task.id)
+                    if not db.mark_task_processing(conn, task.id):
+                        self._stop_event.wait(0.1)
+                        continue
                     
                     # Execute processing pipeline
-                    self._process_task(conn, task, ai_engine, nlp_engine)
+                    with runtime_settings._lock:
+                        ai_processing_version = runtime_settings.ai_processing_version
+                    self._process_task(conn, task, ai_engine, nlp_engine, ai_processing_version)
                     
                 except Exception as e:
                     logger.error(f"Error in worker loop: {e}")
@@ -112,7 +120,8 @@ class ProcessingWorker(threading.Thread):
         conn: sqlite3.Connection,
         task: RecallEntry,
         ai_engine,
-        nlp_engine
+        nlp_engine,
+        ai_processing_version: int
     ):
         """Process a single task through the OCR → AI → NLP pipeline.
         
@@ -123,6 +132,17 @@ class ProcessingWorker(threading.Thread):
             nlp_engine: NLP engine instance for text embedding.
         """
         try:
+            def should_cancel() -> bool:
+                with runtime_settings._lock:
+                    return (
+                        (not runtime_settings.ai_processing_enabled)
+                        or runtime_settings.ai_processing_version != ai_processing_version
+                    )
+
+            if should_cancel():
+                db.mark_task_cancelled_if_processing(conn, task.id)
+                return
+
             # Reconstruct image path from timestamp
             image_path = settings.screenshots_path / f"{task.timestamp}.png"
             
@@ -136,11 +156,17 @@ class ProcessingWorker(threading.Thread):
             image_array = np.array(image)
             
             # Step 1: OCR text extraction
+            if should_cancel():
+                db.mark_task_cancelled_if_processing(conn, task.id)
+                return
             text = extract_text_from_image(image_array)
             if settings.debug:
                 logger.debug(f"  OCR: {len(text)} chars extracted")
             
             # Step 2: AI image analysis (pass PIL Image object)
+            if should_cancel():
+                db.mark_task_cancelled_if_processing(conn, task.id)
+                return
             description = ai_engine.analyze_image(image)
             if settings.debug:
                 logger.debug(f"  AI: {len(description)} chars description")
@@ -158,11 +184,17 @@ class ProcessingWorker(threading.Thread):
                 logger.debug(f"  🔗 合并文本 (总计 {len(combined_text)} chars):\n{combined_text}")
                 logger.debug("="*80)
             
+            if should_cancel():
+                db.mark_task_cancelled_if_processing(conn, task.id)
+                return
             embedding = nlp_engine.encode(combined_text)
             if settings.debug:
                 logger.debug(f"  NLP: Embedding shape {embedding.shape}")
             
             # Mark as completed
+            if should_cancel():
+                db.mark_task_cancelled_if_processing(conn, task.id)
+                return
             success = db.mark_task_completed(
                 conn,
                 task.id,
@@ -175,6 +207,9 @@ class ProcessingWorker(threading.Thread):
                 if settings.debug:
                     logger.info(f"✅ Task #{task.id} completed successfully")
             else:
+                if should_cancel():
+                    db.mark_task_cancelled_if_processing(conn, task.id)
+                    return
                 logger.error(f"⚠️ Task #{task.id}: Failed to update database")
         
         except Exception as e:

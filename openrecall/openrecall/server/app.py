@@ -2,6 +2,7 @@ import os
 import logging
 from threading import Thread
 from datetime import datetime
+from pathlib import Path
 
 import numpy as np
 from flask import Flask, render_template, request, send_from_directory
@@ -53,7 +54,30 @@ def index():
     entries = get_all_entries_with_status()
     # Sort by timestamp descending (newest first)
     entries.sort(key=lambda x: x.timestamp, reverse=True)
-    return render_template("index.html", entries=entries)
+
+    # Calculate counts
+    stats = {
+        "completed": sum(1 for e in entries if e.status == "COMPLETED"),
+        "pending": sum(1 for e in entries if e.status == "PENDING"),
+        "processing": sum(1 for e in entries if e.status == "PROCESSING"),
+    }
+
+    serialized_entries = [
+        {
+            "id": entry.id,
+            "timestamp": entry.timestamp,
+            "app": entry.app,
+            "title": entry.title,
+            "description": entry.description,
+            "status": entry.status,
+            "filename": f"{entry.timestamp}.png",
+            "app_name": entry.app,
+            "window_title": entry.title,
+        }
+        for entry in entries
+    ]
+
+    return render_template("index.html", entries=serialized_entries, stats=stats)
 
 
 @app.route("/timeline")
@@ -116,6 +140,12 @@ def serve_image(filename):
 def serve_screenshot(filename):
     """Serve screenshot images from the screenshots directory."""
     return send_from_directory(str(settings.screenshots_path), filename)
+
+
+@app.route("/vendor/<path:filename>")
+def serve_vendor_asset(filename):
+    vendor_dir = Path(__file__).resolve().parent / "vendor"
+    return send_from_directory(str(vendor_dir), filename)
 
 
 def init_background_worker(app_instance):

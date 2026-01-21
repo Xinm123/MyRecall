@@ -13,7 +13,14 @@ import numpy as np
 from flask import Blueprint, jsonify, request
 from PIL import Image
 
-from openrecall.server.database import insert_pending_entry, get_pending_count
+from openrecall.server.database import (
+    cancel_processing_tasks,
+    get_memories_since,
+    get_recent_memories,
+    get_pending_count,
+    insert_pending_entry,
+    reset_stuck_tasks,
+)
 from openrecall.server.config_runtime import runtime_settings
 from openrecall.shared.config import settings
 
@@ -30,6 +37,54 @@ def health():
         JSON response with status "ok" and HTTP 200.
     """
     return jsonify({"status": "ok"}), 200
+
+
+@api_bp.route("/memories/latest", methods=["GET"])
+def memories_latest():
+    since_str = (request.args.get("since") or "0").strip()
+    try:
+        since = float(since_str)
+    except ValueError:
+        return (
+            jsonify(
+                {
+                    "status": "error",
+                    "message": "Query parameter 'since' must be a float",
+                }
+            ),
+            400,
+        )
+
+    try:
+        memories = get_memories_since(since)
+        return jsonify(memories), 200
+    except Exception as e:
+        logger.exception("Error fetching latest memories")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+@api_bp.route("/memories/recent", methods=["GET"])
+def memories_recent():
+    limit_str = (request.args.get("limit") or "200").strip()
+    try:
+        limit = int(limit_str)
+    except ValueError:
+        return (
+            jsonify(
+                {
+                    "status": "error",
+                    "message": "Query parameter 'limit' must be an integer",
+                }
+            ),
+            400,
+        )
+
+    try:
+        memories = get_recent_memories(limit=limit)
+        return jsonify(memories), 200
+    except Exception as e:
+        logger.exception("Error fetching recent memories")
+        return jsonify({"status": "error", "message": str(e)}), 500
 
 
 @api_bp.route("/queue/status", methods=["GET"])
@@ -227,7 +282,16 @@ def update_config():
                         "message": f"Field {field} must be boolean"
                     }), 400
                 
+                # Special handling for ai_processing_enabled:
+                if field == "ai_processing_enabled" and not value and getattr(runtime_settings, field):
+                    logger.info("AI processing disabled: Will stop picking up new tasks")
+                    cancel_processing_tasks()
+                    runtime_settings.ai_processing_version += 1
+                if field == "ai_processing_enabled" and value and not getattr(runtime_settings, field):
+                    runtime_settings.ai_processing_version += 1
+
                 setattr(runtime_settings, field, value)
+                runtime_settings.notify_change()
             
             # Return updated config
             config = runtime_settings.to_dict()

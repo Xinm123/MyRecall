@@ -30,6 +30,9 @@ class RuntimeSettings:
         
         self.ai_processing_enabled: bool = True
         """Whether AI processing pipeline is active."""
+
+        self.ai_processing_version: int = 0
+        """Monotonic version for AI processing toggle; used to cancel in-flight tasks."""
         
         self.ui_show_ai: bool = True
         """Whether AI results are shown in the UI."""
@@ -40,6 +43,7 @@ class RuntimeSettings:
         
         # Thread safety
         self._lock = threading.RLock()
+        self._change_event = threading.Event()
     
     def to_dict(self) -> dict:
         """Convert all settings to dictionary.
@@ -52,9 +56,17 @@ class RuntimeSettings:
                 "recording_enabled": self.recording_enabled,
                 "upload_enabled": self.upload_enabled,
                 "ai_processing_enabled": self.ai_processing_enabled,
+                "ai_processing_version": self.ai_processing_version,
                 "ui_show_ai": self.ui_show_ai,
                 "last_heartbeat": self.last_heartbeat,
             }
+
+    def notify_change(self) -> None:
+        self._change_event.set()
+
+    def wait_for_change(self, timeout: float) -> None:
+        self._change_event.wait(timeout)
+        self._change_event.clear()
 
 
 # Module-level singleton instance

@@ -99,7 +99,7 @@ class Settings(BaseSettings):
         description="Disable similarity-based deduplication and capture every cycle"
     )
     client_save_local_screenshots: bool = Field(
-        default=True,
+        default=False,
         alias="OPENRECALL_CLIENT_SAVE_LOCAL_SCREENSHOTS",
         description="Whether the client saves local screenshots (WebP) in addition to buffering/uploading"
     )

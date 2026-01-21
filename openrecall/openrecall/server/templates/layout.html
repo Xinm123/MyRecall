@@ -6,7 +6,7 @@
   <title>{% block title %}MyRecall{% endblock %}</title>
   
   <!-- Alpine.js -->
-  <script src="//unpkg.com/alpinejs" defer></script>
+  <script src="/vendor/alpine.min.js" defer onerror="this.onerror=null;this.src='https://unpkg.com/alpinejs';"></script>
   
   <!-- Icons Module Import -->
   {% import 'icons.html' as icons %}
@@ -371,7 +371,7 @@
         <button 
           @click="toggle()" 
           class="toolbar-icon-link" 
-          title="Control Center"
+          title="Control"
           style="position: relative; margin-left: 8px;">
           {{ icons.icon_sliders() }}
         </button>
@@ -514,6 +514,7 @@
           })
           .then(data => {
             console.log('Config updated on server:', data);
+            window.dispatchEvent(new CustomEvent('openrecall-config-changed', { detail: data }));
           })
           .catch(error => {
             console.error('Failed to update setting:', error);

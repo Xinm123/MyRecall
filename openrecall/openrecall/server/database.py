@@ -290,6 +290,81 @@ def get_entries_since(start_time: int) -> List[RecallEntry]:
     return entries
 
 
+def get_memories_since(timestamp: float) -> List[dict]:
+    """Retrieves entries with timestamp > timestamp, ordered by timestamp DESC."""
+    memories: List[dict] = []
+    try:
+        with sqlite3.connect(str(settings.db_path)) as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT id, app, title, text, description, timestamp, status FROM entries "
+                "WHERE timestamp > ? ORDER BY timestamp DESC",
+                (timestamp,),
+            )
+            for row in cursor.fetchall():
+                try:
+                    status = row["status"]
+                except (KeyError, IndexError):
+                    status = "COMPLETED"
+                ts = row["timestamp"]
+                memories.append(
+                    {
+                        "id": row["id"],
+                        "timestamp": ts,
+                        "app": row["app"],
+                        "title": row["title"],
+                        "text": row["text"],
+                        "description": row["description"],
+                        "status": status,
+                        "filename": f"{ts}.png",
+                        "app_name": row["app"],
+                        "window_title": row["title"],
+                    }
+                )
+    except sqlite3.Error as e:
+        print(f"Database error while fetching memories since time: {e}")
+    return memories
+
+
+def get_recent_memories(limit: int = 200) -> List[dict]:
+    memories: List[dict] = []
+    normalized_limit = int(limit) if limit else 200
+    if normalized_limit < 1:
+        normalized_limit = 1
+    if normalized_limit > 1000:
+        normalized_limit = 1000
+
+    try:
+        with sqlite3.connect(str(settings.db_path)) as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT id, app, title, text, description, timestamp, status FROM entries "
+                "ORDER BY timestamp DESC LIMIT ?",
+                (normalized_limit,),
+            )
+            for row in cursor.fetchall():
+                ts = row["timestamp"]
+                memories.append(
+                    {
+                        "id": row["id"],
+                        "timestamp": ts,
+                        "app": row["app"],
+                        "title": row["title"],
+                        "text": row["text"],
+                        "description": row["description"],
+                        "status": row["status"],
+                        "filename": f"{ts}.png",
+                        "app_name": row["app"],
+                        "window_title": row["title"],
+                    }
+                )
+    except sqlite3.Error as e:
+        print(f"Database error while fetching recent memories: {e}")
+    return memories
+
+
 def get_entries_until(end_time: int) -> List[RecallEntry]:
     """Retrieves COMPLETED entries with timestamp <= end_time."""
     entries: List[RecallEntry] = []
@@ -353,7 +428,7 @@ def get_next_task(conn: sqlite3.Connection, lifo_mode: bool = False) -> Optional
         order = "DESC" if lifo_mode else "ASC"
         cursor.execute(
             f"SELECT id, app, title, text, description, timestamp, embedding, status "
-            f"FROM entries WHERE status='PENDING' ORDER BY timestamp {order} LIMIT 1"
+            f"FROM entries WHERE status IN ('PENDING', 'CANCELLED') ORDER BY timestamp {order} LIMIT 1"
         )
         row = cursor.fetchone()
         if row:
@@ -416,6 +491,38 @@ def mark_task_processing(conn: sqlite3.Connection, task_id: int) -> bool:
         return False
 
 
+def mark_task_cancelled_if_processing(conn: sqlite3.Connection, task_id: int) -> bool:
+    try:
+        cursor = conn.cursor()
+        cursor.execute("UPDATE entries SET status='CANCELLED' WHERE id=? AND status='PROCESSING'", (task_id,))
+        conn.commit()
+        return cursor.rowcount > 0
+    except sqlite3.Error as e:
+        logger.error(f"Database error while cancelling task {task_id}: {e}")
+        return False
+
+
+def cancel_processing_tasks(conn: Optional[sqlite3.Connection] = None) -> int:
+    count = 0
+    try:
+        if conn is None:
+            with sqlite3.connect(str(settings.db_path)) as conn:
+                cursor = conn.cursor()
+                cursor.execute("UPDATE entries SET status='CANCELLED' WHERE status='PROCESSING'")
+                count = cursor.rowcount
+                conn.commit()
+        else:
+            cursor = conn.cursor()
+            cursor.execute("UPDATE entries SET status='CANCELLED' WHERE status='PROCESSING'")
+            count = cursor.rowcount
+            conn.commit()
+        if count > 0:
+            logger.info(f"Cancelled {count} processing tasks")
+    except sqlite3.Error as e:
+        logger.error(f"Database error while cancelling processing tasks: {e}")
+    return count
+
+
 def mark_task_completed(
     conn: sqlite3.Connection,
     task_id: int,
@@ -439,7 +546,8 @@ def mark_task_completed(
         embedding_bytes = embedding.astype(np.float32).tobytes()
         cursor = conn.cursor()
         cursor.execute(
-            "UPDATE entries SET text=?, description=?, embedding=?, status='COMPLETED' WHERE id=?",
+            "UPDATE entries SET text=?, description=?, embedding=?, status='COMPLETED' "
+            "WHERE id=? AND status IN ('PROCESSING', 'PENDING')",
             (text, description, embedding_bytes, task_id)
         )
         conn.commit()
