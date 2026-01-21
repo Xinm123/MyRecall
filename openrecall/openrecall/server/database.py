@@ -272,6 +272,42 @@ def get_entries_by_time_range(start_time: int, end_time: int) -> List[RecallEntr
     return entries
 
 
+def get_entries_since(start_time: int) -> List[RecallEntry]:
+    """Retrieves COMPLETED entries with timestamp >= start_time."""
+    entries: List[RecallEntry] = []
+    try:
+        with sqlite3.connect(str(settings.db_path)) as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT id, app, title, text, description, timestamp, embedding, status FROM entries "
+                "WHERE timestamp >= ? AND status='COMPLETED' ORDER BY timestamp DESC",
+                (start_time,),
+            )
+            entries = [_row_to_entry(row) for row in cursor.fetchall()]
+    except sqlite3.Error as e:
+        print(f"Database error while fetching entries since time: {e}")
+    return entries
+
+
+def get_entries_until(end_time: int) -> List[RecallEntry]:
+    """Retrieves COMPLETED entries with timestamp <= end_time."""
+    entries: List[RecallEntry] = []
+    try:
+        with sqlite3.connect(str(settings.db_path)) as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT id, app, title, text, description, timestamp, embedding, status FROM entries "
+                "WHERE timestamp <= ? AND status='COMPLETED' ORDER BY timestamp DESC",
+                (end_time,),
+            )
+            entries = [_row_to_entry(row) for row in cursor.fetchall()]
+    except sqlite3.Error as e:
+        print(f"Database error while fetching entries until time: {e}")
+    return entries
+
+
 # ============================================================================
 # Async Infrastructure Helper Methods (Phase 6.4)
 # ============================================================================

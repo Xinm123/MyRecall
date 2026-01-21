@@ -10,19 +10,15 @@ Tests the integration between RuntimeSettings and Worker/Client logic:
 import json
 import logging
 import sqlite3
-import sys
 import threading
 import time
 import unittest
-from pathlib import Path
 from unittest.mock import MagicMock, Mock, patch, call
 from io import StringIO
 
 import numpy as np
 from PIL import Image
-
-# Configure path for imports
-sys.path.insert(0, str(Path(__file__).parent.parent))
+import requests
 
 from openrecall.server.config_runtime import runtime_settings
 from openrecall.server.worker import ProcessingWorker
@@ -131,14 +127,13 @@ class TestRecorderPhase82(unittest.TestCase):
         }
         
         # Act
-        with patch('urllib.request.urlopen') as mock_urlopen:
-            # Mock successful response
+        with patch("openrecall.client.recorder.requests.post") as mock_post:
             mock_response = MagicMock()
-            mock_response.read.return_value = json.dumps(mock_response_data).encode()
-            mock_response.__enter__.return_value = mock_response
-            mock_urlopen.return_value = mock_response
-            
-            with patch('openrecall.client.recorder.settings.port', 8083):
+            mock_response.raise_for_status.return_value = None
+            mock_response.json.return_value = mock_response_data
+            mock_post.return_value = mock_response
+
+            with patch("openrecall.client.recorder.settings.api_url", "http://localhost:8083/api"):
                 recorder._send_heartbeat()
         
         # Assert
@@ -155,7 +150,7 @@ class TestRecorderPhase82(unittest.TestCase):
         recorder.upload_enabled = True
         
         # Act
-        with patch('urllib.request.urlopen', side_effect=Exception("Network error")):
+        with patch("openrecall.client.recorder.requests.post", side_effect=requests.RequestException("Network error")):
             recorder._send_heartbeat()
         
         # Assert - should still have default values
@@ -170,23 +165,13 @@ class TestRecorderPhase82(unittest.TestCase):
         recorder = ScreenRecorder()
         
         # Act
-        with patch('urllib.request.Request') as mock_request:
-            mock_request.return_value = MagicMock()
-            with patch('urllib.request.urlopen', side_effect=Exception("Stop here")):
-                try:
-                    recorder._send_heartbeat()
-                except:
-                    pass
-            
-            # Assert - check URL was constructed correctly
-            call_args = mock_request.call_args
-            if call_args:
-                url = call_args[0][0] if call_args[0] else None
-                if url:
-                    self.assertIn('/api/heartbeat', url,
-                                 "Should call /api/heartbeat endpoint")
-                    self.assertIn('localhost', url,
-                                 "Should use localhost")
+        with patch("openrecall.client.recorder.requests.post", side_effect=requests.RequestException("Stop here")) as mock_post:
+            with patch("openrecall.client.recorder.settings.api_url", "http://localhost:8083/api"):
+                recorder._send_heartbeat()
+
+        called_url = mock_post.call_args[0][0]
+        self.assertIn("/api/heartbeat", called_url, "Should call /api/heartbeat endpoint")
+        self.assertIn("localhost", called_url, "Should use localhost")
     
     def test_recorder_respects_recording_enabled_rule1(self):
         """Test Rule 1: Stop recording when recording_enabled=False."""
@@ -318,15 +303,13 @@ class TestPhase82Integration(unittest.TestCase):
             runtime_settings.recording_enabled = True
         
         # Act - Sync from server that has disabled recording
-        with patch('urllib.request.urlopen') as mock_urlopen:
+        with patch("openrecall.client.recorder.requests.post") as mock_post:
             mock_response = MagicMock()
-            mock_response.read.return_value = json.dumps({
-                "config": {"recording_enabled": False}
-            }).encode()
-            mock_response.__enter__.return_value = mock_response
-            mock_urlopen.return_value = mock_response
-            
-            with patch('openrecall.client.recorder.settings.port', 8083):
+            mock_response.raise_for_status.return_value = None
+            mock_response.json.return_value = {"config": {"recording_enabled": False}}
+            mock_post.return_value = mock_response
+
+            with patch("openrecall.client.recorder.settings.api_url", "http://localhost:8083/api"):
                 recorder._send_heartbeat()
         
         # Assert
@@ -341,15 +324,13 @@ class TestPhase82Integration(unittest.TestCase):
             runtime_settings.upload_enabled = True
         
         # Act - Sync from server that has disabled upload
-        with patch('urllib.request.urlopen') as mock_urlopen:
+        with patch("openrecall.client.recorder.requests.post") as mock_post:
             mock_response = MagicMock()
-            mock_response.read.return_value = json.dumps({
-                "config": {"upload_enabled": False}
-            }).encode()
-            mock_response.__enter__.return_value = mock_response
-            mock_urlopen.return_value = mock_response
-            
-            with patch('openrecall.client.recorder.settings.port', 8083):
+            mock_response.raise_for_status.return_value = None
+            mock_response.json.return_value = {"config": {"upload_enabled": False}}
+            mock_post.return_value = mock_response
+
+            with patch("openrecall.client.recorder.settings.api_url", "http://localhost:8083/api"):
                 recorder._send_heartbeat()
         
         # Assert
@@ -425,7 +406,7 @@ class TestPhase82EdgeCases(unittest.TestCase):
         recorder = ScreenRecorder()
         
         # Act
-        with patch('urllib.request.urlopen', side_effect=TimeoutError("Timeout")):
+        with patch("openrecall.client.recorder.requests.post", side_effect=requests.Timeout("Timeout")):
             recorder._send_heartbeat()
         
         # Assert - should keep current state
@@ -438,12 +419,11 @@ class TestPhase82EdgeCases(unittest.TestCase):
         recorder = ScreenRecorder()
         
         # Act
-        with patch('urllib.request.urlopen') as mock_urlopen:
+        with patch("openrecall.client.recorder.requests.post") as mock_post:
             mock_response = MagicMock()
-            mock_response.read.return_value = b"invalid json"
-            mock_response.__enter__.return_value = mock_response
-            mock_urlopen.return_value = mock_response
-            
+            mock_response.raise_for_status.return_value = None
+            mock_response.json.side_effect = ValueError("invalid json")
+            mock_post.return_value = mock_response
             recorder._send_heartbeat()
         
         # Assert - should not crash
@@ -457,13 +437,11 @@ class TestPhase82EdgeCases(unittest.TestCase):
         recorder.upload_enabled = True
         
         # Act
-        with patch('urllib.request.urlopen') as mock_urlopen:
+        with patch("openrecall.client.recorder.requests.post") as mock_post:
             mock_response = MagicMock()
-            # Missing fields - empty config
-            mock_response.read.return_value = json.dumps({"config": {}}).encode()
-            mock_response.__enter__.return_value = mock_response
-            mock_urlopen.return_value = mock_response
-            
+            mock_response.raise_for_status.return_value = None
+            mock_response.json.return_value = {"config": {}}
+            mock_post.return_value = mock_response
             recorder._send_heartbeat()
         
         # Assert - should keep defaults

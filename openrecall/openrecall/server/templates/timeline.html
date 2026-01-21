@@ -4,41 +4,50 @@
 
 {% block extra_head %}
 <style>
+  html[data-current-view="timeline"] main {
+    padding-top: 12px;
+  }
+
   .slider-container {
     display: flex;
     flex-direction: column;
     align-items: center;
-    padding: 20px;
+    padding: 12px 16px;
     background: var(--bg-card);
     border-radius: 12px;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
-    margin-bottom: 20px;
+    margin-bottom: 12px;
   }
   
   .slider {
-    width: 80%;
-    margin: 10px 0;
+    width: 86%;
+    margin: 8px 0;
   }
   
   .slider-value {
-    margin-top: 10px;
+    margin-top: 6px;
     font-size: 1.2em;
     color: var(--text-primary);
   }
   
   .image-container {
-    margin-top: 20px;
+    margin-top: 12px;
     text-align: center;
     background: var(--bg-card);
     border-radius: 12px;
-    padding: 20px;
+    padding: 10px 12px;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
   }
   
   .image-container img {
     max-width: 100%;
+    max-height: calc(72vh);
+    width: auto;
     height: auto;
+    object-fit: contain;
     border-radius: 8px;
+    display: block;
+    margin: 0 auto;
   }
   
   .alert {
@@ -69,8 +78,9 @@
 
 {% block extra_body %}
 {% if timestamps|length > 0 %}
+<script type="application/json" id="timelineTimestampsData">{{ timestamps|tojson }}</script>
 <script>
-  const timestamps = {{ timestamps|tojson }};
+  const timelineTimestamps = JSON.parse(document.getElementById('timelineTimestampsData').textContent);
   const slider = document.getElementById('discreteSlider');
   const sliderValue = document.getElementById('sliderValue');
   const timestampImage = document.getElementById('timestampImage');
@@ -87,16 +97,16 @@
   }
 
   slider.addEventListener('input', function() {
-    const reversedIndex = timestamps.length - 1 - slider.value;
-    const timestamp = timestamps[reversedIndex];
+    const reversedIndex = timelineTimestamps.length - 1 - slider.value;
+    const timestamp = timelineTimestamps[reversedIndex];
     sliderValue.textContent = formatDate24Hour(new Date(timestamp * 1000));
     timestampImage.src = `/static/${timestamp}.png`;
   });
 
   // Initialize the slider with a default value
-  slider.value = timestamps.length - 1;
-  sliderValue.textContent = formatDate24Hour(new Date(timestamps[0] * 1000));
-  timestampImage.src = `/static/${timestamps[0]}.png`;
+  slider.value = timelineTimestamps.length - 1;
+  sliderValue.textContent = formatDate24Hour(new Date(timelineTimestamps[0] * 1000));
+  timestampImage.src = `/static/${timelineTimestamps[0]}.png`;
 </script>
 {% endif %}
 {% endblock %}

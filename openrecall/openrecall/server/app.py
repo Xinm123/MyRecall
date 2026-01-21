@@ -14,6 +14,8 @@ from openrecall.server.database import (
     get_all_entries_with_status,
     get_timestamps,
     get_entries_by_time_range,
+    get_entries_since,
+    get_entries_until,
     reset_stuck_tasks,
 )
 from openrecall.server.nlp import cosine_similarity, get_embedding
@@ -63,18 +65,34 @@ def timeline():
 
 @app.route("/search")
 def search():
-    q = request.args.get("q")
-    start_time_str = request.args.get("start_time")
-    end_time_str = request.args.get("end_time")
+    q = (request.args.get("q") or "").strip()
+    start_time_str = (request.args.get("start_time") or "").strip()
+    end_time_str = (request.args.get("end_time") or "").strip()
 
-    if start_time_str and end_time_str:
-        start_time = int(
-            datetime.strptime(start_time_str, "%Y-%m-%dT%H:%M").timestamp()
-        )
-        end_time = int(datetime.strptime(end_time_str, "%Y-%m-%dT%H:%M").timestamp())
-        entries = get_entries_by_time_range(start_time, end_time)
+    def parse_minute_start(value: str) -> int | None:
+        if not value:
+            return None
+        try:
+            return int(datetime.strptime(value, "%Y-%m-%dT%H:%M").timestamp())
+        except ValueError:
+            return None
+
+    start_min = parse_minute_start(start_time_str)
+    end_min = parse_minute_start(end_time_str)
+
+    if start_min is not None and end_min is not None:
+        if start_min > end_min:
+            start_min, end_min = end_min, start_min
+        entries = get_entries_by_time_range(start_min, end_min + 59)
+    elif start_min is not None:
+        entries = get_entries_since(start_min)
+    elif end_min is not None:
+        entries = get_entries_until(end_min + 59)
     else:
         entries = get_all_entries()
+
+    if not q:
+        return render_template("search.html", entries=entries)
 
     embeddings = [entry.embedding for entry in entries]
     query_embedding = get_embedding(q)
@@ -82,8 +100,7 @@ def search():
     indices = np.argsort(similarities)[::-1]
     sorted_entries = [entries[i] for i in indices]
     sorted_similarities = [similarities[i] for i in indices]
-    
-    # Add similarity score to each entry
+
     for entry, similarity in zip(sorted_entries, sorted_similarities):
         entry.similarity_score = similarity
 

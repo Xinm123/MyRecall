@@ -1,0 +1,74 @@
+name: tests
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      run_e2e:
+        description: "Run Playwright E2E tests"
+        required: false
+        default: "false"
+
+jobs:
+  unit-integration:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[test]"
+      - name: Run tests (unit+integration)
+        env:
+          OPENRECALL_PRELOAD_MODELS: "false"
+        run: |
+          mkdir -p reports
+          pytest --junitxml=reports/junit.xml --cov=openrecall --cov-report=term-missing --cov-report=xml:reports/coverage.xml --cov-fail-under=80
+      - name: Enforce 100% on critical paths
+        run: |
+          python -m coverage report --rcfile=.coveragerc.critical --fail-under=100 --include="openrecall/server/api.py,openrecall/server/app.py,openrecall/server/database.py,openrecall/server/config_runtime.py,openrecall/server/nlp.py,openrecall/shared/config.py"
+      - name: Upload reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-reports
+          path: reports/
+
+  security:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[security]"
+      - name: Bandit
+        run: |
+          bandit -q -r openrecall -x openrecall/server/templates
+      - name: pip-audit
+        run: |
+          pip-audit
+
+  e2e:
+    if: github.event_name == 'workflow_dispatch' && inputs.run_e2e == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[test,e2e]"
+          python -m playwright install --with-deps chromium
+      - name: Run E2E
+        run: |
+          pytest -m e2e

@@ -1,0 +1,17 @@
+[run]
+branch = False
+source = openrecall
+omit =
+    tests/*
+    */__main__.py
+    openrecall/main.py
+    openrecall/client/recorder.py
+    openrecall/server/ai_engine.py
+    openrecall/server/ocr.py
+    openrecall/shared/utils.py
+    openrecall/shared/logging_config.py
+
+[report]
+show_missing = True
+skip_covered = False
+fail_under = 80

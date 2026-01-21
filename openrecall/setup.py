@@ -33,6 +33,21 @@ extras_require = {
     "python-doctr": [
         "python-doctr @ git+https://github.com/koenvaneijk/doctr.git@af711bc04eb8876a7189923fb51ec44481ee18cd"
     ],
+    "test": [
+        "pytest>=8.0.0",
+        "pytest-cov>=5.0.0",
+        "pytest-xdist>=3.6.0",
+    ],
+    "perf": [
+        "pytest-benchmark>=4.0.0",
+    ],
+    "security": [
+        "bandit>=1.7.8",
+        "pip-audit>=2.7.3",
+    ],
+    "e2e": [
+        "playwright>=1.41.0",
+    ],
 }
 
 # Determine the current OS

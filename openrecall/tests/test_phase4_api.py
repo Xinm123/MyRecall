@@ -7,19 +7,39 @@ Tests for HTTP communication between client and server:
 """
 
 import json
-import tempfile
+import importlib
+import time
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import numpy as np
 import pytest
 
-# Test configuration before importing modules
-with patch.dict("os.environ", {"OPENRECALL_DATA_DIR": tempfile.mkdtemp()}):
-    from openrecall.shared.config import Settings
-    from openrecall.server.app import app
-    from openrecall.server.api import api_bp
-    from openrecall.client.uploader import HTTPUploader, get_uploader
+from openrecall.shared.config import Settings
+from openrecall.client.uploader import HTTPUploader, get_uploader
+
+
+@pytest.fixture
+def flask_client(tmp_path, monkeypatch):
+    monkeypatch.setenv("OPENRECALL_DATA_DIR", str(tmp_path))
+
+    import openrecall.shared.config
+    importlib.reload(openrecall.shared.config)
+
+    import openrecall.server.database
+    importlib.reload(openrecall.server.database)
+    openrecall.server.database.create_db()
+
+    import openrecall.server.api
+    importlib.reload(openrecall.server.api)
+
+    import openrecall.server.app
+    importlib.reload(openrecall.server.app)
+
+    app = openrecall.server.app.app
+    app.config["TESTING"] = True
+    with app.test_client() as client:
+        yield client
 
 
 class TestAPISettings:
@@ -42,45 +62,31 @@ class TestAPISettings:
 class TestHealthEndpoint:
     """Tests for /api/health endpoint."""
 
-    @pytest.fixture
-    def client(self):
-        """Create Flask test client."""
-        app.config["TESTING"] = True
-        with app.test_client() as client:
-            yield client
-
-    def test_health_returns_ok(self, client):
+    def test_health_returns_ok(self, flask_client):
         """Test health check returns ok status."""
-        response = client.get("/api/health")
+        response = flask_client.get("/api/health")
         assert response.status_code == 200
         data = json.loads(response.data)
         assert data["status"] == "ok"
 
-    def test_health_returns_json(self, client):
+    def test_health_returns_json(self, flask_client):
         """Test health check returns JSON content type."""
-        response = client.get("/api/health")
+        response = flask_client.get("/api/health")
         assert response.content_type == "application/json"
 
 
 class TestUploadEndpoint:
     """Tests for /api/upload endpoint."""
 
-    @pytest.fixture
-    def client(self):
-        """Create Flask test client."""
-        app.config["TESTING"] = True
-        with app.test_client() as client:
-            yield client
-
-    def test_upload_missing_json(self, client):
+    def test_upload_missing_json(self, flask_client):
         """Test upload fails without JSON body."""
-        response = client.post("/api/upload")
+        response = flask_client.post("/api/upload")
         # Flask returns 415 when content-type is missing, or 400 with empty JSON
         assert response.status_code in (400, 415)
 
-    def test_upload_missing_fields(self, client):
+    def test_upload_missing_fields(self, flask_client):
         """Test upload fails with missing required fields."""
-        response = client.post(
+        response = flask_client.post(
             "/api/upload",
             data=json.dumps({"image": [1, 2, 3]}),
             content_type="application/json"
@@ -89,61 +95,41 @@ class TestUploadEndpoint:
         data = json.loads(response.data)
         assert "Missing field" in data["message"]
 
-    @patch("openrecall.server.api.extract_text_from_image")
-    @patch("openrecall.server.api.get_embedding")
-    @patch("openrecall.server.api.insert_entry")
-    def test_upload_success_with_text(self, mock_insert, mock_embed, mock_ocr, client):
-        """Test successful upload with OCR text."""
-        mock_ocr.return_value = "Sample extracted text"
-        mock_embed.return_value = np.random.rand(384).astype(np.float32)
-
+    def test_upload_success_accepted(self, flask_client, tmp_path):
+        """Test successful upload returns 202 and saves screenshot + queues entry."""
+        from openrecall.shared.config import settings
+        import sqlite3
         test_image = np.random.randint(0, 255, (10, 10, 3), dtype=np.uint8)
+        ts = int(time.time())
         payload = {
             "image": test_image.flatten().tolist(),
             "shape": list(test_image.shape),
             "dtype": "uint8",
-            "timestamp": 1234567890,
+            "timestamp": ts,
             "active_app": "TestApp",
             "active_window": "Test Window",
         }
 
-        response = client.post(
+        response = flask_client.post(
             "/api/upload",
             data=json.dumps(payload),
             content_type="application/json"
         )
 
-        assert response.status_code == 200
+        assert response.status_code == 202
         data = json.loads(response.data)
-        assert data["status"] == "ok"
-        assert "stored" in data["message"].lower()
-        mock_insert.assert_called_once()
+        assert data["status"] == "accepted"
+        assert "task_id" in data
 
-    @patch("openrecall.server.api.extract_text_from_image")
-    def test_upload_skips_empty_text(self, mock_ocr, client):
-        """Test upload skips storage when no text extracted."""
-        mock_ocr.return_value = "   "  # Whitespace only
+        screenshot_path = settings.screenshots_path / f"{ts}.png"
+        assert screenshot_path.exists()
 
-        test_image = np.random.randint(0, 255, (10, 10, 3), dtype=np.uint8)
-        payload = {
-            "image": test_image.flatten().tolist(),
-            "shape": list(test_image.shape),
-            "dtype": "uint8",
-            "timestamp": 1234567890,
-            "active_app": "TestApp",
-            "active_window": "Test Window",
-        }
-
-        response = client.post(
-            "/api/upload",
-            data=json.dumps(payload),
-            content_type="application/json"
-        )
-
-        assert response.status_code == 200
-        data = json.loads(response.data)
-        assert data["status"] == "ok"
-        assert "skipped" in data["message"].lower()
+        with sqlite3.connect(str(settings.db_path)) as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT status FROM entries WHERE timestamp=?", (ts,))
+            row = cursor.fetchone()
+            assert row is not None
+            assert row[0] == "PENDING"
 
 
 class TestHTTPUploader:
@@ -307,11 +293,13 @@ class TestAPIBlueprintRegistration:
 
     def test_api_blueprint_registered(self):
         """Test API blueprint is registered with Flask app."""
-        assert "api" in app.blueprints
+        import openrecall.server.app
+        assert "api" in openrecall.server.app.app.blueprints
 
     def test_api_routes_exist(self):
         """Test expected API routes are registered."""
-        rules = [rule.rule for rule in app.url_map.iter_rules()]
+        import openrecall.server.app
+        rules = [rule.rule for rule in openrecall.server.app.app.url_map.iter_rules()]
         assert "/api/health" in rules
         assert "/api/upload" in rules
 

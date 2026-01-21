@@ -27,6 +27,8 @@ def main():
     logger.info("=" * 50)
     logger.info(f"Debug mode: {'ON' if settings.debug else 'OFF'}")
     logger.info(f"Buffer path: {settings.buffer_path}")
+    logger.info(f"Client screenshots: {settings.client_screenshots_path} (enabled={settings.client_save_local_screenshots})")
+    logger.info(f"Cache folder: {settings.cache_path}")
     logger.info(f"Server API: {settings.api_url}")
     logger.info(f"Capture interval: {settings.capture_interval}s")
     logger.info(f"Upload timeout: {settings.upload_timeout}s")

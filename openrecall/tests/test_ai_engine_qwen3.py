@@ -12,11 +12,13 @@ import pytest
 from PIL import Image
 
 
-# Skip if running in CI without GPU resources
-pytestmark = pytest.mark.skipif(
-    os.environ.get("CI") == "true" and os.environ.get("HAS_GPU") != "true",
-    reason="Skipping AI engine tests in CI without GPU"
-)
+pytestmark = [
+    pytest.mark.model,
+    pytest.mark.skipif(
+        os.environ.get("CI") == "true" and os.environ.get("HAS_GPU") != "true",
+        reason="Skipping AI engine tests in CI without GPU",
+    ),
+]
 
 
 class TestAIEngine:

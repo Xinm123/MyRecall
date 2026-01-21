@@ -59,6 +59,7 @@ def main():
     logger.info("=" * 50)
     logger.info(f"Debug mode: {'ON' if settings.debug else 'OFF'}")
     logger.info(f"Data folder: {settings.base_path}")
+    logger.info(f"Cache folder: {settings.cache_path}")
     logger.info(f"Screenshots: {settings.screenshots_path}")
     logger.info(f"Database: {settings.db_path}")
     logger.info(f"API URL: http://localhost:{settings.port}/api")

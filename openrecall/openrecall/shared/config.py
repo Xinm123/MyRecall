@@ -1,6 +1,8 @@
 """Configuration management for OpenRecall using pydantic-settings."""
 
+import os
 from pathlib import Path
+import tempfile
 
 from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings
@@ -31,6 +33,16 @@ class Settings(BaseSettings):
     base_path: Path = Field(
         default_factory=lambda: Path.home() / ".myrecall_data",
         alias="OPENRECALL_DATA_DIR"
+    )
+    cache_dir: Path | None = Field(
+        default=None,
+        alias="OPENRECALL_CACHE_DIR",
+        description="Optional override for cache directory (HF/Transformers/Doctr/Torch caches)"
+    )
+    client_screenshots_dir: Path | None = Field(
+        default=None,
+        alias="OPENRECALL_CLIENT_SCREENSHOTS_DIR",
+        description="Optional override for client local screenshots directory"
     )
     api_url: str = Field(
         default="http://localhost:8083/api",
@@ -71,6 +83,26 @@ class Settings(BaseSettings):
         alias="OPENRECALL_SHOW_AI_DESCRIPTION",
         description="Toggle visibility of AI text on the frontend"
     )
+    user_idle_threshold_seconds: int = Field(
+        default=60,
+        alias="OPENRECALL_USER_IDLE_THRESHOLD_SECONDS",
+        description="Consider user inactive if idle time exceeds this threshold (seconds)"
+    )
+    similarity_threshold: float = Field(
+        default=0.98,
+        alias="OPENRECALL_SIMILARITY_THRESHOLD",
+        description="MSSIM threshold; higher captures more (images considered similar when MSSIM >= threshold)"
+    )
+    disable_similarity_filter: bool = Field(
+        default=False,
+        alias="OPENRECALL_DISABLE_SIMILARITY_FILTER",
+        description="Disable similarity-based deduplication and capture every cycle"
+    )
+    client_save_local_screenshots: bool = Field(
+        default=True,
+        alias="OPENRECALL_CLIENT_SAVE_LOCAL_SCREENSHOTS",
+        description="Whether the client saves local screenshots (WebP) in addition to buffering/uploading"
+    )
     
     model_config = {
         "env_prefix": "",
@@ -82,6 +114,14 @@ class Settings(BaseSettings):
     def screenshots_path(self) -> Path:
         """Directory for storing screenshot images."""
         return self.base_path / "screenshots"
+
+    @property
+    def client_screenshots_path(self) -> Path:
+        """Directory for storing client local screenshots.
+        
+        Defaults to screenshots_path for backwards compatibility.
+        """
+        return self.client_screenshots_dir or self.screenshots_path
     
     @property
     def db_path(self) -> Path:
@@ -97,6 +137,10 @@ class Settings(BaseSettings):
     def model_cache_path(self) -> Path:
         """Directory for caching ML models."""
         return self.base_path / "models"
+
+    @property
+    def cache_path(self) -> Path:
+        return self.cache_dir or (self.base_path / "cache")
     
     def ensure_directories(self) -> None:
         """Create all required directories if they don't exist.
@@ -111,18 +155,44 @@ class Settings(BaseSettings):
         directories = [
             self.base_path,
             self.screenshots_path,
+            self.client_screenshots_path,
             self.buffer_path,
             self.db_path.parent,
             self.model_cache_path,
+            self.cache_path,
         ]
         
         for directory in directories:
             directory.mkdir(parents=True, exist_ok=True)
+
+    def verify_writable(self) -> None:
+        test_path = self.base_path / ".write_test"
+        test_path.write_bytes(b"ok")
+        test_path.unlink(missing_ok=True)
     
+    def configure_cache_env(self) -> None:
+        cache = str(self.cache_path)
+        defaults = {
+            "HF_HOME": cache,
+            "TRANSFORMERS_CACHE": str(self.cache_path / "transformers"),
+            "SENTENCE_TRANSFORMERS_HOME": str(self.cache_path / "sentence_transformers"),
+            "TORCH_HOME": str(self.cache_path / "torch"),
+            "DOCTR_CACHE_DIR": str(self.cache_path / "doctr"),
+        }
+        for key, value in defaults.items():
+            os.environ.setdefault(key, value)
+
     @model_validator(mode="after")
     def _ensure_dirs_on_init(self) -> "Settings":
         """Automatically create directories after settings initialization."""
-        self.ensure_directories()
+        try:
+            self.ensure_directories()
+            self.verify_writable()
+        except PermissionError:
+            self.base_path = Path(tempfile.gettempdir()) / "myrecall_data"
+            self.ensure_directories()
+            self.verify_writable()
+        self.configure_cache_env()
         return self
 
 

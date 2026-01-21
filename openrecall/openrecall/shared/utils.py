@@ -2,6 +2,8 @@ import sys
 import datetime
 import re
 
+from openrecall.shared.config import settings
+
 # Platform-specific imports with error handling
 try:
     import psutil
@@ -328,7 +330,7 @@ def is_user_active_osx() -> bool:
     """Checks if the user is active on macOS based on HID idle time.
 
     Requires the pyobjc package and uses the 'ioreg' command. Considers the user
-    active if the idle time is less than 5 seconds.
+    active if the idle time is less than the configured threshold.
 
     Returns:
         True if the user is considered active, False otherwise. Returns True
@@ -353,8 +355,8 @@ def is_user_active_osx() -> bool:
                 # Convert idle time from nanoseconds to seconds
                 idle_seconds = idle_time / 1_000_000_000  # Use underscore for clarity
 
-                # If idle time is less than 5 seconds, consider the user active
-                return idle_seconds < 5.0
+                threshold = float(getattr(settings, "user_idle_threshold_seconds", 60))
+                return idle_seconds < threshold
 
         # If "HIDIdleTime" is not found (e.g., screen locked), assume inactive?
         # Or assume active as a fallback? Let's assume active for now.
@@ -378,7 +380,7 @@ def is_user_active_windows() -> bool:
     """Checks if the user is active on Windows based on last input time.
 
     Requires the pywin32 package. Considers the user active if the last input
-    was less than 5 seconds ago.
+    was less than the configured threshold.
 
     Returns:
         True if the user is considered active, False otherwise. Returns True
@@ -393,7 +395,8 @@ def is_user_active_windows() -> bool:
         current_time = win32api.GetTickCount()
         idle_milliseconds = current_time - last_input_info
         idle_seconds = idle_milliseconds / 1000.0
-        return idle_seconds < 5.0
+        threshold = float(getattr(settings, "user_idle_threshold_seconds", 60))
+        return idle_seconds < threshold
     except Exception as e:
         print(f"An error occurred during Windows idle check: {e}")
         # Fallback: assume the user is active
@@ -407,7 +410,7 @@ def is_user_active_linux() -> bool:
     (X11 or Wayland) to get idle time. Uses 'xprintidle'.
 
     Returns:
-        True if the user is considered active (idle < 5s), False otherwise.
+        True if the user is considered active (idle < threshold), False otherwise.
         Returns True if the check fails or 'xprintidle' is not available.
     """
     if subprocess is None:
@@ -418,7 +421,8 @@ def is_user_active_linux() -> bool:
         output = subprocess.check_output(['xprintidle'], timeout=1).decode()
         idle_milliseconds = int(output.strip())
         idle_seconds = idle_milliseconds / 1000.0
-        return idle_seconds < 5.0
+        threshold = float(getattr(settings, "user_idle_threshold_seconds", 60))
+        return idle_seconds < threshold
     except FileNotFoundError:
         print("Warning: 'xprintidle' command not found. Please install xprintidle to check user activity.")
         return True # Assume active if command missing

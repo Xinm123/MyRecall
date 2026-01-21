@@ -3,13 +3,8 @@
 Verifies RuntimeSettings singleton and API endpoints work correctly.
 """
 
-import sys
 import time
 import json
-from pathlib import Path
-
-# Add parent directory to path to allow imports
-sys.path.insert(0, str(Path(__file__).parent.parent))
 
 import pytest
 from openrecall.server.config_runtime import RuntimeSettings, runtime_settings

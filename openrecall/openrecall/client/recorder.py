@@ -8,12 +8,12 @@ import json
 import logging
 import os
 import time
-import urllib.error
-import urllib.request
+import urllib.parse
 from typing import List, Optional
 
 import mss
 import numpy as np
+import requests
 from PIL import Image
 
 from openrecall.shared.config import settings
@@ -62,7 +62,7 @@ def mean_structured_similarity_index(
 
 
 def is_similar(
-    img1: np.ndarray, img2: np.ndarray, similarity_threshold: float = 0.9
+    img1: np.ndarray, img2: np.ndarray, similarity_threshold: Optional[float] = None
 ) -> bool:
     """Checks if two images are similar based on MSSIM.
 
@@ -74,14 +74,11 @@ def is_similar(
     Returns:
         True if the images are similar, False otherwise.
     """
-    """
-    similarity: float = mean_structured_similarity_index(img1, img2)
-    """
-    # Compress images to reduce size and improve performance
-    compress_img1: np.ndarray = resize_image(img1)
-    compress_img2: np.ndarray = resize_image(img2)
-    similarity: float = mean_structured_similarity_index(compress_img1, compress_img2)
-    return similarity >= similarity_threshold
+    if settings.disable_similarity_filter:
+        return False
+    similarity: float = compute_similarity(img1, img2)
+    threshold = similarity_threshold if similarity_threshold is not None else settings.similarity_threshold
+    return similarity >= threshold
 
 
 def take_screenshots() -> List[np.ndarray]:
@@ -132,6 +129,12 @@ def resize_image(image: np.ndarray, max_dim: int = 800) -> np.ndarray:
     return np.array(pil_image)
 
 
+def compute_similarity(img1: np.ndarray, img2: np.ndarray) -> float:
+    compress_img1: np.ndarray = resize_image(img1)
+    compress_img2: np.ndarray = resize_image(img2)
+    return mean_structured_similarity_index(compress_img1, compress_img2)
+
+
 class ScreenRecorder:
     """Producer: captures screenshots and enqueues to local buffer.
     
@@ -150,13 +153,18 @@ class ScreenRecorder:
             consumer: UploaderConsumer instance. Creates new if not provided.
         """
         self.buffer = buffer or get_buffer()
-        self.consumer = consumer or UploaderConsumer(buffer=self.buffer)
         self._stop_requested = False
         
         # Phase 8.2: Runtime configuration state
         self.recording_enabled = True
         self.upload_enabled = True
         self.last_heartbeat_time = 0
+        self._no_change_cycles = 0
+        self._warned_capture_issue = False
+        self.consumer = consumer or UploaderConsumer(
+            buffer=self.buffer,
+            should_upload=lambda: self.upload_enabled,
+        )
     
     def start(self) -> None:
         """Start the consumer thread."""
@@ -170,19 +178,27 @@ class ScreenRecorder:
         runtime settings (recording_enabled, upload_enabled, etc.) from server.
         """
         try:
-            url = f"http://localhost:{settings.port}/api/heartbeat"
-            req = urllib.request.Request(url, method="POST")
-            with urllib.request.urlopen(req, timeout=2) as response:
-                data = json.loads(response.read().decode())
-                config = data.get("config", {})
-                self.recording_enabled = config.get("recording_enabled", True)
-                self.upload_enabled = config.get("upload_enabled", True)
-                if settings.debug:
-                    logger.debug(
-                        f"Heartbeat synced: recording={self.recording_enabled}, "
-                        f"upload={self.upload_enabled}"
-                    )
-        except urllib.error.URLError as e:
+            url = f"{settings.api_url.rstrip('/')}/heartbeat"
+            parsed = urllib.parse.urlparse(url)
+            is_loopback = parsed.hostname in {"localhost", "127.0.0.1", "::1"}
+
+            request_kwargs = {"timeout": 2}
+            if is_loopback:
+                request_kwargs["proxies"] = {"http": None, "https": None}
+
+            response = requests.post(url, **request_kwargs)
+            response.raise_for_status()
+
+            data = response.json()
+            config = data.get("config", {})
+            self.recording_enabled = config.get("recording_enabled", True)
+            self.upload_enabled = config.get("upload_enabled", True)
+            if settings.debug:
+                logger.debug(
+                    f"Heartbeat synced: recording={self.recording_enabled}, "
+                    f"upload={self.upload_enabled}"
+                )
+        except requests.RequestException as e:
             logger.warning(f"Heartbeat failed (network): {e}")
         except Exception as e:
             logger.warning(f"Heartbeat failed: {e}")
@@ -225,46 +241,83 @@ class ScreenRecorder:
                 continue
             
             if not is_user_active():
+                if settings.debug:
+                    logger.debug("User inactive, skipping capture cycle")
                 time.sleep(settings.capture_interval)
                 continue
 
             screenshots = take_screenshots()
+            if not screenshots:
+                if settings.debug:
+                    logger.debug("No screenshots captured, skipping capture cycle")
+                time.sleep(settings.capture_interval)
+                continue
+
+            if not self._warned_capture_issue:
+                try:
+                    sample = screenshots[0]
+                    if float(np.mean(sample)) < 1.0 and float(np.std(sample)) < 1.0:
+                        self._warned_capture_issue = True
+                        logger.warning(
+                            "Captured frames look blank. On macOS this usually means missing Screen Recording permission "
+                            "(System Settings → Privacy & Security → Screen Recording)."
+                        )
+                except Exception:
+                    pass
 
             if len(last_screenshots) != len(screenshots):
                 last_screenshots = screenshots
                 time.sleep(settings.capture_interval)
                 continue
 
+            captured_any = False
+            max_similarity = -1.0
             for i, screenshot in enumerate(screenshots):
                 last_screenshot = last_screenshots[i]
 
-                if not is_similar(screenshot, last_screenshot):
+                if settings.disable_similarity_filter:
+                    should_capture = True
+                    similarity = None
+                else:
+                    similarity = compute_similarity(screenshot, last_screenshot)
+                    max_similarity = max(max_similarity, similarity)
+                    should_capture = similarity < settings.similarity_threshold
+
+                if should_capture:
+                    captured_any = True
                     last_screenshots[i] = screenshot
-                    
-                    # Create PIL Image
-                    image = Image.fromarray(screenshot)
-                    timestamp = int(time.time())
-                    
-                    # Also save to screenshots folder (for UI)
-                    filepath = settings.screenshots_path / f"{timestamp}.webp"
-                    image.save(str(filepath), format="webp", lossless=True)
-                    
-                    # Prepare metadata
-                    metadata = {
-                        "timestamp": timestamp,
-                        "active_app": get_active_app_name() or "Unknown App",
-                        "active_window": get_active_window_title() or "Unknown Title",
-                    }
-                    
-                    # Phase 8.2: Rule 2 - Check upload_enabled before enqueueing
-                    if self.upload_enabled:
-                        # Normal flow: enqueue to buffer for processing/upload
+
+                    try:
+                        image = Image.fromarray(screenshot)
+                        timestamp = int(time.time())
+
+                        if settings.client_save_local_screenshots:
+                            filepath = settings.client_screenshots_path / f"{timestamp}.webp"
+                            image.save(str(filepath), format="webp", lossless=True)
+
+                        metadata = {
+                            "timestamp": timestamp,
+                            "active_app": get_active_app_name() or "Unknown App",
+                            "active_window": get_active_window_title() or "Unknown Title",
+                        }
+
                         self.buffer.enqueue(image, metadata)
-                    else:
-                        # Local-only mode: save but don't queue
-                        logger.debug(
-                            f"Saved locally only (upload disabled): {filepath}"
-                        )
+                        if not self.upload_enabled:
+                            logger.debug("Upload disabled: buffered locally (will upload when enabled)")
+                    except Exception:
+                        logger.exception("Failed to persist buffered screenshot")
+
+            if captured_any:
+                self._no_change_cycles = 0
+            else:
+                self._no_change_cycles += 1
+                if settings.debug and self._no_change_cycles in {6, 30, 120}:
+                    msg = (
+                        f"No new frames captured for {self._no_change_cycles} cycles. "
+                        f"Try OPENRECALL_DISABLE_SIMILARITY_FILTER=true or raise OPENRECALL_SIMILARITY_THRESHOLD. "
+                        f"Last max MSSIM={max_similarity:.4f} threshold={settings.similarity_threshold}."
+                    )
+                    logger.debug(msg)
 
             time.sleep(settings.capture_interval)
 

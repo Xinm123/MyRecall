@@ -6,7 +6,7 @@ Reads from LocalBuffer and uploads to server with retry/backoff.
 
 import logging
 import threading
-from typing import Optional
+from typing import Callable, Optional
 
 import numpy as np
 from PIL import Image
@@ -30,6 +30,7 @@ class UploaderConsumer(threading.Thread):
         self,
         buffer: Optional[LocalBuffer] = None,
         uploader: Optional[HTTPUploader] = None,
+        should_upload: Optional[Callable[[], bool]] = None,
         name: str = "UploaderConsumer",
     ):
         """Initialize the consumer thread.
@@ -42,6 +43,7 @@ class UploaderConsumer(threading.Thread):
         super().__init__(name=name, daemon=False)
         self.buffer = buffer or get_buffer()
         self.uploader = uploader or get_uploader()
+        self.should_upload = should_upload or (lambda: True)
         self._stop_event = threading.Event()
         self._retry_count = 0
     
@@ -51,6 +53,10 @@ class UploaderConsumer(threading.Thread):
         logger.info(f"🚀 Consumer started | Pending uploads: {pending}")
         
         while not self._stop_event.is_set():
+            if not self.should_upload():
+                self._stop_event.wait(timeout=1.0)
+                continue
+
             # Get next item from buffer
             items = self.buffer.get_next_batch(limit=1)
             

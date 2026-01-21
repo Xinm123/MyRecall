@@ -269,6 +269,40 @@
       font-weight: 500;
     }
 
+    .control-item-label-with-status {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .client-status {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      font-weight: 500;
+      line-height: 1;
+    }
+
+    .client-status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 999px;
+      background: #ff4d4f;
+    }
+
+    .client-status.online {
+      color: #1a7f37;
+    }
+
+    .client-status.online .client-status-dot {
+      background: #2ecc71;
+    }
+
+    .client-status.offline {
+      color: #b42318;
+    }
+
     /* Toggle Switch Styles */
     .toggle-switch {
       position: relative;
@@ -348,7 +382,15 @@
           <div class="control-section">
             <div class="control-section-title">Privacy</div>
             <div class="control-item">
-              <span class="control-item-label">Recording</span>
+              <span class="control-item-label control-item-label-with-status">
+                <span>Recording</span>
+                <span
+                  class="client-status"
+                  :class="config.client_online ? 'online' : 'offline'">
+                  <span class="client-status-dot"></span>
+                  <span x-text="config.client_online ? 'Connected' : 'Offline'"></span>
+                </span>
+              </span>
               <div 
                 @click="toggleSetting('recording_enabled')"
                 :class="{ 'toggle-switch': true, 'active': config.recording_enabled }"
@@ -411,21 +453,37 @@
           recording_enabled: true,
           upload_enabled: true,
           ai_processing_enabled: true,
-          ui_show_ai: true
+          ui_show_ai: true,
+          client_online: false
         },
+        _pollerId: null,
         
         init() {
           console.log('Control Center initializing...');
-          // Fetch initial config
-          fetch('/api/config')
+          this.refreshConfig();
+          this._pollerId = setInterval(() => this.refreshConfig(), 5000);
+        },
+
+        destroy() {
+          if (this._pollerId) {
+            clearInterval(this._pollerId);
+            this._pollerId = null;
+          }
+        },
+
+        refreshConfig() {
+          return fetch('/api/config')
             .then(response => response.json())
             .then(data => {
               this.config = data;
               this.updateBodyClass();
-              console.log('Initial config loaded:', this.config);
+              if (this.open) {
+                console.log('Config refreshed:', this.config);
+              }
             })
             .catch(error => {
               console.error('Failed to fetch config:', error);
+              this.config.client_online = false;
             });
         },
         

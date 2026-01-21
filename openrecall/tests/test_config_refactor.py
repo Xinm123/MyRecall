@@ -32,12 +32,12 @@ class TestSettingsDefaults:
             assert test_settings.port == 8083
 
     def test_default_primary_monitor_only(self):
-        """Verify primary_monitor_only defaults to False."""
+        """Verify primary_monitor_only defaults to True."""
         from openrecall.shared.config import Settings
         
         with mock.patch.dict(os.environ, {}, clear=True):
             test_settings = Settings()
-            assert test_settings.primary_monitor_only is False
+            assert test_settings.primary_monitor_only is True
 
 
 class TestSettingsAutoCreation:

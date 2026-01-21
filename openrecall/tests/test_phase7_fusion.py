@@ -8,6 +8,8 @@ from unittest import mock
 import numpy as np
 import pytest
 
+pytestmark = pytest.mark.model
+
 
 class TestNLPEngine:
     """Tests for the upgraded NLPEngine with Qwen3-Embedding."""

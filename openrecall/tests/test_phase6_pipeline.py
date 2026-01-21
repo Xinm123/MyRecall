@@ -9,6 +9,8 @@ import numpy as np
 import pytest
 from PIL import Image
 
+pytestmark = pytest.mark.manual
+
 
 class TestParallelPipeline:
     """E2E tests for the parallel OCR + AI upload pipeline."""
