@@ -33,16 +33,26 @@ def preload_ai_models():
     logger.info("Preloading AI models (this may take a minute)...")
     
     try:
-        from openrecall.server.ai_engine import get_ai_engine
-        get_ai_engine()  # Load VL model
-        logger.info("✅ AI Engine (VL model) loaded")
+        from openrecall.server.ai.factory import get_ai_provider
+
+        provider = (settings.vision_provider or settings.ai_provider).strip().lower()
+        if provider == "local":
+            get_ai_provider("vision")
+            logger.info("✅ AI Engine (VL model) loaded")
+        else:
+            logger.info(f"Skipping VL model preload (provider={provider})")
     except Exception as e:
         logger.warning(f"⚠️ Failed to preload AI Engine: {e}")
     
     try:
-        from openrecall.server.nlp import get_nlp_engine
-        get_nlp_engine()  # Load embedding model
-        logger.info("✅ Embedding model loaded")
+        from openrecall.server.ai.factory import get_embedding_provider
+
+        embedding_provider = (settings.embedding_provider or settings.ai_provider).strip().lower()
+        if embedding_provider == "local":
+            get_embedding_provider()
+            logger.info("✅ Embedding model loaded")
+        else:
+            logger.info(f"Skipping embedding model preload (provider={embedding_provider})")
     except Exception as e:
         logger.warning(f"⚠️ Failed to preload Embedding model: {e}")
     

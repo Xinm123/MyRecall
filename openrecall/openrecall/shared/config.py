@@ -19,6 +19,22 @@ class Settings(BaseSettings):
     - OPENRECALL_API_URL: Server API URL for client communication
     - OPENRECALL_CAPTURE_INTERVAL: Screenshot capture interval in seconds
     - OPENRECALL_DEVICE: Device for AI inference (cpu, cuda, mps)
+    - OPENRECALL_AI_PROVIDER: AI provider for vision analysis (local, dashscope, openai)
+    - OPENRECALL_AI_MODEL_NAME: Model name/path for the selected AI provider
+    - OPENRECALL_AI_API_KEY: API key for cloud AI providers
+    - OPENRECALL_AI_API_BASE: Optional base URL for OpenAI-compatible proxies
+    - OPENRECALL_VISION_PROVIDER: Optional override for vision provider (falls back to OPENRECALL_AI_PROVIDER)
+    - OPENRECALL_VISION_MODEL_NAME: Optional override for vision model name/path
+    - OPENRECALL_VISION_API_KEY: Optional override for vision API key
+    - OPENRECALL_VISION_API_BASE: Optional override for vision API base URL
+    - OPENRECALL_OCR_PROVIDER: Optional override for OCR provider (falls back to OPENRECALL_AI_PROVIDER)
+    - OPENRECALL_OCR_MODEL_NAME: Optional override for OCR model name (for API-based OCR)
+    - OPENRECALL_OCR_API_KEY: Optional override for OCR API key
+    - OPENRECALL_OCR_API_BASE: Optional override for OCR API base URL
+    - OPENRECALL_EMBEDDING_PROVIDER: Optional override for embedding provider (falls back to OPENRECALL_AI_PROVIDER)
+    - OPENRECALL_EMBEDDING_MODEL_NAME: Optional override for embedding model name (for API embeddings)
+    - OPENRECALL_EMBEDDING_API_KEY: Optional override for embedding API key
+    - OPENRECALL_EMBEDDING_API_BASE: Optional override for embedding API base URL
     - OPENRECALL_UPLOAD_TIMEOUT: Client upload timeout in seconds
     - OPENRECALL_EMBEDDING_MODEL: Embedding model name for semantic search
     """
@@ -62,6 +78,86 @@ class Settings(BaseSettings):
         default=True,
         alias="OPENRECALL_PRELOAD_MODELS",
         description="Preload AI models at startup to avoid first-request latency"
+    )
+    ai_provider: str = Field(
+        default="local",
+        alias="OPENRECALL_AI_PROVIDER",
+        description="AI provider for vision analysis (local, dashscope, openai)"
+    )
+    ai_model_name: str = Field(
+        default="",
+        alias="OPENRECALL_AI_MODEL_NAME",
+        description="Model name/path for the selected AI provider"
+    )
+    ai_api_key: str = Field(
+        default="",
+        alias="OPENRECALL_AI_API_KEY",
+        description="API key for cloud AI providers"
+    )
+    ai_api_base: str = Field(
+        default="",
+        alias="OPENRECALL_AI_API_BASE",
+        description="Optional base URL for OpenAI-compatible proxies (DeepSeek/vLLM/etc.)"
+    )
+    vision_provider: str = Field(
+        default="",
+        alias="OPENRECALL_VISION_PROVIDER",
+        description="Optional override for vision provider; falls back to ai_provider when empty"
+    )
+    vision_model_name: str = Field(
+        default="",
+        alias="OPENRECALL_VISION_MODEL_NAME",
+        description="Optional override for vision model name/path; falls back to ai_model_name when empty"
+    )
+    vision_api_key: str = Field(
+        default="",
+        alias="OPENRECALL_VISION_API_KEY",
+        description="Optional override for vision API key; falls back to ai_api_key when empty"
+    )
+    vision_api_base: str = Field(
+        default="",
+        alias="OPENRECALL_VISION_API_BASE",
+        description="Optional override for vision API base URL; falls back to ai_api_base when empty"
+    )
+    ocr_provider: str = Field(
+        default="",
+        alias="OPENRECALL_OCR_PROVIDER",
+        description="Optional override for OCR provider; falls back to ai_provider when empty"
+    )
+    ocr_model_name: str = Field(
+        default="",
+        alias="OPENRECALL_OCR_MODEL_NAME",
+        description="Optional override for OCR model name; falls back to ai_model_name when empty"
+    )
+    ocr_api_key: str = Field(
+        default="",
+        alias="OPENRECALL_OCR_API_KEY",
+        description="Optional override for OCR API key; falls back to ai_api_key when empty"
+    )
+    ocr_api_base: str = Field(
+        default="",
+        alias="OPENRECALL_OCR_API_BASE",
+        description="Optional override for OCR API base URL; falls back to ai_api_base when empty"
+    )
+    embedding_provider: str = Field(
+        default="",
+        alias="OPENRECALL_EMBEDDING_PROVIDER",
+        description="Optional override for embedding provider; falls back to ai_provider when empty"
+    )
+    embedding_api_model_name: str = Field(
+        default="",
+        alias="OPENRECALL_EMBEDDING_MODEL_NAME",
+        description="Optional override for embedding API model; falls back to ai_model_name when empty"
+    )
+    embedding_api_key: str = Field(
+        default="",
+        alias="OPENRECALL_EMBEDDING_API_KEY",
+        description="Optional override for embedding API key; falls back to ai_api_key when empty"
+    )
+    embedding_api_base: str = Field(
+        default="",
+        alias="OPENRECALL_EMBEDDING_API_BASE",
+        description="Optional override for embedding API base URL; falls back to ai_api_base when empty"
     )
     embedding_model_name: str = Field(
         default="/Users/tiiny/models/Qwen3-Embedding-0.6B",

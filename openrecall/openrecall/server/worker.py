@@ -9,17 +9,30 @@ from pathlib import Path
 from typing import Optional
 
 import numpy as np
-from PIL import Image
 
 from openrecall.server import database as db
-from openrecall.server.nlp import get_nlp_engine
-from openrecall.server.ocr import extract_text_from_image
-from openrecall.server.ai_engine import get_ai_engine
+from openrecall.server.ai.base import AIProviderError
+from openrecall.server.ai.factory import get_ai_provider, get_embedding_provider, get_ocr_provider
 from openrecall.server.config_runtime import runtime_settings
 from openrecall.shared.config import settings
 from openrecall.shared.models import RecallEntry
 
 logger = logging.getLogger(__name__)
+
+
+class _FallbackVisionProvider:
+    def analyze_image(self, image_path: str) -> str:
+        return ""
+
+
+class _FallbackOCRProvider:
+    def extract_text(self, image_path: str) -> str:
+        return ""
+
+
+class _FallbackEmbeddingProvider:
+    def embed_text(self, text: str) -> np.ndarray:
+        return np.zeros(int(settings.embedding_dim), dtype=np.float32)
 
 
 class ProcessingWorker(threading.Thread):
@@ -51,8 +64,29 @@ class ProcessingWorker(threading.Thread):
         conn = sqlite3.connect(str(settings.db_path))
         
         # Get engine instances (lazy-loaded singletons)
-        ai_engine = get_ai_engine()
-        nlp_engine = get_nlp_engine()
+        try:
+            ai_provider = get_ai_provider()
+        except Exception as e:
+            logger.error(f"Failed to initialize vision provider: {e}")
+            ai_provider = _FallbackVisionProvider()
+
+        try:
+            ocr_provider = get_ocr_provider()
+        except Exception as e:
+            logger.error(f"Failed to initialize OCR provider: {e}")
+            ocr_provider = _FallbackOCRProvider()
+
+        try:
+            embedding_provider = get_embedding_provider()
+        except Exception as e:
+            logger.error(f"Failed to initialize embedding provider: {e}")
+            embedding_provider = _FallbackEmbeddingProvider()
+        logger.info(
+            "🤖 AI Engine initialized: "
+            f"vision={settings.vision_provider or settings.ai_provider}, "
+            f"ocr={settings.ocr_provider or settings.ai_provider}, "
+            f"embedding={settings.embedding_provider or settings.ai_provider}"
+        )
         
         try:
             while not self._stop_event.is_set():
@@ -102,7 +136,14 @@ class ProcessingWorker(threading.Thread):
                     # Execute processing pipeline
                     with runtime_settings._lock:
                         ai_processing_version = runtime_settings.ai_processing_version
-                    self._process_task(conn, task, ai_engine, nlp_engine, ai_processing_version)
+                    self._process_task(
+                        conn,
+                        task,
+                        ai_provider,
+                        ocr_provider,
+                        embedding_provider,
+                        ai_processing_version,
+                    )
                     
                 except Exception as e:
                     logger.error(f"Error in worker loop: {e}")
@@ -119,8 +160,9 @@ class ProcessingWorker(threading.Thread):
         self,
         conn: sqlite3.Connection,
         task: RecallEntry,
-        ai_engine,
-        nlp_engine,
+        ai_provider,
+        ocr_provider,
+        embedding_provider,
         ai_processing_version: int
     ):
         """Process a single task through the OCR → AI → NLP pipeline.
@@ -128,8 +170,9 @@ class ProcessingWorker(threading.Thread):
         Args:
             conn: Database connection.
             task: The task to process.
-            ai_engine: AI engine instance for image analysis.
-            nlp_engine: NLP engine instance for text embedding.
+            ai_provider: AI provider instance for image analysis.
+            ocr_provider: OCR provider instance for text extraction.
+            embedding_provider: Embedding provider instance for text embedding.
         """
         try:
             def should_cancel() -> bool:
@@ -151,23 +194,33 @@ class ProcessingWorker(threading.Thread):
                 db.mark_task_failed(conn, task.id)
                 return
             
-            # Load image and convert to numpy array for OCR
-            image = Image.open(image_path)
-            image_array = np.array(image)
-            
             # Step 1: OCR text extraction
             if should_cancel():
                 db.mark_task_cancelled_if_processing(conn, task.id)
                 return
-            text = extract_text_from_image(image_array)
+            try:
+                text = ocr_provider.extract_text(str(image_path))
+            except AIProviderError as e:
+                logger.warning(f"⚠️ Task #{task.id}: OCR provider failed: {e}")
+                text = ""
+            except Exception as e:
+                logger.warning(f"⚠️ Task #{task.id}: OCR provider unexpected error: {e}")
+                text = ""
             if settings.debug:
                 logger.debug(f"  OCR: {len(text)} chars extracted")
             
-            # Step 2: AI image analysis (pass PIL Image object)
+            # Step 2: AI image analysis
             if should_cancel():
                 db.mark_task_cancelled_if_processing(conn, task.id)
                 return
-            description = ai_engine.analyze_image(image)
+            try:
+                description = ai_provider.analyze_image(str(image_path))
+            except AIProviderError as e:
+                logger.warning(f"⚠️ Task #{task.id}: AI provider failed: {e}")
+                description = ""
+            except Exception as e:
+                logger.warning(f"⚠️ Task #{task.id}: AI provider unexpected error: {e}")
+                description = ""
             if settings.debug:
                 logger.debug(f"  AI: {len(description)} chars description")
             
@@ -187,7 +240,14 @@ class ProcessingWorker(threading.Thread):
             if should_cancel():
                 db.mark_task_cancelled_if_processing(conn, task.id)
                 return
-            embedding = nlp_engine.encode(combined_text)
+            try:
+                embedding = embedding_provider.embed_text(combined_text)
+            except AIProviderError as e:
+                logger.warning(f"⚠️ Task #{task.id}: Embedding provider failed: {e}")
+                embedding = np.zeros(int(settings.embedding_dim), dtype=np.float32)
+            except Exception as e:
+                logger.warning(f"⚠️ Task #{task.id}: Embedding provider unexpected error: {e}")
+                embedding = np.zeros(int(settings.embedding_dim), dtype=np.float32)
             if settings.debug:
                 logger.debug(f"  NLP: Embedding shape {embedding.shape}")
             

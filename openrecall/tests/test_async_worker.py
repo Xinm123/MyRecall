@@ -72,22 +72,22 @@ def test_worker_lifo_priority(temp_db):
     db_path = temp_db["db_path"]
     screenshot_dir = temp_db["screenshots_path"]
     
-    # Mock AI/OCR engines
-    with patch("openrecall.server.worker.extract_text_from_image") as mock_ocr, \
-         patch("openrecall.server.worker.get_ai_engine") as mock_ai, \
-         patch("openrecall.server.worker.get_nlp_engine") as mock_nlp, \
-         patch("openrecall.server.worker.Image.open") as mock_image_open:
-        
-        mock_ocr.return_value = "extracted text"
-        mock_image_open.return_value = MagicMock()  # Mock PIL Image object
+    # Mock providers
+    with patch("openrecall.server.worker.get_ocr_provider") as mock_ocr, \
+         patch("openrecall.server.worker.get_ai_provider") as mock_ai, \
+         patch("openrecall.server.worker.get_embedding_provider") as mock_embed:
         
         mock_ai_instance = MagicMock()
         mock_ai_instance.analyze_image.return_value = "image description"
         mock_ai.return_value = mock_ai_instance
         
-        mock_nlp_instance = MagicMock()
-        mock_nlp_instance.encode.return_value = np.random.rand(1024).astype(np.float32)
-        mock_nlp.return_value = mock_nlp_instance
+        mock_ocr_instance = MagicMock()
+        mock_ocr_instance.extract_text.return_value = "extracted text"
+        mock_ocr.return_value = mock_ocr_instance
+
+        mock_embed_instance = MagicMock()
+        mock_embed_instance.embed_text.return_value = np.random.rand(1024).astype(np.float32)
+        mock_embed.return_value = mock_embed_instance
         
         # Insert 5 pending tasks
         for i in range(1, 6):
@@ -148,22 +148,22 @@ def test_worker_fifo_when_low_queue(temp_db):
     db_path = temp_db["db_path"]
     screenshot_dir = temp_db["screenshots_path"]
     
-    # Mock AI/OCR engines
-    with patch("openrecall.server.worker.extract_text_from_image") as mock_ocr, \
-         patch("openrecall.server.worker.get_ai_engine") as mock_ai, \
-         patch("openrecall.server.worker.get_nlp_engine") as mock_nlp, \
-         patch("openrecall.server.worker.Image.open") as mock_image_open:
-        
-        mock_ocr.return_value = "extracted text"
-        mock_image_open.return_value = MagicMock()  # Mock PIL Image object
+    # Mock providers
+    with patch("openrecall.server.worker.get_ocr_provider") as mock_ocr, \
+         patch("openrecall.server.worker.get_ai_provider") as mock_ai, \
+         patch("openrecall.server.worker.get_embedding_provider") as mock_embed:
         
         mock_ai_instance = MagicMock()
         mock_ai_instance.analyze_image.return_value = "image description"
         mock_ai.return_value = mock_ai_instance
         
-        mock_nlp_instance = MagicMock()
-        mock_nlp_instance.encode.return_value = np.random.rand(1024).astype(np.float32)
-        mock_nlp.return_value = mock_nlp_instance
+        mock_ocr_instance = MagicMock()
+        mock_ocr_instance.extract_text.return_value = "extracted text"
+        mock_ocr.return_value = mock_ocr_instance
+
+        mock_embed_instance = MagicMock()
+        mock_embed_instance.embed_text.return_value = np.random.rand(1024).astype(np.float32)
+        mock_embed.return_value = mock_embed_instance
         
         # Insert 2 pending tasks (below threshold)
         for i in range(1, 3):
@@ -204,21 +204,25 @@ def test_worker_fifo_when_low_queue(temp_db):
 
 
 def test_worker_error_handling(temp_db):
-    """Test that worker marks tasks as FAILED when processing errors occur."""
+    """Test that provider failures don't crash the worker."""
     db_path = temp_db["db_path"]
     screenshot_dir = temp_db["screenshots_path"]
     
-    # Mock OCR to raise an error
-    with patch("openrecall.server.worker.extract_text_from_image") as mock_ocr, \
-         patch("openrecall.server.worker.get_ai_engine") as mock_ai, \
-         patch("openrecall.server.worker.get_nlp_engine") as mock_nlp:
-        
-        mock_ocr.side_effect = Exception("OCR failure")
+    # Mock OCR provider to raise an error
+    with patch("openrecall.server.worker.get_ocr_provider") as mock_ocr, \
+         patch("openrecall.server.worker.get_ai_provider") as mock_ai, \
+         patch("openrecall.server.worker.get_embedding_provider") as mock_embed:
         
         mock_ai_instance = MagicMock()
+        mock_ai_instance.analyze_image.return_value = "description"
         mock_nlp_instance = MagicMock()
+        mock_nlp_instance.embed_text.return_value = np.random.rand(1024).astype(np.float32)
         mock_ai.return_value = mock_ai_instance
-        mock_nlp.return_value = mock_nlp_instance
+        mock_embed.return_value = mock_nlp_instance
+
+        mock_ocr_instance = MagicMock()
+        mock_ocr_instance.extract_text.side_effect = Exception("OCR failure")
+        mock_ocr.return_value = mock_ocr_instance
         
         # Insert 1 pending task
         timestamp = 1000
@@ -236,14 +240,14 @@ def test_worker_error_handling(temp_db):
         worker.stop()
         worker.join(timeout=5)
         
-        # Verify task marked as FAILED
+        # Verify task still completes (OCR can be empty, embedding still works)
         conn = sqlite3.connect(str(db_path))
         cursor = conn.cursor()
         cursor.execute("SELECT status FROM entries WHERE timestamp=?", (timestamp,))
         status = cursor.fetchone()[0]
         conn.close()
         
-        assert status == "FAILED", f"Task should be marked FAILED, got {status}"
+        assert status == "COMPLETED", f"Task should be marked COMPLETED, got {status}"
 
 
 def test_worker_graceful_shutdown(temp_db):
@@ -251,24 +255,26 @@ def test_worker_graceful_shutdown(temp_db):
     db_path = temp_db["db_path"]
     screenshot_dir = temp_db["screenshots_path"]
     
-    # Mock engines with slow processing
-    with patch("openrecall.server.worker.extract_text_from_image") as mock_ocr, \
-         patch("openrecall.server.worker.get_ai_engine") as mock_ai, \
-         patch("openrecall.server.worker.get_nlp_engine") as mock_nlp:
+    # Mock providers with slow processing
+    with patch("openrecall.server.worker.get_ocr_provider") as mock_ocr, \
+         patch("openrecall.server.worker.get_ai_provider") as mock_ai, \
+         patch("openrecall.server.worker.get_embedding_provider") as mock_embed:
         
         def slow_ocr(path):
             time.sleep(0.5)
             return "text"
         
-        mock_ocr.side_effect = slow_ocr
+        mock_ocr_instance = MagicMock()
+        mock_ocr_instance.extract_text.side_effect = slow_ocr
+        mock_ocr.return_value = mock_ocr_instance
         
         mock_ai_instance = MagicMock()
         mock_ai_instance.analyze_image.return_value = "description"
         mock_ai.return_value = mock_ai_instance
         
-        mock_nlp_instance = MagicMock()
-        mock_nlp_instance.encode.return_value = np.random.rand(1024).astype(np.float32)
-        mock_nlp.return_value = mock_nlp_instance
+        mock_embed_instance = MagicMock()
+        mock_embed_instance.embed_text.return_value = np.random.rand(1024).astype(np.float32)
+        mock_embed.return_value = mock_embed_instance
         
         # Start worker
         worker = ProcessingWorker()
