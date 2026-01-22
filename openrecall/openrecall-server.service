@@ -1,0 +1,18 @@
+[Unit]
+Description=OpenRecall Server
+After=network.target
+
+[Service]
+Type=simple
+User=cix
+Group=cix
+WorkingDirectory=/data/apps/MyRecall/openrecall
+EnvironmentFile=/data/apps/MyRecall/openrecall/openrecall.env
+Environment=UV_CACHE_DIR=/data/.cache/uv/openrecall
+ExecStart=/data/venvs/openrecall/bin/python -m openrecall.server
+Restart=always
+RestartSec=5
+TimeoutStartSec=180
+
+[Install]
+WantedBy=multi-user.target

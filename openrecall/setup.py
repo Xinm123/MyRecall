@@ -31,7 +31,7 @@ extras_require = {
     "macos": ["pyobjc==10.3"],
     "linux": [],
     "python-doctr": [
-        "python-doctr @ git+https://github.com/koenvaneijk/doctr.git@af711bc04eb8876a7189923fb51ec44481ee18cd"
+        "python-doctr"
     ],
     "test": [
         "pytest>=8.0.0",

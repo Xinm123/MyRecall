@@ -72,8 +72,9 @@ def main():
     logger.info(f"Cache folder: {settings.cache_path}")
     logger.info(f"Screenshots: {settings.screenshots_path}")
     logger.info(f"Database: {settings.db_path}")
-    logger.info(f"API URL: http://localhost:{settings.port}/api")
-    logger.info(f"Web UI: http://localhost:{settings.port}")
+    logger.info(f"Bind: {settings.host}:{settings.port}")
+    logger.info(f"API URL: http://{settings.host}:{settings.port}/api")
+    logger.info(f"Web UI: http://{settings.host}:{settings.port}")
     logger.info(f"Device: {settings.device}")
     logger.info(f"Processing: LIFO threshold = {settings.processing_lifo_threshold}")
     logger.info("=" * 50)
@@ -118,6 +119,7 @@ def main():
     # Start the Flask server
     try:
         app.run(
+            host=settings.host,
             port=settings.port, 
             debug=settings.debug,  # Enable Flask debug mode based on config
             use_reloader=False, 

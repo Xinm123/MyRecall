@@ -41,6 +41,7 @@ class Settings(BaseSettings):
     
     debug: bool = Field(default=True, alias="OPENRECALL_DEBUG")
     capture_interval: int = Field(default=10, alias="OPENRECALL_CAPTURE_INTERVAL")
+    host: str = Field(default="127.0.0.1", alias="OPENRECALL_HOST")
     port: int = Field(default=8083, alias="OPENRECALL_PORT")
     primary_monitor_only: bool = Field(
         default=True, 
@@ -270,7 +271,6 @@ class Settings(BaseSettings):
         cache = str(self.cache_path)
         defaults = {
             "HF_HOME": cache,
-            "TRANSFORMERS_CACHE": str(self.cache_path / "transformers"),
             "SENTENCE_TRANSFORMERS_HOME": str(self.cache_path / "sentence_transformers"),
             "TORCH_HOME": str(self.cache_path / "torch"),
             "DOCTR_CACHE_DIR": str(self.cache_path / "doctr"),
