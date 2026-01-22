@@ -13,6 +13,7 @@ import numpy as np
 from flask import Blueprint, jsonify, request
 from PIL import Image
 
+from openrecall.server.memory_card import extract_human_description
 from openrecall.server.database import (
     cancel_processing_tasks,
     get_memories_since,
@@ -57,6 +58,9 @@ def memories_latest():
 
     try:
         memories = get_memories_since(since)
+        for m in memories:
+            if isinstance(m, dict) and "description" in m:
+                m["description"] = extract_human_description(m.get("description"))
         return jsonify(memories), 200
     except Exception as e:
         logger.exception("Error fetching latest memories")
@@ -81,6 +85,9 @@ def memories_recent():
 
     try:
         memories = get_recent_memories(limit=limit)
+        for m in memories:
+            if isinstance(m, dict) and "description" in m:
+                m["description"] = extract_human_description(m.get("description"))
         return jsonify(memories), 200
     except Exception as e:
         logger.exception("Error fetching recent memories")

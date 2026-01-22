@@ -61,6 +61,25 @@ def _migrate_db(conn: sqlite3.Connection) -> None:
         conn.commit()
         logger.info("Database schema updated: added 'status' column.")
 
+    if "image_embedding" not in columns:
+        cursor.execute("ALTER TABLE entries ADD COLUMN image_embedding BLOB")
+        conn.commit()
+        logger.info("Database schema updated: added 'image_embedding' column.")
+
+    try:
+        cursor.execute(
+            "CREATE VIRTUAL TABLE IF NOT EXISTS entries_fts USING fts5("
+            "entry_id UNINDEXED, "
+            "app, "
+            "title, "
+            "text, "
+            "description"
+            ")"
+        )
+        conn.commit()
+    except sqlite3.OperationalError as e:
+        logger.warning(f"FTS5 unavailable, skipping entries_fts creation: {e}")
+
 
 def _row_to_entry(row: sqlite3.Row) -> RecallEntry:
     """Convert a database row to RecallEntry (embedding auto-deserialized by Pydantic)."""
@@ -78,8 +97,54 @@ def _row_to_entry(row: sqlite3.Row) -> RecallEntry:
         description=row["description"],
         timestamp=row["timestamp"],
         embedding=row["embedding"],
+        image_embedding=row["image_embedding"] if "image_embedding" in row.keys() else None,
         status=status,
     )
+
+
+def fts_upsert_entry(
+    conn: sqlite3.Connection,
+    entry_id: int,
+    app: str | None,
+    title: str | None,
+    text: str | None,
+    description: str | None,
+) -> bool:
+    try:
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM entries_fts WHERE entry_id = ?", (entry_id,))
+        cursor.execute(
+            "INSERT INTO entries_fts(entry_id, app, title, text, description) VALUES (?, ?, ?, ?, ?)",
+            (entry_id, app or "", title or "", text or "", description or ""),
+        )
+        conn.commit()
+        return True
+    except sqlite3.OperationalError:
+        return False
+    except sqlite3.Error as e:
+        logger.error(f"Database error during FTS upsert: {e}")
+        return False
+
+
+def fts_search(conn: sqlite3.Connection, query: str, topk: int = 50) -> list[tuple[int, float]]:
+    q = (query or "").strip()
+    if not q:
+        return []
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT entry_id, bm25(entries_fts) AS score "
+            "FROM entries_fts WHERE entries_fts MATCH ? "
+            "ORDER BY score LIMIT ?",
+            (q, int(topk)),
+        )
+        rows = cursor.fetchall()
+        return [(int(r[0]), float(r[1])) for r in rows]
+    except sqlite3.OperationalError:
+        return []
+    except sqlite3.Error as e:
+        logger.error(f"Database error during FTS search: {e}")
+        return []
 
 
 def get_all_entries() -> List[RecallEntry]:
@@ -98,7 +163,7 @@ def get_all_entries() -> List[RecallEntry]:
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
             cursor.execute(
-                "SELECT id, app, title, text, description, timestamp, embedding, status FROM entries "
+                "SELECT id, app, title, text, description, timestamp, embedding, image_embedding, status FROM entries "
                 "WHERE status='COMPLETED' ORDER BY timestamp DESC"
             )
             entries = [_row_to_entry(row) for row in cursor.fetchall()]
@@ -123,7 +188,7 @@ def get_all_entries_with_status() -> List[RecallEntry]:
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
             cursor.execute(
-                "SELECT id, app, title, text, description, timestamp, embedding, status FROM entries "
+                "SELECT id, app, title, text, description, timestamp, embedding, image_embedding, status FROM entries "
                 "ORDER BY timestamp DESC"
             )
             entries = [_row_to_entry(row) for row in cursor.fetchall()]
@@ -262,7 +327,7 @@ def get_entries_by_time_range(start_time: int, end_time: int) -> List[RecallEntr
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
             cursor.execute(
-                "SELECT id, app, title, text, description, timestamp, embedding, status FROM entries "
+                "SELECT id, app, title, text, description, timestamp, embedding, image_embedding, status FROM entries "
                 "WHERE timestamp BETWEEN ? AND ? AND status='COMPLETED' ORDER BY timestamp DESC",
                 (start_time, end_time),
             )
@@ -280,7 +345,7 @@ def get_entries_since(start_time: int) -> List[RecallEntry]:
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
             cursor.execute(
-                "SELECT id, app, title, text, description, timestamp, embedding, status FROM entries "
+                "SELECT id, app, title, text, description, timestamp, embedding, image_embedding, status FROM entries "
                 "WHERE timestamp >= ? AND status='COMPLETED' ORDER BY timestamp DESC",
                 (start_time,),
             )
@@ -373,7 +438,7 @@ def get_entries_until(end_time: int) -> List[RecallEntry]:
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
             cursor.execute(
-                "SELECT id, app, title, text, description, timestamp, embedding, status FROM entries "
+                "SELECT id, app, title, text, description, timestamp, embedding, image_embedding, status FROM entries "
                 "WHERE timestamp <= ? AND status='COMPLETED' ORDER BY timestamp DESC",
                 (end_time,),
             )
@@ -427,7 +492,7 @@ def get_next_task(conn: sqlite3.Connection, lifo_mode: bool = False) -> Optional
         cursor = conn.cursor()
         order = "DESC" if lifo_mode else "ASC"
         cursor.execute(
-            f"SELECT id, app, title, text, description, timestamp, embedding, status "
+            f"SELECT id, app, title, text, description, timestamp, embedding, image_embedding, status "
             f"FROM entries WHERE status IN ('PENDING', 'CANCELLED') ORDER BY timestamp {order} LIMIT 1"
         )
         row = cursor.fetchone()
@@ -528,7 +593,8 @@ def mark_task_completed(
     task_id: int,
     text: str,
     description: Optional[str],
-    embedding: np.ndarray
+    embedding: np.ndarray,
+    image_embedding: np.ndarray | None = None,
 ) -> bool:
     """Mark a task as completed with processing results.
     
@@ -544,11 +610,16 @@ def mark_task_completed(
     """
     try:
         embedding_bytes = embedding.astype(np.float32).tobytes()
+        image_embedding_bytes = (
+            image_embedding.astype(np.float32).tobytes()
+            if isinstance(image_embedding, np.ndarray)
+            else None
+        )
         cursor = conn.cursor()
         cursor.execute(
-            "UPDATE entries SET text=?, description=?, embedding=?, status='COMPLETED' "
+            "UPDATE entries SET text=?, description=?, embedding=?, image_embedding=?, status='COMPLETED' "
             "WHERE id=? AND status IN ('PROCESSING', 'PENDING')",
-            (text, description, embedding_bytes, task_id)
+            (text, description, embedding_bytes, image_embedding_bytes, task_id)
         )
         conn.commit()
         return cursor.rowcount > 0

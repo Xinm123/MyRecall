@@ -33,6 +33,10 @@ extras_require = {
     "python-doctr": [
         "python-doctr"
     ],
+    "paddleocr": [
+        "paddleocr",
+        "paddlepaddle",
+    ],
     "test": [
         "pytest>=8.0.0",
         "pytest-cov>=5.0.0",

@@ -170,6 +170,66 @@ class Settings(BaseSettings):
         alias="OPENRECALL_EMBEDDING_DIM",
         description="Embedding vector dimension (must match model output)"
     )
+    mm_embedding_provider: str = Field(
+        default="api",
+        alias="OPENRECALL_MM_EMBEDDING_PROVIDER",
+        description="Multimodal embedding provider (api|local)"
+    )
+    mm_embedding_model_name: str = Field(
+        default="",
+        alias="OPENRECALL_MM_EMBEDDING_MODEL_NAME",
+        description="Model name/path for multimodal embedding provider"
+    )
+    mm_embedding_api_key: str = Field(
+        default="",
+        alias="OPENRECALL_MM_EMBEDDING_API_KEY",
+        description="API key for multimodal embedding provider"
+    )
+    mm_embedding_api_base: str = Field(
+        default="",
+        alias="OPENRECALL_MM_EMBEDDING_API_BASE",
+        description="API base URL for OpenAI-compatible multimodal embeddings"
+    )
+    rerank_provider: str = Field(
+        default="api",
+        alias="OPENRECALL_RERANK_PROVIDER",
+        description="Reranker provider (api|local)"
+    )
+    rerank_model_name: str = Field(
+        default="",
+        alias="OPENRECALL_RERANK_MODEL_NAME",
+        description="Model name/path for reranker provider"
+    )
+    rerank_enabled: bool = Field(
+        default=False,
+        alias="OPENRECALL_RERANK_ENABLED",
+        description="Enable two-stage reranking in search"
+    )
+    rerank_topk: int = Field(
+        default=50,
+        alias="OPENRECALL_RERANK_TOPK",
+        description="Number of fused candidates to rerank"
+    )
+    rerank_include_image: bool = Field(
+        default=False,
+        alias="OPENRECALL_RERANK_INCLUDE_IMAGE",
+        description="Include screenshot image as evidence for reranking (may be expensive)"
+    )
+    rerank_image_topk: int = Field(
+        default=10,
+        alias="OPENRECALL_RERANK_IMAGE_TOPK",
+        description="Max candidates for image-based reranking"
+    )
+    vector_backend: str = Field(
+        default="cache",
+        alias="OPENRECALL_VECTOR_BACKEND",
+        description="Vector backend (cache|sqlite_vss)"
+    )
+    hard_limit_recent_n: int = Field(
+        default=2000,
+        alias="OPENRECALL_HARD_LIMIT_RECENT_N",
+        description="Hard limit on recent candidates before ANN/filtering"
+    )
     processing_lifo_threshold: int = Field(
         default=10,
         alias="OPENRECALL_PROCESSING_LIFO_THRESHOLD",

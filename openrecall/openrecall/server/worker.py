@@ -12,7 +12,13 @@ import numpy as np
 
 from openrecall.server import database as db
 from openrecall.server.ai.base import AIProviderError
-from openrecall.server.ai.factory import get_ai_provider, get_embedding_provider, get_ocr_provider
+from openrecall.server.ai.factory import (
+    get_ai_provider,
+    get_embedding_provider,
+    get_mm_embedding_provider,
+    get_ocr_provider,
+)
+from openrecall.server.memory_card import build_memory_card
 from openrecall.server.config_runtime import runtime_settings
 from openrecall.shared.config import settings
 from openrecall.shared.models import RecallEntry
@@ -32,6 +38,14 @@ class _FallbackOCRProvider:
 
 class _FallbackEmbeddingProvider:
     def embed_text(self, text: str) -> np.ndarray:
+        return np.zeros(int(settings.embedding_dim), dtype=np.float32)
+
+
+class _FallbackMMEmbeddingProvider:
+    def embed_text(self, text: str) -> np.ndarray:
+        return np.zeros(int(settings.embedding_dim), dtype=np.float32)
+
+    def embed_image(self, image_path: str) -> np.ndarray:
         return np.zeros(int(settings.embedding_dim), dtype=np.float32)
 
 
@@ -81,11 +95,18 @@ class ProcessingWorker(threading.Thread):
         except Exception as e:
             logger.error(f"Failed to initialize embedding provider: {e}")
             embedding_provider = _FallbackEmbeddingProvider()
+
+        try:
+            mm_embedding_provider = get_mm_embedding_provider()
+        except Exception as e:
+            logger.error(f"Failed to initialize multimodal embedding provider: {e}")
+            mm_embedding_provider = _FallbackMMEmbeddingProvider()
         logger.info(
             "🤖 AI Engine initialized: "
             f"vision={settings.vision_provider or settings.ai_provider}, "
             f"ocr={settings.ocr_provider or settings.ai_provider}, "
-            f"embedding={settings.embedding_provider or settings.ai_provider}"
+            f"embedding={settings.embedding_provider or settings.ai_provider}, "
+            f"mm_embedding={settings.mm_embedding_provider}"
         )
         
         try:
@@ -142,6 +163,7 @@ class ProcessingWorker(threading.Thread):
                         ai_provider,
                         ocr_provider,
                         embedding_provider,
+                        mm_embedding_provider,
                         ai_processing_version,
                     )
                     
@@ -163,6 +185,7 @@ class ProcessingWorker(threading.Thread):
         ai_provider,
         ocr_provider,
         embedding_provider,
+        mm_embedding_provider,
         ai_processing_version: int
     ):
         """Process a single task through the OCR → AI → NLP pipeline.
@@ -214,25 +237,33 @@ class ProcessingWorker(threading.Thread):
                 db.mark_task_cancelled_if_processing(conn, task.id)
                 return
             try:
-                description = ai_provider.analyze_image(str(image_path))
+                vision_description = ai_provider.analyze_image(str(image_path))
             except AIProviderError as e:
                 logger.warning(f"⚠️ Task #{task.id}: AI provider failed: {e}")
-                description = ""
+                vision_description = ""
             except Exception as e:
                 logger.warning(f"⚠️ Task #{task.id}: AI provider unexpected error: {e}")
-                description = ""
+                vision_description = ""
             if settings.debug:
-                logger.debug(f"  AI: {len(description)} chars description")
+                logger.debug(f"  AI: {len(vision_description)} chars description")
             
             # Step 3: Generate text embedding
-            # Combine text and description for richer embedding
-            combined_text = f"{text}\n{description}"
+            card = build_memory_card(
+                app=task.app,
+                title=task.title,
+                timestamp=task.timestamp,
+                ocr_text=text,
+                vision_description=vision_description,
+            )
+            description_human = (card.scene or "").strip()
+            description = (vision_description or "").strip()
+            combined_text = card.embedding_text
             
             if settings.debug:
                 logger.debug("="*80)
                 logger.debug(f"  📝 OCR文本 ({len(text)} chars):\n{text}")
                 logger.debug("="*80)
-                logger.debug(f"  🤖 VL描述 ({len(description)} chars):\n{description}")
+                logger.debug(f"  🤖 VL描述 ({len(description_human)} chars):\n{description_human}")
                 logger.debug("="*80)
                 logger.debug(f"  🔗 合并文本 (总计 {len(combined_text)} chars):\n{combined_text}")
                 logger.debug("="*80)
@@ -250,6 +281,18 @@ class ProcessingWorker(threading.Thread):
                 embedding = np.zeros(int(settings.embedding_dim), dtype=np.float32)
             if settings.debug:
                 logger.debug(f"  NLP: Embedding shape {embedding.shape}")
+
+            if should_cancel():
+                db.mark_task_cancelled_if_processing(conn, task.id)
+                return
+            try:
+                image_embedding = mm_embedding_provider.embed_image(str(image_path))
+            except AIProviderError as e:
+                logger.warning(f"⚠️ Task #{task.id}: MM embedding provider failed: {e}")
+                image_embedding = np.zeros(int(settings.embedding_dim), dtype=np.float32)
+            except Exception as e:
+                logger.warning(f"⚠️ Task #{task.id}: MM embedding provider unexpected error: {e}")
+                image_embedding = np.zeros(int(settings.embedding_dim), dtype=np.float32)
             
             # Mark as completed
             if should_cancel():
@@ -260,7 +303,16 @@ class ProcessingWorker(threading.Thread):
                 task.id,
                 text,
                 description,
-                embedding
+                embedding,
+                image_embedding=image_embedding,
+            )
+            db.fts_upsert_entry(
+                conn,
+                entry_id=task.id,
+                app=task.app,
+                title=task.title,
+                text=text,
+                description=description_human,
             )
             
             if success:

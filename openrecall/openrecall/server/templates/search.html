@@ -187,6 +187,36 @@
     width: 100%;
     justify-content: space-between;
   }
+
+  .reason-tags {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-top: 8px;
+  }
+
+  .tag {
+    font-size: 0.75rem;
+    padding: 2px 8px;
+    border-radius: 999px;
+    border: 1px solid var(--border-color);
+    color: var(--text-secondary);
+    background: var(--bg-body);
+  }
+
+  .reason-snippet {
+    margin-top: 8px;
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    line-height: 1.35;
+  }
+
+  .reason-snippet mark {
+    background: rgba(255, 214, 0, 0.35);
+    color: inherit;
+    padding: 0 2px;
+    border-radius: 4px;
+  }
   
   .similarity-label {
     font-size: 0.85rem;
@@ -365,6 +395,24 @@
             <span class="similarity-score">—</span>
           {% endif %}
         </div>
+        {% set r = reasons.get(entry.id) if reasons else None %}
+        {% if r and r.tags %}
+          <div class="reason-tags">
+            {% for t in r.tags %}
+              <span class="tag">{{ t }}</span>
+            {% endfor %}
+            {% if r.rerank_score is not none %}
+              <span class="tag">rerank {{ "%.2f" % r.rerank_score }}</span>
+            {% endif %}
+          </div>
+        {% elif r and r.rerank_score is not none %}
+          <div class="reason-tags">
+            <span class="tag">rerank {{ "%.2f" % r.rerank_score }}</span>
+          </div>
+        {% endif %}
+        {% if r and r.snippet %}
+          <div class="reason-snippet">{{ r.snippet }}</div>
+        {% endif %}
       </div>
     </article>
   {% else %}

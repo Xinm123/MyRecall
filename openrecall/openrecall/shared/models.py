@@ -22,6 +22,7 @@ class RecallEntry(BaseModel):
     text: str | None = None  # OCR result (None when PENDING)
     description: str | None = None  # AI-generated semantic description (None when PENDING)
     embedding: Any | None = None  # Embedding vector (None when PENDING)
+    image_embedding: Any | None = None
     status: str = "PENDING"  # Task status: PENDING, PROCESSING, COMPLETED, FAILED
     similarity_score: float | None = None  # Similarity score for search results (0.0 to 1.0)
     
@@ -36,3 +37,14 @@ class RecallEntry(BaseModel):
         if isinstance(v, np.ndarray):
             return v
         raise ValueError(f"embedding must be bytes, np.ndarray or None, got {type(v)}")
+
+    @field_validator("image_embedding", mode="before")
+    @classmethod
+    def deserialize_image_embedding(cls, v: Any) -> np.ndarray | None:
+        if v is None:
+            return None
+        if isinstance(v, bytes):
+            return np.frombuffer(v, dtype=np.float32)
+        if isinstance(v, np.ndarray):
+            return v
+        raise ValueError(f"image_embedding must be bytes, np.ndarray or None, got {type(v)}")
