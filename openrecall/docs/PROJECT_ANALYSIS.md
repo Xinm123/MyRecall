@@ -1,310 +1,195 @@
-# OpenRecall 深度解析指南（架构视角）
+# OpenRecall 项目分析报告
+
+## 1. 项目概览
+
+OpenRecall 是一个开源的隐私优先的屏幕记忆工具，采用 **Client-Server** 架构。
+- **Client**: 负责定期截取屏幕截图，收集上下文信息（活动应用、窗口标题），并将数据上传到 Server。
+- **Server**: 负责接收数据、异步处理（OCR、图像理解、Embedding）、存储数据，并提供 Web 界面和搜索 API。
+
+## 2. 处理 Pipeline (Ingestion & Processing)
+
+数据处理流程分为两个主要阶段：**同步摄入 (Ingestion)** 和 **异步处理 (Processing)**。
+
+### 2.1 同步摄入 (Ingestion)
+**入口**: `openrecall/server/api.py` -> `/api/upload`
+
+1.  **接收数据**: 接收 Client 上传的 JSON 数据（包含图像数据、时间戳、应用名称、窗口标题）。
+2.  **落盘**: 将图像数据还原为图片文件，保存到磁盘 (`settings.screenshots_path`)。
+3.  **入库 (PENDING)**: 在 SQLite 数据库中插入一条状态为 `PENDING` 的记录。
+4.  **立即响应**: 返回 HTTP 202 Accepted，不等待后续繁重的 AI 处理，确保 Client 端低延迟。
 
-> 适用对象：需要快速接手、重构、扩展 OpenRecall 的开发者/架构师。
->
-> 目标：从“入口/模块职责/核心算法/数据契约/工作流”把项目讲透，帮助你在最短时间内做出正确改动。
-
----
-
-## 1. 项目全景（关键文件与核心功能）
-
-### 1.1 顶层工程文件
-
-- `README.md`
-  - 项目定位、安装与运行方式：`python3 -m openrecall.app`
-  - CLI 参数：`--storage-path`、`--primary-monitor-only`
-- `setup.py`
-  - 依赖声明（Flask、mss、sentence-transformers、torch、Pillow 等）
-  - OS-specific extras：Windows/macOS/Linux
-  - OCR 依赖：`python-doctr` 以 Git 依赖形式安装（固定 commit）
-- `docs/`
-  - `encryption.md`：加密卷存储指引
-  - `hardware.md`：硬件要求/兼容性
-- `tests/`
-  - `test_config.py`：验证跨平台 appdata 路径逻辑
-  - `test_database.py`：验证 SQLite 建表、插入、去重与查询
-  - `test_nlp.py`：验证 cosine 相似度（当前与实现存在预期不一致，见后文）
-
-### 1.2 核心包目录：`openrecall/`
-
-- `openrecall/app.py`：Web UI（Flask）+ 搜索/时间轴路由 + 启动后台录制线程
-- `openrecall/config.py`：CLI 参数解析 + 数据目录/路径（db、截图、模型缓存）
-- `openrecall/screenshot.py`：截图采集、相似度去重、保存图片、OCR、Embedding、写库
-- `openrecall/ocr.py`：Doctr OCR predictor 初始化与文字抽取
-- `openrecall/nlp.py`：SentenceTransformer embedding + 余弦相似度
-- `openrecall/database.py`：SQLite schema、插入、查询；embedding blob 序列化/反序列化
-- `openrecall/utils.py`：跨平台获取前台应用/窗口标题、用户活跃检测、时间格式化
-
----
-
-## 2. 技术栈与方法论（库、算法、模式）
-
-### 2.1 技术栈（按层拆解）
-
-- 语言：Python
-- Web：Flask（`openrecall/app.py`，使用 `render_template_string` + 内嵌模板）
-- 截图：`mss`（`openrecall/screenshot.py`）
-- 图像处理：Pillow（保存 WebP、缩放）
-- OCR：`python-doctr`（`openrecall/ocr.py`，`ocr_predictor`）
-- Embedding：`sentence-transformers`（`openrecall/nlp.py`，默认 `all-MiniLM-L6-v2`）
-- 数值计算：NumPy（向量计算、序列化/反序列化）
-- 存储：SQLite（`sqlite3` 标准库，`openrecall/database.py`）
-- OS 集成：
-  - macOS：pyobjc（AppKit/Quartz）+ `ioreg`
-  - Windows：pywin32 + psutil
-  - Linux：`xprop`、`xprintidle`（subprocess 调用）
-
-### 2.2 方法论/结构模式
-
-- **Pipeline（流水线）**：截图 → 去重 → OCR → Embedding → SQLite → Web 检索与展示
-- **Producer/Consumer**：后台线程持续写入（Producer），Flask 路由查询展示（Consumer）
-- **缓存/单例**：
-  - `nlp.py` 模块级加载 SentenceTransformer 模型（避免每次调用重新加载）
-  - `ocr.py` 模块级创建 Doctr predictor
-
-### 2.3 核心算法
-
-- **近似重复帧过滤**：MSSIM（Mean Structural Similarity Index）
-  - 先缩放降低计算量，再做全局统计版 SSIM
-- **语义检索相似度**：余弦相似度（cosine similarity）
-
----
-
-## 3. 深度代码实现（逐模块讲透实现逻辑）
-
-> 说明：此处描述以“当前仓库代码行为”为准；同时会标注关键的契约不一致/潜在缺陷，便于你后续修复。
-
-### 3.1 配置与路径：`openrecall/config.py`
-
-**职责**
-- 使用 `argparse` 在模块导入时解析 CLI 参数：
-  - `--storage-path`：自定义数据存储目录
-  - `--primary-monitor-only`：仅录制主屏
-- 计算/创建：
-  - `appdata_folder`
-  - `screenshots_path`
-  - `db_path`（`recall.db`）
-  - `model_cache_path`（`sentence_transformers/`）
-
-**实现要点**
-- `get_appdata_folder(app_name='openrecall')` 根据 `sys.platform` 返回默认数据目录并 `os.makedirs`。
-
-**重要风险（数据目录契约）**
-- 当传入 `--storage-path` 时，当前代码只设置 `appdata_folder = args.storage_path`，但 **没有设置 `screenshots_path`**。
-- 随后代码会执行 `for d in [screenshots_path, model_cache_path]: ...`，这会导致 `screenshots_path` 未定义的运行时错误。
-
-> 结论：如果你要让 `--storage-path` 正常工作，需要统一初始化 `screenshots_path` 与目录创建逻辑。
-
----
-
-### 3.2 截图与入库主循环：`openrecall/screenshot.py`
-
-**职责**
-- 多显示器截图（可选只录主屏）
-- 用户活跃检测：空闲时跳过
-- 相似度去重：过滤“变化很小”的帧
-- 保存 WebP 截图到 `screenshots_path`
-- OCR 抽取文本，生成 embedding，写入 SQLite
-
-#### 3.2.1 `take_screenshots()`
-- 使用 `mss.mss()` 获取 `sct.monitors`
-- 约定：
-  - `sct.monitors[0]` 是“所有屏幕拼接视图”
-  - `sct.monitors[1]` 是主屏
-- `--primary-monitor-only` 为真时只抓取 index=1
-- `sct.grab(monitor_info)` 输出 BGRA，转换为 RGB：`np.array(sct_img)[:, :, [2, 1, 0]]`
-
-#### 3.2.2 `mean_structured_similarity_index(img1, img2)`
-- 将 RGB 转灰度（线性加权）
-- 计算均值、方差、协方差
-- 代入全局统计版本 SSIM：返回 [-1, 1] 的相似度
-
-#### 3.2.3 `is_similar(img1, img2, similarity_threshold=0.9)`
-- 先 `resize_image()`（Pillow `thumbnail`）压缩图像
-- 再计算 MSSIM，阈值默认 0.9
-
-#### 3.2.4 `record_screenshots_thread()`（后台线程）
-- 循环：
-  1) `is_user_active()` 判断活跃；不活跃 sleep
-  2) `take_screenshots()`
-  3) 与 `last_screenshots` 做相似度比较
-  4) 变化明显则保存图片、OCR、embedding、写库
-
-**重要风险（函数重复定义导致行为混乱）**
-- 文件中出现 **两次同名 `record_screenshots_thread` 定义**，后者覆盖前者（Python 以最后定义为准）。
-- 前一个版本会保存为 `{timestamp}_{monitorIndex}.webp`，后一个版本保存为 `{timestamp}.webp`。
-- 前一个版本末尾出现 `return screenshots`，但该函数按设计是无限循环线程函数，该 `return` 语义不合理且变量来源不清晰。
-
-> 结论：目前实际运行行为由“第二个定义”决定。建议删除重复定义并固化截图命名契约。
-
----
-
-### 3.3 OCR：`openrecall/ocr.py`
-
-**职责**
-- 初始化 Doctr OCR predictor：`ocr_predictor(pretrained=True, det_arch=..., reco_arch=...)`
-- 对输入图像进行 OCR，并把 `words` 拼接为文本
-
-**实现逻辑**
-- `extract_text_from_image(image)`：
-  - 调用 `result = ocr([image])`
-  - 遍历 `pages → blocks → lines → words`，把 `word.value` 拼接
-  - 以空格与换行分隔
-
-**工程化注意点**
-- predictor 在模块导入时初始化：冷启动慢、依赖问题会影响整个应用导入。
-- 输入 `image` 目前直接传入 `np.ndarray`，实际可用性依赖 doctr 对 numpy 输入的支持。
-
----
-
-### 3.4 Embedding 与相似度：`openrecall/nlp.py`
-
-**职责**
-- 加载/缓存 SentenceTransformer（默认 `all-MiniLM-L6-v2`）
-- 提供 `get_embedding(text)` 与 `cosine_similarity(a, b)`
-
-**实现逻辑**
-- `get_model(model_name)`：
-  - `cache_path = os.path.join(model_cache_path, model_name)`
-  - 若目录存在：从本地目录加载
-  - 否则：下载模型并 `model.save(cache_path)`
-- 模块级 `model = get_model(...)`：避免重复加载
-- `get_embedding(text)`：
-  - 若 model 加载失败或输入为空：返回 384 维 float32 零向量
-  - 按行 split 并过滤空行后编码：`model.encode(sentences)`
-  - 对行向量做均值聚合：`np.mean(..., axis=0)`
-- `cosine_similarity(a, b)`：
-  - 若任一向量范数为 0：返回 `0.0`
-  - 否则返回点积/范数积并 clip 到 [-1, 1]
-
-**测试契约不一致**
-- `tests/test_nlp.py` 期望当任一向量为零向量时结果为 NaN；但当前实现返回 `0.0`。
-
-> 结论：需要你明确“零向量”的产品语义：0（不相似）、NaN（无效）、或跳过该条。
-
----
-
-### 3.5 数据库：`openrecall/database.py`
-
-**职责**
-- SQLite 表结构初始化与索引
-- 插入条目（timestamp 唯一去重）
-- 查询条目、时间戳
-- embedding 以 BLOB 方式存储
-
-**表结构**
-- `entries(id, app, title, text, timestamp UNIQUE, embedding BLOB)`
-- `idx_timestamp` 索引
-
-**写入：`insert_entry(text, timestamp, embedding, app, title)`**
-- `embedding.astype(np.float32).tobytes()` 序列化
-- `ON CONFLICT(timestamp) DO NOTHING` 去重
-
-**读取：`get_all_entries()`**
-- 使用 `sqlite3.Row` row_factory
-- embedding 用 `np.frombuffer(..., dtype=np.float32)` 反序列化
-- 返回 `Entry(namedtuple)`，其中 `embedding` 为 `np.ndarray`
-
-**重要风险（查询返回类型不一致）**
-- `get_entries_by_time_range(start_time, end_time)` 直接 `SELECT *` 并 `Entry(*result)`，**没有**反序列化 embedding。
-- 这导致：
-  - `get_all_entries()` 返回 `Entry.embedding: np.ndarray`
-  - `get_entries_by_time_range()` 返回 `Entry.embedding: bytes/blob`
-
-> 结论：数据库查询层应统一输出契约（推荐：永远返回 `np.ndarray`），避免上层重复 `frombuffer` 或类型错配。
-
----
-
-### 3.6 Web UI 与搜索：`openrecall/app.py`
-
-**职责**
-- 路由：
-  - `/`：时间轴 slider 浏览历史
-  - `/search`：按 query 语义相似度排序展示
-  - `/static/<filename>`：从 `screenshots_path` 提供截图文件
-- 启动后台线程 `record_screenshots_thread()` 持续写库
-
-#### 3.6.1 模板组织
-- `base_template` 以字符串内嵌
-- 自定义 `StringLoader(BaseLoader)` 给 Jinja 提供 `base_template`
-
-#### 3.6.2 时间轴 `/`
-- `timestamps = get_timestamps()`（按 timestamp DESC）
-- 前端 slider 使用 `reversedIndex = timestamps.length - 1 - slider.value` 把 slider 值映射到倒序数组
-- 通过 `/static/${timestamp}.webp` 加载截图
-
-#### 3.6.3 搜索 `/search`
-- 若提供 `start_time`/`end_time`：调用 `get_entries_by_time_range`
-- 否则调用 `get_all_entries`
-- 计算：
-  - `query_embedding = get_embedding(q)`
-  - 对每条 entry 的 embedding 与 query embedding 做 `cosine_similarity`
-  - `np.argsort(similarities)[::-1]` 排序
-
-**重要风险（多处契约不一致会导致运行时错误）**
-1) embedding 二次反序列化风险
-- `search()` 中固定做：`np.frombuffer(entry.embedding, dtype=np.float32)`
-- 但 `get_all_entries()` 已经返回 `np.ndarray`，再 `frombuffer` 会产生类型/语义问题。
-
-2) 模板中对 `Entry` 的访问方式可能错误
-- 模板中使用 `entry['timestamp']`（字典式访问）
-- 但数据库返回的是 `Entry(namedtuple)`，更可靠的方式应是 `entry.timestamp`。
-
-3) 截图文件命名契约
-- UI 默认请求 `/static/<timestamp>.webp`
-- 若截图保存逻辑采用 `{timestamp}_{i}.webp`，则 UI 将无法找到图片。
-
----
-
-## 4. 工作流与数据流（模块交互）
-
-### 4.1 端到端工作流（从屏幕到检索）
-
-1) **启动**
-- `python -m openrecall.app`
-- `create_db()` 初始化 SQLite
-- 创建后台线程运行 `record_screenshots_thread()`
-- 启动 Flask Web 服务（默认端口 8082）
-
-2) **后台采集（Producer）**
-- 每 3 秒循环：
-  - `is_user_active()` 为 False：跳过
-  - `take_screenshots()` 抓取屏幕图像
-  - 与上次截图比较 `is_similar()`：相似则跳过
-  - 保存截图到 `screenshots_path`
-  - OCR：`extract_text_from_image()`
-  - embedding：`get_embedding()`
-  - 写库：`insert_entry(text, timestamp, embedding, app, title)`
-
-3) **Web 查询（Consumer）**
-- 时间轴 `/`：读取 `timestamps` 并按时间浏览图片
-- 搜索 `/search`：读取 entries → 向量化 query → 余弦相似度排序 → 渲染结果
-
-### 4.2 数据契约（建议你显式固化）
-
-- **截图命名契约**：UI 以 `{timestamp}.webp` 作为静态资源键
-- **Entry.embedding 类型契约**：建议查询层统一输出 `np.ndarray(float32, dim=384)`
-- **零向量相似度契约**：0/NaN/过滤（需要和测试/产品期望一致）
-
----
-
-## 5. 架构债与优先级建议（可选）
-
-如果你准备进入“稳定可用 + 可维护”的状态，建议优先处理：
-
-1) `config.py`：修复 `--storage-path` 分支未初始化 `screenshots_path` 的问题（否则自定义目录直接崩）
-2) `screenshot.py`：去掉重复的 `record_screenshots_thread` 定义，并统一截图命名策略与 UI 契约
-3) `database.py`：统一 `get_all_entries` 与 `get_entries_by_time_range` 的 embedding 返回类型
-4) `app.py`：模板改为 `entry.timestamp` 访问；并避免对已经是 `np.ndarray` 的 embedding 再 `frombuffer`
-5) `nlp.py` vs `tests/test_nlp.py`：统一零向量相似度行为（返回 NaN / 0 / 跳过）
-
----
-
-## 6. 快速定位（按你要改什么）
-
-- 想改“录制策略/去重阈值/频率”：`openrecall/screenshot.py`
-- 想改“存储结构/索引/查询性能”：`openrecall/database.py`
-- 想改“检索排序/embedding 策略”：`openrecall/nlp.py` + `openrecall/app.py`
-- 想改“OCR 模型/抽取效果”：`openrecall/ocr.py`
-- 想改“UI/交互”：`openrecall/app.py`（模板内嵌）
-- 想改“跨平台活动窗口/空闲检测”：`openrecall/utils.py`
+### 2.2 异步处理 (Processing)
+**核心**: `openrecall/server/worker.py` -> `ProcessingWorker`
+
+后台线程 `ProcessingWorker` 持续监控数据库中的任务队列。
+
+1.  **任务调度**:
+    -   默认使用 **FIFO** (先进先出) 处理任务。
+    -   当积压任务超过阈值 (`settings.processing_lifo_threshold`，默认 10) 时，切换为 **LIFO** (后进先出)，优先处理最新的截图，保证用户感知的实时性。
+2.  **处理步骤**:
+    -   **Step 1: OCR (文字提取)**
+        -   调用 `ocr_provider.extract_text()`。
+        -   提取图片中的可见文本。
+    -   **Step 2: Vision Analysis (图像理解)**
+        -   调用 `ai_provider.analyze_image()`。
+        -   生成图像的语义描述（例如："用户正在 VS Code 中编写 Python 代码"）。
+    -   **Step 3: Embedding (向量化)**
+        -   将 **OCR 文本** 与 **Vision 描述** 合并：`combined_text = f"{text}\n{description}"`。
+        -   调用 `embedding_provider.embed_text(combined_text)` 生成高维向量。
+    -   **Step 4: 完成 (Completion)**
+        -   更新数据库记录：写入 OCR 文本、图像描述、Embedding 向量，并将状态更新为 `COMPLETED`。
+
+## 3. 查询 Pipeline (Search & Query)
+
+**入口**: `openrecall/server/app.py` -> `/search`
+
+查询过程基于语义向量检索 (Vector Search)。
+
+1.  **接收请求**: 获取查询关键词 `q` 和可选的时间范围 (`start_time`, `end_time`)。
+2.  **初步筛选**: 根据时间范围从数据库中拉取候选记录 (`RecallEntry`)。
+3.  **语义匹配**:
+    -   **Query Embedding**: 调用 `NLPEngine` 将查询关键词 `q` 转换为向量。
+    -   **Cosine Similarity**: 计算查询向量与所有候选记录向量的余弦相似度。
+4.  **排序与返回**:
+    -   按相似度从高到低排序。
+    -   渲染 `search.html` 模板返回结果。
+
+## 4. 模型与 AI 架构 (Models & Providers)
+
+OpenRecall 采用插件式 AI 架构，支持本地运行和云端 API。
+
+**代码位置**: `openrecall/server/ai/`
+
+### 4.1 核心能力 (Capabilities)
+系统定义了三种核心能力：
+-   **OCR**: 文字提取
+-   **Vision**: 图像理解
+-   **Embedding**: 文本向量化
+
+### 4.2 提供商 (Providers)
+
+#### Local (默认，隐私优先)
+本地模式依赖 `transformers`、`docTR` 和 `sentence-transformers` 库。
+
+-   **OCR Model**:
+    -   库: `docTR` (Document Text Recognition)
+    -   检测模型: `db_mobilenet_v3_large`
+    -   识别模型: `crnn_mobilenet_v3_large`
+-   **Vision Model**:
+    -   模型: **Qwen3-VL** (`Qwen3VLForConditionalGeneration`)
+    -   用途: 生成图像的自然语言描述。
+-   **Embedding Model**:
+    -   模型: **Qwen3-Embedding-0.6B** (默认路径: `/Users/tiiny/models/Qwen3-Embedding-0.6B`)
+    -   维度: 1024
+    -   库: `SentenceTransformer`
+
+#### Cloud (可选)
+支持通过 API 调用云端大模型，适合性能有限的设备。
+-   **OpenAI**: 支持兼容 OpenAI 协议的模型（如 GPT-4o, DeepSeek 等）。
+-   **DashScope (阿里云)**: 支持 Qwen 系列云端模型。
+
+## 5. 数据库设计
+
+**存储**: SQLite (`settings.db_path`)
+
+**表结构 (`entries`)**:
+| 字段 | 类型 | 说明 |
+| :--- | :--- | :--- |
+| `id` | INTEGER | 主键 |
+| `timestamp` | INTEGER | 截图时间戳 (索引, Unique) |
+| `app` | TEXT | 活动应用名称 |
+| `title` | TEXT | 窗口标题 |
+| `text` | TEXT | OCR 提取的文本 |
+| `description` | TEXT | AI 生成的图像描述 |
+| `embedding` | BLOB | 序列化的向量数据 |
+| `status` | TEXT | 状态 (`PENDING`, `PROCESSING`, `COMPLETED`, `FAILED`) |
+
+## 6. 关键配置
+
+配置通过 `openrecall/shared/config.py` 管理，支持环境变量覆盖。
+
+-   `OPENRECALL_AI_PROVIDER`: 指定 AI 提供商 (`local`, `openai`, `dashscope`)。
+-   `OPENRECALL_DEVICE`: 推理设备 (`cpu`, `cuda`, `mps`)。
+-   `OPENRECALL_PROCESSING_LIFO_THRESHOLD`: 触发 LIFO 模式的队列阈值。
+
+## 7. 详细数据流与 Pipeline 解析
+
+本节深入剖析数据从采集到检索的完整生命周期。
+
+### 7.1 数据流全景图 (Data Flow Overview)
+
+```mermaid
+sequenceDiagram
+    participant Screen as Monitor
+    participant Recorder as Client (Recorder)
+    participant Uploader as Client (Uploader)
+    participant ServerAPI as Server (API)
+    participant DB as SQLite
+    participant Worker as Server (Worker)
+    participant AI as AI Models
+
+    %% Capture Phase
+    Screen->>Recorder: 1. 截屏 (MSS)
+    Recorder->>Recorder: 2. 去重 (MSSIM > 0.98?)
+    Recorder->>Uploader: 3. 原始图像 (NumPy) + Metadata
+    
+    %% Ingestion Phase
+    Uploader->>ServerAPI: 4. HTTP POST /api/upload (JSON)
+    ServerAPI->>ServerAPI: 5. 还原图像 (Save to Disk)
+    ServerAPI->>DB: 6. INSERT "PENDING"
+    ServerAPI-->>Uploader: 7. 202 Accepted (立即返回)
+
+    %% Processing Phase (Async)
+    loop Worker Loop
+        Worker->>DB: 8. Check Queue (LIFO/FIFO)
+        DB-->>Worker: Next Task
+        Worker->>DB: 9. Update Status: "PROCESSING"
+        
+        par Parallel Execution
+            Worker->>AI: 10. OCR (Extract Text)
+            Worker->>AI: 11. Vision (Analyze Image)
+        end
+        
+        AI-->>Worker: Text + Description
+        Worker->>AI: 12. Embedding (Text + Desc)
+        AI-->>Worker: Vector (1024 dim)
+        
+        Worker->>DB: 13. Update Entry (Text, Desc, Vector, COMPLETED)
+    end
+```
+
+### 7.2 关键环节深度解析
+
+#### A. 客户端采集与去重 (Client Capture & Deduplication)
+*   **采集**: 使用 `mss` 库捕获屏幕。
+*   **去重算法**: **MSSIM (Mean Structural Similarity Index)**。
+    *   客户端会缓存上一帧截图。
+    *   将当前帧与上一帧计算 MSSIM 相似度。
+    *   **阈值**: 默认 `0.98` (`settings.similarity_threshold`)。
+    *   **效果**: 只有当屏幕内容发生显著变化时（如滚动页面、切换窗口），才会触发上传，极大节省了服务器计算资源。
+*   **数据打包**: 图像被转换为 NumPy 数组，并序列化为 JSON 列表发送，附带 `active_app` 和 `active_window`。
+
+#### B. 服务端数据重构 (Server Reconstruction)
+*   **接收**: Server 接收到的不是 multipart 文件，而是 JSON Payload。
+*   **重构**: 使用 `numpy.array()` 和 `reshape()` 将扁平数组还原为图像矩阵。
+*   **设计考量**: 这种方式虽然 JSON 体积较大，但与 NumPy 生态结合紧密，便于后续直接传递给 AI 模型处理。
+
+#### C. AI 处理逻辑 (AI Processing Logic)
+Worker 线程执行以下具体逻辑：
+
+1.  **Prompt 工程**:
+    *   Vision 模型接收的 Prompt 固定为：**"In one sentence: What app is this and what is the user doing?"**
+    *   这确保了生成的 `description` 简洁且专注于用户行为，而非无关的图像细节。
+
+2.  **Embedding 融合策略**:
+    *   系统不仅仅对 OCR 文本进行向量化，而是采用了 **"Context Fusion"** 策略。
+    *   **输入内容**: `combined_text = f"{text}\n{description}"`
+    *   **优势**: 即使 OCR 识别出的文本很少（例如只有图标），Vision 生成的描述也能提供语义信息，保证了向量检索的召回率。
+
+#### D. 搜索匹配逻辑 (Search Matching Logic)
+*   **当前实现**: **Brute-force Cosine Similarity** (暴力余弦相似度)。
+*   **流程**:
+    1.  加载所有（或经过时间筛选的）记录的 Embedding 到内存。
+    2.  计算 Query Vector 与每一条记录的相似度。
+    3.  NumPy 向量化运算确保了在数万条记录规模下的毫秒级响应。
+*   **未来瓶颈**: 当记录数达到百万级时，可能需要引入 FAISS 或向量数据库。
