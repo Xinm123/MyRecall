@@ -23,6 +23,7 @@ install_requires = [
     "Pillow==10.3.0",
     "pydantic>=2.0.0",
     "pydantic-settings>=2.0.0",
+    "lancedb",
 ]
 
 # Define OS-specific dependencies

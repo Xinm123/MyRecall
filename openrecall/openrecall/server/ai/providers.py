@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import base64
+import json
 import logging
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 import requests
@@ -95,7 +97,7 @@ class LocalProvider(AIProvider):
 
         return image.resize((new_width, new_height), Image.Resampling.LANCZOS)
 
-    def analyze_image(self, image_path: str) -> str:
+    def analyze_image(self, image_path: str) -> dict[str, Any]:
         path = Path(image_path)
         if not path.is_file():
             raise AIProviderRequestError(f"Image not found: {image_path}")
@@ -111,7 +113,7 @@ class LocalProvider(AIProvider):
                     {"type": "image", "image": image},
                     {
                         "type": "text",
-                        "text": "In one sentence: What app is this and what is the user doing?",
+                        "text": "Analyze this screenshot. Output a strictly valid JSON object with these keys:\n- 'caption': A detailed natural language description of the screen content and user intent.\n- 'scene': A single tag describing the scene (e.g., coding, browsing, meeting, chat).\n- 'action': A single tag describing the action (e.g., debugging, reading, typing).\nDo not include markdown formatting.",
                     },
                 ],
             }
@@ -143,7 +145,19 @@ class LocalProvider(AIProvider):
             skip_special_tokens=True,
             clean_up_tokenization_spaces=False,
         )[0]
-        return output_text.strip()
+        
+        raw_text = output_text.strip()
+        try:
+            # Attempt to clean potential markdown fences
+            clean_text = raw_text.replace("```json", "").replace("```", "").strip()
+            data = json.loads(clean_text)
+            if isinstance(data, dict):
+                return data
+        except Exception:
+            pass
+            
+        logger.warning(f"Failed to parse JSON from LocalProvider. Raw: {raw_text[:50]}...")
+        return {"caption": raw_text, "scene": "", "action": ""}
 
 
 class DashScopeProvider(AIProvider):
@@ -164,7 +178,7 @@ class DashScopeProvider(AIProvider):
         self._dashscope.api_key = api_key
         self.model_name = model_name
 
-    def analyze_image(self, image_path: str) -> str:
+    def analyze_image(self, image_path: str) -> dict[str, Any]:
         path = Path(image_path).resolve()
         if not path.is_file():
             raise AIProviderRequestError(f"Image not found: {image_path}")
@@ -174,7 +188,7 @@ class DashScopeProvider(AIProvider):
                 "role": "user",
                 "content": [
                     {"image": f"file://{path.as_posix()}"},
-                    {"text": "In one sentence: What app is this and what is the user doing?"},
+                    {"text": "Analyze this screenshot. Output a strictly valid JSON object with these keys:\n- 'caption': A detailed natural language description of the screen content and user intent.\n- 'scene': A single tag describing the scene (e.g., coding, browsing, meeting, chat).\n- 'action': A single tag describing the action (e.g., debugging, reading, typing).\nDo not include markdown formatting."},
                 ],
             }
         ]
@@ -187,6 +201,7 @@ class DashScopeProvider(AIProvider):
         except Exception as e:
             raise AIProviderRequestError(f"DashScope request failed: {e}") from e
 
+        raw_text = ""
         try:
             data = response
             if hasattr(response, "to_dict"):
@@ -198,20 +213,34 @@ class DashScopeProvider(AIProvider):
                     message = choices[0].get("message") or {}
                     content = message.get("content")
                     if isinstance(content, str):
-                        return content.strip()
-                    if isinstance(content, list):
+                        raw_text = content.strip()
+                    elif isinstance(content, list):
                         texts: list[str] = []
                         for item in content:
                             if isinstance(item, dict) and "text" in item:
                                 texts.append(str(item["text"]))
                         if texts:
-                            return " ".join(texts).strip()
-                text = output.get("text")
-                if isinstance(text, str) and text.strip():
-                    return text.strip()
-            raise KeyError("unexpected response shape")
+                            raw_text = " ".join(texts).strip()
+                else:
+                    text = output.get("text")
+                    if isinstance(text, str) and text.strip():
+                        raw_text = text.strip()
         except Exception as e:
             raise AIProviderRequestError(f"DashScope response parse failed: {e}") from e
+            
+        if not raw_text:
+             raise KeyError("unexpected response shape or empty text")
+
+        try:
+            clean_text = raw_text.replace("```json", "").replace("```", "").strip()
+            data = json.loads(clean_text)
+            if isinstance(data, dict):
+                return data
+        except Exception:
+            pass
+            
+        logger.warning(f"Failed to parse JSON from DashScopeProvider. Raw: {raw_text[:50]}...")
+        return {"caption": raw_text, "scene": "", "action": ""}
 
 
 class OpenAIProvider(AIProvider):
@@ -228,7 +257,7 @@ class OpenAIProvider(AIProvider):
         self.api_base = _normalize_api_base(api_base or "https://api.openai.com/v1")
         logger.info(f"OpenAIProvider configured: base={self.api_base} model={self.model_name}")
 
-    def analyze_image(self, image_path: str) -> str:
+    def analyze_image(self, image_path: str) -> dict[str, Any]:
         path = Path(image_path).resolve()
         if not path.is_file():
             raise AIProviderRequestError(f"Image not found: {image_path}")
@@ -249,7 +278,7 @@ class OpenAIProvider(AIProvider):
                     "content": [
                         {
                             "type": "text",
-                            "text": "In one sentence: What app is this and what is the user doing?",
+                            "text": "Analyze this screenshot. Output a strictly valid JSON object with these keys:\n- 'caption': A detailed natural language description of the screen content and user intent.\n- 'scene': A single tag describing the scene (e.g., coding, browsing, meeting, chat).\n- 'action': A single tag describing the action (e.g., debugging, reading, typing).\nDo not include markdown formatting.",
                         },
                         {
                             "type": "image_url",
@@ -275,6 +304,7 @@ class OpenAIProvider(AIProvider):
         except Exception as e:
             raise AIProviderRequestError(f"OpenAI response is not JSON: {e}") from e
 
+        raw_text = ""
         try:
             choices = data.get("choices") or []
             if not choices:
@@ -282,10 +312,22 @@ class OpenAIProvider(AIProvider):
             message = choices[0].get("message") or {}
             content = message.get("content")
             if isinstance(content, str):
-                return content.strip()
-            raise TypeError("message.content is not a string")
+                raw_text = content.strip()
+            else:
+                raise TypeError("message.content is not a string")
         except Exception as e:
             raise AIProviderRequestError(f"OpenAI response parse failed: {e}") from e
+            
+        try:
+            clean_text = raw_text.replace("```json", "").replace("```", "").strip()
+            data = json.loads(clean_text)
+            if isinstance(data, dict):
+                return data
+        except Exception:
+            pass
+            
+        logger.warning(f"Failed to parse JSON from OpenAIProvider. Raw: {raw_text[:50]}...")
+        return {"caption": raw_text, "scene": "", "action": ""}
 
 
 class LocalOCRProvider(OCRProvider):

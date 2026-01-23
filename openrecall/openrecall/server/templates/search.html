@@ -182,10 +182,10 @@
   
   .similarity-info {
     display: flex;
-    align-items: center;
-    gap: 8px;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 6px;
     width: 100%;
-    justify-content: space-between;
   }
   
   .similarity-label {
@@ -200,7 +200,22 @@
     color: var(--accent-color);
     font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
   }
+
+  .score-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    width: 100%;
+  }
   
+  .score-multiline {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 2px;
+  }
+
   .modal {
     display: none;
     position: fixed;
@@ -345,8 +360,9 @@
       </div>
       
       <!-- Card Image -->
+      {% set filename = entry.filename if entry.filename else ((entry.timestamp | int) ~ '.png') %}
       <img 
-        src="/screenshots/{{ entry.timestamp }}.png" 
+        src="/screenshots/{{ filename }}" 
         alt="Screenshot" 
         class="card-image js-open-modal"
         loading="lazy"
@@ -358,12 +374,29 @@
       <!-- Card Footer with Similarity Score -->
       <div class="card-footer">
         <div class="similarity-info">
-          <span class="similarity-label">Match:</span>
-          {% if entry.similarity_score is not none %}
-            <span class="similarity-score">{{ "%.1f" % (entry.similarity_score * 100) }}%</span>
-          {% else %}
-            <span class="similarity-score">—</span>
-          {% endif %}
+          <div class="score-row">
+            <span class="similarity-label">Final</span>
+            {% if entry.final_rank is not none and entry.final_score is not none %}
+              <span class="similarity-score">#{{ entry.final_rank }} · {{ "%.4f" % entry.final_score }}</span>
+            {% else %}
+              <span class="similarity-score">—</span>
+            {% endif %}
+          </div>
+          <div class="score-row">
+            <span class="similarity-label">Vector</span>
+            {% if entry.vector_rank is not none and entry.vector_score is not none %}
+              <span class="similarity-score">#{{ entry.vector_rank + 1 }} · {{ "%.4f" % entry.vector_score }}</span>
+            {% else %}
+              <span class="similarity-score">—</span>
+            {% endif %}
+          </div>
+          <div class="score-row">
+            <span class="similarity-label">FTS</span>
+            <div class="score-multiline similarity-score">
+              <div>bm25={% if entry.fts_bm25 is not none %}{{ "%.4f" % entry.fts_bm25 }}{% else %}none{% endif %}</div>
+              <div>#{% if entry.fts_rank is not none %}{{ entry.fts_rank + 1 }}{% else %}—{% endif %} · boost={{ "%.4f" % (entry.fts_boost or 0.0) }}</div>
+            </div>
+          </div>
         </div>
       </div>
     </article>

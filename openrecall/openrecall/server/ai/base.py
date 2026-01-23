@@ -21,9 +21,15 @@ class AIProviderRequestError(AIProviderError):
     pass
 
 
+from typing import Any
+
 class AIProvider(ABC):
     @abstractmethod
-    def analyze_image(self, image_path: str) -> str:
+    def analyze_image(self, image_path: str) -> dict[str, Any]:
+        """
+        Analyze the image and return a JSON dictionary.
+        Expected keys: 'caption', 'scene', 'action'.
+        """
         raise NotImplementedError
 
 

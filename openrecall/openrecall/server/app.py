@@ -8,7 +8,7 @@ import numpy as np
 from flask import Flask, render_template, request, send_from_directory
 
 from openrecall.shared.config import settings
-from openrecall.server.api import api_bp
+from openrecall.server.api import api_bp, search_engine
 from openrecall.server.database import (
     create_db,
     get_all_entries,
@@ -89,46 +89,43 @@ def timeline():
 
 @app.route("/search")
 def search():
+    """Legacy Search UI calling New Hybrid Search Engine."""
     q = (request.args.get("q") or "").strip()
-    start_time_str = (request.args.get("start_time") or "").strip()
-    end_time_str = (request.args.get("end_time") or "").strip()
-
-    def parse_minute_start(value: str) -> int | None:
-        if not value:
-            return None
-        try:
-            return int(datetime.strptime(value, "%Y-%m-%dT%H:%M").timestamp())
-        except ValueError:
-            return None
-
-    start_min = parse_minute_start(start_time_str)
-    end_min = parse_minute_start(end_time_str)
-
-    if start_min is not None and end_min is not None:
-        if start_min > end_min:
-            start_min, end_min = end_min, start_min
-        entries = get_entries_by_time_range(start_min, end_min + 59)
-    elif start_min is not None:
-        entries = get_entries_since(start_min)
-    elif end_min is not None:
-        entries = get_entries_until(end_min + 59)
-    else:
-        entries = get_all_entries()
-
+    
     if not q:
+        # Default view: show recent entries
+        entries = get_all_entries_with_status()
+        entries.sort(key=lambda x: x.timestamp, reverse=True)
+        serialized_entries = [
+            {
+                "id": entry.id,
+                "timestamp": entry.timestamp,
+                "app": entry.app,
+                "title": entry.title,
+                "description": entry.description,
+                "status": entry.status,
+                "filename": f"{entry.timestamp}.png",
+                "app_name": entry.app,
+                "window_title": entry.title,
+                "final_rank": None,
+                "final_score": None,
+                "vector_rank": None,
+                "vector_score": None,
+                "fts_rank": None,
+                "fts_bm25": None,
+            }
+            for entry in entries[:50]
+        ]
+        return render_template("search.html", entries=serialized_entries)
+
+    # Use the new Hybrid Search Engine
+    try:
+        entries = search_engine.search_debug(q, limit=50)
         return render_template("search.html", entries=entries)
-
-    embeddings = [entry.embedding for entry in entries]
-    query_embedding = get_embedding(q)
-    similarities = [cosine_similarity(query_embedding, emb) for emb in embeddings]
-    indices = np.argsort(similarities)[::-1]
-    sorted_entries = [entries[i] for i in indices]
-    sorted_similarities = [similarities[i] for i in indices]
-
-    for entry, similarity in zip(sorted_entries, sorted_similarities):
-        entry.similarity_score = similarity
-
-    return render_template("search.html", entries=sorted_entries)
+        
+    except Exception as e:
+        logger.error(f"Search UI failed: {e}")
+        return render_template("search.html", entries=[], error=str(e))
 
 
 @app.route("/static/<filename>")

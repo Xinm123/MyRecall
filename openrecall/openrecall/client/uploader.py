@@ -5,10 +5,13 @@ Provides health check and screenshot upload functionality.
 """
 
 import time
+import json
+import io
 from typing import Optional
 
 import numpy as np
 import requests
+from PIL import Image
 
 from openrecall.shared.config import settings
 
@@ -85,18 +88,22 @@ class HTTPUploader:
             True if upload succeeded, False otherwise.
         """
         try:
-            payload = {
-                "image": image.flatten().tolist(),
-                "shape": list(image.shape),
-                "dtype": str(image.dtype),
+            # Convert numpy array to PNG bytes
+            img_pil = Image.fromarray(image)
+            img_byte_arr = io.BytesIO()
+            img_pil.save(img_byte_arr, format='PNG')
+            img_byte_arr.seek(0)
+
+            metadata = {
                 "timestamp": timestamp,
-                "active_app": active_app,
-                "active_window": active_window,
+                "app_name": active_app,
+                "window_title": active_window,
             }
             
             response = requests.post(
                 f"{self.api_url}/upload",
-                json=payload,
+                files={"file": ("screenshot.png", img_byte_arr, "image/png")},
+                data={"metadata": json.dumps(metadata)},
                 timeout=self.timeout
             )
             

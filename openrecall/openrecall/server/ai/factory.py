@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Dict
+from typing import Any, Dict, Union
 
 from openrecall.server.ai.base import AIProvider, AIProviderConfigError, EmbeddingProvider, OCRProvider
 from openrecall.server.ai.providers import (
@@ -43,8 +43,12 @@ def _resolve_embedding_config() -> tuple[str, str, str, str]:
     return provider, model_name, api_key, api_base
 
 
-def get_ai_provider(capability: str = "vision") -> AIProvider:
-    if capability != "vision":
+def get_ai_provider(capability: str = "vision") -> Union[AIProvider, OCRProvider, EmbeddingProvider]:
+    if capability == "embedding":
+        return get_embedding_provider()
+    elif capability == "ocr":
+        return get_ocr_provider()
+    elif capability != "vision":
         raise AIProviderConfigError(f"Unsupported capability: {capability}")
 
     cached = _instances.get(capability)

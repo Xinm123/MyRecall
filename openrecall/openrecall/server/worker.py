@@ -1,5 +1,6 @@
 """Background worker for processing screenshot tasks asynchronously."""
 
+import datetime
 import logging
 import sqlite3
 import threading
@@ -7,6 +8,7 @@ import time
 import traceback
 from pathlib import Path
 from typing import Optional
+from uuid import uuid4
 
 import numpy as np
 
@@ -17,12 +19,19 @@ from openrecall.server.config_runtime import runtime_settings
 from openrecall.shared.config import settings
 from openrecall.shared.models import RecallEntry
 
+# Phase 3 Imports
+from openrecall.server.utils.keywords import KeywordExtractor
+from openrecall.server.utils.fusion import build_fusion_text
+from openrecall.server.schema import SemanticSnapshot, Context, Content
+from openrecall.server.database.vector_store import VectorStore
+from openrecall.server.database.sql import FTSStore
+
 logger = logging.getLogger(__name__)
 
 
 class _FallbackVisionProvider:
-    def analyze_image(self, image_path: str) -> str:
-        return ""
+    def analyze_image(self, image_path: str) -> dict:
+        return {"caption": "", "scene": "", "action": ""}
 
 
 class _FallbackOCRProvider:
@@ -49,6 +58,7 @@ class ProcessingWorker(threading.Thread):
         """Initialize the processing worker."""
         super().__init__(daemon=True, name="ProcessingWorker")
         self._stop_event = threading.Event()
+        self.keyword_extractor = KeywordExtractor()
         logger.info("ProcessingWorker initialized")
     
     def stop(self):
@@ -62,6 +72,16 @@ class ProcessingWorker(threading.Thread):
         
         # Thread-isolated database connection
         conn = sqlite3.connect(str(settings.db_path))
+        
+        # Initialize Phase 3 Stores
+        try:
+            vector_store = VectorStore()
+            fts_store = FTSStore()
+        except Exception as e:
+            logger.error(f"Failed to initialize stores: {e}")
+            # We continue, but processing will likely fail or degrade
+            vector_store = None
+            fts_store = None
         
         # Get engine instances (lazy-loaded singletons)
         try:
@@ -142,6 +162,8 @@ class ProcessingWorker(threading.Thread):
                         ai_provider,
                         ocr_provider,
                         embedding_provider,
+                        vector_store,
+                        fts_store,
                         ai_processing_version,
                     )
                     
@@ -163,17 +185,11 @@ class ProcessingWorker(threading.Thread):
         ai_provider,
         ocr_provider,
         embedding_provider,
+        vector_store,
+        fts_store,
         ai_processing_version: int
     ):
-        """Process a single task through the OCR → AI → NLP pipeline.
-        
-        Args:
-            conn: Database connection.
-            task: The task to process.
-            ai_provider: AI provider instance for image analysis.
-            ocr_provider: OCR provider instance for text extraction.
-            embedding_provider: Embedding provider instance for text embedding.
-        """
+        """Process a single task through the OCR → AI → NLP pipeline (Phase 3)."""
         try:
             def should_cancel() -> bool:
                 with runtime_settings._lock:
@@ -209,63 +225,116 @@ class ProcessingWorker(threading.Thread):
             if settings.debug:
                 logger.debug(f"  OCR: {len(text)} chars extracted")
             
-            # Step 2: AI image analysis
+            # Step 2: AI image analysis (Phase 3: Returns JSON dict)
             if should_cancel():
                 db.mark_task_cancelled_if_processing(conn, task.id)
                 return
             try:
-                description = ai_provider.analyze_image(str(image_path))
+                vision_data = ai_provider.analyze_image(str(image_path))
+                if not isinstance(vision_data, dict):
+                    vision_data = {"caption": str(vision_data), "scene": "", "action": ""}
             except AIProviderError as e:
                 logger.warning(f"⚠️ Task #{task.id}: AI provider failed: {e}")
-                description = ""
+                vision_data = {"caption": "", "scene": "", "action": ""}
             except Exception as e:
                 logger.warning(f"⚠️ Task #{task.id}: AI provider unexpected error: {e}")
-                description = ""
+                vision_data = {"caption": "", "scene": "", "action": ""}
+            
+            caption = vision_data.get("caption", "") or ""
+            scene = vision_data.get("scene", "") or ""
+            action = vision_data.get("action", "") or ""
+
             if settings.debug:
-                logger.debug(f"  AI: {len(description)} chars description")
+                logger.debug(f"  AI: {len(caption)} chars description. Tags: {scene}, {action}")
             
-            # Step 3: Generate text embedding
-            # Combine text and description for richer embedding
-            combined_text = f"{text}\n{description}"
+            # Step 3: Keyword Extraction
+            keywords = self.keyword_extractor.extract(text)
+
+            # Step 4: Construct SemanticSnapshot
+            dt = datetime.datetime.fromtimestamp(task.timestamp)
+            time_bucket = dt.strftime("%Y-%m-%d-%H")
+            
+            snapshot = SemanticSnapshot(
+                id=str(uuid4()),
+                image_path=str(image_path),
+                context=Context(
+                    app_name=task.app or "Unknown",
+                    window_title=task.title or "Unknown",
+                    timestamp=task.timestamp,
+                    time_bucket=time_bucket
+                ),
+                content=Content(
+                    ocr_text=text,
+                    ocr_head=text[:300],
+                    caption=caption,
+                    keywords=keywords,
+                    scene_tag=scene,
+                    action_tag=action
+                ),
+                embedding_vector=[0.0] * settings.embedding_dim # Placeholder
+            )
+
+            # Step 5: Structured Fusion
+            fusion_text = build_fusion_text(snapshot)
             
             if settings.debug:
                 logger.debug("="*80)
-                logger.debug(f"  📝 OCR文本 ({len(text)} chars):\n{text}")
-                logger.debug("="*80)
-                logger.debug(f"  🤖 VL描述 ({len(description)} chars):\n{description}")
-                logger.debug("="*80)
-                logger.debug(f"  🔗 合并文本 (总计 {len(combined_text)} chars):\n{combined_text}")
+                logger.debug(f"  🔗 Fusion Text:\n{fusion_text}")
                 logger.debug("="*80)
             
+            # Step 6: Generate Embedding
             if should_cancel():
                 db.mark_task_cancelled_if_processing(conn, task.id)
                 return
             try:
-                embedding = embedding_provider.embed_text(combined_text)
+                embedding = embedding_provider.embed_text(fusion_text)
+                # Convert to list for Pydantic serialization (silences warning)
+                if hasattr(embedding, 'tolist'):
+                    snapshot.embedding_vector = embedding.tolist()
+                else:
+                    snapshot.embedding_vector = embedding
             except AIProviderError as e:
                 logger.warning(f"⚠️ Task #{task.id}: Embedding provider failed: {e}")
                 embedding = np.zeros(int(settings.embedding_dim), dtype=np.float32)
+                snapshot.embedding_vector = embedding.tolist()
             except Exception as e:
                 logger.warning(f"⚠️ Task #{task.id}: Embedding provider unexpected error: {e}")
                 embedding = np.zeros(int(settings.embedding_dim), dtype=np.float32)
+                snapshot.embedding_vector = embedding.tolist()
+            
             if settings.debug:
                 logger.debug(f"  NLP: Embedding shape {embedding.shape}")
             
-            # Mark as completed
+            # Step 7: Save to Stores
             if should_cancel():
                 db.mark_task_cancelled_if_processing(conn, task.id)
                 return
+            
+            if vector_store:
+                try:
+                    vector_store.add_snapshot(snapshot)
+                except Exception as e:
+                    logger.error(f"Failed to save to LanceDB: {e}")
+            
+            if fts_store:
+                try:
+                    fts_store.add_document(snapshot.id, text, caption, keywords)
+                except Exception as e:
+                    logger.error(f"Failed to save to FTS: {e}")
+
+            # Mark as completed in Legacy DB
+            # We map 'description' to 'caption' for legacy compatibility
             success = db.mark_task_completed(
                 conn,
                 task.id,
                 text,
-                description,
+                caption,
                 embedding
             )
             
             if success:
                 if settings.debug:
-                    logger.info(f"✅ Task #{task.id} completed successfully")
+                    logger.info(f"✅ Task #{task.id} completed successfully (Phase 3 Pipeline)")
             else:
                 if should_cancel():
                     db.mark_task_cancelled_if_processing(conn, task.id)

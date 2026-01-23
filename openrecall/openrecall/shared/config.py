@@ -205,6 +205,8 @@ class Settings(BaseSettings):
         "env_prefix": "",
         "populate_by_name": True,
         "extra": "ignore",
+        "env_file": ["openrecall.env", ".env"],
+        "env_file_encoding": "utf-8",
     }
     
     @property
@@ -224,6 +226,16 @@ class Settings(BaseSettings):
     def db_path(self) -> Path:
         """Path to the SQLite database file."""
         return self.base_path / "db" / "recall.db"
+
+    @property
+    def lancedb_path(self) -> Path:
+        """Path to the LanceDB directory."""
+        return self.base_path / "lancedb"
+
+    @property
+    def fts_path(self) -> Path:
+        """Path to the SQLite FTS database file."""
+        return self.base_path / "db" / "fts.db"
     
     @property
     def buffer_path(self) -> Path:

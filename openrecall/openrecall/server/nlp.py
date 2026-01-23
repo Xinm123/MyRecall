@@ -70,13 +70,22 @@ def get_nlp_engine() -> NLPEngine:
 def get_embedding(text: str) -> np.ndarray:
     """Convenience function to get embedding for text.
     
+    Delegates to the configured EmbeddingProvider via factory.
+    
     Args:
         text: Input text to embed.
         
     Returns:
         Embedding vector of shape (embedding_dim,).
     """
-    return get_nlp_engine().encode(text)
+    try:
+        from openrecall.server.ai.factory import get_embedding_provider
+        return get_embedding_provider().embed_text(text)
+    except Exception as e:
+        logger.error(f"Failed to get embedding: {e}")
+        # Return zero vector on failure
+        dim = int(getattr(settings, "embedding_dim", 1024))
+        return np.zeros(dim, dtype=np.float32)
 
 
 def cosine_similarity(a: np.ndarray, b: np.ndarray) -> float:

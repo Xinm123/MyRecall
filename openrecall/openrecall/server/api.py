@@ -7,6 +7,7 @@ Provides HTTP endpoints for client-server communication:
 
 import logging
 import time
+import json
 from pathlib import Path
 
 import numpy as np
@@ -23,10 +24,63 @@ from openrecall.server.database import (
 )
 from openrecall.server.config_runtime import runtime_settings
 from openrecall.shared.config import settings
+from openrecall.server.search.engine import SearchEngine
 
 logger = logging.getLogger(__name__)
 
 api_bp = Blueprint("api", __name__, url_prefix="/api")
+search_engine = SearchEngine()
+
+
+@api_bp.route("/search", methods=["GET"])
+def search_api():
+    """Hybrid Search Endpoint.
+    
+    Query Params:
+        q: Search query string
+        limit: Max results (default 50)
+        
+    Returns:
+        JSON list of SemanticSnapshot objects.
+    """
+    q = (request.args.get("q") or "").strip()
+    try:
+        limit = int(request.args.get("limit", 50))
+    except ValueError:
+        limit = 50
+        
+    if not q:
+        return jsonify([]), 200
+        
+    try:
+        results = search_engine.search(q, limit=limit)
+        
+        # Serialize results to JSON
+        serialized = []
+        for snap in results:
+            item = snap.model_dump()
+            # Flatten some fields for easier UI consumption if needed, 
+            # or just return the nested structure. 
+            # User asked for: caption, scene_tag, app_name, timestamp, image_path
+            # These are in: content.caption, content.scene_tag, context.app_name...
+            # I will return the full object + flattened convenience fields.
+            
+            flat = {
+                "id": snap.id,
+                "timestamp": snap.context.timestamp,
+                "app_name": snap.context.app_name,
+                "window_title": snap.context.window_title,
+                "caption": snap.content.caption,
+                "scene_tag": snap.content.scene_tag,
+                "image_path": snap.image_path,
+                "full_data": item
+            }
+            serialized.append(flat)
+            
+        return jsonify(serialized), 200
+    except Exception as e:
+        logger.exception("Search error")
+        return jsonify({"status": "error", "message": str(e)}), 500
 
 
 @api_bp.route("/health", methods=["GET"])
@@ -135,48 +189,39 @@ def queue_status():
 def upload():
     """Fast screenshot ingestion endpoint (Fire-and-Forget).
     
-    Accepts screenshot data, saves to disk, inserts PENDING entry.
-    Returns immediately without processing (OCR/AI done by worker).
-    
-    Expects JSON payload:
-    {
-        "image": list (flattened numpy array data),
-        "shape": list (original image shape),
-        "dtype": str (numpy dtype name),
-        "timestamp": int (Unix timestamp),
-        "active_app": str (active application name),
-        "active_window": str (active window title)
-    }
+    Accepts multipart/form-data:
+    - file: Image file (PNG)
+    - metadata: JSON string with timestamp, app_name, window_title
     
     Returns:
         HTTP 202 Accepted with task ID.
     """
     start_time = time.perf_counter()
-    data = request.get_json()
     
-    if not data:
-        return jsonify({"status": "error", "message": "No JSON data provided"}), 400
-    
-    required_fields = ["image", "shape", "dtype", "timestamp", "active_app", "active_window"]
-    for field in required_fields:
-        if field not in data:
-            return jsonify({"status": "error", "message": f"Missing field: {field}"}), 400
+    if 'file' not in request.files:
+        return jsonify({"status": "error", "message": "No file part"}), 400
+        
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({"status": "error", "message": "No selected file"}), 400
+        
+    metadata_str = request.form.get('metadata')
+    if not metadata_str:
+        return jsonify({"status": "error", "message": "No metadata provided"}), 400
     
     try:
-        # Reconstruct numpy array from JSON data
-        image_array = np.array(data["image"], dtype=data["dtype"]).reshape(data["shape"])
-        timestamp = int(data["timestamp"])
-        active_app = str(data["active_app"])
-        active_window = str(data["active_window"])
+        metadata = json.loads(metadata_str)
+        timestamp = int(metadata.get("timestamp", 0))
+        active_app = str(metadata.get("app_name", "Unknown"))
+        active_window = str(metadata.get("window_title", "Unknown"))
         
         if settings.debug:
             logger.debug(f"📥 Upload request: app={active_app}, timestamp={timestamp}")
         
-        # Save image to disk
+        # Save image to disk (Streaming)
         image_filename = f"{timestamp}.png"
         image_path = settings.screenshots_path / image_filename
-        pil_image = Image.fromarray(image_array)
-        pil_image.save(image_path)
+        file.save(str(image_path))
         
         # Fast ingestion: Insert PENDING entry (no processing)
         task_id = insert_pending_entry(
