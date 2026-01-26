@@ -1,5 +1,6 @@
 import logging
 from typing import List, Dict, Optional
+from pathlib import Path
 
 import time
 from datetime import datetime, timezone
@@ -309,7 +310,8 @@ class SearchEngine:
                 if settings.debug:
                     # Log full context to file for inspection
                     try:
-                        log_dir = settings.server_data_dir / "logs"
+                        # User requested logs in project_root/logs
+                        log_dir = Path("logs").resolve()
                         log_dir.mkdir(parents=True, exist_ok=True)
                         log_file = log_dir / "rerank_debug.log"
                         
