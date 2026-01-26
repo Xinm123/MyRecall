@@ -169,6 +169,8 @@ def queue_status():
             "system": {
                 "debug": settings.debug,
                 "device": settings.device,
+                "reranker_mode": settings.reranker_mode,
+                "reranker_model": settings.reranker_model,
             }
         }
         

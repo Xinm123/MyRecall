@@ -192,6 +192,29 @@ class Settings(BaseSettings):
         alias="OPENRECALL_EMBEDDING_DIM",
         description="Embedding vector dimension (must match model output)"
     )
+    
+    # Reranker Configuration
+    reranker_mode: str = Field(
+        default="api",
+        alias="OPENRECALL_RERANKER_MODE",
+        description="Reranker mode: 'api' or 'local'"
+    )
+    reranker_url: str = Field(
+        default="http://localhost:8080/rerank",
+        alias="OPENRECALL_RERANKER_URL",
+        description="URL for the reranker API (compatible with TEI/BGE)"
+    )
+    reranker_model: str = Field(
+        default="Qwen/Qwen3-Reranker-0.6B",
+        alias="OPENRECALL_RERANKER_MODEL",
+        description="Model name/path for the reranker"
+    )
+    reranker_api_key: str = Field(
+        default="",
+        alias="OPENRECALL_RERANKER_API_KEY",
+        description="Optional API key specifically for the reranker service"
+    )
+
     processing_lifo_threshold: int = Field(
         default=10,
         alias="OPENRECALL_PROCESSING_LIFO_THRESHOLD",

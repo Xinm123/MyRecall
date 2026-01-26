@@ -104,7 +104,8 @@ class ProcessingWorker(threading.Thread):
             "🤖 AI Engine initialized: "
             f"vision={settings.vision_provider or settings.ai_provider}, "
             f"ocr={settings.ocr_provider or settings.ai_provider}, "
-            f"embedding={settings.embedding_provider or settings.ai_provider}"
+            f"embedding={settings.embedding_provider or settings.ai_provider}, "
+            f"rerank={settings.reranker_mode}({settings.reranker_model})"
         )
         
         try:

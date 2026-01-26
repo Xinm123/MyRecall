@@ -11,8 +11,15 @@ def mock_search_engine(mock_settings, mock_ai_provider):
     """Create a SearchEngine with mocked stores."""
     with patch("openrecall.server.search.engine.VectorStore") as MockVectorStore, \
          patch("openrecall.server.search.engine.SQLStore") as MockSQLStore, \
-         patch("openrecall.server.search.engine.get_ai_provider", return_value=mock_ai_provider):
+         patch("openrecall.server.search.engine.get_ai_provider", return_value=mock_ai_provider), \
+         patch("openrecall.server.search.engine.get_reranker") as MockGetReranker:
         
+        # Mock the reranker to return zeros by default (simulating failure or no-op)
+        # This prevents it from altering scores in tests that check Stage 1/2 logic
+        mock_reranker = MagicMock()
+        mock_reranker.compute_score.return_value = [0.0] * 50 # Return 0s so engine keeps RRF order
+        MockGetReranker.return_value = mock_reranker
+
         engine = SearchEngine()
         yield engine, MockVectorStore.return_value, MockSQLStore.return_value
 

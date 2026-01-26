@@ -106,6 +106,9 @@ def search():
                 "vector_score": None,
                 "fts_rank": None,
                 "fts_bm25": None,
+                "rerank_rank": None,
+                "rerank_score": None,
+                "combined_rank": None,
             }
             for entry in entries[:50]
         ]

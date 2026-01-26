@@ -9,10 +9,38 @@ from openrecall.server.database.sql import SQLStore
 from openrecall.server.utils.query_parser import QueryParser
 from openrecall.server.schema import SemanticSnapshot
 from openrecall.server.ai.factory import get_ai_provider
+from openrecall.server.services.reranker import get_reranker
 
 from openrecall.shared.config import settings
 
 logger = logging.getLogger(__name__)
+
+def construct_rerank_context(snapshot: SemanticSnapshot) -> str:
+    # 1. Human-readable Time
+    ts = snapshot.context.timestamp
+    time_str = datetime.fromtimestamp(ts).strftime("%A, %Y-%m-%d %H:%M")
+
+    # 2. Build Parts with Explicit Headers and Double Newlines
+    parts = [
+        # --- Section 1: Metadata (High Priority) ---
+        "[Metadata]",
+        f"App: {snapshot.context.app_name or 'Unknown App'}",
+        f"Title: {snapshot.context.window_title or 'No Title'}",
+        f"Time: {time_str}",
+        
+        # --- Section 2: Visual Context (Medium Priority) ---
+        "", # Empty string creates \n\n for paragraph separation
+        "[Visual Context]",
+        f"Scene: {snapshot.content.scene_tag or 'general'}",
+        f"Summary: {snapshot.content.caption or ''}",
+        
+        # --- Section 3: OCR Content (Low Priority, High Volume) ---
+        "",
+        "[OCR Content]",
+        snapshot.content.ocr_text or ''
+    ]
+    
+    return "\n".join(parts)
 
 class SearchEngine:
     def __init__(self, vector_store: Optional[VectorStore] = None, sql_store: Optional[SQLStore] = None):
@@ -20,6 +48,8 @@ class SearchEngine:
         self.sql_store = sql_store or SQLStore()
         self.query_parser = QueryParser()
         self.embedding_provider = get_ai_provider("embedding")
+        self.reranker = get_reranker()
+        logger.info(f"SearchEngine initialized with Reranker: {settings.reranker_mode} ({settings.reranker_model})")
 
     def search(self, user_query: str, limit: int = 50) -> List[SemanticSnapshot]:
         sorted_results = self._search_impl(user_query=user_query, limit=limit)
@@ -42,6 +72,9 @@ class SearchEngine:
                     "filename": f"{int(ts)}.png",
                     "final_rank": idx + 1,
                     "final_score": float(item["score"]),
+                    "rerank_rank": item["debug"].get("rerank_rank"),
+                    "rerank_score": float(item["debug"].get("rerank_score") or 0.0) if item["debug"].get("rerank_score") is not None else None,
+                    "combined_rank": item["debug"].get("combined_rank"),
                     "vector_rank": dbg.get("vector_rank"),
                     "vector_score": float(dbg.get("vector_score") or 0.0),
                     "vector_distance": dbg.get("vector_distance"),
@@ -262,7 +295,73 @@ class SearchEngine:
             key=lambda x: x['score'], 
             reverse=True
         )
-        
+
+        # Record Combined Rank (Stage 2 Rank)
+        for rank, item in enumerate(sorted_results):
+            item['debug']['combined_rank'] = rank
+
+        # --- Stage 3: Deep Reranking (Top 30) ---
+        candidates = sorted_results[:30]
+        if candidates and (parsed.text or user_query):
+            try:
+                doc_texts = [construct_rerank_context(c['snapshot']) for c in candidates]
+                
+                if settings.debug:
+                    # Log full context to file for inspection
+                    try:
+                        log_dir = settings.server_data_dir / "logs"
+                        log_dir.mkdir(parents=True, exist_ok=True)
+                        log_file = log_dir / "rerank_debug.log"
+                        
+                        with open(log_file, "a", encoding="utf-8") as f:
+                            f.write(f"\n\n{'='*60}\n")
+                            f.write(f"Query: {parsed.text or user_query}\n")
+                            f.write(f"Time: {datetime.now().isoformat()}\n")
+                            f.write(f"Candidates: {len(doc_texts)}\n")
+                            f.write(f"{'='*60}\n")
+                            for i, text in enumerate(doc_texts):
+                                f.write(f"\n--- [Doc #{i+1}] ---\n{text}\n-------------------\n")
+                        
+                        logger.debug(f"🧠 Reranker Input (Full Context) logged to {log_file}")
+                        logger.debug(f"🧠 Reranker Input Preview (Doc 1/{len(doc_texts)}):\n{doc_texts[0]}...$$")
+                        logger.debug(f"🧠 Reranker Input Preview (Doc 2/{len(doc_texts)}):\n{doc_texts[1]}...$$")
+                    except Exception as e:
+                        logger.error(f"Failed to write rerank debug log: {e}")
+                
+                scores = self.reranker.compute_score(parsed.text or user_query, doc_texts)
+                
+                # If scores are not all zero (resilience check)
+                if any(s != 0.0 for s in scores):
+                    for i, c in enumerate(candidates):
+                        c['score'] = scores[i]
+                        c['debug']['rerank_score'] = scores[i]
+                    
+                    # Re-sort candidates
+                    candidates.sort(key=lambda x: x['score'], reverse=True)
+                    
+                    # Update ranks
+                    for rank, c in enumerate(candidates):
+                        c['debug']['rerank_rank'] = rank
+
+                    # Update the main list
+                    sorted_results[:30] = candidates
+
+                    # Log Top Reranked Results
+                    if settings.debug:
+                        logger.debug(f"🧠 Reranked Top Results (Top {len(candidates)}):")
+                        for i, c in enumerate(candidates):
+                            # doc_preview = construct_rerank_context(c['snapshot']).replace('\n', ' ')[:145]
+                            doc_preview = construct_rerank_context(c['snapshot'])[:845]
+                            ocr_len = len(c['snapshot'].content.ocr_text or "")
+                            caption_len = len(c['snapshot'].content.caption or "")
+                            logger.debug(f"#{i+1} Score: {c['score']:.4f} | OCR_len={ocr_len} Cap_len={caption_len} |\nDoc:\n{doc_preview}...\n")
+
+                else:
+                    logger.warning("⚠️ Reranker returned all zeros. Keeping RRF order.")
+                    
+            except Exception as e:
+                logger.exception(f"Reranking stage failed: {e}")
+
         if settings.debug:
             total_ms = (time.perf_counter() - t0) * 1000.0
             logger.debug(
@@ -301,6 +400,11 @@ class SearchEngine:
                 dbg = item['debug']
                 ts = snap.context.timestamp
                 img = f"{int(ts)}.png"
+                
+                rerank_info = ""
+                if dbg.get('rerank_score') is not None:
+                    rerank_info = f" | Rerank={dbg['rerank_score']:.4f} (Rank={dbg.get('rerank_rank')})"
+                
                 logger.debug(
                     f"#{i+1} [Score: {item['score']:.4f}] "
                     f"ID={snap.id[:8]}... | "
@@ -308,7 +412,7 @@ class SearchEngine:
                     f"Vector={dbg['vector_score']:.4f} "
                     f"(dist={dbg.get('vector_distance')}, metric={dbg.get('vector_metric')}) | "
                     f"FTS_Match={'YES' if dbg['is_fts_match'] else 'NO'} "
-                    f"(Rank={dbg['fts_rank']}, bm25={dbg.get('fts_bm25')}, Boost={dbg['fts_boost']:.4f}) | "
+                    f"(Rank={dbg['fts_rank']}, bm25={dbg.get('fts_bm25')}, Boost={dbg['fts_boost']:.4f}){rerank_info} | "
                     f"App='{snap.context.app_name}' Time={ts} Img={img}"
                 )
         

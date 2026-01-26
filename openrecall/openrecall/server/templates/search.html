@@ -383,6 +383,14 @@
             {% endif %}
           </div>
           <div class="score-row">
+            <span class="similarity-label">Rerank</span>
+            {% if entry.rerank_rank is not none and entry.rerank_score is not none %}
+              <span class="similarity-score">#{{ entry.rerank_rank + 1 }} · {{ "%.4f" % entry.rerank_score }}</span>
+            {% else %}
+              <span class="similarity-score">—</span>
+            {% endif %}
+          </div>
+          <div class="score-row">
             <span class="similarity-label">Vector</span>
             {% if entry.vector_rank is not none and entry.vector_score is not none %}
               <span class="similarity-score">#{{ entry.vector_rank + 1 }} · {{ "%.4f" % entry.vector_score }}</span>
@@ -396,6 +404,12 @@
               <div>bm25={% if entry.fts_bm25 is not none %}{{ "%.4f" % entry.fts_bm25 }}{% else %}none{% endif %}</div>
               <div>#{% if entry.fts_rank is not none %}{{ entry.fts_rank + 1 }}{% else %}—{% endif %} · boost={{ "%.4f" % (entry.fts_boost or 0.0) }}</div>
             </div>
+          </div>
+          <div class="score-row">
+            <span class="similarity-label">Combined</span>
+            <span class="similarity-score">
+              #{% if entry.combined_rank is not none %}{{ entry.combined_rank + 1 }}{% else %}—{% endif %} · {{ "%.4f" % ((entry.vector_score or 0) + (entry.fts_boost or 0)) }}
+            </span>
           </div>
         </div>
       </div>

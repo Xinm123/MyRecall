@@ -1,17 +1,18 @@
 
 import os
 from pathlib import Path
+from unittest.mock import patch
 from openrecall.shared.config import Settings
 
 def test_path_expansion():
     """Test that paths are expanded and resolved correctly."""
-    # We can't easily test ~ expansion in CI/Auto environments without assuming home dir,
-    # but we can test that it returns an absolute path.
-    settings = Settings(
-        OPENRECALL_SERVER_DATA_DIR="~/MRS_TEST"
-    )
-    assert settings.server_data_dir.is_absolute()
-    assert str(settings.server_data_dir).endswith("MRS_TEST")
+    # We mock the writable check to prevent fallback to tempdir during testing
+    with patch("openrecall.shared.config.os.access", return_value=True):
+        settings = Settings(
+            OPENRECALL_SERVER_DATA_DIR="~/MRS_TEST"
+        )
+        assert settings.server_data_dir.is_absolute()
+        assert str(settings.server_data_dir).endswith("MRS_TEST")
 
 def test_env_override(monkeypatch):
     """Test that environment variables override defaults."""
@@ -50,9 +51,11 @@ def test_default_behavior():
             del os.environ[key]
             
     try:
-        settings = Settings()
-        # Should default to ~/MRS and ~/MRC (expanded)
-        assert settings.server_data_dir == Path.home() / "MRS"
-        assert settings.client_data_dir == Path.home() / "MRC"
+        # Mock writable check to avoid fallback to temp paths
+        with patch("openrecall.shared.config.os.access", return_value=True):
+            settings = Settings()
+            # Should default to ~/MRS and ~/MRC (expanded)
+            assert settings.server_data_dir == Path.home() / "MRS"
+            assert settings.client_data_dir == Path.home() / "MRC"
     finally:
         os.environ.update(original_environ)

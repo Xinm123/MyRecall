@@ -638,3 +638,141 @@ Create `tests/test_phase5_e2e.py`.
     - Storage: LanceDB + SQLite FTS5
     - Search: Hybrid RRF
     ```
+
+
+这是为您准备的**最终完整版提示词**。
+
+这份提示词已经包含了我们刚才讨论的所有细节：**三阶段漏斗架构**、**API 优先设计**、**32k 长文本策略**以及**带明确 Header 的输入结构**。
+
+请直接复制以下内容发送给您的 Code Agent（Cursor / Windsurf / Copilot）：
+
+---
+
+# Prompt: Implement Cascade Search with Qwen Reranker for MyRecall V2
+
+**Role:** Senior Python Backend Engineer & Search Architect
+**Project:** MyRecall V2 (Personal Memory System)
+**Context:**
+*   **Server Root:** `~/MRS`
+*   **Tech Stack:** FastAPI, Python 3.10+, LanceDB (Vector), SQLite (FTS & Metadata).
+*   **Current Search Pipeline:** Parallel Retrieval (Vector + FTS) $\rightarrow$ RRF Fusion $\rightarrow$ Return Results.
+
+**Objective:**
+Upgrade the search engine to a **"Retrieve-then-Rerank" (Cascade) Pipeline** by integrating the `Qwen/Qwen3-Reranker-0.6B` model. The goal is to maximize search precision using a 3-stage funnel strategy.
+
+---
+
+## 1. Architectural Strategy (The 3-Stage Funnel)
+
+Refactor the search logic in `engine.py` to follow this strict pipeline:
+
+*   **Stage 1: Broad Recall (Top 100)**
+    *   Retrieve Top 100 from Vector Search (LanceDB).
+    *   Retrieve Top 100 from Keyword Search (SQLite FTS).
+*   **Stage 2: Coarse Fusion (Top 30)**
+    *   Apply RRF (Reciprocal Rank Fusion) to merge the lists.
+    *   **Action:** Slice the combined list to the **Top 30** candidates. These are the "Rerank Candidates".
+*   **Stage 3: Deep Reranking (Top 10)**
+    *   Construct a detailed "Document Context" string for each of the 30 candidates (utilizing the model's 32k context).
+    *   Pass `(Query, Document)` pairs to the Reranker.
+    *   Re-sort based on the new similarity scores.
+    *   Return the final Top 10-20 to the user.
+
+---
+
+## 2. Technical Specifications
+
+### A. Configuration (`config.py`)
+Add the following environment variables with defaults:
+*   `OPENRECALL_RERANKER_MODE`: `api` (default) or `local`.
+*   `OPENRECALL_RERANKER_URL`: Default `http://localhost:8080/rerank` (Compatible with TEI/BGE API).
+*   `OPENRECALL_RERANKER_MODEL`: Default `Qwen/Qwen3-Reranker-0.6B`.
+
+### B. New Service: `services/reranker.py`
+Implement a Strategy Pattern.
+
+1.  **`BaseReranker` (Interface)**:
+    *   Method: `compute_score(query: str, documents: list[str]) -> list[float]`
+
+2.  **`APIReranker` (Production/Default)**:
+    *   Use `requests` to hit the `OPENRECALL_RERANKER_URL`.
+    *   **Payload**: `{"query": "...", "texts": [...]}`.
+    *   **Resilience**: If the API fails (timeout/connection error), catch the exception, log it, and return a list of `0.0` scores to ensure the search doesn't crash.
+
+3.  **`LocalReranker` (Development/Fallback)**:
+    *   Use `transformers` (`AutoModelForSequenceClassification`).
+    *   **Lazy Loading**: Do NOT load the model on import. Initialize it only on the first `compute_score` call.
+    *   **Device**: Auto-detect `cuda`, `mps` (Apple Silicon), or `cpu`.
+    *   **Model**: Load `Qwen/Qwen3-Reranker-0.6B`.
+
+4.  **Factory**: `get_reranker()` returns the correct instance based on config.
+
+### C. Input Context Construction (Critical)
+We must construct a structured prompt that leverages the **32k context window** without confusing the model. We will use an **"Inverted Pyramid"** structure with **Explicit Section Headers**.
+
+Create a helper function in `engine.py` (or a utility module): `construct_rerank_context(item: dict) -> str`.
+
+**Requirements:**
+1.  **Time Parsing**: Convert Unix timestamp to a human-readable string (e.g., "Monday, 2026-01-26 14:00").
+2.  **Explicit Headers**: Use `[Metadata]`, `[Visual Context]`, and `[OCR Content]` to guide the model's attention.
+3.  **No Truncation**: Do not truncate OCR text unless it is absurdly large (e.g., > 20k chars).
+4.  **Safety**: Use `.get()` for all dictionary accesses.
+
+**Required Code Pattern for Context Builder:**
+```python
+import datetime
+
+def construct_rerank_context(item: dict) -> str:
+    # 1. Human-readable Time
+    ts = item.get('timestamp', 0)
+    time_str = datetime.datetime.fromtimestamp(ts).strftime("%A, %Y-%m-%d %H:%M")
+
+    # 2. Build Parts with Explicit Headers and Double Newlines
+    parts = [
+        # --- Section 1: Metadata (High Priority) ---
+        "[Metadata]",
+        f"App: {item.get('app', 'Unknown App')}",
+        f"Title: {item.get('title', 'No Title')}",
+        f"Time: {time_str}",
+        
+        # --- Section 2: Visual Context (Medium Priority) ---
+        "", # Empty string creates \n\n for paragraph separation
+        "[Visual Context]",
+        f"Scene: {item.get('scene', 'general')}",
+        f"Summary: {item.get('caption', '')}",
+        
+        # --- Section 3: OCR Content (Low Priority, High Volume) ---
+        "", 
+        "[OCR Content]",
+        item.get('text', '') # Full text, leveraging 32k context
+    ]
+    
+    return "\n".join(parts)
+```
+
+### D. Search Logic Integration (`engine.py`)
+Update the `search()` method:
+1.  **Step 1 & 2**: Keep existing Vector/FTS/RRF logic.
+2.  **Step 3 (New)**:
+    *   Take the Top 30 results from RRF: `candidates = fused_results[:30]`.
+    *   **Guard Clause**: If `candidates` is empty, return empty list.
+    *   **Build Docs**: `doc_texts = [construct_rerank_context(c) for c in candidates]`.
+    *   **Rerank**: `scores = self.reranker.compute_score(query, doc_texts)`.
+    *   **Update**: Assign the new scores to the candidates.
+    *   **Sort**: Sort candidates by the *new Reranker score* (descending).
+    *   **Return**: The re-sorted list (Top 10-20).
+
+---
+
+## 3. Implementation Plan
+
+Please modify/create the following files in this order:
+1.  `config.py`: Add env vars.
+2.  `services/reranker.py`: Create the module with API and Local implementations.
+3.  `engine.py`: Integrate the context builder and the 3-stage logic.
+
+**Note:** Ensure the code handles the case where `reranker.compute_score` returns all zeros (API failure) by preserving the original RRF sort order as a fallback.
+
+
+
+
