@@ -40,6 +40,7 @@ extras_require = {
         "pytest>=8.0.0",
         "pytest-cov>=5.0.0",
         "pytest-xdist>=3.6.0",
+        "httpx",
     ],
     "perf": [
         "pytest-benchmark>=4.0.0",

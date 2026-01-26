@@ -1,10 +1,11 @@
 """Configuration management for OpenRecall using pydantic-settings."""
 
 import os
+from typing import Optional, Union
 from pathlib import Path
 import tempfile
 
-from pydantic import Field, model_validator
+from pydantic import Field, model_validator, field_validator
 from pydantic_settings import BaseSettings
 
 
@@ -47,16 +48,32 @@ class Settings(BaseSettings):
         default=True, 
         alias="OPENRECALL_PRIMARY_MONITOR_ONLY"
     )
-    base_path: Path = Field(
-        default_factory=lambda: Path.home() / ".openrecall" / "data",
+    
+    # Split Data Directories
+    server_data_dir: Path = Field(
+        default_factory=lambda: Path.home() / "MRS",
+        alias="OPENRECALL_SERVER_DATA_DIR",
+        description="Base directory for server data (DB, Vector Store, Server Screenshots)"
+    )
+    client_data_dir: Path = Field(
+        default_factory=lambda: Path.home() / "MRC",
+        alias="OPENRECALL_CLIENT_DATA_DIR",
+        description="Base directory for client data (Buffer, Local Screenshots)"
+    )
+    
+    # Legacy base_path field - mapped to server_data_dir for backward compatibility if not overridden
+    # We keep it as a field because Pydantic might try to populate it from env OPENRECALL_DATA_DIR
+    base_path_legacy: Optional[Path] = Field(
+        default=None,
         alias="OPENRECALL_DATA_DIR"
     )
-    cache_dir: Path | None = Field(
+
+    cache_dir: Optional[Path] = Field(
         default=None,
         alias="OPENRECALL_CACHE_DIR",
         description="Optional override for cache directory (HF/Transformers/Doctr/Torch caches)"
     )
-    client_screenshots_dir: Path | None = Field(
+    client_screenshots_dir: Optional[Path] = Field(
         default=None,
         alias="OPENRECALL_CLIENT_SCREENSHOTS_DIR",
         description="Optional override for client local screenshots directory"
@@ -206,6 +223,20 @@ class Settings(BaseSettings):
         description="Whether the client saves local screenshots (WebP) in addition to buffering/uploading"
     )
     
+    @field_validator(
+        "server_data_dir", 
+        "client_data_dir", 
+        "cache_dir", 
+        "client_screenshots_dir", 
+        "base_path_legacy",
+        mode="before"
+    )
+    @classmethod
+    def expand_path(cls, v: Optional[Union[str, Path]]) -> Optional[Path]:
+        if v is None:
+            return None
+        return Path(str(v)).expanduser().resolve()
+
     model_config = {
         "env_prefix": "",
         "populate_by_name": True,
@@ -215,63 +246,64 @@ class Settings(BaseSettings):
     }
     
     @property
+    def base_path(self) -> Path:
+        """Backward compatibility for base_path, defaulting to server_data_dir."""
+        if self.base_path_legacy:
+            return self.base_path_legacy
+        return self.server_data_dir
+
+    @property
     def screenshots_path(self) -> Path:
-        """Directory for storing screenshot images."""
-        return self.base_path / "screenshots"
+        """Directory for storing screenshot images (Server side)."""
+        return self.server_data_dir / "screenshots"
 
     @property
     def client_screenshots_path(self) -> Path:
         """Directory for storing client local screenshots.
         
-        Defaults to screenshots_path for backwards compatibility.
+        Defaults to client_data_dir/screenshots.
         """
-        return self.client_screenshots_dir or self.screenshots_path
+        return self.client_screenshots_dir or (self.client_data_dir / "screenshots")
     
     @property
     def db_path(self) -> Path:
         """Path to the SQLite database file."""
-        return self.base_path / "db" / "recall.db"
+        return self.server_data_dir / "db" / "recall.db"
 
     @property
     def lancedb_path(self) -> Path:
         """Path to the LanceDB directory."""
-        return self.base_path / "lancedb"
+        return self.server_data_dir / "lancedb"
 
     @property
     def fts_path(self) -> Path:
         """Path to the SQLite FTS database file."""
-        return self.base_path / "fts.db"
+        return self.server_data_dir / "fts.db"
     
     @property
     def buffer_path(self) -> Path:
         """Directory for local buffering when server is unavailable."""
-        return self.base_path / "buffer"
+        return self.client_data_dir / "buffer"
     
     @property
     def model_cache_path(self) -> Path:
         """Directory for caching ML models."""
-        return self.base_path / "models"
+        return self.server_data_dir / "models"
 
     @property
     def cache_path(self) -> Path:
-        return self.cache_dir or (self.base_path / "cache")
+        return self.cache_dir or (self.server_data_dir / "cache")
     
     def ensure_directories(self) -> None:
-        """Create all required directories if they don't exist.
-        
-        This method ensures that:
-        - base_path exists
-        - screenshots_path exists
-        - buffer_path exists
-        - Parent directory of db_path exists
-        - model_cache_path exists
-        """
+        """Create all required directories if they don't exist."""
         directories = [
-            self.base_path,
+            self.server_data_dir,
+            self.client_data_dir,
             self.screenshots_path,
             self.client_screenshots_path,
             self.buffer_path,
             self.db_path.parent,
+            self.lancedb_path,
             self.model_cache_path,
             self.cache_path,
         ]
@@ -280,9 +312,10 @@ class Settings(BaseSettings):
             directory.mkdir(parents=True, exist_ok=True)
 
     def verify_writable(self) -> None:
-        test_path = self.base_path / ".write_test"
-        test_path.write_bytes(b"ok")
-        test_path.unlink(missing_ok=True)
+        for path in [self.server_data_dir, self.client_data_dir]:
+            test_path = path / ".write_test"
+            test_path.write_bytes(b"ok")
+            test_path.unlink(missing_ok=True)
     
     def configure_cache_env(self) -> None:
         cache = str(self.cache_path)
@@ -302,9 +335,18 @@ class Settings(BaseSettings):
             self.ensure_directories()
             self.verify_writable()
         except PermissionError:
-            self.base_path = Path(tempfile.gettempdir()) / "myrecall_data"
+            # Fallback for permission errors - maybe just use temp for both?
+            # Or log warning. For now, let's just try to fallback base_path logic if it was used,
+            # but here we have explicit paths.
+            # If server dir fails, fallback to temp/MRS. If client fails, temp/MRC.
+            if not os.access(self.server_data_dir.parent, os.W_OK):
+                self.server_data_dir = Path(tempfile.gettempdir()) / "MRS"
+            if not os.access(self.client_data_dir.parent, os.W_OK):
+                self.client_data_dir = Path(tempfile.gettempdir()) / "MRC"
+            
             self.ensure_directories()
             self.verify_writable()
+            
         self.configure_cache_env()
         return self
 
