@@ -48,7 +48,7 @@ class Settings(BaseSettings):
         alias="OPENRECALL_PRIMARY_MONITOR_ONLY"
     )
     base_path: Path = Field(
-        default_factory=lambda: Path.home() / ".myrecall_data",
+        default_factory=lambda: Path.home() / ".openrecall" / "data",
         alias="OPENRECALL_DATA_DIR"
     )
     cache_dir: Path | None = Field(
@@ -161,9 +161,14 @@ class Settings(BaseSettings):
         description="Optional override for embedding API base URL; falls back to ai_api_base when empty"
     )
     embedding_model_name: str = Field(
-        default="/Users/tiiny/models/Qwen3-Embedding-0.6B",
+        default="qwen-text-v1",
         alias="OPENRECALL_EMBEDDING_MODEL",
         description="Embedding model for semantic search"
+    )
+    keyword_strategy: str = Field(
+        default="local",
+        alias="OPENRECALL_KEYWORD_STRATEGY",
+        description="Strategy for keyword extraction (local, rake, etc.)"
     )
     embedding_dim: int = Field(
         default=1024,
@@ -235,7 +240,7 @@ class Settings(BaseSettings):
     @property
     def fts_path(self) -> Path:
         """Path to the SQLite FTS database file."""
-        return self.base_path / "db" / "fts.db"
+        return self.base_path / "fts.db"
     
     @property
     def buffer_path(self) -> Path:

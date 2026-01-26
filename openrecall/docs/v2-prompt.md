@@ -541,3 +541,100 @@ Create `tests/test_phase4_search.py`.
 3.  Update the API endpoint.
 4.  Run `tests/test_phase4_search.py`.
 5.  If successful, output "**Phase 4 Hybrid Search Refactor Complete**".
+
+
+
+
+x# Refactor OpenRecall to V2 - Phase 5: Cleanup & Optimization (Final)
+
+**Context**:
+- Phases 1-4 are complete. The new "Caption-First" architecture (Ingestion -> Processing -> Hybrid Search) is implemented.
+- The codebase currently contains a mix of new modules (`vector_store.py`, `sql.py`) and legacy modules (`legacy.py`) kept for backward compatibility during refactoring.
+- **Goal**: Remove technical debt, finalize configuration, and verify the entire system E2E.
+
+**Environment**:
+- Local macOS.
+
+---
+
+## 🎯 Objective
+Clean up the codebase by removing legacy database logic, updating the configuration system, and running a final End-to-End integration test.
+
+---
+
+## 📝 Task List
+
+### 1. Update Configuration
+- **File**: `openrecall/shared/config.py`
+- **Action**: Update `Settings` class.
+- **Changes**:
+    - **Add**:
+        - `LANCEDB_PATH`: Default to `~/.openrecall/data/lancedb`.
+        - `FTS_PATH`: Default to `~/.openrecall/data/fts.db`.
+        - `KEYWORD_STRATEGY`: Default to `"local"`.
+        - `EMBEDDING_MODEL`: Default to `"qwen-text-v1"` (or whatever model logic you implemented).
+    - **Remove**:
+        - Any deprecated paths strictly related to the old BLOB storage if they exist.
+    - **Verify**: Ensure environment variable overrides work (e.g., `os.getenv("OPENRECALL_LANCEDB_PATH")`).
+
+### 2. Remove Legacy Database Code
+- **File**: `openrecall/server/database/legacy.py`
+- **Action**: **Delete this file.** We no longer support the V1 architecture.
+- **File**: `openrecall/server/database/__init__.py`
+- **Action**: Update exports.
+    - **Remove**: `from .legacy import *`
+    - **Add**: Explicit exports for the new system.
+      ```python
+      from .vector_store import VectorStore
+      from .sql import SQLStore
+      ```
+
+### 3. Scan and Fix Imports
+- **Action**: Scan the codebase (especially `app.py`, `worker.py`, `api.py`) for any lingering imports from the old database interface.
+- **Logic**:
+    - If `api.py` calls `create_db()` (old function), remove it or replace it with `SQLStore().setup_fts()` and `VectorStore().create_table()`.
+    - Ensure `app.py` initializes the new stores on startup if necessary.
+
+### 4. Optimize Dependencies
+- **File**: `openrecall/setup.py` (or `pyproject.toml`)
+- **Action**: Review dependencies.
+    - Ensure `lancedb`, `pydantic`, `fastapi`, `python-multipart` are listed.
+    - If `numpy` is ONLY used for the old manual vector math (which we replaced with LanceDB), and NOT used by OCR/Vision providers, consider removing it. *However, typically OCR libraries need numpy, so keep it if unsure, but remove any direct `numpy.save` calls in our code.*
+
+---
+
+## ✅ Verification Plan (The Grand Finale: E2E Test)
+
+Create `tests/test_phase5_e2e.py`.
+**Requirement**: This test simulates the **entire lifecycle** of a screenshot. Use `tempfile` for data directories.
+
+**Scenario**:
+1.  **Setup**: Initialize fresh LanceDB and SQLite FTS in temp dirs.
+2.  **Step 1: Ingestion (API)**
+    - Send a POST request to `/api/upload` with a test image (blue square) and metadata (App="Safari").
+    - Assert Response is `202 Accepted`.
+3.  **Step 2: Processing (Worker)**
+    - Manually trigger the `process_task` function (simulating the worker picking up the job).
+    - *Mocking*: You may mock the slow AI parts (VLM/OCR) to make the test fast, BUT use the **real** database logic.
+    - Assert: Task status becomes `COMPLETED` in SQLite.
+    - Assert: Data exists in LanceDB (Vector) and SQLite (FTS).
+4.  **Step 3: Retrieval (Search Engine)**
+    - Call `search_engine.search("Safari")`.
+    - Assert: The record uploaded in Step 1 is returned in the results.
+    - Assert: Result contains `caption`, `app_name`, and `image_path`.
+
+---
+
+## 🚀 Execution Instructions
+
+1.  Update `config.py`.
+2.  Delete `legacy.py` and fix `database/__init__.py`.
+3.  Run `grep` or search to ensure no old DB calls remain.
+4.  Run `tests/test_phase5_e2e.py`.
+5.  If passed, output:
+    ```text
+    🎉 OpenRecall V2 Refactor Completed Successfully!
+    - Architecture: Caption-First (Text Only)
+    - Storage: LanceDB + SQLite FTS5
+    - Search: Hybrid RRF
+    ```

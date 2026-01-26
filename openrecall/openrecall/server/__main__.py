@@ -20,7 +20,6 @@ from openrecall.shared.logging_config import configure_logging
 
 logger = configure_logging("openrecall.server")
 
-from openrecall.server.database import create_db
 from openrecall.server.app import app
 
 
@@ -61,8 +60,7 @@ def preload_ai_models():
 
 def main():
     """Start the OpenRecall server."""
-    # Initialize database
-    create_db()
+    # Database initialized on app import
 
     logger.info("=" * 50)
     logger.info("OpenRecall Server Starting")

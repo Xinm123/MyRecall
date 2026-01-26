@@ -20,7 +20,6 @@ from openrecall.shared.logging_config import configure_logging
 
 logger = configure_logging("openrecall.main")
 
-from openrecall.server.database import create_db
 from openrecall.server.app import app
 from openrecall.client.recorder import get_recorder
 
@@ -68,8 +67,7 @@ def main():
     - python -m openrecall.server
     - python -m openrecall.client
     """
-    # Initialize database
-    create_db()
+    # Database initialized on app import
 
     logger.info("=" * 50)
     logger.info("OpenRecall Starting (Combined Mode)")

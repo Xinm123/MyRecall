@@ -1,5 +1,4 @@
-# Backward compatibility for existing code
-# This allows 'from openrecall.server.database import ...' to work as before
-# by re-exporting everything from the legacy module.
+from .vector_store import VectorStore
+from .sql import SQLStore
 
-from .legacy import *
+__all__ = ["VectorStore", "SQLStore"]

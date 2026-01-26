@@ -5,7 +5,7 @@ import time
 from datetime import datetime, timezone
 
 from openrecall.server.database.vector_store import VectorStore
-from openrecall.server.database.sql import FTSStore
+from openrecall.server.database.sql import SQLStore
 from openrecall.server.utils.query_parser import QueryParser
 from openrecall.server.schema import SemanticSnapshot
 from openrecall.server.ai.factory import get_ai_provider
@@ -15,9 +15,9 @@ from openrecall.shared.config import settings
 logger = logging.getLogger(__name__)
 
 class SearchEngine:
-    def __init__(self, vector_store: Optional[VectorStore] = None, fts_store: Optional[FTSStore] = None):
+    def __init__(self, vector_store: Optional[VectorStore] = None, sql_store: Optional[SQLStore] = None):
         self.vector_store = vector_store or VectorStore()
-        self.fts_store = fts_store or FTSStore()
+        self.sql_store = sql_store or SQLStore()
         self.query_parser = QueryParser()
         self.embedding_provider = get_ai_provider("embedding")
 
@@ -178,7 +178,7 @@ class SearchEngine:
         if fts_query:
             try:
                 t_fts0 = time.perf_counter()
-                fts_rows = self.fts_store.search(fts_query, limit=limit)
+                fts_rows = self.sql_store.search(fts_query, limit=limit)
                 fts_ms = (time.perf_counter() - t_fts0) * 1000.0
                 fts_candidates = len(fts_rows)
                 fts_ids = [sid for sid, _score in fts_rows]

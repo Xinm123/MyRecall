@@ -14,14 +14,7 @@ import numpy as np
 from flask import Blueprint, jsonify, request
 from PIL import Image
 
-from openrecall.server.database import (
-    cancel_processing_tasks,
-    get_memories_since,
-    get_recent_memories,
-    get_pending_count,
-    insert_pending_entry,
-    reset_stuck_tasks,
-)
+from openrecall.server.database import SQLStore
 from openrecall.server.config_runtime import runtime_settings
 from openrecall.shared.config import settings
 from openrecall.server.search.engine import SearchEngine
@@ -29,6 +22,7 @@ from openrecall.server.search.engine import SearchEngine
 logger = logging.getLogger(__name__)
 
 api_bp = Blueprint("api", __name__, url_prefix="/api")
+sql_store = SQLStore()
 search_engine = SearchEngine()
 
 
@@ -110,7 +104,7 @@ def memories_latest():
         )
 
     try:
-        memories = get_memories_since(since)
+        memories = sql_store.get_memories_since(since)
         return jsonify(memories), 200
     except Exception as e:
         logger.exception("Error fetching latest memories")
@@ -134,7 +128,7 @@ def memories_recent():
         )
 
     try:
-        memories = get_recent_memories(limit=limit)
+        memories = sql_store.get_recent_memories(limit=limit)
         return jsonify(memories), 200
     except Exception as e:
         logger.exception("Error fetching recent memories")
@@ -149,10 +143,9 @@ def queue_status():
         JSON with queue statistics and processing mode.
     """
     try:
-        from openrecall.server.database import get_pending_count
         import sqlite3
         
-        pending = get_pending_count()
+        pending = sql_store.get_pending_count()
         
         # Get count by status
         with sqlite3.connect(str(settings.db_path)) as conn:
@@ -224,7 +217,7 @@ def upload():
         file.save(str(image_path))
         
         # Fast ingestion: Insert PENDING entry (no processing)
-        task_id = insert_pending_entry(
+        task_id = sql_store.insert_pending_entry(
             timestamp=timestamp,
             app=active_app,
             title=active_window,
@@ -235,7 +228,7 @@ def upload():
         
         if task_id:
             # Get current queue status for debug info
-            pending_count = get_pending_count() if settings.debug else 0
+            pending_count = sql_store.get_pending_count() if settings.debug else 0
             
             if settings.debug:
                 logger.debug(f"✅ HTTP 202 Accepted | task_id={task_id} | {elapsed_ms:.1f}ms | queue={pending_count}")
@@ -330,7 +323,7 @@ def update_config():
                 # Special handling for ai_processing_enabled:
                 if field == "ai_processing_enabled" and not value and getattr(runtime_settings, field):
                     logger.info("AI processing disabled: Will stop picking up new tasks")
-                    cancel_processing_tasks()
+                    sql_store.cancel_processing_tasks()
                     runtime_settings.ai_processing_version += 1
                 if field == "ai_processing_enabled" and value and not getattr(runtime_settings, field):
                     runtime_settings.ai_processing_version += 1

@@ -24,6 +24,8 @@ install_requires = [
     "pydantic>=2.0.0",
     "pydantic-settings>=2.0.0",
     "lancedb",
+    "fastapi",
+    "python-multipart",
 ]
 
 # Define OS-specific dependencies

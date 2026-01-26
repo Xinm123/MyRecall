@@ -12,7 +12,7 @@ from uuid import uuid4
 
 import numpy as np
 
-from openrecall.server import database as db
+from openrecall.server.database import SQLStore
 from openrecall.server.ai.base import AIProviderError
 from openrecall.server.ai.factory import get_ai_provider, get_embedding_provider, get_ocr_provider
 from openrecall.server.config_runtime import runtime_settings
@@ -24,7 +24,6 @@ from openrecall.server.utils.keywords import KeywordExtractor
 from openrecall.server.utils.fusion import build_fusion_text
 from openrecall.server.schema import SemanticSnapshot, Context, Content
 from openrecall.server.database.vector_store import VectorStore
-from openrecall.server.database.sql import FTSStore
 
 logger = logging.getLogger(__name__)
 
@@ -76,12 +75,12 @@ class ProcessingWorker(threading.Thread):
         # Initialize Phase 3 Stores
         try:
             vector_store = VectorStore()
-            fts_store = FTSStore()
+            sql_store = SQLStore()
         except Exception as e:
             logger.error(f"Failed to initialize stores: {e}")
             # We continue, but processing will likely fail or degrade
             vector_store = None
-            fts_store = None
+            sql_store = None
         
         # Get engine instances (lazy-loaded singletons)
         try:
@@ -119,7 +118,7 @@ class ProcessingWorker(threading.Thread):
                         continue
                     
                     # Check queue size and determine processing order
-                    pending_count = db.get_pending_count(conn)
+                    pending_count = sql_store.get_pending_count(conn) if sql_store else 0
                     
                     if pending_count == 0:
                         if self._stop_event.wait(0.1):
@@ -132,7 +131,7 @@ class ProcessingWorker(threading.Thread):
                     mode_str = "LIFO (newest first)" if lifo_mode else "FIFO (oldest first)"
                     
                     # Get next task
-                    task = db.get_next_task(conn, lifo_mode=lifo_mode)
+                    task = sql_store.get_next_task(conn, lifo_mode=lifo_mode) if sql_store else None
                     
                     if task is None:
                         # Race condition: task was taken by another process
@@ -149,7 +148,7 @@ class ProcessingWorker(threading.Thread):
                         )
                     
                     # Mark as PROCESSING
-                    if not db.mark_task_processing(conn, task.id):
+                    if not (sql_store and sql_store.mark_task_processing(conn, task.id)):
                         self._stop_event.wait(0.1)
                         continue
                     
@@ -163,7 +162,7 @@ class ProcessingWorker(threading.Thread):
                         ocr_provider,
                         embedding_provider,
                         vector_store,
-                        fts_store,
+                        sql_store,
                         ai_processing_version,
                     )
                     
@@ -186,7 +185,7 @@ class ProcessingWorker(threading.Thread):
         ocr_provider,
         embedding_provider,
         vector_store,
-        fts_store,
+        sql_store,
         ai_processing_version: int
     ):
         """Process a single task through the OCR → AI → NLP pipeline (Phase 3)."""
@@ -199,7 +198,8 @@ class ProcessingWorker(threading.Thread):
                     )
 
             if should_cancel():
-                db.mark_task_cancelled_if_processing(conn, task.id)
+                if sql_store:
+                    sql_store.mark_task_cancelled_if_processing(conn, task.id)
                 return
 
             # Reconstruct image path from timestamp
@@ -207,12 +207,14 @@ class ProcessingWorker(threading.Thread):
             
             if not image_path.exists():
                 logger.error(f"❌ Task #{task.id}: Image not found at {image_path}")
-                db.mark_task_failed(conn, task.id)
+                if sql_store:
+                    sql_store.mark_task_failed(conn, task.id)
                 return
             
             # Step 1: OCR text extraction
             if should_cancel():
-                db.mark_task_cancelled_if_processing(conn, task.id)
+                if sql_store:
+                    sql_store.mark_task_cancelled_if_processing(conn, task.id)
                 return
             try:
                 text = ocr_provider.extract_text(str(image_path))
@@ -227,7 +229,8 @@ class ProcessingWorker(threading.Thread):
             
             # Step 2: AI image analysis (Phase 3: Returns JSON dict)
             if should_cancel():
-                db.mark_task_cancelled_if_processing(conn, task.id)
+                if sql_store:
+                    sql_store.mark_task_cancelled_if_processing(conn, task.id)
                 return
             try:
                 vision_data = ai_provider.analyze_image(str(image_path))
@@ -284,7 +287,8 @@ class ProcessingWorker(threading.Thread):
             
             # Step 6: Generate Embedding
             if should_cancel():
-                db.mark_task_cancelled_if_processing(conn, task.id)
+                if sql_store:
+                    sql_store.mark_task_cancelled_if_processing(conn, task.id)
                 return
             try:
                 embedding = embedding_provider.embed_text(fusion_text)
@@ -307,7 +311,8 @@ class ProcessingWorker(threading.Thread):
             
             # Step 7: Save to Stores
             if should_cancel():
-                db.mark_task_cancelled_if_processing(conn, task.id)
+                if sql_store:
+                    sql_store.mark_task_cancelled_if_processing(conn, task.id)
                 return
             
             if vector_store:
@@ -316,32 +321,36 @@ class ProcessingWorker(threading.Thread):
                 except Exception as e:
                     logger.error(f"Failed to save to LanceDB: {e}")
             
-            if fts_store:
+            if sql_store:
                 try:
-                    fts_store.add_document(snapshot.id, text, caption, keywords)
+                    sql_store.add_document(snapshot.id, text, caption, keywords)
                 except Exception as e:
                     logger.error(f"Failed to save to FTS: {e}")
 
             # Mark as completed in Legacy DB
             # We map 'description' to 'caption' for legacy compatibility
-            success = db.mark_task_completed(
-                conn,
-                task.id,
-                text,
-                caption,
-                embedding
-            )
+            success = False
+            if sql_store:
+                success = sql_store.mark_task_completed(
+                    conn,
+                    task.id,
+                    text,
+                    caption,
+                    embedding
+                )
             
             if success:
                 if settings.debug:
                     logger.info(f"✅ Task #{task.id} completed successfully (Phase 3 Pipeline)")
             else:
                 if should_cancel():
-                    db.mark_task_cancelled_if_processing(conn, task.id)
+                    if sql_store:
+                        sql_store.mark_task_cancelled_if_processing(conn, task.id)
                     return
                 logger.error(f"⚠️ Task #{task.id}: Failed to update database")
         
         except Exception as e:
             logger.error(f"❌ Task #{task.id} failed: {e}")
             logger.error(traceback.format_exc())
-            db.mark_task_failed(conn, task.id)
+            if sql_store:
+                sql_store.mark_task_failed(conn, task.id)

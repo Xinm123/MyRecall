@@ -9,20 +9,13 @@ from flask import Flask, render_template, request, send_from_directory
 
 from openrecall.shared.config import settings
 from openrecall.server.api import api_bp, search_engine
-from openrecall.server.database import (
-    create_db,
-    get_all_entries,
-    get_all_entries_with_status,
-    get_timestamps,
-    get_entries_by_time_range,
-    get_entries_since,
-    get_entries_until,
-    reset_stuck_tasks,
-)
-from openrecall.server.nlp import cosine_similarity, get_embedding
+from openrecall.server.database import SQLStore
 from openrecall.shared.utils import human_readable_time, timestamp_to_human_readable
 
 logger = logging.getLogger(__name__)
+
+# Initialize Store
+sql_store = SQLStore()
 
 app = Flask(__name__)
 
@@ -51,7 +44,7 @@ def inject_settings():
 @app.route("/")
 def index():
     """Grid view - default landing page."""
-    entries = get_all_entries_with_status()
+    entries = sql_store.get_all_entries_with_status()
     # Sort by timestamp descending (newest first)
     entries.sort(key=lambda x: x.timestamp, reverse=True)
 
@@ -83,7 +76,7 @@ def index():
 @app.route("/timeline")
 def timeline():
     """Timeline slider view - preserved from original."""
-    timestamps = get_timestamps()
+    timestamps = sql_store.get_timestamps()
     return render_template("timeline.html", timestamps=timestamps)
 
 
@@ -94,7 +87,7 @@ def search():
     
     if not q:
         # Default view: show recent entries
-        entries = get_all_entries_with_status()
+        entries = sql_store.get_all_entries_with_status()
         entries.sort(key=lambda x: x.timestamp, reverse=True)
         serialized_entries = [
             {
@@ -160,7 +153,7 @@ def init_background_worker(app_instance):
     from openrecall.server.worker import ProcessingWorker
     
     # Step 1: Zombie Recovery - Fix tasks left in PROCESSING from previous crash
-    count = reset_stuck_tasks()
+    count = sql_store.reset_stuck_tasks()
     if count > 0:
         logger.warning(f"⚠️ Recovered {count} stuck tasks (Zombies) from previous session.")
     
