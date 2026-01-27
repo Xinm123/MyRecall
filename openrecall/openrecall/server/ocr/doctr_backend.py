@@ -2,8 +2,10 @@ from doctr.models import ocr_predictor
 
 ocr = ocr_predictor(
     pretrained=True,
-    det_arch="db_mobilenet_v3_large",
-    reco_arch="crnn_mobilenet_v3_large",
+    # det_arch="db_mobilenet_v3_large",
+    # reco_arch="parseq",
+    det_arch="db_resnet50",
+    reco_arch="parseq",
 )
 
 

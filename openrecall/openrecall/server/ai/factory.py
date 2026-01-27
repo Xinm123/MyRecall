@@ -7,12 +7,14 @@ from openrecall.server.ai.providers import (
     DashScopeEmbeddingProvider,
     DashScopeOCRProvider,
     DashScopeProvider,
+    DoctrOCRProvider,
     LocalEmbeddingProvider,
     LocalOCRProvider,
     LocalProvider,
     OpenAIEmbeddingProvider,
     OpenAIOCRProvider,
     OpenAIProvider,
+    RapidOCRProvider,
 )
 from openrecall.shared.config import settings
 
@@ -82,6 +84,10 @@ def get_ocr_provider() -> OCRProvider:
 
     if provider == "local":
         instance: OCRProvider = LocalOCRProvider()
+    elif provider == "rapidocr":
+        instance = RapidOCRProvider()
+    elif provider == "doctr":
+        instance = DoctrOCRProvider()
     elif provider == "dashscope":
         instance = DashScopeOCRProvider(api_key=api_key, model_name=model_name)
     elif provider == "openai":

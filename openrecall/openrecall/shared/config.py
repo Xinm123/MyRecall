@@ -92,6 +92,11 @@ class Settings(BaseSettings):
         alias="OPENRECALL_UPLOAD_TIMEOUT",
         description="Client upload timeout in seconds (needs to be long for CPU AI inference)"
     )
+    ai_request_timeout: int = Field(
+        default=120,
+        alias="OPENRECALL_AI_REQUEST_TIMEOUT",
+        description="Timeout for AI provider requests in seconds"
+    )
     preload_models: bool = Field(
         default=True,
         alias="OPENRECALL_PRELOAD_MODELS",
@@ -156,6 +161,16 @@ class Settings(BaseSettings):
         default="",
         alias="OPENRECALL_OCR_API_BASE",
         description="Optional override for OCR API base URL; falls back to ai_api_base when empty"
+    )
+    ocr_rapid_use_local: bool = Field(
+        default=False,
+        alias="OPENRECALL_OCR_RAPID_USE_LOCAL",
+        description="Whether to use local models for RapidOCR"
+    )
+    ocr_rapid_model_dir: Optional[str] = Field(
+        default=None,
+        alias="OPENRECALL_OCR_RAPID_MODEL_DIR",
+        description="Directory containing RapidOCR models (required if use_local is True)"
     )
     embedding_provider: str = Field(
         default="",
@@ -244,6 +259,11 @@ class Settings(BaseSettings):
         default=False,
         alias="OPENRECALL_CLIENT_SAVE_LOCAL_SCREENSHOTS",
         description="Whether the client saves local screenshots (WebP) in addition to buffering/uploading"
+    )
+    fusion_log_enabled: bool = Field(
+        default=False,
+        alias="OPENRECALL_FUSION_LOG_ENABLED",
+        description="Whether to log fusion text to a file for debugging"
     )
     
     @field_validator(

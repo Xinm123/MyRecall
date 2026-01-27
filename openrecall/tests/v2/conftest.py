@@ -5,6 +5,13 @@ import tempfile
 import pytest
 from pathlib import Path
 from unittest.mock import MagicMock
+import sys
+
+# Mock rapidocr_onnxruntime for tests if missing
+try:
+    import rapidocr_onnxruntime
+except ImportError:
+    sys.modules["rapidocr_onnxruntime"] = MagicMock()
 
 # Import Settings to patch it
 from openrecall.shared.config import Settings

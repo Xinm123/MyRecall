@@ -75,6 +75,16 @@ def main():
     logger.info(f"Web UI: http://{settings.host}:{settings.port}")
     logger.info(f"Device: {settings.device}")
     logger.info(f"Processing: LIFO threshold = {settings.processing_lifo_threshold}")
+    
+    # Log OCR Provider Info
+    ocr_provider = (settings.ocr_provider or settings.ai_provider).strip().lower()
+    logger.info(f"OCR Provider: {ocr_provider}")
+    if ocr_provider == "rapidocr":
+        use_local = settings.ocr_rapid_use_local
+        logger.info(f"  - Mode: {'Local Models' if use_local else 'Auto-Download'}")
+        if use_local:
+            logger.info(f"  - Model Dir: {settings.ocr_rapid_model_dir}")
+            
     logger.info("=" * 50)
 
     # Preload AI models to avoid first-request timeout

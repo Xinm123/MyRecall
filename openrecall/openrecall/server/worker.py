@@ -227,6 +227,10 @@ class ProcessingWorker(threading.Thread):
                 text = ""
             if settings.debug:
                 logger.debug(f"  OCR: {len(text)} chars extracted")
+                if len(text) > 0:
+                    # Log first 100 chars of extracted text for debugging
+                    preview_text = text[:100].replace('\n', ' ')
+                    logger.debug(f"  OCR Preview: {preview_text}...")
             
             # Step 2: AI image analysis (Phase 3: Returns JSON dict)
             if should_cancel():
@@ -285,6 +289,22 @@ class ProcessingWorker(threading.Thread):
                 logger.debug("="*80)
                 logger.debug(f"  🔗 Fusion Text:\n{fusion_text}")
                 logger.debug("="*80)
+
+            # Fusion Text Logging (Debug Feature)
+            if settings.fusion_log_enabled:
+                try:
+                    log_dir = Path("logs")
+                    log_dir.mkdir(exist_ok=True)
+                    log_file = log_dir / "fusion_debug.log"
+                    with open(log_file, "a", encoding="utf-8") as f:
+                        f.write(f"\n--- Task #{task.id} [{datetime.datetime.now()}] ---\n")
+                        f.write("--- Full OCR Text ---\n")
+                        f.write(text)
+                        f.write("\n--- Fusion Text ---\n")
+                        f.write(fusion_text)
+                        f.write("\n" + "="*50 + "\n")
+                except Exception as e:
+                    logger.warning(f"Failed to write fusion log: {e}")
             
             # Step 6: Generate Embedding
             if should_cancel():

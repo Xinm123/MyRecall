@@ -26,6 +26,7 @@ install_requires = [
     "lancedb",
     "fastapi",
     "python-multipart",
+    "rapidocr_onnxruntime",
 ]
 
 # Define OS-specific dependencies

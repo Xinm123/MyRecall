@@ -774,5 +774,84 @@ Please modify/create the following files in this order:
 **Note:** Ensure the code handles the case where `reranker.compute_score` returns all zeros (API failure) by preserving the original RRF sort order as a fallback.
 
 
+这是为您准备的**最终版完整提示词 (Final Prompt)**。
+
+我已经将之前讨论的所有细节（**“黄金组合”模型版本**、**ONNX Runtime**、**本地/自动双模式**、**ch前缀含义**）都融入了这段指令中。
+
+您可以直接复制下面的内容，发送给 **Cursor / Windsurf / Copilot**，它将能够一次性生成准确的代码。
+
+***
+
+**System / Role:**
+You are an expert Python Backend Engineer working on "MyRecall V2". Your task is to implement a new high-performance OCR provider for the **Server** side.
+
+**Objective:**
+Integrate **RapidOCR (ONNX Runtime)** as a selectable OCR backend. This will replace or work alongside existing Tesseract/Apple Native backends. The implementation must support both **Automatic Download** (default) and **Local Model Loading** (for air-gapped or custom model setups).
+
+**Technical Constraints & Requirements:**
+
+1.  **Dependencies**:
+    *   Add `rapidocr_onnxruntime` to `requirements.txt`.
+
+2.  **Configuration Management (`.env` handling)**:
+    *   The system must check `OPENRECALL_OCR_PROVIDER`. If set to `rapidocr`, engage this new backend.
+    *   Implement two specific environment variables for this backend:
+        *   `OPENRECALL_OCR_RAPID_USE_LOCAL` (bool): Defaults to `False`.
+        *   `OPENRECALL_OCR_RAPID_MODEL_DIR` (str): Absolute path to the model directory (required if `USE_LOCAL` is True).
+
+3.  **Model Selection Logic (Crucial)**:
+    *   We are using the **"Golden Combination"** of models for Chinese/English mixed environments (`ch` prefix):
+        *   **Detection**: `ch_PP-OCRv4_det_infer.onnx` (Note: **v4** for stability)
+        *   **Recognition**: `ch_PP-OCRv5_rec_infer.onnx` (Note: **v5** for high accuracy)
+        *   **Classification**: `ch_ppocr_mobile_v2.0_cls_infer.onnx` (Standard direction classifier)
+    *   **Logic**:
+        *   If `USE_LOCAL` is **True**: You must verify these specific files exist in `OPENRECALL_OCR_RAPID_MODEL_DIR` and pass their paths to the `RapidOCR` constructor. Raise a clear error if files are missing.
+        *   If `USE_LOCAL` is **False**: Initialize `RapidOCR()` with default arguments (this triggers the library's built-in auto-download).
+
+4.  **Code Structure (`server/ocr/rapid_backend.py`)**:
+    *   Implement a `RapidOCRBackend` class.
+    *   **Singleton Pattern**: The model loading is expensive. Ensure `__init__` only loads the model once, even if called multiple times.
+    *   **Method `extract_text(self, image)`**:
+        *   Input: Can be `PIL.Image`, `numpy.ndarray`, or bytes.
+        *   Preprocessing: Convert PIL Image to Numpy array (BGR) as required by ONNX Runtime.
+        *   Output: Return a single string of extracted text, joined by `\n`.
+        *   Error Handling: Log errors but do not crash the server; return empty string on failure.
+
+5.  **Integration**:
+    *   Update `server/ocr/factory.py` (or the equivalent initialization file) to return `RapidOCRBackend` when `OPENRECALL_OCR_PROVIDER` is set to `rapidocr`.
+
+**Reference Implementation Logic (Model Loading):**
+
+```python
+# Use this logic inside your init method
+if use_local:
+    # Explicitly map the "Golden Combination" filenames
+    det_path = os.path.join(model_dir, "ch_PP-OCRv4_det_infer.onnx") 
+    rec_path = os.path.join(model_dir, "ch_PP-OCRv5_rec_infer.onnx")
+    cls_path = os.path.join(model_dir, "ch_ppocr_mobile_v2.0_cls_infer.onnx")
+    
+    # Check existence
+    if not (os.path.exists(det_path) and os.path.exists(rec_path)):
+        raise FileNotFoundError(f"Missing required ONNX models in {model_dir}")
+        
+    self.engine = RapidOCR(
+        det_model_path=det_path,
+        rec_model_path=rec_path,
+        cls_model_path=cls_path,
+        use_angle_cls=True, 
+        use_gpu=True # Auto-fallback to CPU if not available
+    )
+else:
+    # Auto-download mode
+    self.engine = RapidOCR(use_angle_cls=True, use_gpu=True)
+```
+
+**Task Execution Steps:**
+1.  Modify `requirements.txt`.
+2.  Create `server/ocr/rapid_backend.py`.
+3.  Update the OCR Factory `server/ocr/__init__.py` (or `factory.py`).
+4.  Print a summary of changes.
+
+
 
 

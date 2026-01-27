@@ -23,7 +23,8 @@ from openrecall.server.ai.base import (
 )
 from openrecall.server.ai_engine import AIEngine
 from openrecall.server.nlp import get_nlp_engine
-from openrecall.server.ocr import extract_text_from_image
+# from openrecall.server.ocr import extract_text_from_image
+from openrecall.server.ocr.rapid_backend import RapidOCRBackend
 from openrecall.shared.config import settings
 
 logger = logging.getLogger(__name__)
@@ -290,7 +291,7 @@ class OpenAIProvider(AIProvider):
         }
 
         try:
-            resp = requests.post(url, headers=headers, json=payload, timeout=60)
+            resp = requests.post(url, headers=headers, json=payload, timeout=settings.ai_request_timeout)
         except Exception as e:
             raise AIProviderRequestError(f"OpenAI request failed: {e}") from e
 
@@ -330,14 +331,29 @@ class OpenAIProvider(AIProvider):
         return {"caption": raw_text, "scene": "", "action": ""}
 
 
-class LocalOCRProvider(OCRProvider):
+class DoctrOCRProvider(OCRProvider):
     def extract_text(self, image_path: str) -> str:
+        # Import Doctr backend lazily to avoid triggering model downloads
+        # when this provider is not in use.
+        try:
+            from openrecall.server.ocr.doctr_backend import extract_text_from_image
+        except ImportError as e:
+            raise AIProviderUnavailableError(
+                "Doctr dependencies are missing. Install with 'pip install python-doctr[torch]' or similar."
+            ) from e
+            
         path = Path(image_path)
         if not path.is_file():
             raise AIProviderRequestError(f"Image not found: {image_path}")
         image = Image.open(path)
         image_array = np.array(image)
         return extract_text_from_image(image_array)
+
+
+class LocalOCRProvider(OCRProvider):
+    def extract_text(self, image_path: str) -> str:
+        # Backward compatibility: Use RapidOCR as the default local provider
+        return RapidOCRBackend().extract_text(image_path)
 
 
 class OpenAIOCRProvider(OCRProvider):
@@ -387,7 +403,7 @@ class OpenAIOCRProvider(OCRProvider):
         }
 
         try:
-            resp = requests.post(url, headers=headers, json=payload, timeout=60)
+            resp = requests.post(url, headers=headers, json=payload, timeout=settings.ai_request_timeout)
         except Exception as e:
             raise AIProviderRequestError(f"OpenAI OCR request failed: {e}") from e
 
@@ -516,7 +532,7 @@ class OpenAIEmbeddingProvider(EmbeddingProvider):
         payload = {"model": self.model_name, "input": text, "encoding_format": "float"}
 
         try:
-            resp = requests.post(url, headers=headers, json=payload, timeout=60)
+            resp = requests.post(url, headers=headers, json=payload, timeout=settings.ai_request_timeout)
         except Exception as e:
             raise AIProviderRequestError(f"OpenAI embeddings request failed: {e}") from e
 
@@ -592,3 +608,12 @@ class DashScopeEmbeddingProvider(EmbeddingProvider):
             raise KeyError("embedding missing")
         except Exception as e:
             raise AIProviderRequestError(f"DashScope embeddings response parse failed: {e}") from e
+
+
+class RapidOCRProvider(OCRProvider):
+    def extract_text(self, image_path: str) -> str:
+        path = Path(image_path)
+        if not path.is_file():
+            raise AIProviderRequestError(f"Image not found: {image_path}")
+        # RapidOCRBackend supports path string directly
+        return RapidOCRBackend().extract_text(str(path))
