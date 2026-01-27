@@ -1,32 +1,46 @@
-# MyRecall V2 Project Analysis Report
+# MyRecall V2 Project Analysis Report / 项目分析报告
 
-## 1. System Architecture
+## 1. System Architecture / 系统架构
 
-MyRecall V2 adopts a decoupled Client-Server architecture designed for scalability and data isolation. The system is split into a lightweight collection client and a robust processing server, communicating via a RESTful API.
+MyRecall V2 adopts a decoupled **Client-Server Architecture**, designed for high scalability and strict data isolation.
+MyRecall V2 采用解耦的 **客户端-服务端架构**，旨在实现高扩展性和严格的数据隔离。
 
-### 1.1 High-Level Architecture
+### 1.1 High-Level Overview / 宏观架构图
 
 ```mermaid
 graph TD
-    subgraph Client ["Client Side (~/MRC)"]
-        Capture[Screen Capture] --> |POST /api/upload| API
+    subgraph Client ["Client Side (客户端 ~/MRC)"]
+        Recorder[Recorder / 录制器] --> |Capture| Buffer[Buffer / 缓冲区]
+        Recorder -.-> |Sync Config| Heartbeat[Heartbeat / 心跳]
+        Buffer --> Uploader[Uploader / 上传器]
+        Heartbeat --> |POST /api/health| API
+        Uploader --> |POST /api/upload| API
     end
 
-    subgraph Server ["Server Side (~/MRS)"]
+    subgraph Server ["Server Side (服务端 ~/MRS)"]
         API[FastAPI Gateway]
-        Queue[(SQLite Task Queue)]
-        Worker[Processing Worker]
+        Config[Config Manager / 配置管理]
+        Queue[(SQLite Queue / 任务队列)]
+        Worker[Async Worker / 异步处理]
         
-        subgraph AI_Engine [AI Processing Pipeline]
+        API --> Config
+        
+        subgraph AI_Engine [AI Pipeline / AI流水线]
             OCR[OCR Provider]
-            VLM[Vision Language Model]
+            VLM[Vision Model]
             Embed[Embedding Model]
         end
 
-        subgraph Storage [Dual-Storage Layer]
-            LanceDB[(LanceDB\nVector Store)]
-            SQLite[(SQLite\nFTS + Metadata)]
-            FS[File System\nImages]
+        subgraph Search_Engine [Hybrid Search / 混合搜索]
+            Parser[Query Parser]
+            Retriever[Vector + FTS]
+            Reranker[Cross-Encoder]
+        end
+
+        subgraph Storage [Storage Layer / 存储层]
+            LanceDB[(LanceDB Vector)]
+            SQLite[(SQLite Meta/FTS)]
+            FS[File System / 文件系统]
         end
     end
 
@@ -36,225 +50,328 @@ graph TD
     Worker --> |3. Poll Task| Queue
     Worker --> |4. Analyze| AI_Engine
     
-    AI_Engine --> |5. Store Vector| LanceDB
-    AI_Engine --> |6. Store Text/Meta| SQLite
+    AI_Engine --> |5. Store| Storage
+
+    API --> |Search Query| Search_Engine
+    Search_Engine --> Parser
+    Parser --> Retriever
+    Retriever --> Reranker
+    Reranker --> |Ranked Results| API
 ```
 
-### 1.2 Data Separation Strategy
+### 1.2 Component Roles / 组件角色
 
-To support multi-client setups and clean state management, data directories are strictly separated:
-
-*   **Server Data (`MRS`)**: Located at `~/MRS` (configurable via `OPENRECALL_SERVER_DATA_DIR`). Contains the central databases (`openrecall.db`, `lancedb`), raw screenshot storage, and server logs.
-*   **Client Data (`MRC`)**: Located at `~/MRC` (configurable via `OPENRECALL_CLIENT_DATA_DIR`). Contains client-specific configurations and temporary buffers if needed.
+*   **Client (客户端)**: Lightweight and resilient. Focuses on capturing screen data, deduplicating frames, and ensuring data delivery even in unstable network conditions.
+    *   **客户端**: 轻量且健壮。专注于屏幕捕获、帧去重，并确保在网络不稳定时的可靠数据传输。
+*   **Server (服务端)**: Heavy lifting. Handles AI processing, indexing, and complex search queries.
+    *   **服务端**: 负责核心计算。处理 AI 分析、索引构建以及复杂的搜索请求。
 
 ---
 
-## 2. Data Flow Analysis
+## 2. Client-Side Mechanics / 客户端机制深度解析
 
-The lifecycle of a memory record ("Snapshot") involves three distinct phases: **Ingestion**, **Processing**, and **Retrieval**.
+The client is designed to be "always-on" but resource-efficient.
+客户端设计为“常驻运行”但资源占用极低。
 
-### 2.1 Lifecycle of a Memory
+### 2.1 Capture & Filter Logic / 捕获与过滤逻辑
 
 ```mermaid
-sequenceDiagram
-    participant C as Client
-    participant A as API
-    participant D as Disk/DB
-    participant W as Worker
-    participant S as SearchEngine
-
-    Note over C, A: Phase 1: Ingestion (Fire-and-Forget)
-    C->>A: Upload Screenshot + Metadata
-    A->>D: Save Raw Image (FS)
-    A->>D: Insert Task (PENDING)
-    A-->>C: 202 Accepted (Task ID)
-
-    Note over W, D: Phase 2: Processing (Async)
-    W->>D: Poll Pending Task (LIFO/FIFO)
-    W->>W: OCR Extraction
-    W->>W: VLM Captioning
-    W->>W: Text Fusion & Embedding
-    W->>D: Write to LanceDB (Vector)
-    W->>D: Write to SQLite (FTS Index)
-    W->>D: Update Status -> COMPLETED
-
-    Note over S, C: Phase 3: Retrieval (Hybrid)
-    C->>S: Search Query ("Safari meeting")
-    par Parallel Search
-        S->>D: Vector Search (LanceDB)
-        S->>D: Keyword Search (SQLite FTS)
-    end
-    S->>S: RRF Fusion & Re-ranking
-    S-->>C: Ranked Results
+graph LR
+    Start(Tick / 定时触发) --> Heartbeat{Config Sync / 配置同步}
+    Heartbeat -- "Disabled" --> Wait[Wait 5s]
+    Heartbeat -- "Enabled" --> SelectMon{Monitor Selection / 显示器选择}
+    
+    SelectMon -- "Primary Only" --> Capture[Capture Main Screen]
+    SelectMon -- "All Monitors" --> Capture[Capture All Screens]
+    
+    Capture --> Resize[Resize / 缩放]
+    Resize --> MSSIM{MSSIM Check / 相似度检查}
+    
+    MSSIM -- "High Similarity (>0.98)\n高度相似" --> Discard[Discard / 丢弃]
+    MSSIM -- "Low Similarity\n画面变化" --> Activity{User Active? / 用户活跃?}
+    
+    Activity -- "Idle > 60s" --> Discard
+    Activity -- "Active" --> Buffer[Save to Buffer / 存入缓冲]
 ```
 
-### 2.2 Data Transformation Map
+*   **Heartbeat & Config Sync**: Before capturing, the client checks the `recording_enabled` flag synced from the server.
+    *   **心跳与配置同步**: 每次捕获前，客户端会检查从服务端同步来的 `recording_enabled` 标志。
+*   **Monitor Selection**: Captures either the primary monitor or all monitors based on `OPENRECALL_PRIMARY_MONITOR_ONLY` setting.
+    *   **显示器选择**: 根据配置决定是仅捕获主显示器还是所有显示器。
+*   **MSSIM Deduplication**: Instead of saving every frame, the client calculates the **Mean Structural Similarity (MSSIM)** between the current and previous frame. Only frames with significant changes are kept.
+    *   **MSSIM 去重**: 客户端不盲目保存每一帧，而是计算当前帧与上一帧的 **平均结构相似性 (MSSIM)**。只有画面发生显著变化时才会被保留。
+*   **Idle Detection**: Pauses recording when no mouse/keyboard activity is detected for a set period (default 60s).
+    *   **闲置检测**: 当检测到一段时间（默认60秒）没有鼠标/键盘活动时，暂停录制以节省空间。
 
-| Stage | Data Representation | Storage Location |
-| :--- | :--- | :--- |
-| **1. Input** | Raw PNG Bytes + JSON Metadata | RAM (API) |
-| **2. Persisted** | File (`timestamp.png`) + DB Row (`PENDING`) | `~/MRS/screenshots/` + SQLite |
-| **3. Extracted** | Raw Text Strings | RAM (Worker) |
-| **4. Analyzed** | Structured Caption (`summary`, `scene`, `action`) | RAM (Worker) |
-| **5. Fused** | "Fusion Text" (Metadata + OCR + Caption) | RAM (Worker) |
-| **6. Vectorized** | 1024-dim Float32 Array | LanceDB |
-| **7. Indexed** | Inverted Index (Tokens) | SQLite FTS5 |
+### 2.2 Resilient Buffering / 健壮的缓冲机制
+
+*   **Atomic Writes**: Metadata is written to `.json.tmp` first, then renamed to `.json`. This prevents corrupted files if the app crashes mid-write.
+    *   **原子写入**: 元数据先写入 `.json.tmp`，完成后重命名为 `.json`。防止写入中途崩溃导致文件损坏。
+*   **Offline Queue**: If the server is down, data accumulates in `~/MRC/buffer`. The `Uploader` retries indefinitely until the server is reachable.
+    *   **离线队列**: 若服务端宕机，数据会堆积在 `~/MRC/buffer`。`Uploader` 会无限重试直到服务恢复，确保**零数据丢失**。
 
 ---
 
-## 3. Pipeline Deep Dive
+## 3. Server Processing Pipeline / 服务端处理流水线 (Strictly Verified)
 
-### 3.1 Ingestion Pipeline (`api.py`)
-The ingestion layer is optimized for **low latency**.
--   **Blocking Operations**: Minimal. Only file I/O (saving the image) and a single lightweight SQL insert happen synchronously.
--   **Response**: Returns immediately after persistence. AI processing is fully decoupled.
+The server pipeline transforms raw images into searchable semantic data through a multi-stage process.
+服务端流水线通过多阶段处理，将原始图像转化为可搜索的语义数据。
 
-### 3.2 Processing Pipeline (`worker.py`)
-The `ProcessingWorker` runs as a background daemon, consuming tasks from the SQLite queue. It implements a robust "Dual-Write" strategy to ensure data consistency between the vector store and relational database.
+### 3.1 Task Queue & Flow Control / 任务队列与流控
 
-#### 3.2.1 Queue Strategy (Dynamic Priority)
-*   **LIFO Mode (Newest First)**: Activated when `Queue Size >= 10`. This prioritization ensures that the user's most recent screenshots appear in search results almost immediately, preventing a backlog from stalling the "live" experience.
-*   **FIFO Mode (Oldest First)**: Activated when `Queue Size < 10`. This mode clears out older tasks when the system is under low load.
+*   **State Machine (状态机)**: Tasks transition through `PENDING` (Waiting) -> `PROCESSING` (Locked) -> `COMPLETED` or `FAILED`.
+    *   **状态流转**: 任务状态从 `PENDING` (等待) -> `PROCESSING` (锁定) -> `COMPLETED` (完成) 或 `FAILED` (失败)。
 
-#### 3.2.2 Pipeline Steps (Detailed)
+    ```mermaid
+    stateDiagram-v2
+        [*] --> PENDING: New Task
+        PENDING --> PROCESSING: Worker Locks
+        PROCESSING --> COMPLETED: Success
+        PROCESSING --> FAILED: Error
+        FAILED --> PENDING: Retry Policy
+        COMPLETED --> [*]
+    ```
 
-1.  **OCR Extraction (`ocr_provider`)**:
-    *   The raw image path is passed to the configured OCR provider (e.g., Apple Vision Framework on macOS or Tesseract).
-    *   Returns raw text strings found in the image.
+*   **Dynamic Queue Strategy (动态队列策略)**:
+    *   **LIFO (Burst Mode)**: When the queue backlog exceeds `lifo_threshold` (default 10), the worker processes the **newest** tasks first (`ORDER BY timestamp DESC`). This ensures recent user activity is indexed immediately.
+        *   **LIFO (爆发模式)**: 当队列积压超过阈值（默认10）时，优先处理**最新**任务。保证用户刚发生的操作能被立即搜索到。
+    *   **FIFO (Catch-up Mode)**: Standard processing for backlog clearing during idle times (`ORDER BY timestamp ASC`).
+        *   **FIFO (追赶模式)**: 标准模式，在空闲时按顺序处理积压的历史任务。
 
-2.  **Vision Analysis (`ai_provider`)**:
-    *   The image is sent to a Vision Language Model (VLM).
-    *   **Output**: A structured JSON object containing:
-        *   `caption`: A descriptive summary of the visual content.
-        *   `scene`: A high-level tag (e.g., "coding", "meeting", "browsing").
-        *   `action`: The inferred user activity (e.g., "debugging", "writing email").
-    *   **Fallback**: If the AI provider fails, empty strings are used to prevent pipeline blockage.
+    ```mermaid
+    flowchart TD
+        Start[Worker Loop] --> CheckCount{Queue Size > Threshold?}
+        
+        CheckCount -- "Yes (Burst Mode)" --> LIFO[LIFO Strategy]
+        LIFO --> GetNew[Pop NEWEST Task]
+        GetNew --> Note1[Prioritize User's Current Context]
+        
+        CheckCount -- "No (Catch-up Mode)" --> FIFO[FIFO Strategy]
+        FIFO --> GetOld[Pop OLDEST Task]
+        GetOld --> Note2[Clear Backlog History]
+        
+        GetNew --> Process[Execute AI Pipeline]
+        GetOld --> Process
+    ```
 
-3.  **Keyword Extraction (`KeywordExtractor`)**:
-    *   **Algorithm**: Local regex-based extraction.
-    *   **Process**:
-        1.  Tokenizes OCR text (lowercase, word characters only).
-        2.  Filters out stopwords (common English words + programming keywords like `def`, `class`).
-        3.  Filters out short words (< 3 chars) and pure digits.
-        4.  Returns the top 10 most frequent terms.
+*   **Concurrency Control (并发控制)**: Uses SQLite atomic updates to "lock" tasks, preventing multiple workers from processing the same image.
+    *   **并发控制**: 使用 SQLite 原子更新锁定任务，防止多 Worker 争抢同一图片。
 
-4.  **Data Fusion (`build_fusion_text`)**:
-    *   Constructs a single, rich text block for embedding. This "Fusion Text" ensures the embedding model "sees" all context types.
-    *   **Format**:
+### 3.2 AI Processing Implementation / AI 处理链实现
+
+```mermaid
+flowchart TD
+    Input[Raw Screenshot] --> Parallel_Start
+    
+    subgraph OCR_Branch [OCR Extraction]
+        Native{OS Native API?}
+        Native -- Yes --> Apple[Apple Vision]
+        Native -- No --> Tesseract[Tesseract / EasyOCR]
+        Apple --> OCR_Text
+        Tesseract --> OCR_Text
+    end
+    
+    subgraph VLM_Branch [Visual Understanding]
+        Model[Qwen-VL / OpenAI] --> Prompt[Strict JSON Prompt]
+        Prompt --> Raw_Res[Raw Response]
+        Raw_Res --> Clean[Strip Markdown/Regex]
+        Clean --> JSON[Structured Data\n(Scene, Action, Caption)]
+    end
+    
+    Parallel_Start --> OCR_Branch
+    Parallel_Start --> VLM_Branch
+    
+    OCR_Text --> Fusion[Data Fusion Builder]
+    JSON --> Fusion
+    Meta[Metadata\n(App, Window Title, Time)] --> Fusion
+    
+    Fusion --> Result[Fusion Text Block]
+    Result --> Note[Input for Embedding Model]
+```
+
+1.  **OCR Extraction (文字提取)**:
+    *   **Implementation**: Wraps `openrecall.server.ocr` module.
+    *   **Strategy**: Uses native OS APIs (Apple Vision on macOS) for speed and privacy, falling back to Tesseract/EasyOCR if unavailable.
+    *   **实现**: 封装 `openrecall.server.ocr` 模块。优先使用原生 OS API (如 macOS Apple Vision) 以兼顾速度与隐私，不可用时回退至 Tesseract。
+
+2.  **VLM Analysis (视觉理解)**:
+    *   **Model**: Supports `Qwen-VL` (Local) or OpenAI/DashScope (Cloud).
+    *   **Prompt Engineering**: Enforces strict JSON output (`caption`, `scene`, `action`) to ensure the response is machine-readable. Includes robustness logic to strip Markdown formatting (```json) from responses.
+    *   **VLM 分析**: 支持 Qwen-VL (本地) 或 OpenAI (云端)。通过 Prompt 强制要求输出 JSON 格式，并包含清洗逻辑以移除 Markdown 标记。
+
+3.  **Data Fusion (数据融合)**:
+    *   **Function**: `build_fusion_text` in `worker.py`.
+    *   **Format**: Explicitly constructs a "Fusion Text" block combining all context layers. This single text block allows the Embedding model to "see" the full picture.
+    *   **数据融合**: `worker.py` 中的 `build_fusion_text` 函数显式构建“融合文本”，将所有上下文层（元数据、OCR、AI描述）组合成一个文本块，供 Embedding 模型理解。
+    *   **Template / 模板**:
         ```text
         [APP] VS Code
         [TITLE] worker.py - MyRecall
         [SCENE] coding
         [ACTION] debugging
         [CAPTION] A screenshot of Python code showing a class definition.
-        [KEYWORDS] python, class, worker, thread
-        [OCR_HEAD] import logging... (first 300 chars)
+        [OCR] import logging...
         ```
 
-5.  **Vector Embedding (`embedding_provider`)**:
-    *   The Fusion Text is sent to the embedding model (default: `qwen-text-v1`).
-    *   **Output**: A fixed-size float32 vector (Dimension: 1024).
-
-6.  **Dual-Write Persistence**:
-    *   **LanceDB**: Stores the `SemanticSnapshot` (Vector + structured metadata).
-    *   **SQLite**:
-        *   Updates the `entries` table with status `COMPLETED`.
-        *   Updates the `ocr_fts` virtual table for keyword search.
-    *   *Note*: While not strictly transactional across two DBs, the worker handles failures by marking the task as `FAILED` if either write fails, allowing for retry logic.
-
-### 3.3 Search Pipeline (`engine.py`)
-The search engine employs a **Hybrid Reciprocal Rank Fusion (RRF)** strategy, merging semantic understanding with precise keyword matching.
-
-#### 3.3.1 Query Parsing (`QueryParser`)
-Before searching, the user query is parsed to extract intent:
-*   **Mandatory Keywords**: Text inside double quotes (e.g., `"error 500"`) is treated as a required exact match.
-*   **Time Filters**: Natural language terms like "today", "yesterday", or "last week" are converted into Unix timestamp ranges (`start_time`, `end_time`).
-
-#### 3.3.2 Parallel Retrieval
-Two searches are executed in parallel:
-1.  **Vector Search (Semantic)**:
-    *   Query text is embedded into a 1024d vector.
-    *   LanceDB finds the nearest neighbors (Cosine Similarity).
-    *   *Goal*: Find concepts (e.g., "coding" finds "Python script").
-2.  **FTS Search (Keyword)**:
-    *   SQLite FTS5 executes a BM25 query on OCR text, captions, and keywords.
-    *   *Goal*: Find exact strings (e.g., specific variable names or error codes).
-
-#### 3.3.3 Hybrid Fusion Algorithm
-The results are merged using a custom scoring formula:
-
-1.  **Base Score**: Derived from the Vector Similarity score (0.0 to 1.0).
-2.  **Rescue Mechanism (FTS-Only)**:
-    *   If a result is found in FTS but *not* in the Vector results, it is "rescued" and added to the list.
-    *   **Base Score**: Assigned a low fixed score of **0.2**.
-    *   *Why?* Ensures that specific keyword matches (like a unique ID) are never lost, even if the embedding model thinks they are semantically irrelevant.
-3.  **Boosting (FTS Overlap)**:
-    *   If a result appears in *both* lists, its score is boosted.
-    *   **Formula**:
-        $$ Score_{final} = Score_{vector} + 0.3 \times (1.0 - \frac{Rank_{fts}}{Count_{fts}}) $$
-    *   *Effect*: A semantic match that also has a high-ranking keyword match gets a significant score bump (up to +0.3).
-
-This approach prioritizes semantic relevance but guarantees that exact keyword matches can "tip the scales" or rescue otherwise missed results.
-
 ---
 
-## 4. Schema Design
+## 4. Hybrid Search Engine / 混合搜索引擎 (Strictly Verified)
 
-### 4.1 Relational Schema (SQLite)
+The search engine employs a **Weighted Linear Fusion** strategy (not RRF) to balance semantic understanding and exact keyword matching.
+搜索引擎采用 **加权线性融合** 策略（而非 RRF），以平衡语义理解与精确关键词匹配。
 
-**Table: `entries`** (Task Management & Metadata)
-| Column | Type | Description |
-| :--- | :--- | :--- |
-| `id` | UUID | Primary Key |
-| `timestamp` | REAL | Unique Unix timestamp |
-| `status` | TEXT | State: `PENDING`, `PROCESSING`, `COMPLETED`, `FAILED` |
-| `app` | TEXT | Application Name (e.g., "VS Code") |
-| `title` | TEXT | Window Title |
-| `text` | TEXT | Raw OCR Output |
-| `description`| TEXT | AI Generated Caption |
+### 4.1 Search Pipeline Diagram / 搜索流程图
 
-**Table: `ocr_fts`** (Full-Text Search Index)
--   Virtual table using `FTS5` extension.
--   Indexed Columns: `ocr_text`, `caption`, `keywords`.
-
-### 4.2 Vector Schema (LanceDB)
-
-**Model: `SemanticSnapshot`**
-```json
-{
-  "id": "uuid-string",
-  "context": {
-    "app_name": "string",
-    "window_title": "string",
-    "timestamp": float,
-    "time_bucket": "YYYY-MM-DD-HH"
-  },
-  "content": {
-    "ocr_text": "string",
-    "caption": "string",
-    "keywords": ["list", "of", "strings"],
-    "scene_tag": "string"
-  },
-  "embedding_vector": [0.0, ..., 0.0]  // 1024 floats
-}
+```mermaid
+graph TD
+    Query[User Query / 用户查询] --> Parser{Query Parser / 查询解析}
+    
+    Parser --> |Extract Text| Text[Search Text]
+    Parser --> |Extract Time| Time[Time Range]
+    Parser --> |Extract Keywords| Keys[Mandatory Keywords]
+    
+    Text --> Vector_Branch
+    Text & Keys --> FTS_Branch
+    
+    subgraph Vector_Branch [Vector Search]
+        Embed[Embed Query] --> ANN[LanceDB Search]
+        Time --> ANN
+        ANN --> Vec_Res[Top 100 (Score/Distance)]
+    end
+    
+    subgraph FTS_Branch [Keyword Search]
+        Token[Tokenize] --> BM25[SQLite FTS5]
+        BM25 --> FTS_Res[Top 100 (BM25 Score)]
+    end
+    
+    Vec_Res --> Fusion[Stage 2: Weighted Fusion / 加权融合]
+    FTS_Res --> Fusion
+    
+    Fusion --> |Base + Boost| Candidates[Top 30 Candidates]
+    
+    Candidates --> Context[Build Context\n(Meta + Visual + OCR)]
+    Context --> Rerank{Stage 3: Deep Reranking / 深度重排}
+    Rerank --> |Cross-Encoder Model| Final[Final Results / 最终结果]
 ```
 
+### 4.2 Stage 1: Parallel Retrieval / 第一阶段：并行召回
+
+*   **Vector Branch**: Uses LanceDB to find semantically similar images based on Embedding vectors. Good for concepts (e.g., "coding").
+    *   **向量分支**: 使用 LanceDB 基于 Embedding 向量查找语义相似的图像。擅长概念搜索（如“编程”）。
+*   **FTS Branch**: Uses SQLite FTS5 to find exact keyword matches in OCR text and metadata. Good for identifiers (e.g., "Error 500").
+    *   **FTS 分支**: 使用 SQLite FTS5 在 OCR 文本和元数据中查找精确关键词。擅长标识符搜索（如“Error 500”）。
+
+### 4.3 Stage 2: Weighted Linear Fusion / 第二阶段：加权线性融合
+
+**Note**: The system uses a custom weighted boosting algorithm, **NOT** Reciprocal Rank Fusion (RRF).
+**注意**: 系统使用自定义的加权提升算法，**而非** RRF。
+
+```mermaid
+flowchart TD
+    Start[Candidates] --> CheckSrc{Source?}
+    
+    CheckSrc -- "Vector Only" --> Base[Base Score = Vector Similarity]
+    CheckSrc -- "FTS Only (Rescue)" --> Rescue[Base Score = 0.2]
+    CheckSrc -- "Both" --> Base
+    
+    Base --> CheckFTS{Exists in FTS?}
+    Rescue --> Final
+    
+    CheckFTS -- No --> Final[Final Score]
+    CheckFTS -- Yes --> Boost_Calc[Calculate Boost]
+    
+    Boost_Calc --> Formula["Boost = 0.3 * (1.0 - Rank/Total)"]
+    Formula --> Add[Final Score = Base + Boost]
+    
+    Add --> Final
+```
+
+*   **The Logic (算法逻辑)**:
+    1.  **Base Score (基础分)**: 
+        *   **Vector Match**: Uses the Cosine Similarity score (0.0 to 1.0).
+        *   **FTS Rescue**: If a document is found *only* by keyword search (missed by vector), it gets a fixed `0.2` base score to ensure it enters the candidate pool.
+    2.  **Boost Calculation (提升计算)**:
+        *   **Goal**: Reward documents that match exact keywords (FTS) in addition to semantic meaning.
+        *   **Formula**: $$ Boost = 0.3 \times (1.0 - \frac{Rank_{fts}}{Total_{fts}}) $$
+        *   **Explanation**: 
+            *   `Rank 0` (Best match) gets nearly `+0.3` score.
+            *   `Rank N` (Last match) gets nearly `+0.0` score.
+            *   This linear decay ensures high-quality keyword matches significantly influence the ranking.
+        *   **Effect**: A semantic match that is also an exact keyword match gets a significant score bump (up to +0.3).
+        *   **效果**: 既符合语义又是精确匹配的结果会获得显著加分（最高 +0.3）。
+
+        ```mermaid
+        xychart-beta
+            title "Impact of FTS Boosting (Linear Decay) / FTS 提升效果 (线性衰减)"
+            x-axis [Rank 1, Rank 10, Rank 20, Rank 30]
+            y-axis "Boost Score" 0 --> 0.3
+            bar [0.30, 0.20, 0.10, 0.00]
+        ```
+
+
+### 4.4 Stage 3: Deep Reranking / 第三阶段：深度重排
+
+*   **Model**: Cross-Encoder (`Qwen/Qwen3-Reranker-0.6B`).
+*   **Context Construction (上下文构建)**:
+    The reranker sees a richer context than the embedding model.
+    Reranker 模型会看到比 Embedding 模型更丰富的上下文。
+    
+    **Template / 模板代码**:
+    ```python
+    def construct_rerank_context(snapshot):
+        return f"""
+    [Metadata]
+    App: {snapshot.context.app_name}
+    Title: {snapshot.context.window_title}
+    Time: {formatted_time}
+
+    [Visual Context]
+    Scene: {snapshot.content.scene_tag}
+    Summary: {snapshot.content.caption}
+
+    [OCR Content]
+    {snapshot.content.ocr_text}
+    """
+    ```
+
+*   **Scoring (打分)**:
+    *   The model inputs `(Query, Context)` pairs and outputs a relevance probability (0-1).
+    *   This score **overwrites** the fusion score for the final ranking.
+    *   **打分**: 模型输入 (Query, Context) 对，输出相关性概率，该分数直接**覆盖**之前的融合分数。
+
 ---
 
-## 5. Technology Stack & Configuration
+## 5. Data Schema / 数据结构
 
-### 5.1 Core Stack
--   **Framework**: FastAPI (Server), Pydantic V2 (Validation).
--   **Database**: SQLite (Relational), LanceDB (Vector).
--   **ORM**: Peewee (SQLite Interaction).
+### 5.1 Relational (SQLite) / 关系型数据
+Stored in `~/MRS/db/recall.db`.
+存储于 `~/MRS/db/recall.db`。
 
-### 5.2 AI Models (Default)
--   **Embedding**: `qwen-text-v1` (1024 dimensions).
--   **Vision/OCR**: Local providers (extensible to OpenAI/Ollama).
+| Table | Purpose / 用途 | Key Columns / 关键列 |
+| :--- | :--- | :--- |
+| `entries` | Metadata & Status | `id`, `timestamp`, `app`, `status`, `caption` |
+| `ocr_fts` | Full-Text Index | `ocr_text`, `caption`, `keywords` (Virtual Table) |
 
-### 5.3 Configuration (`config.py`)
--   **Path Management**: All paths are resolved to absolute paths using `pathlib.Path.expanduser().resolve()`.
--   **Environment Variables**:
-    -   `OPENRECALL_SERVER_DATA_DIR`: Overrides `~/MRS`.
-    -   `OPENRECALL_CLIENT_DATA_DIR`: Overrides `~/MRC`.
-    -   `OPENRECALL_AI_PROVIDER`: Selects the backend (e.g., `local`, `openai`).
+### 5.2 Vector (LanceDB) / 向量数据
+Stored in `~/MRS/lancedb`.
+存储于 `~/MRS/lancedb`。
+
+*   **Model**: `SemanticSnapshot`
+*   **Dimension**: 1024 (default for `qwen-text-v1`)
+*   **Fields**: Contains the Embedding Vector plus a copy of metadata for fast filtering.
+    *   **字段**: 包含嵌入向量 (Embedding) 以及元数据的副本，用于快速过滤。
+
+---
+
+## 6. Configuration / 配置说明
+
+Managed via `.env` file or Environment Variables.
+通过 `.env` 文件或环境变量管理。
+
+| Variable (变量名) | Description (描述) | Default (默认值) |
+| :--- | :--- | :--- |
+| `OPENRECALL_SERVER_DATA_DIR` | Server data storage path / 服务端数据存储路径 | `~/MRS` |
+| `OPENRECALL_CLIENT_DATA_DIR` | Client data storage path / 客户端数据存储路径 | `~/MRC` |
+| `OPENRECALL_AI_PROVIDER` | AI Provider (local/openai) / AI 提供商 | `local` |
+| `OPENRECALL_RERANKER_MODE` | Reranker mode (api/local) / 重排模式 | `api` |
+| `OPENRECALL_RERANKER_URL` | Reranker API Endpoint / 重排 API 地址 | `http://localhost:8080/rerank` |

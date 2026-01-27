@@ -308,6 +308,15 @@ class SearchEngine:
                 doc_texts = [construct_rerank_context(c['snapshot']) for c in candidates]
                 
                 if settings.debug:
+                    # Log context length summary first (as requested)
+                    total_chars = sum(len(d) for d in doc_texts)
+                    logger.debug(
+                        f"🧠 Reranker Input Stats | Candidates={len(doc_texts)} | "
+                        f"Total Context Length={total_chars} chars | "
+                        f"Avg Context Length={total_chars // len(doc_texts) if doc_texts else 0} chars | "
+                        f"Query Length={len(parsed.text or user_query)} chars"
+                    )
+
                     # Log full context to file for inspection
                     try:
                         # User requested logs in project_root/logs
@@ -351,12 +360,15 @@ class SearchEngine:
                     # Log Top Reranked Results
                     if settings.debug:
                         logger.debug(f"🧠 Reranked Top Results (Top {len(candidates)}):")
+                        query_text = parsed.text or user_query
                         for i, c in enumerate(candidates):
                             # doc_preview = construct_rerank_context(c['snapshot']).replace('\n', ' ')[:145]
-                            doc_preview = construct_rerank_context(c['snapshot'])[:845]
+                            full_context = construct_rerank_context(c['snapshot'])
+                            doc_preview = full_context[:845]
                             ocr_len = len(c['snapshot'].content.ocr_text or "")
                             caption_len = len(c['snapshot'].content.caption or "")
-                            logger.debug(f"#{i+1} Score: {c['score']:.4f} | OCR_len={ocr_len} Cap_len={caption_len} |\nDoc:\n{doc_preview}...\n")
+                            pair_len = len(query_text) + len(full_context)
+                            logger.debug(f"#{i+1} Score: {c['score']:.4f} | OCR_len={ocr_len} Cap_len={caption_len} Pair_len={pair_len} |\nDoc:\n{doc_preview}...\n")
 
                 else:
                     logger.warning("⚠️ Reranker returned all zeros. Keeping RRF order.")
