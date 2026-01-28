@@ -164,11 +164,17 @@ flowchart TD
     Input[Raw Screenshot] --> Parallel_Start
     
     subgraph OCR_Branch [OCR Extraction]
-        Native{OS Native API?}
-        Native -- Yes --> Apple[Apple Vision]
-        Native -- No --> Tesseract[Tesseract / EasyOCR]
-        Apple --> OCR_Text
-        Tesseract --> OCR_Text
+        Config{Provider Config}
+        Config -- "RapidOCR" --> Rapid[RapidOCR (Local/ONNX)]
+        Config -- "Doctr" --> Doctr[Doctr (DL Based)]
+        Config -- "API" --> API_OCR[OpenAI/DashScope API]
+        
+        Rapid --> PostProc[OCRPostProcessor]
+        Doctr --> PostProc
+        API_OCR --> PostProc
+        
+        PostProc --> |Grid/Column Detection| Clean_Text
+        PostProc --> |Smart Language Joining| Clean_Text
     end
     
     subgraph VLM_Branch [Visual Understanding]
@@ -181,7 +187,7 @@ flowchart TD
     Parallel_Start --> OCR_Branch
     Parallel_Start --> VLM_Branch
     
-    OCR_Text --> Fusion[Data Fusion Builder]
+    Clean_Text --> Fusion[Data Fusion Builder]
     JSON --> Fusion
     Meta[Metadata\n(App, Window Title, Time)] --> Fusion
     
@@ -190,28 +196,27 @@ flowchart TD
 ```
 
 1.  **OCR Extraction (文字提取)**:
-    *   **Implementation**: Wraps `openrecall.server.ocr` module.
-    *   **Strategy**: Uses native OS APIs (Apple Vision on macOS) for speed and privacy, falling back to Tesseract/EasyOCR if unavailable.
-    *   **实现**: 封装 `openrecall.server.ocr` 模块。优先使用原生 OS API (如 macOS Apple Vision) 以兼顾速度与隐私，不可用时回退至 Tesseract。
+    *   **Providers**: Supports `RapidOCR` (Default, Lightweight ONNX), `Doctr` (Deep Learning), or Cloud APIs.
+    *   **Post-Processing**: Implements a robust `OCRPostProcessor` that handles:
+        *   **Grid Layouts**: Detects column gaps and inserts tabs (`\t`) to preserve table structures.
+        *   **Smart Spacing**: Inserts spaces between English words but joins Chinese characters tightly.
+        *   **Line Merging**: Uses a "Running Mean" algorithm to merge text on the same line despite font size differences.
+    *   **实现**: 支持 RapidOCR (默认/ONNX), Doctr (深度学习) 或云端 API。内置 `OCRPostProcessor` 处理：
+        *   **网格布局**: 检测列间距并插入制表符，保留表格结构。
+        *   **智能分词**: 英文加空格，中文紧密连接。
+        *   **行合并**: 使用“运行均值”算法，忽略字体大小差异正确合并同形文本。
 
 2.  **VLM Analysis (视觉理解)**:
     *   **Model**: Supports `Qwen-VL` (Local) or OpenAI/DashScope (Cloud).
     *   **Prompt Engineering**: Enforces strict JSON output (`caption`, `scene`, `action`) to ensure the response is machine-readable. Includes robustness logic to strip Markdown formatting (```json) from responses.
-    *   **VLM 分析**: 支持 Qwen-VL (本地) 或 OpenAI (云端)。通过 Prompt 强制要求输出 JSON 格式，并包含清洗逻辑以移除 Markdown 标记。
+    *   **Timeout Handling**: Configurable `OPENRECALL_AI_REQUEST_TIMEOUT` (default 120s) to handle slow API responses.
+    *   **VLM 分析**: 支持 Qwen-VL (本地) 或 OpenAI (云端)。通过 Prompt 强制要求输出 JSON 格式，并包含清洗逻辑。支持可配置的超时时间。
 
 3.  **Data Fusion (数据融合)**:
     *   **Function**: `build_fusion_text` in `worker.py`.
     *   **Format**: Explicitly constructs a "Fusion Text" block combining all context layers. This single text block allows the Embedding model to "see" the full picture.
-    *   **数据融合**: `worker.py` 中的 `build_fusion_text` 函数显式构建“融合文本”，将所有上下文层（元数据、OCR、AI描述）组合成一个文本块，供 Embedding 模型理解。
-    *   **Template / 模板**:
-        ```text
-        [APP] VS Code
-        [TITLE] worker.py - MyRecall
-        [SCENE] coding
-        [ACTION] debugging
-        [CAPTION] A screenshot of Python code showing a class definition.
-        [OCR] import logging...
-        ```
+    *   **Logging**: Can optionally log full fusion text to `logs/fusion_debug.log` via `OPENRECALL_FUSION_LOG_ENABLED`.
+    *   **数据融合**: 构建“融合文本”，将所有上下文层组合。支持通过配置开启调试日志 `fusion_debug.log`。
 
 ---
 
@@ -373,5 +378,9 @@ Managed via `.env` file or Environment Variables.
 | `OPENRECALL_SERVER_DATA_DIR` | Server data storage path / 服务端数据存储路径 | `~/MRS` |
 | `OPENRECALL_CLIENT_DATA_DIR` | Client data storage path / 客户端数据存储路径 | `~/MRC` |
 | `OPENRECALL_AI_PROVIDER` | AI Provider (local/openai) / AI 提供商 | `local` |
+| `OPENRECALL_AI_REQUEST_TIMEOUT` | AI Request Timeout (seconds) / AI 请求超时 | `120` |
+| `OPENRECALL_OCR_PROVIDER` | OCR Provider (rapidocr/doctr/openai) / OCR 引擎 | `rapidocr` |
+| `OPENRECALL_OCR_RAPID_USE_LOCAL` | Use Local RapidOCR Models / 使用本地 OCR 模型 | `false` |
 | `OPENRECALL_RERANKER_MODE` | Reranker mode (api/local) / 重排模式 | `api` |
 | `OPENRECALL_RERANKER_URL` | Reranker API Endpoint / 重排 API 地址 | `http://localhost:8080/rerank` |
+| `OPENRECALL_FUSION_LOG_ENABLED` | Enable Fusion Debug Log / 开启融合日志 | `false` |
