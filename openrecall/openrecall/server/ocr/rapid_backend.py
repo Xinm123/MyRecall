@@ -180,12 +180,10 @@ class RapidOCRBackend:
             if not model_dir:
                 raise ValueError("OPENRECALL_OCR_RAPID_MODEL_DIR is required when USE_LOCAL is True")
             
-            det_path = os.path.join(model_dir, "onnx/PP-OCRv5/det/ch_PP-OCRv5_server_det.onnx")
-            rec_path = os.path.join(model_dir, "onnx/PP-OCRv5/rec/ch_PP-OCRv5_rec_server_infer.onnx")
-            cls_path = os.path.join(model_dir, "onnx/PP-OCRv4/cls/ch_ppocr_mobile_v2.0_cls_infer.onnx")
-            # det_path = os.path.join(model_dir, "onnx/PP-OCRv5/det/ch_PP-OCRv5_mobile_det.onnx")
-            # rec_path = os.path.join(model_dir, "onnx/PP-OCRv5/rec/ch_PP-OCRv5_rec_mobile_infer.onnx")
-            # cls_path = os.path.join(model_dir, "onnx/PP-OCRv4/cls/ch_ppocr_mobile_v2.0_cls_infer.onnx")
+            # Use configured paths or fallback to default structure in model_dir
+            det_path = settings.ocr_rapid_det_model or os.path.join(model_dir, "onnx/PP-OCRv5/det/ch_PP-OCRv5_server_det.onnx")
+            rec_path = settings.ocr_rapid_rec_model or os.path.join(model_dir, "onnx/PP-OCRv5/rec/ch_PP-OCRv5_rec_server_infer.onnx")
+            cls_path = settings.ocr_rapid_cls_model or os.path.join(model_dir, "onnx/PP-OCRv4/cls/ch_ppocr_mobile_v2.0_cls_infer.onnx")
 
             if not (os.path.exists(det_path) and os.path.exists(rec_path) and os.path.exists(cls_path)):
                 # Log detailed error about which file is missing
@@ -193,7 +191,7 @@ class RapidOCRBackend:
                 if not os.path.exists(det_path): missing.append(f"DET: {det_path}")
                 if not os.path.exists(rec_path): missing.append(f"REC: {rec_path}")
                 if not os.path.exists(cls_path): missing.append(f"CLS: {cls_path}")
-                raise FileNotFoundError(f"Missing required ONNX models in {model_dir}: {', '.join(missing)}")
+                raise FileNotFoundError(f"Missing required ONNX models: {', '.join(missing)}")
 
             self.engine = RapidOCR(
                 det_model_path=det_path,

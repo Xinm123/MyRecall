@@ -172,6 +172,21 @@ class Settings(BaseSettings):
         alias="OPENRECALL_OCR_RAPID_MODEL_DIR",
         description="Directory containing RapidOCR models (required if use_local is True)"
     )
+    ocr_rapid_det_model: Optional[str] = Field(
+        default=None,
+        alias="OPENRECALL_OCR_RAPID_DET_MODEL",
+        description="Path to RapidOCR detection model"
+    )
+    ocr_rapid_rec_model: Optional[str] = Field(
+        default=None,
+        alias="OPENRECALL_OCR_RAPID_REC_MODEL",
+        description="Path to RapidOCR recognition model"
+    )
+    ocr_rapid_cls_model: Optional[str] = Field(
+        default=None,
+        alias="OPENRECALL_OCR_RAPID_CLS_MODEL",
+        description="Path to RapidOCR classification model"
+    )
     embedding_provider: str = Field(
         default="",
         alias="OPENRECALL_EMBEDDING_PROVIDER",
