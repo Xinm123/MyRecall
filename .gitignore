@@ -10,3 +10,4 @@ htmlcov
 reports
 .vscode
 .aider*
+.worktrees
