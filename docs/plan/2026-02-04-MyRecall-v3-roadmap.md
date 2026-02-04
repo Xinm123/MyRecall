@@ -43,6 +43,14 @@ MyRecall 与 screenpipe 都是 **local-first 数字记忆层**（capture → ind
   - 分阶段吸收 screenpipe 的工程/体验/Chat 思路
 - MVP 优先：**体验 + 检索 + Chat**
 - Timeline 增量：**HTTP Polling**（基于现有 `/api/memories/latest?since=` 或新增 v3 frames 接口）
+- 运行形态：**强制显式 Role（严格隔离）**
+  - `OPENRECALL_ROLE` 必须显式配置：`server` / `client` / `combined`（缺失直接退出）
+  - `server` 进程只触碰 `OPENRECALL_SERVER_DATA_DIR`；`client` 进程只触碰 `OPENRECALL_CLIENT_DATA_DIR`
+  - 越界访问：fail-fast（立刻异常并终止启动）
+  - `combined` 仅用于本机开发/遗留兼容：必须显式 `OPENRECALL_ROLE=combined` 且显式配置两侧目录
+- 配置形态：**两个 env 文件**
+  - server：`myrecall_server.env`（或通过 `run_server.sh --env=...` 指定）
+  - client：`myrecall_client.env`（或通过 `run_client.sh --env=...` 指定）
 - 时间跨度：**8 周**（4 个 2 周阶段）
 
 ## 4. 借鉴清单（screenpipe → MyRecall-v3）
@@ -89,6 +97,8 @@ MyRecall 与 screenpipe 都是 **local-first 数字记忆层**（capture → ind
   - 应对：tool-call 强约束截断/限额/超时；“建议时间范围”策略
 - 隐私与远程暴露风险
   - v3 默认本机：`OPENRECALL_HOST=127.0.0.1`；远程暴露另开安全门槛（Phase 3 文档明确）
+- client/server 目录耦合（“单机跑通但拆机困难”）
+  - 应对：从 Phase 0 起强制 role-based 目录隔离与 fail-fast，保证未来分离仅需移动 env 与更改 `OPENRECALL_API_URL`
 
 ## 7. v3.1+ Backlog（后续版本候选）
 
@@ -97,4 +107,3 @@ MyRecall 与 screenpipe 都是 **local-first 数字记忆层**（capture → ind
 3) UI events（可选、强隐私开关）
 4) WS 事件总线、插件/MCP 生态
 5) 云同步（zero-knowledge）
-

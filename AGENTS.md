@@ -8,7 +8,7 @@
   - `openrecall/shared/`: shared config/logging/models.
 - `tests/`: pytest suite. `tests/manual/` contains opt-in scripts; `tests/v2/` holds legacy/regression coverage.
 - `docs/` and `images/`: documentation and static assets.
-- Root helper scripts: `run_server_foreground.sh`, `run_client_foreground.sh`, `run_phase8_*_tests.sh`.
+- Root helper scripts: `run_server.sh`, `run_client.sh`, `run_phase8_*_tests.sh`.
 
 ## Build, Test, and Development Commands
 
@@ -17,7 +17,7 @@
 - Install (editable): `python -m pip install -e ".[test]"`
 - Run (combined mode): `python -m openrecall.main`
 - Run (split processes): `python -m openrecall.server` and `python -m openrecall.client`
-  - With env files: `./run_server_foreground.sh --env=openrecall.env` and `./run_client_foreground.sh --env=openrecall_client.env`
+  - With env files: `./run_server.sh --env=myrecall_server.env` and `./run_client.sh --env=myrecall_client.env`
 - Unit+integration tests: `pytest` (default selection excludes `e2e`, `perf`, `security`, `model`, `manual`)
 - Coverage gate: `pytest --cov=openrecall --cov-fail-under=80`
 - Security checks: `python -m pip install -e ".[security]" && bandit -q -r openrecall && pip-audit`

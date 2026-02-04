@@ -26,7 +26,7 @@
   - `openrecall/server/config_runtime.py`（运行时开关 `runtime_settings`）
 - Entrypoints / 启动入口：
   - `openrecall/main.py`, `openrecall/server/__main__.py`, `openrecall/client/__main__.py`
-  - `run_server_foreground.sh`, `run_client_foreground.sh`, `run_client_mac.sh`
+  - `run_server.sh`, `run_client.sh`, `run_client_mac.sh`
 
 ---
 
@@ -604,7 +604,7 @@ sequenceDiagram
 
 - 单机一体：`python -m openrecall.main`（同进程启动 server + client；适合本地开发/验证链路）。
 - 分离部署：`python -m openrecall.server` + `python -m openrecall.client`（适合 Client/Server 分机）。
-- 脚本启动：`run_server_foreground.sh` / `run_client_foreground.sh` / `run_client_mac.sh`（加载对应 env 文件）。
+- 脚本启动：`run_server.sh` / `run_client.sh` / `run_client_mac.sh`（加载对应 env 文件）。
 
 ### TL;DR (English)
 
@@ -633,13 +633,13 @@ sequenceDiagram
 ### 8.2 Script 启动（Env 文件约定）
 
 **中文**
-- `run_server_foreground.sh` 默认加载 `openrecall.env`
-- `run_client_foreground.sh` 优先加载 `openrecall_client.env`（不存在则回退 `openrecall.env`）
+- `run_server.sh` 默认加载 `myrecall_server.env`（不存在则回退 `openrecall.env`）
+- `run_client.sh` 默认加载 `myrecall_client.env`（不存在则回退 `openrecall_client.env`，再回退 `openrecall.env`）
 - `run_client_mac.sh` 会生成最小 `openrecall_client.env`，并在启动前检查 `GET {API_URL}/health`
 
 **English**
-- `run_server_foreground.sh` loads `openrecall.env` by default.
-- `run_client_foreground.sh` prefers `openrecall_client.env` (fallback to `openrecall.env`).
+- `run_server.sh` loads `myrecall_server.env` by default (fallback to `openrecall.env`).
+- `run_client.sh` loads `myrecall_client.env` by default (fallback to `openrecall_client.env`, then `openrecall.env`).
 - `run_client_mac.sh` can generate a minimal `openrecall_client.env` and checks server health before launching.
 
 ---

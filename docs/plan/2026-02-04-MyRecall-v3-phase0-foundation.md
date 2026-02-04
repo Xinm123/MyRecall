@@ -8,6 +8,26 @@
 
 **Tech Stack:** Flask（现有 app）、sqlite3 + FTS5（现有）、LanceDB（现有，Phase0 不强依赖）
 
+## v3 Foundation Contract（Role-based Split, Fail-fast）
+
+v3 以“未来 client/server 分离到不同机器上”为终极目标，因此从 Phase 0 起建立**严格隔离**的运行契约：
+
+### Required env（必须显式配置）
+- `OPENRECALL_ROLE`: `server` / `client` / `combined`
+  - 缺失：**直接报错退出**（避免偷偷写到默认目录）
+  - `server`：只允许触碰 `OPENRECALL_SERVER_DATA_DIR`（DB/FTS/LanceDB/screenshots/cache/models）
+  - `client`：只允许触碰 `OPENRECALL_CLIENT_DATA_DIR`（buffer/client screenshots/cache）
+  - `combined`：允许两侧目录，但也必须显式配置 `OPENRECALL_SERVER_DATA_DIR` + `OPENRECALL_CLIENT_DATA_DIR`
+- `OPENRECALL_SERVER_DATA_DIR`: server 数据根目录（建议本机：`$ROOT/server`）
+- `OPENRECALL_CLIENT_DATA_DIR`: client 数据根目录（建议本机：`$ROOT/client`）
+
+### Strict isolation（严格隔离定义）
+- `server` 进程：启动与运行期间**禁止**创建/写入任何 client 侧目录（包括任何“探测性写入”）
+- `client` 进程：启动与运行期间**禁止**创建/写入任何 server 侧目录（包括任何“探测性写入”）
+- 越界访问：**立刻异常并终止启动**（fail-fast，避免运行一段时间后才发现配置错误）
+
+> 说明：当前实现里 `Settings` 在 import 时会 `ensure_directories()` + `verify_writable()`，会触碰两侧目录；Phase 0 Task 1 会把这件事改到满足上述契约。
+
 ## Scope
 - In:
   - v3 blueprint 注册与基础路由
@@ -27,34 +47,55 @@
 
 ---
 
-### Task 1: 修正测试 fixture 的数据目录隔离（避免写到 ~/MRS, ~/MRC）
+### Task 1: 建立严格隔离的测试与启动契约（OPENRECALL_ROLE + split dirs）
 
 **Files:**
 - Modify: `MyRecall/tests/conftest.py`
+- (Likely) Modify: `MyRecall/openrecall/shared/config.py`
 
 **Step 1: Write the failing test**
-- 新增一个断言用例（或在现有 fixture 内）验证 settings 的 `server_data_dir/client_data_dir` 都指向 `tmp_path`。
+- 新增断言用例，验证 **role 缺失会直接失败**，并验证 **server role 不会触碰 client 路径**（反之亦然）。
 
-示例（放在 `MyRecall/tests/test_shared_utils_smoke.py` 或新建文件都可）：
+示例（可以新建 `MyRecall/tests/test_role_isolation.py`）：
 ```python
-def test_test_fixture_uses_tmp_dirs(tmp_path, monkeypatch):
-    monkeypatch.setenv("OPENRECALL_SERVER_DATA_DIR", str(tmp_path / "MRS"))
-    monkeypatch.setenv("OPENRECALL_CLIENT_DATA_DIR", str(tmp_path / "MRC"))
+import importlib
+import pytest
+
+
+def test_settings_requires_role(monkeypatch):
+    monkeypatch.delenv("OPENRECALL_ROLE", raising=False)
+    import openrecall.shared.config
+    with pytest.raises(Exception):
+        importlib.reload(openrecall.shared.config)
+
+
+def test_server_role_does_not_touch_client_paths(tmp_path, monkeypatch):
+    monkeypatch.setenv("OPENRECALL_ROLE", "server")
+    monkeypatch.setenv("OPENRECALL_SERVER_DATA_DIR", str(tmp_path / "server"))
+    monkeypatch.setenv("OPENRECALL_CLIENT_DATA_DIR", str(tmp_path / "client"))
     import importlib
     import openrecall.shared.config
     importlib.reload(openrecall.shared.config)
-    assert str(openrecall.shared.config.settings.server_data_dir).startswith(str(tmp_path))
+    s = openrecall.shared.config.settings
+    assert str(s.server_data_dir).startswith(str(tmp_path))
+    # 关键：server role 下访问任何 client 侧路径应直接失败（fail-fast）
+    with pytest.raises(Exception):
+        _ = s.buffer_path
 ```
 
 **Step 2: Run test to verify it fails**
 Run: `cd MyRecall && pytest -q`  
-Expected: FAIL（当前 fixture 只设置 `OPENRECALL_DATA_DIR`，不会影响 server/client split dirs）
+Expected: FAIL（当前 Settings 在 import 时会创建/探测两侧目录；且 role 缺失时不会 fail-fast）
 
 **Step 3: Write minimal implementation**
-- 在 `flask_app` fixture 中新增：
-  - `OPENRECALL_SERVER_DATA_DIR=<tmp_path>/MRS`
-  - `OPENRECALL_CLIENT_DATA_DIR=<tmp_path>/MRC`
-- 并保留 `OPENRECALL_DATA_DIR`（兼容 legacy）
+- 在 `flask_app` fixture 中明确设置 server 侧所需 env：
+  - `OPENRECALL_ROLE=server`
+  - `OPENRECALL_SERVER_DATA_DIR=<tmp_path>/server`
+  - `OPENRECALL_CLIENT_DATA_DIR=<tmp_path>/client`（仅用于断言越界，不应被触碰）
+- 在 `Settings` 内实现 role 约束：
+  - role 缺失：直接异常并退出
+  - `ensure_directories()` / `verify_writable()`：只对本侧目录生效（server/client），避免跨目录写入
+  - 对“越界属性”（如 server role 访问 `buffer_path`）做硬失败
 
 **Step 4: Run test to verify it passes**
 Run: `cd MyRecall && pytest -q`  
@@ -170,4 +211,3 @@ Run: `cd MyRecall && pytest -q`
 - (Optional) Modify: `MyRecall/docs/plan/2026-02-04-MyRecall-v3-roadmap.md`（补充接口说明）
 
 **Step:** 仅同步文档（若实现与文档偏差）。
-

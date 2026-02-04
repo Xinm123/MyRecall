@@ -1,10 +1,12 @@
 #!/usr/bin/env bash
+# NOTE: Renamed from run_client_foreground.sh
 set -euo pipefail
 
 repo_root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 cd "$repo_root"
 
-env_file="${OPENRECALL_ENV_FILE:-$repo_root/openrecall.env}"
+env_file="${OPENRECALL_ENV_FILE:-$repo_root/myrecall_client.env}"
+
 enable_debug="false"
 
 for arg in "$@"; do
@@ -16,11 +18,20 @@ for arg in "$@"; do
       env_file="${arg#--env=}"
       ;;
     *)
-      echo "Usage: $0 [--debug] [--env=/abs/path/to/openrecall.env]" >&2
+      echo "Usage: $0 [--debug] [--env=/abs/path/to/myrecall_client.env]" >&2
       exit 2
       ;;
   esac
 done
+
+if [[ ! -f "$env_file" ]]; then
+  # Backward compatible fallbacks
+  if [[ -f "$repo_root/openrecall_client.env" ]]; then
+    env_file="$repo_root/openrecall_client.env"
+  elif [[ -f "$repo_root/openrecall.env" ]]; then
+    env_file="$repo_root/openrecall.env"
+  fi
+fi
 
 if [[ ! -f "$env_file" ]]; then
   echo "Env file not found: $env_file" >&2
@@ -35,7 +46,7 @@ if [[ "$enable_debug" == "true" ]]; then
   export OPENRECALL_DEBUG=true
 fi
 
-python_bin="${OPENRECALL_PYTHON_BIN:-$(pwd)/.venv/bin/python}"
+python_bin="${OPENRECALL_PYTHON_BIN:-/data/venvs/openrecall/bin/python}"
 if [[ ! -x "$python_bin" ]]; then
   python_bin="$(command -v python3 || true)"
 fi
@@ -44,5 +55,4 @@ if [[ -z "${python_bin:-}" ]]; then
   exit 1
 fi
 
-exec "$python_bin" -m openrecall.server
-
+exec "$python_bin" -m openrecall.client

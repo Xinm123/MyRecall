@@ -56,7 +56,7 @@
   - 安装（可编辑）：`cd MyRecall && python -m pip install -e ".[test]"`
   - 运行（combined）：`python -m openrecall.main`
   - 运行（split）：`python -m openrecall.server` + `python -m openrecall.client`
-  - 使用 env 文件：`./run_server_foreground.sh --env=openrecall.env`、`./run_client_foreground.sh --env=openrecall_client.env`
+  - 使用 env 文件：`./run_server.sh --env=myrecall_server.env`、`./run_client.sh --env=myrecall_client.env`
 - 默认端口/目录（来自当前代码与文档）
   - Web 端口：`OPENRECALL_PORT` 默认 `8083`
   - Server 数据目录：`OPENRECALL_SERVER_DATA_DIR` 默认 `~/MRS`

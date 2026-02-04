@@ -27,6 +27,7 @@ v3 的成功标准分 4 类：
 | Chat | tool 输出预算 | 单条 ≤300 chars；总 ≤4000 chars；limit≤10 | tool_trace / debug |
 | Chat | 引用（citations）覆盖 | 有检索结果时 ≥3 条引用 | 响应字段校验 |
 | Stability | “database is locked” | 0（正常运行 4h） | 日志 grep 统计 |
+| Stability | client/server 目录隔离 | 0（无跨目录写入） | 启动后检查 `$ROOT/server` 与 `$ROOT/client` 目录树；越界应 fail-fast |
 | Reliability | 队列可恢复 | 恢复后 30min 内积压回落 | `/api/queue/status` 观察 |
 
 ## 3. 指标口径（定义）
@@ -77,6 +78,8 @@ v3 的成功标准分 4 类：
 
 ## 5. 基线环境（写入评估报告时必须注明）
 - OS / CPU / RAM
+- `OPENRECALL_ROLE`（server/client/combined）
+- `OPENRECALL_SERVER_DATA_DIR` / `OPENRECALL_CLIENT_DATA_DIR`
 - `OPENRECALL_CAPTURE_INTERVAL`
 - 是否仅主屏 `OPENRECALL_PRIMARY_MONITOR_ONLY`
 - AI provider（local/openai/dashscope）
@@ -86,4 +89,3 @@ v3 的成功标准分 4 类：
 ## 6. 产出物（建议）
 - 每次评估产出一份报告（可放 `MyRecall/docs/plan/` 或 `docs/archive/`）：
   - 当次配置、数据规模、Scorecard、问题清单、下一步建议
-
