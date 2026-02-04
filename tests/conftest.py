@@ -11,12 +11,20 @@ _PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(_PROJECT_ROOT))
 
 _DEFAULT_TEST_DATA_DIR = tempfile.mkdtemp(prefix="openrecall_test_data_")
-os.environ.setdefault("OPENRECALL_DATA_DIR", _DEFAULT_TEST_DATA_DIR)
+_DEFAULT_TEST_CLIENT_DIR = tempfile.mkdtemp(prefix="openrecall_test_client_")
+os.environ.setdefault("OPENRECALL_ROLE", "combined")
+os.environ.setdefault("OPENRECALL_SERVER_DATA_DIR", _DEFAULT_TEST_DATA_DIR)
+os.environ.setdefault("OPENRECALL_CLIENT_DATA_DIR", _DEFAULT_TEST_CLIENT_DIR)
 
 
 @pytest.fixture
 def flask_app(tmp_path, monkeypatch):
-    monkeypatch.setenv("OPENRECALL_DATA_DIR", str(tmp_path))
+    server_dir = tmp_path / "server"
+    client_dir = tmp_path / "client"
+
+    monkeypatch.setenv("OPENRECALL_ROLE", "combined")
+    monkeypatch.setenv("OPENRECALL_SERVER_DATA_DIR", str(server_dir))
+    monkeypatch.setenv("OPENRECALL_CLIENT_DATA_DIR", str(client_dir))
 
     import openrecall.shared.config
 
@@ -25,7 +33,6 @@ def flask_app(tmp_path, monkeypatch):
     import openrecall.server.database
 
     importlib.reload(openrecall.server.database)
-    # SQLStore() auto-initializes the database in __init__
     openrecall.server.database.SQLStore()
 
     import openrecall.server.api

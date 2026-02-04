@@ -9,6 +9,7 @@ from flask import Flask, render_template, request, send_from_directory
 
 from openrecall.shared.config import settings
 from openrecall.server.api import api_bp, search_engine
+from openrecall.server.api_v3 import v3_bp
 from openrecall.server.database import SQLStore
 from openrecall.shared.utils import human_readable_time, timestamp_to_human_readable
 
@@ -21,6 +22,9 @@ app = Flask(__name__)
 
 # Register API Blueprint
 app.register_blueprint(api_bp)
+
+# Register v3 API Blueprint
+app.register_blueprint(v3_bp)
 
 app.jinja_env.filters["human_readable_time"] = human_readable_time
 app.jinja_env.filters["timestamp_to_human_readable"] = timestamp_to_human_readable
@@ -84,7 +88,7 @@ def timeline():
 def search():
     """Legacy Search UI calling New Hybrid Search Engine."""
     q = (request.args.get("q") or "").strip()
-    
+
     if not q:
         # Default view: show recent entries
         entries = sql_store.get_all_entries_with_status()
@@ -118,7 +122,7 @@ def search():
     try:
         entries = search_engine.search_debug(q, limit=50)
         return render_template("search.html", entries=entries)
-        
+
     except Exception as e:
         logger.error(f"Search UI failed: {e}")
         return render_template("search.html", entries=[], error=str(e))
@@ -143,28 +147,30 @@ def serve_vendor_asset(filename):
 
 def init_background_worker(app_instance):
     """Initialize the background processing worker with crash recovery.
-    
+
     This function:
     1. Recovers 'zombie' tasks stuck in PROCESSING state from crashes
     2. Starts the background worker thread
     3. Attaches worker to app instance to prevent garbage collection
-    
+
     Args:
         app_instance: Flask app instance to attach worker to
     """
     # Import here to avoid circular dependency
     from openrecall.server.worker import ProcessingWorker
-    
+
     # Step 1: Zombie Recovery - Fix tasks left in PROCESSING from previous crash
     count = sql_store.reset_stuck_tasks()
     if count > 0:
-        logger.warning(f"⚠️ Recovered {count} stuck tasks (Zombies) from previous session.")
-    
+        logger.warning(
+            f"⚠️ Recovered {count} stuck tasks (Zombies) from previous session."
+        )
+
     # Step 2: Start the Engine
     worker = ProcessingWorker()
     worker.daemon = True  # Ensure it dies when main process dies
     worker.start()
-    
+
     # Step 3: Attach to App (Crucial: Prevents Garbage Collection)
     app_instance.worker = worker
     logger.info("🚀 Background Processing Worker started successfully.")

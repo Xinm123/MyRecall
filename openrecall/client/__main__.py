@@ -27,8 +27,10 @@ def main():
     logger.info("=" * 50)
     logger.info(f"Debug mode: {'ON' if settings.debug else 'OFF'}")
     logger.info(f"Buffer path: {settings.buffer_path}")
-    logger.info(f"Client screenshots: {settings.client_screenshots_path} (enabled={settings.client_save_local_screenshots})")
-    logger.info(f"Cache folder: {settings.cache_path}")
+    logger.info(
+        f"Client screenshots: {settings.client_screenshots_path} (enabled={settings.client_save_local_screenshots})"
+    )
+    logger.info(f"Cache folder: {settings.client_cache_path}")
     logger.info(f"Server API: {settings.api_url}")
     logger.info(f"Capture interval: {settings.capture_interval}s")
     logger.info(f"Upload timeout: {settings.upload_timeout}s")
@@ -37,7 +39,7 @@ def main():
 
     # Get recorder (manages Producer + Consumer)
     recorder = get_recorder()
-    
+
     # Flag to prevent duplicate signal handling
     _shutting_down = False
 
@@ -46,13 +48,13 @@ def main():
         if _shutting_down:
             return
         _shutting_down = True
-        
+
         logger.info("")
         logger.info("Received shutdown signal, stopping client...")
         recorder.stop()
         logger.info("Client shutdown complete")
         sys.exit(0)
-    
+
     signal.signal(signal.SIGINT, shutdown_handler)
     signal.signal(signal.SIGTERM, shutdown_handler)
 
