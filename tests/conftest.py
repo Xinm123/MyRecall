@@ -19,16 +19,21 @@ def flask_app(tmp_path, monkeypatch):
     monkeypatch.setenv("OPENRECALL_DATA_DIR", str(tmp_path))
 
     import openrecall.shared.config
+
     importlib.reload(openrecall.shared.config)
 
     import openrecall.server.database
+
     importlib.reload(openrecall.server.database)
-    openrecall.server.database.create_db()
+    # SQLStore() auto-initializes the database in __init__
+    openrecall.server.database.SQLStore()
 
     import openrecall.server.api
+
     importlib.reload(openrecall.server.api)
 
     import openrecall.server.app
+
     importlib.reload(openrecall.server.app)
 
     return openrecall.server.app.app
