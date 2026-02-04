@@ -35,7 +35,7 @@ if [[ "$enable_debug" == "true" ]]; then
   export OPENRECALL_DEBUG=true
 fi
 
-python_bin="${OPENRECALL_PYTHON_BIN:-/data/venvs/openrecall/bin/python}"
+python_bin="${OPENRECALL_PYTHON_BIN:-$(pwd)/.venv/bin/python}"
 if [[ ! -x "$python_bin" ]]; then
   python_bin="$(command -v python3 || true)"
 fi
