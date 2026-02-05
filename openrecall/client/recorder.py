@@ -9,7 +9,7 @@ import logging
 import os
 import time
 import urllib.parse
-from typing import List, Optional
+from typing import Any, List, Optional
 
 import mss
 import numpy as np
@@ -19,6 +19,11 @@ from PIL import Image
 from openrecall.shared.config import settings
 from openrecall.client.buffer import LocalBuffer, get_buffer
 from openrecall.client.consumer import UploaderConsumer
+from openrecall.client.uploader import (
+    _get_device_id,
+    _get_client_tz,
+    get_client_capabilities,
+)
 from openrecall.shared.utils import (
     get_active_app_name,
     get_active_window_title,
@@ -77,7 +82,11 @@ def is_similar(
     if settings.disable_similarity_filter:
         return False
     similarity: float = compute_similarity(img1, img2)
-    threshold = similarity_threshold if similarity_threshold is not None else settings.similarity_threshold
+    threshold = (
+        similarity_threshold
+        if similarity_threshold is not None
+        else settings.similarity_threshold
+    )
     return similarity >= threshold
 
 
@@ -137,52 +146,73 @@ def compute_similarity(img1: np.ndarray, img2: np.ndarray) -> float:
 
 class ScreenRecorder:
     """Producer: captures screenshots and enqueues to local buffer.
-    
+
     Manages the consumer thread lifecycle and provides graceful shutdown.
     """
-    
+
     def __init__(
         self,
         buffer: Optional[LocalBuffer] = None,
         consumer: Optional[UploaderConsumer] = None,
     ):
         """Initialize the recorder.
-        
+
         Args:
             buffer: LocalBuffer instance. Defaults to global singleton.
             consumer: UploaderConsumer instance. Creates new if not provided.
         """
         self.buffer = buffer or get_buffer()
         self._stop_requested = False
-        
+
         # Phase 8.2: Runtime configuration state
         self.recording_enabled = True
         self.upload_enabled = True
         self.last_heartbeat_time = 0
         self._no_change_cycles = 0
         self._warned_capture_issue = False
+        self._client_seq = 0
+        self._last_error: dict[str, Any] | None = None
         self.consumer = consumer or UploaderConsumer(
             buffer=self.buffer,
             should_upload=lambda: self.upload_enabled,
         )
-    
+
     def start(self) -> None:
         """Start the consumer thread."""
         if not self.consumer.is_alive():
             self.consumer.start()
-    
+
     def _send_heartbeat(self) -> None:
         """Send heartbeat to server and sync runtime configuration.
-        
-        Phase 8.2: Periodically registers client activity and fetches current
-        runtime settings (recording_enabled, upload_enabled, etc.) from server.
+
+        M0 contract: Sends JSON body with device_id, client_ts, client_tz,
+        queue_depth, last_error, and capabilities. Also includes Authorization
+        header if device_token is configured.
         """
         try:
             url = f"{settings.api_url.rstrip('/')}/heartbeat"
             parsed = urllib.parse.urlparse(url)
             is_loopback = parsed.hostname in {"localhost", "127.0.0.1", "::1"}
 
-            request_kwargs = {"timeout": 2}
+            client_ts = int(time.time() * 1000)
+            heartbeat_body: dict[str, Any] = {
+                "device_id": _get_device_id(),
+                "client_ts": client_ts,
+                "client_tz": _get_client_tz(),
+                "queue_depth": self.buffer.count(),
+                "last_error": self._get_last_error(),
+                "capabilities": get_client_capabilities(),
+            }
+
+            headers: dict[str, str] = {"Content-Type": "application/json"}
+            if settings.device_token:
+                headers["Authorization"] = f"Bearer {settings.device_token}"
+
+            request_kwargs: dict[str, Any] = {
+                "timeout": 2,
+                "headers": headers,
+                "json": heartbeat_body,
+            }
             if is_loopback:
                 request_kwargs["proxies"] = {"http": None, "https": None}
 
@@ -194,36 +224,64 @@ class ScreenRecorder:
             self.recording_enabled = config.get("recording_enabled", True)
             self.upload_enabled = config.get("upload_enabled", True)
             if settings.debug:
+                drift_ms = data.get("drift_ms", {})
                 logger.debug(
                     f"Heartbeat synced: recording={self.recording_enabled}, "
-                    f"upload={self.upload_enabled}"
+                    f"upload={self.upload_enabled}, drift={drift_ms.get('estimate', 'N/A')}ms"
                 )
         except requests.RequestException as e:
             logger.warning(f"Heartbeat failed (network): {e}")
+            self._record_error("HEARTBEAT_NETWORK_ERROR", str(e))
         except Exception as e:
             logger.warning(f"Heartbeat failed: {e}")
-    
+            self._record_error("HEARTBEAT_ERROR", str(e))
+
+    def _get_last_error(self) -> dict[str, Any] | None:
+        """Get the last recorded error for heartbeat reporting.
+
+        Returns:
+            Error dict with code, message, at_ms or None if no recent error.
+        """
+        if hasattr(self, "_last_error") and self._last_error is not None:
+            return self._last_error
+        return None
+
+    def _record_error(self, code: str, message: str) -> None:
+        """Record an error for reporting in the next heartbeat.
+
+        Args:
+            code: Error code identifier.
+            message: Human-readable error message.
+        """
+        self._last_error: dict[str, Any] | None = {
+            "code": code,
+            "message": message[:500],
+            "at_ms": int(time.time() * 1000),
+        }
+
     def stop(self) -> None:
         """Stop the recorder and consumer thread gracefully."""
         self._stop_requested = True
         self.consumer.stop()
         if self.consumer.is_alive():
             self.consumer.join(timeout=2.0)  # Wait up to 2s for clean exit
-    
+
     def run_capture_loop(self) -> None:
         """Main capture loop. Runs until stop() is called.
-        
+
         Captures screenshots, detects changes, and enqueues to buffer.
         Blocks only on disk I/O, never on network.
         """
         os.environ["TOKENIZERS_PARALLELISM"] = "false"
-        
+
         # Start the consumer thread
         self.start()
-        
+
         logger.info("🎥 Recorder started (Producer-Consumer mode)")
-        logger.info(f"   Monitors: {'Primary only' if settings.primary_monitor_only else 'All'}")
-        
+        logger.info(
+            f"   Monitors: {'Primary only' if settings.primary_monitor_only else 'All'}"
+        )
+
         last_screenshots: List[np.ndarray] = take_screenshots()
         logger.info(f"   Tracking {len(last_screenshots)} monitor(s)")
 
@@ -233,13 +291,13 @@ class ScreenRecorder:
             if current_time - self.last_heartbeat_time > 5:
                 self._send_heartbeat()
                 self.last_heartbeat_time = current_time
-            
+
             # Phase 8.2: Rule 1 - Stop recording if recording_enabled=False
             if not self.recording_enabled:
                 logger.info("⏸️  Recording paused (recording_enabled=False)")
                 time.sleep(1)
                 continue
-            
+
             if not is_user_active():
                 if settings.debug:
                     logger.debug("User inactive, skipping capture cycle")
@@ -292,18 +350,25 @@ class ScreenRecorder:
                         timestamp = int(time.time())
 
                         if settings.client_save_local_screenshots:
-                            filepath = settings.client_screenshots_path / f"{timestamp}.webp"
+                            filepath = (
+                                settings.client_screenshots_path / f"{timestamp}.webp"
+                            )
                             image.save(str(filepath), format="webp", lossless=True)
 
+                        self._client_seq += 1
                         metadata = {
                             "timestamp": timestamp,
                             "active_app": get_active_app_name() or "Unknown App",
-                            "active_window": get_active_window_title() or "Unknown Title",
+                            "active_window": get_active_window_title()
+                            or "Unknown Title",
+                            "client_seq": self._client_seq,
                         }
 
                         self.buffer.enqueue(image, metadata)
                         if not self.upload_enabled:
-                            logger.debug("Upload disabled: buffered locally (will upload when enabled)")
+                            logger.debug(
+                                "Upload disabled: buffered locally (will upload when enabled)"
+                            )
                     except Exception:
                         logger.exception("Failed to persist buffered screenshot")
 
@@ -336,7 +401,7 @@ def get_recorder() -> ScreenRecorder:
 
 def record_screenshots_thread() -> None:
     """Legacy function for backwards compatibility.
-    
+
     Wraps the new ScreenRecorder class.
     """
     recorder = get_recorder()

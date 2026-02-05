@@ -63,7 +63,9 @@ def index():
             "title": entry.title,
             "description": entry.description,
             "status": entry.status,
-            "filename": f"{entry.timestamp}.png",
+            "filename": entry.image_relpath
+            if entry.image_relpath
+            else f"{entry.timestamp}.png",
             "app_name": entry.app,
             "window_title": entry.title,
         }
@@ -76,15 +78,15 @@ def index():
 @app.route("/timeline")
 def timeline():
     """Timeline slider view - preserved from original."""
-    timestamps = sql_store.get_timestamps()
-    return render_template("timeline.html", timestamps=timestamps)
+    entries = sql_store.get_timeline_data()
+    return render_template("timeline.html", entries=entries)
 
 
 @app.route("/search")
 def search():
     """Legacy Search UI calling New Hybrid Search Engine."""
     q = (request.args.get("q") or "").strip()
-    
+
     if not q:
         # Default view: show recent entries
         entries = sql_store.get_all_entries_with_status()
@@ -97,7 +99,9 @@ def search():
                 "title": entry.title,
                 "description": entry.description,
                 "status": entry.status,
-                "filename": f"{entry.timestamp}.png",
+                "filename": entry.image_relpath
+                if entry.image_relpath
+                else f"{entry.timestamp}.png",
                 "app_name": entry.app,
                 "window_title": entry.title,
                 "final_rank": None,
@@ -118,7 +122,7 @@ def search():
     try:
         entries = search_engine.search_debug(q, limit=50)
         return render_template("search.html", entries=entries)
-        
+
     except Exception as e:
         logger.error(f"Search UI failed: {e}")
         return render_template("search.html", entries=[], error=str(e))
@@ -143,28 +147,30 @@ def serve_vendor_asset(filename):
 
 def init_background_worker(app_instance):
     """Initialize the background processing worker with crash recovery.
-    
+
     This function:
     1. Recovers 'zombie' tasks stuck in PROCESSING state from crashes
     2. Starts the background worker thread
     3. Attaches worker to app instance to prevent garbage collection
-    
+
     Args:
         app_instance: Flask app instance to attach worker to
     """
     # Import here to avoid circular dependency
     from openrecall.server.worker import ProcessingWorker
-    
+
     # Step 1: Zombie Recovery - Fix tasks left in PROCESSING from previous crash
     count = sql_store.reset_stuck_tasks()
     if count > 0:
-        logger.warning(f"⚠️ Recovered {count} stuck tasks (Zombies) from previous session.")
-    
+        logger.warning(
+            f"⚠️ Recovered {count} stuck tasks (Zombies) from previous session."
+        )
+
     # Step 2: Start the Engine
     worker = ProcessingWorker()
     worker.daemon = True  # Ensure it dies when main process dies
     worker.start()
-    
+
     # Step 3: Attach to App (Crucial: Prevents Garbage Collection)
     app_instance.worker = worker
     logger.info("🚀 Background Processing Worker started successfully.")

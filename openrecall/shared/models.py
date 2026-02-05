@@ -8,23 +8,34 @@ from pydantic import BaseModel, ConfigDict, field_validator
 
 class RecallEntry(BaseModel):
     """Represents a database entry with guaranteed type safety.
-    
+
     The embedding field is always a numpy array, automatically converted
     from bytes if necessary (e.g., when reading from SQLite BLOB).
     """
-    
+
     model_config = ConfigDict(arbitrary_types_allowed=True)
-    
+
     id: int | None = None
     timestamp: int
     app: str
     title: str | None = None
     text: str | None = None  # OCR result (None when PENDING)
-    description: str | None = None  # AI-generated semantic description (None when PENDING)
+    description: str | None = (
+        None  # AI-generated semantic description (None when PENDING)
+    )
     embedding: Any | None = None  # Embedding vector (None when PENDING)
     status: str = "PENDING"  # Task status: PENDING, PROCESSING, COMPLETED, FAILED
-    similarity_score: float | None = None  # Similarity score for search results (0.0 to 1.0)
-    
+    device_id: str | None = None
+    client_ts: int | None = None
+    client_tz: str | None = None
+    client_seq: int | None = None
+    image_hash: str | None = None
+    server_received_at: int | None = None
+    image_relpath: str | None = None
+    similarity_score: float | None = (
+        None  # Similarity score for search results (0.0 to 1.0)
+    )
+
     @field_validator("embedding", mode="before")
     @classmethod
     def deserialize_embedding(cls, v: Any) -> np.ndarray | None:
