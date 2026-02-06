@@ -3,6 +3,8 @@
 **Version**: 2.1
 **Last Updated**: 2026-02-06
 **Status**: COMPLETE -- All 19 Gates Passed
+**Freeze Timestamp**: 2026-02-06 20:00 CST
+**Baseline Tag**: `v3-phase0-go`
 **Authority**: Gate criteria sourced from `/Users/pyw/new/MyRecall/v3/metrics/phase-gates.md`
 
 ---
@@ -249,7 +251,19 @@ All gate criteria sourced from `/Users/pyw/new/MyRecall/v3/metrics/phase-gates.m
 
 ---
 
-## 6. Last Updated
+## 6. Baseline Freeze Record
+
+| Item | Value |
+|------|-------|
+| Freeze Scope | Phase 0 implementation + tests + validation docs |
+| Gate Result | 19/19 Pass (GO) |
+| Baseline Branch | `v3.0-p0` |
+| Baseline Tag | `v3-phase0-go` |
+| Follow-up Start Point | Phase 1 (Screen Recording Pipeline) |
+
+---
+
+## 7. Last Updated
 
 **Date**: 2026-02-06
 **Updated By**: Phase 0 Implementation Engineer

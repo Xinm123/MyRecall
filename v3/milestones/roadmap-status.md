@@ -422,6 +422,7 @@ This section tracks questions that have been resolved through architectural deci
 | 2026-02-06 | Documentation Fix | Roadmap consistency pass: unified timeline (20周), fixed Search priority, clarified execution strategy | Resolved 12 documentation conflicts |
 | 2026-02-06 | Phase 0 Planning | Phase 0 detailed plan produced (`02-phase-0-detailed-plan.md`), roadmap Phase 0 section expanded with 21 progress items and 19 gate IDs, validation template created | Phase 0 ready to execute |
 | 2026-02-06 | Phase 0 Complete | All 19 Phase 0 gates passed (155 tests, 0 failures). 20 new files, 5 modified files, 2 governance docs. Go decision confirmed. | Phase 1 unblocked |
+| 2026-02-06 | Baseline Freeze | Phase 0 result frozen and baseline tagged (`v3-phase0-go`) on branch `v3.0-p0` | Stable rollback point for Phase 1+ |
 
 ---
 
