@@ -280,6 +280,11 @@ class Settings(BaseSettings):
         alias="OPENRECALL_FUSION_LOG_ENABLED",
         description="Whether to log fusion text to a file for debugging"
     )
+    deployment_mode: str = Field(
+        default="local",
+        alias="OPENRECALL_DEPLOYMENT_MODE",
+        description="Deployment mode: local, remote, debian_client, debian_server"
+    )
     
     @field_validator(
         "server_data_dir", 

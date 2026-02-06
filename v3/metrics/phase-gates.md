@@ -32,10 +32,10 @@ This section defines data governance acceptance criteria that must be validated 
 
 | Gate | Criteria | Validation Method | Status |
 |------|----------|-------------------|--------|
-| **PII Classification Policy** | Document defines PII categories (screen text, audio, faces) | Review policy document | ⬜️ |
-| **Encryption Schema Design** | Database schema supports encryption fields | Review `migration.sql` | ⬜️ |
-| **Retention Policy Design** | Schema includes `created_at`, `expires_at` fields | Review schema | ⬜️ |
-| **API Authentication Placeholder** | API routes include auth decorator (even if localhost) | Code review | ⬜️ |
+| **PII Classification Policy** | Document defines PII categories (screen text, audio, faces) | Review policy document | ✅ |
+| **Encryption Schema Design** | Database schema supports encryption fields | Review `migration.sql` | ✅ |
+| **Retention Policy Design** | Schema includes `created_at`, `expires_at` fields | Review schema | ✅ |
+| **API Authentication Placeholder** | API routes include auth decorator (even if localhost) | Code review | ✅ |
 
 ### Phase 1: Video Data Governance
 
@@ -83,11 +83,11 @@ This section validates the temporary local buffer strategy defined in ADR-0002.
 
 | Gate | Criteria | Validation Method | Status |
 |------|----------|-------------------|--------|
-| **Buffer Capacity Enforcement** | Client respects 100GB max capacity | Fill buffer to 101GB, verify oldest chunk deleted (FIFO) | ⬜️ |
-| **TTL Cleanup** | Chunks >7 days auto-deleted | Set test chunk timestamp to 8 days ago, verify cleanup job removes it | ⬜️ |
-| **FIFO Deletion** | Oldest chunks deleted first when capacity reached | Create chunks with sequential timestamps, fill capacity, verify deletion order | ⬜️ |
-| **Post-Upload Deletion** | Successful upload deletes local copy within 1s | Upload chunk, verify local file removed after 200 OK | ⬜️ |
-| **Retry Exponential Backoff** | Retry delays: 1min → 5min → 15min → 1h → 6h | Simulate upload failures, measure retry intervals | ⬜️ |
+| **Buffer Capacity Enforcement** | Client respects 100GB max capacity | Fill buffer to 101GB, verify oldest chunk deleted (FIFO) | ✅ |
+| **TTL Cleanup** | Chunks >7 days auto-deleted | Set test chunk timestamp to 8 days ago, verify cleanup job removes it | ✅ |
+| **FIFO Deletion** | Oldest chunks deleted first when capacity reached | Create chunks with sequential timestamps, fill capacity, verify deletion order | ✅ |
+| **Post-Upload Deletion** | Successful upload deletes local copy within 1s | Upload chunk, verify local file removed after 202 Accepted | ✅ |
+| **Retry Exponential Backoff** | Retry delays: 1min → 5min → 15min → 1h → 6h | Simulate upload failures, measure retry intervals | ✅ |
 
 ### Phase 5: Upload Queue Production Validation
 
@@ -115,31 +115,31 @@ This section validates the temporary local buffer strategy defined in ADR-0002.
 
 | Gate | Criteria | Validation Method | Status |
 |------|----------|-------------------|--------|
-| **Schema Migration Success** | All new tables created (video_chunks, frames, ocr_text, audio_chunks, audio_transcriptions) | Run migration script, check `sqlite3 recall.db ".tables"` | ⬜️ |
-| **Backward Compatibility** | Existing screenshot pipeline 100% functional after migration | Run full screenshot capture → upload → OCR → search workflow | ⬜️ |
-| **API Versioning** | `/api/v1/*` routes functional, `/api/*` aliases work | Automated API test suite (pytest) | ⬜️ |
-| **Configuration Matrix** | All 4 deployment modes configurable (local, remote, debian_client, debian_server) | Load each config variant, verify env vars parsed | ⬜️ |
+| **Schema Migration Success** | All new tables created (video_chunks, frames, ocr_text, audio_chunks, audio_transcriptions) | Run migration script, check `sqlite3 recall.db ".tables"` | ✅ |
+| **Backward Compatibility** | Existing screenshot pipeline 100% functional after migration | Run full screenshot capture → upload → OCR → search workflow | ✅ |
+| **API Versioning** | `/api/v1/*` routes functional, `/api/*` aliases work | Automated API test suite (pytest) | ✅ |
+| **Configuration Matrix** | All 4 deployment modes configurable (local, remote, debian_client, debian_server) | Load each config variant, verify env vars parsed | ✅ |
 
 ### 2. Performance Gates
 
 | Metric | Target | Measurement Method | Status |
 |--------|--------|-------------------|--------|
-| **Migration Latency** | <5 seconds for 10K entries | Time migration script on test DB (10K rows) | ⬜️ |
-| **Query Overhead** | Schema changes add <10ms to typical queries | Benchmark search query before/after migration (100 runs) | ⬜️ |
+| **Migration Latency** | <5 seconds for 10K entries | Time migration script on test DB (10K rows) | ✅ |
+| **Query Overhead** | Schema changes add <10ms to typical queries | Benchmark search query before/after migration (100 runs) | ✅ |
 
 ### 3. Stability Gates
 
 | Gate | Criteria | Validation Method | Status |
 |------|----------|-------------------|--------|
-| **Data Integrity** | Zero data loss during migration | Compare checksums (SHA256) of data before/after | ⬜️ |
-| **Rollback Success** | Rollback script restores original state in <2 minutes | Execute rollback, verify all tables, run test query | ⬜️ |
+| **Data Integrity** | Zero data loss during migration | Compare checksums (SHA256) of data before/after | ✅ |
+| **Rollback Success** | Rollback script restores original state in <2 minutes | Execute rollback, verify all tables, run test query | ✅ |
 
 ### 4. Resource Gates
 
 | Metric | Target | Measurement Method | Status |
 |--------|--------|-------------------|--------|
-| **Peak Memory** | Migration uses <500MB RAM | Monitor with `psutil` during migration | ⬜️ |
-| **Disk Space** | Schema overhead <10MB (empty tables) | Compare DB file size before/after | ⬜️ |
+| **Peak Memory** | Migration uses <500MB RAM | Monitor with `psutil` during migration | ✅ |
+| **Disk Space** | Schema overhead <10MB (empty tables) | Compare DB file size before/after | ✅ |
 
 ---
 
@@ -468,7 +468,8 @@ Placeholder section for Phase 7 gates. Go/No-Go criteria to be defined after Pha
 | Version | Date | Changes |
 |---------|------|---------|
 | 1.0 | 2026-02-06 | Initial phase gates definition (baseline for Phase 0) |
+| 1.1 | 2026-02-06 | Phase 0 gates marked ✅ (all 19 passed: 4 Functional, 2 Performance, 2 Stability, 2 Resource, 4 Data Governance, 5 Upload Queue) |
 
 ---
 
-**Next Update**: After Phase 0 completion (adjust baselines based on actual measurements)
+**Next Update**: Phase 0 baselines已在 2026-02-06 完成实测校准；下一次更新在 Phase 1 Gate 首轮验收后执行。

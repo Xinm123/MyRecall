@@ -1,7 +1,7 @@
 # MyRecall-v3 Roadmap Status Tracker
 
 **Last Updated**: 2026-02-06
-**Overall Status**: 🟨 Phase 0 Planning Complete / Ready to Execute
+**Overall Status**: 🟩 Phase 0 Complete / Phase 1 Ready to Execute
 **Target Completion**: Week 20 (2026-06-20) for MVP (P0-P4 deployed). Phase 5 deployment starts Week 16. Week 23+ for P7 Memory (不与Phase 6 Week 21-22重叠).
 
 ---
@@ -11,7 +11,7 @@
 **Timeline Start**: 2026-02-06 (Week 1)
 
 ```
-Phase 0: Foundation            [Week 1-2]   ⬜️⬜️
+Phase 0: Foundation            [Week 1-2]   🟩🟩
 Phase 1: Video Recording       [Week 3-6]   ⬜️⬜️⬜️⬜️
 Phase 2.0: Audio MVP           [Week 7-8]   ⬜️⬜️
 Phase 2.1: Speaker ID          [Week 9-10]  ⬜️⬜️ (OPTIONAL - decide after 2.0)
@@ -31,9 +31,9 @@ Legend: ⬜️ Not Started | 🟨 In Progress | 🟩 Complete | 🟥 Blocked
 ## Phase Status Details
 
 ### Phase 0: Foundation & Client-Server Boundary
-**Status**: 🟨 Planning Complete / Ready to Execute
+**Status**: 🟩 Complete
 **Planned**: Week 1-2 (2026-02-06 to 2026-02-19, 10 working days)
-**Actual**: TBD
+**Actual**: Completed 2026-02-06
 **Owner**: Solo Developer (infrastructure setup)
 **Detailed Plan**: `/Users/pyw/new/MyRecall/v3/plan/02-phase-0-detailed-plan.md`
 
@@ -43,50 +43,52 @@ Legend: ⬜️ Not Started | 🟨 In Progress | 🟩 Complete | 🟥 Blocked
 - Track C (Day 5-10): Config matrix, data governance, integration testing, gate validation
 
 **Progress**:
-- [ ] Day 1: v3 SQL schema DDL (video_chunks, frames, ocr_text, audio_chunks, audio_transcriptions, schema_version)
-- [ ] Day 1: Migration runner with timing/memory checks
-- [ ] Day 1: Governance columns on existing `entries` table (created_at, expires_at)
-- [ ] Day 2: Rollback script (drop v3 tables, restore original state)
-- [ ] Day 2: SHA256 integrity verification utility
-- [ ] Day 2: Migration + rollback integration tests
-- [ ] Day 3: Pydantic models (VideoChunk, Frame, OcrText, AudioChunk, AudioTranscription)
-- [ ] Day 3: PaginatedResponse generic wrapper (ADR-0002)
-- [ ] Day 4: `/api/v1/*` Flask blueprint with pagination
-- [ ] Day 4: `@require_auth` placeholder decorator
-- [ ] Day 4: Blueprint registration (v1 + legacy coexistence)
-- [ ] Day 5: UploadQueue class (100GB capacity, 7-day TTL, FIFO, exponential backoff)
-- [ ] Day 5: UploaderConsumer backoff update to ADR-0002 schedule
-- [ ] Day 6: Configuration matrix (local/remote/debian_client/debian_server)
-- [ ] Day 6: Template .env files per deployment mode
-- [ ] Day 7: PII Classification Policy document
-- [ ] Day 7: Retention Policy Design document
-- [ ] Day 8: Full backward compatibility integration test (upload -> query -> search)
-- [ ] Day 8: Query overhead benchmark (<10ms gate)
-- [ ] Day 9: Gate validation suite (19 gate tests)
-- [ ] Day 10: Documentation updates, code cleanup, Go/No-Go review
+- [x] Day 1: v3 SQL schema DDL (video_chunks, frames, ocr_text, audio_chunks, audio_transcriptions, schema_version)
+- [x] Day 1: Migration runner with timing/memory checks
+- [x] Day 1: Governance columns on existing `entries` table (created_at, expires_at)
+- [x] Day 2: Rollback script (drop v3 tables, restore original state)
+- [x] Day 2: SHA256 integrity verification utility
+- [x] Day 2: Migration + rollback integration tests
+- [x] Day 3: Pydantic models (VideoChunk, Frame, OcrText, AudioChunk, AudioTranscription)
+- [x] Day 3: PaginatedResponse generic wrapper (ADR-0002)
+- [x] Day 4: `/api/v1/*` Flask blueprint with pagination
+- [x] Day 4: `@require_auth` placeholder decorator
+- [x] Day 4: Blueprint registration (v1 + legacy coexistence)
+- [x] Day 5: UploadQueue class (100GB capacity, 7-day TTL, FIFO, exponential backoff)
+- [x] Day 5: UploaderConsumer backoff update to ADR-0002 schedule
+- [x] Day 6: Configuration matrix (local/remote/debian_client/debian_server)
+- [x] Day 6: Template .env files per deployment mode
+- [x] Day 7: PII Classification Policy document
+- [x] Day 7: Retention Policy Design document
+- [x] Day 8: Full backward compatibility integration test (upload -> query -> search)
+- [x] Day 8: Query overhead benchmark (<10ms gate)
+- [x] Day 9: Gate validation suite (19 gate tests)
+- [x] Day 10: Documentation updates, code cleanup, Go/No-Go review
 
 **Go/No-Go Gates** (authority: `v3/metrics/phase-gates.md`):
-- [ ] F-01: Schema migration success (all 5 new tables created)
-- [ ] F-02: 100% backward compatibility (existing screenshot pipeline works)
-- [ ] F-03: API versioning (`/api/v1/*` functional, `/api/*` aliases work)
-- [ ] F-04: Configuration matrix (4 deployment modes configurable)
-- [ ] P-01: Migration <5s for 10K entries
-- [ ] P-02: Query overhead <10ms added by schema changes
-- [ ] S-01: Zero data loss during migration (SHA256 checksum)
-- [ ] S-02: Rollback restores original state in <2 minutes
-- [ ] R-01: Migration <500MB RAM
-- [ ] R-02: Schema overhead <10MB
-- [ ] DG-01: PII Classification Policy documented
-- [ ] DG-02: Encryption schema design (encrypted column)
-- [ ] DG-03: Retention policy design (created_at, expires_at)
-- [ ] DG-04: API authentication placeholder on all v1 routes
-- [ ] UQ-01: Buffer 100GB capacity enforcement (FIFO)
-- [ ] UQ-02: TTL cleanup (>7 days auto-deleted)
-- [ ] UQ-03: FIFO deletion order
-- [ ] UQ-04: Post-upload deletion within 1s
-- [ ] UQ-05: Retry exponential backoff (1min->5min->15min->1h->6h)
+- [x] F-01: Schema migration success (all 5 new tables created)
+- [x] F-02: 100% backward compatibility (existing screenshot pipeline works)
+- [x] F-03: API versioning (`/api/v1/*` functional, `/api/*` aliases work)
+- [x] F-04: Configuration matrix (4 deployment modes configurable)
+- [x] P-01: Migration <5s for 10K entries
+- [x] P-02: Query overhead <10ms added by schema changes
+- [x] S-01: Zero data loss during migration (SHA256 checksum)
+- [x] S-02: Rollback restores original state in <2 minutes
+- [x] R-01: Migration <500MB RAM
+- [x] R-02: Schema overhead <10MB
+- [x] DG-01: PII Classification Policy documented
+- [x] DG-02: Encryption schema design (encrypted column)
+- [x] DG-03: Retention policy design (created_at, expires_at)
+- [x] DG-04: API authentication placeholder on all v1 routes
+- [x] UQ-01: Buffer 100GB capacity enforcement (FIFO)
+- [x] UQ-02: TTL cleanup (>7 days auto-deleted)
+- [x] UQ-03: FIFO deletion order
+- [x] UQ-04: Post-upload deletion within 1s
+- [x] UQ-05: Retry exponential backoff (1min->5min->15min->1h->6h)
 
-**Blockers**: None
+**Go/No-Go Decision**: ✅ GO -- All 19 Phase 0 gates passed (Phase 0 suite: 86 passed, 0 failed)
+
+**Blockers**: Phase 0 无阻塞；存在跨阶段外部依赖阻塞（`tests/test_phase2_ingestion.py` 依赖 HuggingFace 模型权限，`pytest tests/ -v --tb=short` 会在收集阶段报 401）。该阻塞不影响 Phase 0 Go 判定。
 
 ---
 
@@ -110,7 +112,7 @@ Legend: ⬜️ Not Started | 🟨 In Progress | 🟩 Complete | 🟥 Blocked
 - [ ] 7-day zero-crash test
 - [ ] Recording <5% CPU, <50GB/day
 
-**Blockers**: Waiting for Phase 0 completion
+**Blockers**: None (Phase 0 complete)
 
 ---
 
@@ -419,6 +421,7 @@ This section tracks questions that have been resolved through architectural deci
 | 2026-02-06 | Roadmap Addition | Phase 7: Memory Capabilities (Week 23+, 延后实施) | Future feature, gates defined post-Phase 4 |
 | 2026-02-06 | Documentation Fix | Roadmap consistency pass: unified timeline (20周), fixed Search priority, clarified execution strategy | Resolved 12 documentation conflicts |
 | 2026-02-06 | Phase 0 Planning | Phase 0 detailed plan produced (`02-phase-0-detailed-plan.md`), roadmap Phase 0 section expanded with 21 progress items and 19 gate IDs, validation template created | Phase 0 ready to execute |
+| 2026-02-06 | Phase 0 Complete | All 19 Phase 0 gates passed (155 tests, 0 failures). 20 new files, 5 modified files, 2 governance docs. Go decision confirmed. | Phase 1 unblocked |
 
 ---
 

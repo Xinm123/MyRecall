@@ -17,23 +17,39 @@ os.environ.setdefault("OPENRECALL_DATA_DIR", _DEFAULT_TEST_DATA_DIR)
 @pytest.fixture
 def flask_app(tmp_path, monkeypatch):
     monkeypatch.setenv("OPENRECALL_DATA_DIR", str(tmp_path))
+    monkeypatch.setenv("OPENRECALL_SERVER_DATA_DIR", str(tmp_path / "MRS"))
+    monkeypatch.setenv("OPENRECALL_CLIENT_DATA_DIR", str(tmp_path / "MRC"))
 
     import openrecall.shared.config
-
     importlib.reload(openrecall.shared.config)
 
+    # Reload sql submodule so it picks up new settings
+    import openrecall.server.database.sql
+    importlib.reload(openrecall.server.database.sql)
     import openrecall.server.database
-
     importlib.reload(openrecall.server.database)
     # SQLStore() auto-initializes the database in __init__
     openrecall.server.database.SQLStore()
 
-    import openrecall.server.api
+    import openrecall.server.auth
+    importlib.reload(openrecall.server.auth)
 
+    # Mock SearchEngine to avoid HuggingFace model download in test env
+    import unittest.mock as mock
+    import openrecall.server.search.engine
+    mock_se = mock.MagicMock()
+    mock_se.search.return_value = []
+    monkeypatch.setattr(
+        openrecall.server.search.engine, "SearchEngine", lambda: mock_se
+    )
+
+    import openrecall.server.api
     importlib.reload(openrecall.server.api)
 
-    import openrecall.server.app
+    import openrecall.server.api_v1
+    importlib.reload(openrecall.server.api_v1)
 
+    import openrecall.server.app
     importlib.reload(openrecall.server.app)
 
     return openrecall.server.app.app

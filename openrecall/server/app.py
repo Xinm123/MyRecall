@@ -9,6 +9,7 @@ from flask import Flask, render_template, request, send_from_directory
 
 from openrecall.shared.config import settings
 from openrecall.server.api import api_bp, search_engine
+from openrecall.server.api_v1 import api_v1_bp
 from openrecall.server.database import SQLStore
 from openrecall.shared.utils import human_readable_time, timestamp_to_human_readable
 
@@ -19,8 +20,9 @@ sql_store = SQLStore()
 
 app = Flask(__name__)
 
-# Register API Blueprint
-app.register_blueprint(api_bp)
+# Register API Blueprints
+app.register_blueprint(api_bp)       # Legacy /api/*
+app.register_blueprint(api_v1_bp)    # New /api/v1/*
 
 app.jinja_env.filters["human_readable_time"] = human_readable_time
 app.jinja_env.filters["timestamp_to_human_readable"] = timestamp_to_human_readable

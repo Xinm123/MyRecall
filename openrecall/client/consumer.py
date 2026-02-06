@@ -104,9 +104,10 @@ class UploaderConsumer(threading.Thread):
         logger.info(f"🛑 Consumer stopped | Remaining in buffer: {remaining}")
     
     def _handle_failure(self) -> None:
-        """Handle upload failure with exponential backoff."""
+        """Handle upload failure with exponential backoff (ADR-0002 schedule)."""
         self._retry_count += 1
-        wait_time = min(2 ** self._retry_count, 60)  # Max 60s
+        from openrecall.client.upload_queue import UploadQueue
+        wait_time = UploadQueue.get_backoff_delay(self._retry_count)
         logger.warning(f"Upload failed. Backing off for {wait_time}s (retry #{self._retry_count})")
         
         # Interruptible sleep - allows immediate exit if stopped
