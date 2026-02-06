@@ -1,8 +1,8 @@
 # MyRecall-v3 Master Prompt (Version Control)
 
-**Version**: 1.0
+**Version**: 1.1
 **Last Updated**: 2026-02-06
-**Status**: Active
+**Status**: Active (Phase 0 complete baseline)
 **Original Request**: Retained below for reference
 
 ---
@@ -197,10 +197,11 @@ MyRecall-v3 (Third major version)
 | Version | Date | Changes |
 |---------|------|---------|
 | 1.0 | 2026-02-06 | Initial master prompt (Phase 0 planning baseline) |
+| 1.1 | 2026-02-06 | Phase 0 completion reflected (baseline freeze + trigger update for Phase 1 planning) |
 
 ---
 
 **Next Update Trigger**:
-- Phase 0 完成后 (update based on execution learnings)
+- Phase 1 详细计划定稿后 (sync Phase 0 learnings into next execution phase)
 - 遇到与此 prompt 冲突的新需求
 - 技术栈重大调整

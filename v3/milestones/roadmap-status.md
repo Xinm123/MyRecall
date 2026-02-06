@@ -334,7 +334,7 @@ After Phase 5 (Thin Client):
 | **Stability** | 7-day 0-crash | 24h 0-crash | N/A | N/A | >99.5% uptime |
 | **Resource** | <5% CPU | <3% CPU | N/A | <$0.05/query | Queue <10 p95 |
 
-**Current Baseline**: TBD (measure after Phase 0)
+**Current Baseline**: Phase 0 measured on 2026-02-06: migration <1s (10K entries), query overhead <10ms, rollback <1s, schema overhead <1MB, migration memory <1MB. Source: `/Users/pyw/new/MyRecall/v3/results/phase-0-validation.md`.
 
 ---
 
