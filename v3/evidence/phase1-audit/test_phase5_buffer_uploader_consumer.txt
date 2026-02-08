@@ -1,0 +1,16 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.11.14, pytest-9.0.2, pluggy-1.6.0 -- /opt/homebrew/Caskroom/miniforge/base/envs/v3/bin/python3.11
+cachedir: .pytest_cache
+rootdir: /Users/pyw/new/MyRecall
+configfile: pytest.ini
+plugins: anyio-4.12.1
+collecting ... collected 18 items / 12 deselected / 6 selected
+
+tests/test_phase5_buffer.py::TestUploaderConsumer::test_consumer_stops_on_signal PASSED [ 16%]
+tests/test_phase5_buffer.py::TestUploaderConsumer::test_consumer_uploads_and_commits PASSED [ 33%]
+tests/test_phase5_buffer.py::TestUploaderConsumer::test_consumer_uploads_video_chunk_and_commits PASSED [ 50%]
+tests/test_phase5_buffer.py::TestUploaderConsumer::test_consumer_logs_item_type_and_target_branch PASSED [ 66%]
+tests/test_phase5_buffer.py::TestUploaderConsumer::test_consumer_retries_on_failure PASSED [ 83%]
+tests/test_phase5_buffer.py::TestUploaderConsumer::test_consumer_interruptible_backoff PASSED [100%]
+
+======================= 6 passed, 12 deselected in 2.54s =======================

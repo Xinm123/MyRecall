@@ -1,0 +1,13 @@
+HTTP/1.1 202 ACCEPTED
+Server: Werkzeug/3.1.5 Python/3.12.12
+Date: Sat, 07 Feb 2026 15:07:38 GMT
+Content-Type: application/json
+Content-Length: 115
+Connection: close
+
+{
+  "chunk_id": 9,
+  "elapsed_ms": 3.1,
+  "message": "Video chunk queued for processing",
+  "status": "accepted"
+}

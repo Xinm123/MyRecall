@@ -1,0 +1,13 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.11.14, pytest-9.0.2, pluggy-1.6.0 -- /opt/homebrew/Caskroom/miniforge/base/envs/v3/bin/python3.11
+cachedir: .pytest_cache
+rootdir: /Users/pyw/new/MyRecall
+configfile: pytest.ini
+plugins: anyio-4.12.1
+collecting ... collected 3 items
+
+tests/test_phase1_monitor_metadata_migration.py::test_migration_adds_monitor_columns PASSED [ 33%]
+tests/test_phase1_monitor_metadata_migration.py::test_insert_video_chunk_persists_monitor_metadata PASSED [ 66%]
+tests/test_phase1_monitor_metadata_migration.py::test_sql_store_init_auto_applies_video_migrations PASSED [100%]
+
+============================== 3 passed in 0.95s ===============================

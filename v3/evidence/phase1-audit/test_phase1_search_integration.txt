@@ -1,0 +1,21 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.11.14, pytest-9.0.2, pluggy-1.6.0 -- /opt/homebrew/Caskroom/miniforge/base/envs/v3/bin/python3.11
+cachedir: .pytest_cache
+rootdir: /Users/pyw/new/MyRecall
+configfile: pytest.ini
+plugins: anyio-4.12.1
+collecting ... collected 11 items
+
+tests/test_phase1_search_integration.py::TestVideoFTSSearch::test_search_returns_matching_frames PASSED [  9%]
+tests/test_phase1_search_integration.py::TestVideoFTSSearch::test_search_returns_metadata PASSED [ 18%]
+tests/test_phase1_search_integration.py::TestVideoFTSSearch::test_search_respects_limit PASSED [ 27%]
+tests/test_phase1_search_integration.py::TestSQLStoreVideoMethods::test_insert_and_get_video_chunk PASSED [ 36%]
+tests/test_phase1_search_integration.py::TestSQLStoreVideoMethods::test_video_chunk_status_transitions PASSED [ 45%]
+tests/test_phase1_search_integration.py::TestSQLStoreVideoMethods::test_video_chunk_failed_status PASSED [ 54%]
+tests/test_phase1_search_integration.py::TestSQLStoreVideoMethods::test_get_next_pending_fifo PASSED [ 63%]
+tests/test_phase1_search_integration.py::TestSQLStoreVideoMethods::test_reset_stuck_video_chunks PASSED [ 72%]
+tests/test_phase1_search_integration.py::TestSQLStoreVideoMethods::test_insert_and_get_frame PASSED [ 81%]
+tests/test_phase1_search_integration.py::TestSQLStoreVideoMethods::test_query_frames_by_time_range PASSED [ 90%]
+tests/test_phase1_search_integration.py::TestSQLStoreVideoMethods::test_insert_frames_batch PASSED [100%]
+
+============================== 11 passed in 1.15s ==============================

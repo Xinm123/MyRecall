@@ -1,0 +1,17 @@
+HTTP/1.1 202 ACCEPTED
+Server: Werkzeug/3.1.5 Python/3.12.12
+Date: Sat, 07 Feb 2026 15:07:38 GMT
+Content-Type: application/json
+Content-Length: 171
+Connection: close
+
+{
+  "debug": {
+    "processing_mode": "FIFO",
+    "queue_size": 1
+  },
+  "elapsed_ms": 2.0,
+  "message": "Queued for processing",
+  "status": "accepted",
+  "task_id": 2
+}

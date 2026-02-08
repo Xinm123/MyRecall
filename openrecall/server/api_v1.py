@@ -8,12 +8,13 @@ Provides versioned HTTP endpoints at /api/v1/* with:
 Legacy /api/* routes remain unchanged for backward compatibility.
 """
 
+import hashlib
 import logging
 import time
 import json
 from pathlib import Path
 
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, jsonify, request, send_from_directory
 
 from openrecall.server.auth import require_auth
 from openrecall.server.database import SQLStore
@@ -27,6 +28,34 @@ sql_store = SQLStore()
 
 # Lazy import search engine to avoid circular imports
 _search_engine = None
+
+
+def _build_vision_status() -> dict:
+    capture_mode = runtime_settings.capture_mode or "unknown"
+    last_error = (runtime_settings.sck_last_error_code or "").strip()
+    selected = list(runtime_settings.selected_monitors or [])
+
+    status = "ok"
+    if last_error == "permission_denied":
+        status = "permission_denied"
+    elif last_error in {"no_displays", "display_not_found"}:
+        status = "no_monitors"
+    elif last_error:
+        status = "error"
+    elif capture_mode == "legacy":
+        status = "degraded_legacy"
+
+    if capture_mode == "paused" and status == "degraded_legacy":
+        status = "ok"
+
+    return {
+        "status": status,
+        "active_mode": capture_mode,
+        "selected_monitors": selected,
+        "last_sck_error_code": last_error,
+        "last_sck_error_at": runtime_settings.sck_last_error_at,
+        "sck_available": bool(runtime_settings.sck_available),
+    }
 
 
 def _get_search_engine():
@@ -50,22 +79,63 @@ def _paginate_response(items: list, total: int, limit: int, offset: int) -> dict
     }
 
 
-def _parse_pagination(default_limit: int = 50, max_limit: int = 1000) -> tuple:
-    """Parse limit/offset from query parameters.
+def _extract_app_window(metadata: dict) -> tuple[str, str]:
+    """Extract app/window metadata with backward-compatible key aliases."""
+    app = str(
+        metadata.get("app_name")
+        or metadata.get("active_app")
+        or "Unknown"
+    )
+    window = str(
+        metadata.get("window_title")
+        or metadata.get("active_window")
+        or "Unknown"
+    )
+    return app, window
 
+
+def _parse_pagination(default_limit: int = 50, max_limit: int = 1000) -> tuple:
+    """Parse pagination query params with v1-compatible aliases.
+
+    Supports both:
+    - limit/offset (legacy)
+    - page/page_size (remote-friendly)
+
+    If both styles are provided, limit/offset takes precedence.
     Returns:
         (limit, offset) tuple with validated values.
     """
+    # limit/offset keep priority for backward compatibility.
+    limit_raw = request.args.get("limit")
+    page_size_raw = request.args.get("page_size")
+    offset_raw = request.args.get("offset")
+    page_raw = request.args.get("page")
+
     try:
-        limit = int(request.args.get("limit", default_limit))
+        if limit_raw is not None:
+            limit = int(limit_raw)
+        elif page_size_raw is not None:
+            limit = int(page_size_raw)
+        else:
+            limit = default_limit
     except (ValueError, TypeError):
         limit = default_limit
+
+    limit = max(1, min(limit, max_limit))
+
     try:
-        offset = int(request.args.get("offset", 0))
+        if offset_raw is not None:
+            offset = int(offset_raw)
+        elif page_raw is not None:
+            page = int(page_raw)
+            if page < 1:
+                page = 1
+            offset = (page - 1) * limit
+        else:
+            offset = 0
     except (ValueError, TypeError):
         offset = 0
 
-    limit = max(1, min(limit, max_limit))
     offset = max(0, offset)
     return limit, offset
 
@@ -80,7 +150,7 @@ def health():
 @api_v1_bp.route("/upload", methods=["POST"])
 @require_auth
 def upload():
-    """Fast screenshot ingestion endpoint (mirrors /api/upload)."""
+    """Fast ingestion endpoint for screenshots and video chunks."""
     start_time = time.perf_counter()
 
     if "file" not in request.files:
@@ -96,39 +166,140 @@ def upload():
 
     try:
         metadata = json.loads(metadata_str)
-        timestamp = int(metadata.get("timestamp", 0))
-        active_app = str(metadata.get("app_name", "Unknown"))
-        active_window = str(metadata.get("window_title", "Unknown"))
 
-        image_filename = f"{timestamp}.png"
-        image_path = settings.screenshots_path / image_filename
-        file.save(str(image_path))
-
-        task_id = sql_store.insert_pending_entry(
-            timestamp=timestamp,
-            app=active_app,
-            title=active_window,
-            image_path=str(image_path),
+        # Detect video upload
+        is_video = (
+            (file.content_type and file.content_type.startswith("video/"))
+            or (file.filename and file.filename.endswith(".mp4"))
+            or metadata.get("type") == "video_chunk"
         )
 
-        elapsed_ms = (time.perf_counter() - start_time) * 1000
-
-        if task_id:
-            return jsonify({
-                "status": "accepted",
-                "task_id": task_id,
-                "message": "Queued for processing",
-                "elapsed_ms": round(elapsed_ms, 1),
-            }), 202
+        if is_video:
+            return _handle_video_upload(file, metadata, start_time)
         else:
-            return jsonify({
-                "status": "error",
-                "message": "Failed to insert entry (possibly duplicate)",
-            }), 409
+            return _handle_screenshot_upload(file, metadata, start_time)
 
     except Exception as e:
         logger.exception("Upload ingestion error")
         return jsonify({"status": "error", "message": str(e)}), 500
+
+
+def _handle_screenshot_upload(file, metadata, start_time):
+    """Handle screenshot upload (existing logic)."""
+    timestamp = int(metadata.get("timestamp", 0))
+    active_app, active_window = _extract_app_window(metadata)
+
+    image_filename = f"{timestamp}.png"
+    image_path = settings.screenshots_path / image_filename
+    file.save(str(image_path))
+
+    task_id = sql_store.insert_pending_entry(
+        timestamp=timestamp,
+        app=active_app,
+        title=active_window,
+        image_path=str(image_path),
+    )
+
+    elapsed_ms = (time.perf_counter() - start_time) * 1000
+
+    if task_id:
+        return jsonify({
+            "status": "accepted",
+            "task_id": task_id,
+            "message": "Queued for processing",
+            "elapsed_ms": round(elapsed_ms, 1),
+        }), 202
+    else:
+        return jsonify({
+            "status": "error",
+            "message": "Failed to insert entry (possibly duplicate)",
+        }), 409
+
+
+def _handle_video_upload(file, metadata, start_time):
+    """Handle video chunk upload."""
+    checksum_raw = str(metadata.get("checksum", "") or "")
+    checksum = checksum_raw.split(":", 1)[1] if checksum_raw.startswith("sha256:") else checksum_raw
+    device_name = metadata.get("device_name", "")
+    monitor_id = str(metadata.get("monitor_id", "") or "")
+    monitor_width = int(metadata.get("monitor_width", 0) or 0)
+    monitor_height = int(metadata.get("monitor_height", 0) or 0)
+    monitor_is_primary = int(metadata.get("monitor_is_primary", 0) or 0)
+    monitor_backend = str(metadata.get("monitor_backend", "") or "")
+    monitor_fingerprint = str(metadata.get("monitor_fingerprint", "") or "")
+    active_app, active_window = _extract_app_window(metadata)
+
+    # Save to video_chunks_path
+    settings.video_chunks_path.mkdir(parents=True, exist_ok=True)
+    filename = f"{checksum}.mp4" if checksum else file.filename
+    video_path = settings.video_chunks_path / filename
+
+    # Support upload resume via X-Upload-Offset header
+    upload_offset = request.headers.get("X-Upload-Offset")
+    if upload_offset is not None:
+        offset = int(upload_offset)
+        partial_path = video_path.with_suffix(".mp4.partial")
+        with open(partial_path, "ab") as f:
+            f.seek(offset)
+            f.write(file.read())
+        total_size = metadata.get("file_size_bytes", 0)
+        if total_size and partial_path.stat().st_size >= total_size:
+            partial_path.rename(video_path)
+        else:
+            elapsed_ms = (time.perf_counter() - start_time) * 1000
+            return jsonify({
+                "status": "partial",
+                "bytes_received": partial_path.stat().st_size,
+                "elapsed_ms": round(elapsed_ms, 1),
+            }), 202
+    else:
+        file.save(str(video_path))
+
+    # Verify checksum if provided
+    if checksum:
+        h = hashlib.sha256()
+        with open(video_path, "rb") as f:
+            for chunk in iter(lambda: f.read(8192), b""):
+                h.update(chunk)
+        actual_checksum = h.hexdigest()
+        if actual_checksum != checksum:
+            logger.warning(f"Checksum mismatch: expected {checksum}, got {actual_checksum}")
+
+    # Insert into database
+    chunk_id = sql_store.insert_video_chunk(
+        file_path=str(video_path),
+        device_name=device_name,
+        checksum=checksum,
+        app_name=active_app,
+        window_name=active_window,
+        monitor_id=monitor_id,
+        monitor_width=monitor_width,
+        monitor_height=monitor_height,
+        monitor_is_primary=monitor_is_primary,
+        monitor_backend=monitor_backend,
+        monitor_fingerprint=monitor_fingerprint,
+    )
+
+    elapsed_ms = (time.perf_counter() - start_time) * 1000
+
+    if chunk_id:
+        return jsonify({
+            "status": "accepted",
+            "chunk_id": chunk_id,
+            "message": "Video chunk queued for processing",
+            "elapsed_ms": round(elapsed_ms, 1),
+        }), 202
+    else:
+        logger.error(
+            "Video upload DB insert failed | path=%s | checksum=%s | monitor_id=%s",
+            settings.db_path,
+            checksum or "<none>",
+            monitor_id or "<none>",
+        )
+        return jsonify({
+            "status": "error",
+            "message": "Failed to insert video chunk",
+        }), 500
 
 
 @api_v1_bp.route("/search", methods=["GET"])
@@ -258,6 +429,14 @@ def get_config():
     return jsonify(config), 200
 
 
+@api_v1_bp.route("/vision/status", methods=["GET"])
+@require_auth
+def vision_status():
+    """Read-only capture health endpoint."""
+    with runtime_settings._lock:
+        return jsonify(_build_vision_status()), 200
+
+
 @api_v1_bp.route("/config", methods=["POST"])
 @require_auth
 def update_config():
@@ -316,6 +495,39 @@ def heartbeat():
     try:
         with runtime_settings._lock:
             runtime_settings.last_heartbeat = time.time()
+            payload = request.get_json(silent=True) or {}
+            if isinstance(payload, dict):
+                capture_mode = payload.get("capture_mode")
+                if isinstance(capture_mode, str) and capture_mode.strip():
+                    runtime_settings.capture_mode = capture_mode.strip()
+
+                sck_available = payload.get("sck_available")
+                if isinstance(sck_available, bool):
+                    runtime_settings.sck_available = sck_available
+
+                sck_last_error = payload.get("sck_last_error_code")
+                if not isinstance(sck_last_error, str):
+                    sck_last_error = payload.get("last_sck_error_code")
+                if isinstance(sck_last_error, str):
+                    runtime_settings.sck_last_error_code = sck_last_error.strip()
+
+                sck_last_error_at = payload.get("sck_last_error_at")
+                if sck_last_error_at is not None:
+                    try:
+                        runtime_settings.sck_last_error_at = float(sck_last_error_at)
+                    except (TypeError, ValueError):
+                        pass
+
+                selected_monitors = payload.get("selected_monitors")
+                if isinstance(selected_monitors, list):
+                    runtime_settings.selected_monitors = [
+                        str(m).strip() for m in selected_monitors if str(m).strip()
+                    ]
+                elif isinstance(selected_monitors, str):
+                    runtime_settings.selected_monitors = [
+                        item.strip() for item in selected_monitors.split(",") if item.strip()
+                    ]
+
             config = runtime_settings.to_dict()
             client_online = (time.time() - runtime_settings.last_heartbeat) < 15
             config["client_online"] = client_online
@@ -325,3 +537,98 @@ def heartbeat():
     except Exception as e:
         logger.exception("Error processing heartbeat")
         return jsonify({"status": "error", "message": str(e)}), 500
+
+
+# =========================================================================
+# Phase 1: Timeline API
+# =========================================================================
+
+@api_v1_bp.route("/timeline", methods=["GET"])
+@require_auth
+def timeline_api():
+    """Get video frames within a time range with pagination."""
+    try:
+        start_time = float(request.args.get("start_time", 0))
+    except (ValueError, TypeError):
+        return jsonify({"status": "error", "message": "start_time must be a number"}), 400
+    try:
+        end_time = float(request.args.get("end_time", time.time()))
+    except (ValueError, TypeError):
+        return jsonify({"status": "error", "message": "end_time must be a number"}), 400
+
+    limit, offset = _parse_pagination()
+
+    try:
+        frames, total = sql_store.query_frames_by_time_range(
+            start_time=start_time,
+            end_time=end_time,
+            limit=limit,
+            offset=offset,
+        )
+        return jsonify(_paginate_response(frames, total, limit, offset)), 200
+    except Exception as e:
+        logger.exception("Error fetching timeline")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+# =========================================================================
+# Phase 1: Frame Serving API
+# =========================================================================
+
+@api_v1_bp.route("/frames/<int:frame_id>", methods=["GET"])
+@require_auth
+def serve_frame(frame_id):
+    """Serve a frame image by its database ID."""
+    # Check if frame exists in DB
+    frame = sql_store.get_frame_by_id(frame_id)
+    if frame is None:
+        return jsonify({"status": "error", "message": "Frame not found"}), 404
+
+    # Primary path: pre-extracted PNG
+    frame_filename = f"{frame_id}.png"
+    frame_path = settings.frames_path / frame_filename
+
+    if frame_path.exists():
+        return send_from_directory(str(settings.frames_path), frame_filename)
+
+    # Fallback: on-demand extraction
+    try:
+        from openrecall.server.video.frame_extractor import FrameExtractor
+        extractor = FrameExtractor()
+        chunk_path = frame.get("chunk_path", "")
+        offset_index = frame.get("offset_index", 0)
+        offset_seconds = offset_index * settings.frame_extraction_interval
+
+        extracted_path = extractor.extract_single_frame(chunk_path, offset_seconds)
+        if extracted_path and extracted_path.exists():
+            # Rename to expected path
+            extracted_path.rename(frame_path)
+            return send_from_directory(str(settings.frames_path), frame_filename)
+    except Exception as e:
+        logger.error(f"On-demand frame extraction failed for frame {frame_id}: {e}")
+
+    return jsonify({"status": "error", "message": "Frame image not available"}), 404
+
+
+# =========================================================================
+# Phase 1: Upload Status (for resume support)
+# =========================================================================
+
+@api_v1_bp.route("/upload/status", methods=["GET"])
+@require_auth
+def upload_status():
+    """Check upload status for resume support."""
+    checksum_raw = request.args.get("checksum", "").strip()
+    checksum = checksum_raw.split(":", 1)[1] if checksum_raw.startswith("sha256:") else checksum_raw
+    if not checksum:
+        return jsonify({"status": "error", "message": "checksum required"}), 400
+
+    video_path = settings.video_chunks_path / f"{checksum}.mp4"
+    partial_path = video_path.with_suffix(".mp4.partial")
+
+    if video_path.exists():
+        return jsonify({"status": "completed", "bytes_received": video_path.stat().st_size}), 200
+    elif partial_path.exists():
+        return jsonify({"status": "partial", "bytes_received": partial_path.stat().st_size}), 200
+    else:
+        return jsonify({"status": "not_found", "bytes_received": 0}), 200

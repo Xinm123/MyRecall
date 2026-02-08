@@ -1,0 +1,320 @@
+[2026-02-07 22:27:17 +0800] AUDIT SESSION START
+[2026-02-07 22:27:17 +0800] CMD: ffmpeg -version
+[2026-02-07 22:27:17 +0800] EXIT: 0
+[2026-02-07 22:27:28 +0800] CMD: ./run_server.sh --debug (background)
+[2026-02-07 22:27:33 +0800] Server started PID=10176
+[2026-02-07 22:27:46 +0800] CMD: curl -i http://127.0.0.1:18083/api/health
+[2026-02-07 22:27:46 +0800] CMD: curl -i http://127.0.0.1:18083/api/v1/health
+[2026-02-07 22:29:08 +0800] CMD: curl -i http://127.0.0.1:18083/api/health
+HTTP/1.1 200 OK
+Server: Werkzeug/3.1.5 Python/3.12.12
+Date: Sat, 07 Feb 2026 14:29:08 GMT
+Content-Type: application/json
+Content-Length: 21
+Connection: close
+
+{
+  "status": "ok"
+}
+
+[2026-02-07 22:29:08 +0800] EXIT: 0
+[2026-02-07 22:29:08 +0800] CMD: curl -i http://127.0.0.1:18083/api/v1/health
+HTTP/1.1 200 OK
+Server: Werkzeug/3.1.5 Python/3.12.12
+Date: Sat, 07 Feb 2026 14:29:08 GMT
+Content-Type: application/json
+Content-Length: 21
+Connection: close
+
+{
+  "status": "ok"
+}
+
+[2026-02-07 22:29:08 +0800] EXIT: 0
+[2026-02-07 22:29:13 +0800] CLIENT: Blocked-ClientUI - GUI/desktop session not available in CLI agent context. Not blocking server/api/tests.
+[2026-02-07 22:30:19 +0800] CMD: pytest tests/test_phase1_video_recorder.py -v
+[2026-02-07 22:30:24 +0800] EXIT: 
+[2026-02-07 22:30:24 +0800] CMD: pytest tests/test_phase1_frame_extractor.py -v
+[2026-02-07 22:30:25 +0800] EXIT: 
+[2026-02-07 22:30:25 +0800] CMD: pytest tests/test_phase1_ocr_pipeline.py -v
+[2026-02-07 22:30:26 +0800] EXIT: 
+[2026-02-07 22:30:37 +0800] CMD: pytest tests/test_phase1_timeline_api.py -v
+[2026-02-07 22:30:42 +0800] EXIT: 
+[2026-02-07 22:30:42 +0800] CMD: pytest tests/test_phase1_search_integration.py -v
+[2026-02-07 22:30:43 +0800] EXIT: 
+[2026-02-07 22:30:43 +0800] CMD: pytest tests/test_phase1_retention.py -v
+[2026-02-07 22:30:44 +0800] EXIT: 
+[2026-02-07 22:31:19 +0800] degradation done EXIT=
+[2026-02-07 22:31:58 +0800] buffer_pool done EXIT=
+[2026-02-07 22:32:39 +0800] stride done EXIT=
+[2026-02-07 22:33:24 +0800] profile done EXIT=
+[2026-02-07 22:39:10 +0800] CMD: pytest tests/test_phase1_retention.py -v (with >30-day tests)
+[2026-02-07 22:39:10 +0800] EXIT: 
+[2026-02-07 22:40:36 +0800] CMD: pytest tests/test_phase1_retention.py -v (re-run after reload fix)
+[2026-02-07 22:40:37 +0800] EXIT: 
+[2026-02-07 22:40:50 +0800] CMD: pytest tests/test_phase1_* -v (full regression after code change)
+[2026-02-07 22:42:40 +0800] CMD: curl -s -i http://127.0.0.1:18083/api/health
+[2026-02-07 22:42:40 +0800] CMD: curl -s -i http://127.0.0.1:18083/api/v1/health
+[2026-02-07 22:42:40 +0800] CMD: curl -s -i http://127.0.0.1:18083/api/search?q=smoke&limit=5
+[2026-02-07 22:42:41 +0800] CMD: curl -s -i 'http://127.0.0.1:18083/api/v1/search?q=smoke&page=1&page_size=20'
+[2026-02-07 22:42:42 +0800] CMD: curl -s -i 'http://127.0.0.1:18083/api/v1/timeline?start_time=0&end_time=4102444800&page=1&page_size=20'
+[2026-02-07 22:42:51 +0800] CMD: POST /api/upload (screenshot)
+[2026-02-07 22:43:01 +0800] CMD: POST /api/upload (video)
+[2026-02-07 22:43:01 +0800] CMD: POST /api/v1/upload (video)
+[2026-02-07 22:43:16 +0800] CMD: GET /api/upload/status?checksum=c6a286cd65f95d53963c027742350b8eadc11bb88e49ed905a234f1292449636
+[2026-02-07 22:43:16 +0800] CMD: GET /api/v1/upload/status?checksum=c6a286cd65f95d53963c027742350b8eadc11bb88e49ed905a234f1292449636
+[2026-02-07 22:57:58 +0800] CMD: lsof -i tcp:18083 -sTCP:LISTEN
+[2026-02-07 22:57:58 +0800] EXIT: 0
+[2026-02-07 22:57:59 +0800] CMD: nohup ./run_server.sh --debug > /Users/pyw/new/MyRecall/v3/evidence/phase1-audit/server.log 2>&1 & echo 13928 > /Users/pyw/new/MyRecall/v3/evidence/phase1-audit/server.pid
+[2026-02-07 22:57:59 +0800] EXIT: 0
+[2026-02-07 22:57:59 +0800] CMD: nohup ./run_client.sh --debug > /Users/pyw/new/MyRecall/v3/evidence/phase1-audit/client.log 2>&1 & echo 14016 > /Users/pyw/new/MyRecall/v3/evidence/phase1-audit/client.pid
+[2026-02-07 22:57:59 +0800] EXIT: 0
+[2026-02-07 22:57:59 +0800] CMD: cat /Users/pyw/new/MyRecall/v3/evidence/phase1-audit/server.pid /Users/pyw/new/MyRecall/v3/evidence/phase1-audit/client.pid
+[2026-02-07 22:57:59 +0800] EXIT: 0
+[2026-02-07 22:57:59 +0800] CMD: ffmpeg -version
+[2026-02-07 22:57:59 +0800] EXIT: 0
+[2026-02-07 22:57:59 +0800] CMD: curl -i http://127.0.0.1:18083/api/health
+[2026-02-07 22:57:59 +0800] EXIT: 0
+[2026-02-07 22:57:59 +0800] CMD: curl -i http://127.0.0.1:18083/api/v1/health
+[2026-02-07 22:57:59 +0800] EXIT: 0
+[2026-02-07 22:58:26 +0800] CMD: pgrep -fl 'openrecall.server|openrecall.client'
+[2026-02-07 22:58:26 +0800] EXIT: 0
+[2026-02-07 22:58:26 +0800] CMD: tail -n 80 /Users/pyw/new/MyRecall/v3/evidence/phase1-audit/server.log
+[2026-02-07 22:58:26 +0800] EXIT: 0
+[2026-02-07 22:58:26 +0800] CMD: tail -n 120 /Users/pyw/new/MyRecall/v3/evidence/phase1-audit/client.log
+[2026-02-07 22:58:26 +0800] EXIT: 0
+[2026-02-07 22:58:26 +0800] CMD: lsof -i tcp:18083 -sTCP:LISTEN -Fp | sed -n 's/^p//p' | head -n1 > /Users/pyw/new/MyRecall/v3/evidence/phase1-audit/server.pid && cat /Users/pyw/new/MyRecall/v3/evidence/phase1-audit/server.pid
+[2026-02-07 22:58:26 +0800] EXIT: 0
+[2026-02-07 22:58:27 +0800] CMD: (pgrep -f 'python.*-m openrecall.client' | head -n1 > /Users/pyw/new/MyRecall/v3/evidence/phase1-audit/client.pid && cat /Users/pyw/new/MyRecall/v3/evidence/phase1-audit/client.pid) || true
+[2026-02-07 22:58:27 +0800] EXIT: 0
+[2026-02-07 22:58:57 +0800] CMD: { date '+%Y-%m-%d %H:%M:%S %z'; echo '--- phase-gates'; nl -ba /Users/pyw/new/MyRecall/v3/metrics/phase-gates.md | sed -n '166,226p'; echo '--- validation'; nl -ba /Users/pyw/new/MyRecall/v3/results/phase-1-validation.md | sed -n '176,245p'; echo '--- roadmap'; nl -ba /Users/pyw/new/MyRecall/v3/milestones/roadmap-status.md | sed -n '132,165p'; echo '--- gates test'; nl -ba /Users/pyw/new/MyRecall/tests/test_phase1_gates.py | sed -n '360,405p'; } | tee /Users/pyw/new/MyRecall/v3/evidence/phase1-audit/baseline_audit_round1.txt
+[2026-02-07 22:58:57 +0800] EXIT: 0
+[2026-02-07 22:58:57 +0800] CMD: pytest tests/test_phase1_video_recorder.py -v | tee /Users/pyw/new/MyRecall/v3/evidence/phase1-audit/test_phase1_video_recorder.txt
+[2026-02-07 22:58:59 +0800] EXIT: 0
+[2026-02-07 22:58:59 +0800] CMD: pytest tests/test_phase1_frame_extractor.py -v | tee /Users/pyw/new/MyRecall/v3/evidence/phase1-audit/test_phase1_frame_extractor.txt
+[2026-02-07 22:59:00 +0800] EXIT: 0
+[2026-02-07 22:59:00 +0800] CMD: pytest tests/test_phase1_ocr_pipeline.py -v | tee /Users/pyw/new/MyRecall/v3/evidence/phase1-audit/test_phase1_ocr_pipeline.txt
+[2026-02-07 22:59:02 +0800] EXIT: 0
+[2026-02-07 22:59:02 +0800] CMD: pytest tests/test_phase1_timeline_api.py -v | tee /Users/pyw/new/MyRecall/v3/evidence/phase1-audit/test_phase1_timeline_api.txt
+[2026-02-07 22:59:08 +0800] EXIT: 0
+[2026-02-07 22:59:08 +0800] CMD: pytest tests/test_phase1_search_integration.py -v | tee /Users/pyw/new/MyRecall/v3/evidence/phase1-audit/test_phase1_search_integration.txt
+[2026-02-07 22:59:10 +0800] EXIT: 0
+[2026-02-07 22:59:10 +0800] CMD: pytest tests/test_phase1_retention.py -v | tee /Users/pyw/new/MyRecall/v3/evidence/phase1-audit/test_phase1_retention.txt
+[2026-02-07 22:59:11 +0800] EXIT: 0
+[2026-02-07 22:59:11 +0800] CMD: pytest tests/test_phase1_degradation.py -v | tee /Users/pyw/new/MyRecall/v3/evidence/phase1-audit/test_phase1_degradation.txt
+[2026-02-07 22:59:12 +0800] EXIT: 0
+[2026-02-07 22:59:12 +0800] CMD: pytest tests/test_phase1_buffer_pool.py -v | tee /Users/pyw/new/MyRecall/v3/evidence/phase1-audit/test_phase1_buffer_pool.txt
+[2026-02-07 22:59:13 +0800] EXIT: 0
+[2026-02-07 22:59:13 +0800] CMD: pytest tests/test_phase1_sck_stride_unpadding.py -v | tee /Users/pyw/new/MyRecall/v3/evidence/phase1-audit/test_phase1_sck_stride_unpadding.txt
+[2026-02-07 22:59:13 +0800] EXIT: 0
+[2026-02-07 22:59:13 +0800] CMD: pytest tests/test_phase1_pipeline_profile_change.py -v | tee /Users/pyw/new/MyRecall/v3/evidence/phase1-audit/test_phase1_pipeline_profile_change.txt
+[2026-02-07 22:59:14 +0800] EXIT: 0
+[2026-02-07 22:59:14 +0800] CMD: pytest tests/test_phase1_monitor_metadata_migration.py -v | tee /Users/pyw/new/MyRecall/v3/evidence/phase1-audit/test_phase1_monitor_metadata_migration.txt
+[2026-02-07 22:59:16 +0800] EXIT: 0
+[2026-02-07 22:59:16 +0800] CMD: pytest tests/test_phase1_monitor_upload_api.py -v | tee /Users/pyw/new/MyRecall/v3/evidence/phase1-audit/test_phase1_monitor_upload_api.txt
+[2026-02-07 22:59:23 +0800] EXIT: 0
+[2026-02-07 22:59:23 +0800] CMD: pytest tests/test_phase1_search_debug_render.py -v | tee /Users/pyw/new/MyRecall/v3/evidence/phase1-audit/test_phase1_search_debug_render.txt
+[2026-02-07 22:59:28 +0800] EXIT: 0
+[2026-02-07 22:59:29 +0800] CMD: pytest tests/test_phase1_server_startup.py -v | tee /Users/pyw/new/MyRecall/v3/evidence/phase1-audit/test_phase1_server_startup.txt
+[2026-02-07 22:59:29 +0800] EXIT: 0
+[2026-02-07 22:59:29 +0800] CMD: pytest tests/test_phase5_buffer.py -k TestUploaderConsumer -v | tee /Users/pyw/new/MyRecall/v3/evidence/phase1-audit/test_phase5_buffer_uploader_consumer.txt
+[2026-02-07 22:59:32 +0800] EXIT: 0
+[2026-02-07 22:59:32 +0800] CMD: pytest tests/test_phase1_gates.py -v | tee /Users/pyw/new/MyRecall/v3/evidence/phase1-audit/test_phase1_gates_round1.txt
+[2026-02-07 22:59:34 +0800] EXIT: 0
+[2026-02-07 23:01:51 +0800] CMD: pytest tests/test_phase1_retention.py -v | tee /Users/pyw/new/MyRecall/v3/evidence/phase1-audit/test_phase1_retention_after_fix.txt
+[2026-02-07 23:01:54 +0800] EXIT: 0
+[2026-02-07 23:01:54 +0800] CMD: pytest tests/test_phase1_timeline_api.py -v | tee /Users/pyw/new/MyRecall/v3/evidence/phase1-audit/test_phase1_timeline_api_after_fix.txt
+[2026-02-07 23:02:02 +0800] EXIT: 0
+[2026-02-07 23:02:02 +0800] CMD: pytest tests/test_phase1_gates.py -v | tee /Users/pyw/new/MyRecall/v3/evidence/phase1-audit/test_phase1_gates_after_fix.txt
+[2026-02-07 23:02:05 +0800] EXIT: 0
+[2026-02-07 23:02:05 +0800] CMD: pytest tests/test_phase1_* -v | tee /Users/pyw/new/MyRecall/v3/evidence/phase1-audit/test_phase1_all_after_fix.txt
+[2026-02-07 23:02:17 +0800] EXIT: 0
+[2026-02-07 23:03:23 +0800] CMD: pytest tests/test_phase1_retention.py::TestRetentionWorker::test_cleanup_31_day_expired_chunk_deletes_all_related_data -vv
+[2026-02-07 23:03:25 +0800] EXIT: 0
+[2026-02-07 23:03:44 +0800] CMD: pytest tests/test_phase1_retention.py -v > /Users/pyw/new/MyRecall/v3/evidence/phase1-audit/test_phase1_retention_after_fix2.txt 2>&1
+[2026-02-07 23:03:47 +0800] EXIT: 0
+[2026-02-07 23:03:47 +0800] CMD: tail -n 25 /Users/pyw/new/MyRecall/v3/evidence/phase1-audit/test_phase1_retention_after_fix2.txt
+[2026-02-07 23:03:47 +0800] EXIT: 0
+[2026-02-07 23:03:47 +0800] CMD: pytest tests/test_phase1_timeline_api.py -v > /Users/pyw/new/MyRecall/v3/evidence/phase1-audit/test_phase1_timeline_api_after_fix2.txt 2>&1
+[2026-02-07 23:03:55 +0800] EXIT: 0
+[2026-02-07 23:03:55 +0800] CMD: tail -n 25 /Users/pyw/new/MyRecall/v3/evidence/phase1-audit/test_phase1_timeline_api_after_fix2.txt
+[2026-02-07 23:03:55 +0800] EXIT: 0
+[2026-02-07 23:03:56 +0800] CMD: pytest tests/test_phase1_gates.py -v > /Users/pyw/new/MyRecall/v3/evidence/phase1-audit/test_phase1_gates_after_fix2.txt 2>&1
+[2026-02-07 23:03:59 +0800] EXIT: 0
+[2026-02-07 23:03:59 +0800] CMD: tail -n 30 /Users/pyw/new/MyRecall/v3/evidence/phase1-audit/test_phase1_gates_after_fix2.txt
+[2026-02-07 23:03:59 +0800] EXIT: 0
+[2026-02-07 23:03:59 +0800] CMD: pytest tests/test_phase1_* -v > /Users/pyw/new/MyRecall/v3/evidence/phase1-audit/test_phase1_all_after_fix2.txt 2>&1
+[2026-02-07 23:04:10 +0800] EXIT: 0
+[2026-02-07 23:04:10 +0800] CMD: tail -n 40 /Users/pyw/new/MyRecall/v3/evidence/phase1-audit/test_phase1_all_after_fix2.txt
+[2026-02-07 23:04:10 +0800] EXIT: 0
+[2026-02-07 23:05:07 +0800] CMD: python - <<'PY'
+from PIL import Image
+from pathlib import Path
+p=Path('/Users/pyw/new/MyRecall/v3/evidence/phase1-audit/smoke.png')
+p.parent.mkdir(parents=True, exist_ok=True)
+Image.new('RGB',(64,64),(0,180,0)).save(p)
+print(p)
+PY
+[2026-02-07 23:05:07 +0800] EXIT: 0
+[2026-02-07 23:05:07 +0800] CMD: ffmpeg -nostdin -y -f lavfi -i color=c=blue:s=320x240:d=1 -c:v libx264 -pix_fmt yuv420p /Users/pyw/new/MyRecall/v3/evidence/phase1-audit/smoke.mp4
+[2026-02-07 23:05:07 +0800] EXIT: 0
+[2026-02-07 23:05:07 +0800] CMD: shasum -a 256 /Users/pyw/new/MyRecall/v3/evidence/phase1-audit/smoke.mp4 | awk '{print }' > /Users/pyw/new/MyRecall/v3/evidence/phase1-audit/smoke_sha256.txt
+[2026-02-07 23:05:07 +0800] EXIT: 0
+[2026-02-07 23:05:07 +0800] CMD: cat /Users/pyw/new/MyRecall/v3/evidence/phase1-audit/smoke_sha256.txt
+[2026-02-07 23:05:07 +0800] EXIT: 0
+[2026-02-07 23:05:07 +0800] CMD: curl -sS -i 'http://127.0.0.1:18083/api/health' | tee /Users/pyw/new/MyRecall/v3/evidence/phase1-audit/api_01_health.txt
+[2026-02-07 23:05:07 +0800] EXIT: 0
+[2026-02-07 23:05:07 +0800] CMD: curl -sS -i 'http://127.0.0.1:18083/api/v1/health' | tee /Users/pyw/new/MyRecall/v3/evidence/phase1-audit/api_02_v1_health.txt
+[2026-02-07 23:05:07 +0800] EXIT: 0
+[2026-02-07 23:05:08 +0800] CMD: curl -sS -i 'http://127.0.0.1:18083/api/search?q=smoke&limit=5' | tee from PIL import Image
+f/vfrom pathlib import dip=Path('/Users/pyw/new/txp.parent.mkdir(parents=True, exist_ok=True)
+Image.new('RGB',(64,64)zeImage.new('RGB',(64,64),(0,180,0)).save(p)enprint(p)
+PY
+[2026-02-07 23:05:08 +0800] EXIT: 1
+[2026-02-07 23:05:08 +0800] CMD: ffmpeg -nostdin -y 
+[2026-02-07 23:05:08 +0800] EXIT: 1
+[2026-02-07 23:05:52 +0800] CMD: shasum -a 256 /Users/pyw/new/MyRecall/v3/evidence/phase1-audit/smoke.mp4 | cut -d ' ' -f1 > /Users/pyw/new/MyRecall/v3/evidence/phase1-audit/smoke_sha256.txt
+[2026-02-07 23:05:53 +0800] EXIT: 0
+[2026-02-07 23:05:53 +0800] CMD: cat /Users/pyw/new/MyRecall/v3/evidence/phase1-audit/smoke_sha256.txt
+[2026-02-07 23:05:53 +0800] EXIT: 0
+[2026-02-07 23:05:53 +0800] CMD: curl -sS -i http://127.0.0.1:18083/api/health > /Users/pyw/new/MyRecall/v3/evidence/phase1-audit/api_01_health.txt
+[2026-02-07 23:05:53 +0800] EXIT: 0
+[2026-02-07 23:05:53 +0800] CMD: curl -sS -i http://127.0.0.1:18083/api/v1/health > /Users/pyw/new/MyRecall/v3/evidence/phase1-audit/api_02_v1_health.txt
+[2026-02-07 23:05:53 +0800] EXIT: 0
+[2026-02-07 23:05:53 +0800] CMD: curl -sS -i 'http://127.0.0.1:18083/api/search?q=smoke&limit=5' > /Users/pyw/new/MyRecall/v3/evidence/phase1-audit/api_03_search_legacy.txt
+[2026-02-07 23:05:56 +0800] EXIT: 0
+[2026-02-07 23:05:56 +0800] CMD: curl -sS -i 'http://127.0.0.1:18083/api/v1/search?q=smoke&page=1&page_size=20' > /Users/pyw/new/MyRecall/v3/evidence/phase1-audit/api_04_search_v1_page.txt
+[2026-02-07 23:05:58 +0800] EXIT: 0
+[2026-02-07 23:05:58 +0800] CMD: curl -sS -i 'http://127.0.0.1:18083/api/v1/timeline?start_time=0&end_time=4102444800&page=1&page_size=20' > /Users/pyw/new/MyRecall/v3/evidence/phase1-audit/api_05_timeline_page.txt
+[2026-02-07 23:05:58 +0800] EXIT: 0
+[2026-02-07 23:05:59 +0800] CMD: curl -sS 'http://127.0.0.1:18083/api/v1/timeline?start_time=0&end_time=4102444800&page=1&page_size=20' > /Users/pyw/new/MyRecall/v3/evidence/phase1-audit/api_05_timeline_body.json
+[2026-02-07 23:05:59 +0800] EXIT: 0
+[2026-02-07 23:05:59 +0800] CMD: python - <<'PY'
+import json
+from pathlib import Path
+p=Path('/Users/pyw/new/MyRecall/v3/evidence/phase1-audit/api_05_timeline_body.json')
+obj=json.loads(p.read_text() or '{}')
+fid=''
+for item in obj.get('data',[]):
+    if isinstance(item, dict) and item.get('frame_id') is not None:
+        fid=str(item['frame_id'])
+        break
+Path('/Users/pyw/new/MyRecall/v3/evidence/phase1-audit/frame_id.txt').write_text(fid)
+print(fid)
+PY
+[2026-02-07 23:05:59 +0800] EXIT: 0
+[2026-02-07 23:06:13 +0800] CMD: curl -sS -i -X POST http://127.0.0.1:18083/api/upload -F "file=@/Users/pyw/new/MyRecall/v3/evidence/phase1-audit/smoke.png;type=image/png" -F "metadata={"timestamp":1770476773,"app_name":"Phase1Smoke","window_title":"Screenshot"}" > /Users/pyw/new/MyRecall/v3/evidence/phase1-audit/api_07_upload_screenshot.txt
+[2026-02-07 23:06:13 +0800] EXIT: 0
+[2026-02-07 23:06:13 +0800] CMD: curl -sS -i -X POST http://127.0.0.1:18083/api/upload -F "file=@/Users/pyw/new/MyRecall/v3/evidence/phase1-audit/smoke.mp4;type=video/mp4" -F "metadata={"type":"video_chunk","timestamp":1770476773,"device_name":"phase1-smoke","checksum":"sha256:9016d2b6276ea23e60dd5de5b5fdd4ace273f5a877376268c31bcf4a6efba9ec"}" > /Users/pyw/new/MyRecall/v3/evidence/phase1-audit/api_08_upload_video_legacy.txt
+[2026-02-07 23:06:13 +0800] EXIT: 0
+[2026-02-07 23:06:13 +0800] CMD: curl -sS -i -X POST http://127.0.0.1:18083/api/v1/upload -F "file=@/Users/pyw/new/MyRecall/v3/evidence/phase1-audit/smoke.mp4;type=video/mp4" -F "metadata={"type":"video_chunk","timestamp":1770476773,"device_name":"phase1-smoke","checksum":"sha256:9016d2b6276ea23e60dd5de5b5fdd4ace273f5a877376268c31bcf4a6efba9ec"}" > /Users/pyw/new/MyRecall/v3/evidence/phase1-audit/api_09_upload_video_v1.txt
+[2026-02-07 23:06:13 +0800] EXIT: 0
+[2026-02-07 23:06:13 +0800] CMD: curl -sS -i http://127.0.0.1:18083/api/v1/frames/1 > /Users/pyw/new/MyRecall/v3/evidence/phase1-audit/api_06_frame_by_id.txt
+[2026-02-07 23:06:13 +0800] EXIT: 0
+[2026-02-07 23:06:13 +0800] CMD: curl -sS -i 'http://127.0.0.1:18083/api/upload/status?checksum=9016d2b6276ea23e60dd5de5b5fdd4ace273f5a877376268c31bcf4a6efba9ec' > /Users/pyw/new/MyRecall/v3/evidence/phase1-audit/api_10_upload_status_legacy.txt
+[2026-02-07 23:06:13 +0800] EXIT: 0
+[2026-02-07 23:06:13 +0800] CMD: curl -sS -i 'http://127.0.0.1:18083/api/v1/upload/status?checksum=9016d2b6276ea23e60dd5de5b5fdd4ace273f5a877376268c31bcf4a6efba9ec' > /Users/pyw/new/MyRecall/v3/evidence/phase1-audit/api_11_upload_status_v1.txt
+[2026-02-07 23:06:13 +0800] EXIT: 0
+[2026-02-07 23:06:14 +0800] CMD: for f in api_01_health.txt api_02_v1_health.txt api_03_search_legacy.txt api_04_search_v1_page.txt api_05_timeline_page.txt api_06_frame_by_id.txt api_07_upload_screenshot.txt api_08_upload_video_legacy.txt api_09_upload_video_v1.txt api_10_upload_status_legacy.txt api_11_upload_status_v1.txt; do echo "==== "; sed -n '1,24p' /Users/pyw/new/MyRecall/v3/evidence/phase1-audit/; done > /Users/pyw/new/MyRecall/v3/evidence/phase1-audit/api_smoke_summary_round1.txt
+[2026-02-07 23:06:14 +0800] EXIT: 0
+[2026-02-07 23:06:14 +0800] CMD: sed -n '1,240p' /Users/pyw/new/MyRecall/v3/evidence/phase1-audit/api_smoke_summary_round1.txt
+[2026-02-07 23:06:14 +0800] EXIT: 0
+[2026-02-07 23:06:29 +0800] CMD: for f in api_01_health.txt api_02_v1_health.txt api_03_search_legacy.txt api_04_search_v1_page.txt api_05_timeline_page.txt api_06_frame_by_id.txt api_07_upload_screenshot.txt api_08_upload_video_legacy.txt api_09_upload_video_v1.txt api_10_upload_status_legacy.txt api_11_upload_status_v1.txt; do printf "%s " "$f"; sed -n "1p" "$EVID_DIR/$f"; done | tee "$EVID_DIR/api_smoke_status_lines.txt"
+[2026-02-07 23:06:29 +0800] EXIT: 0
+[2026-02-07 23:06:29 +0800] CMD: sed -n '1,120p' /Users/pyw/new/MyRecall/v3/evidence/phase1-audit/api_smoke_status_lines.txt
+[2026-02-07 23:06:29 +0800] EXIT: 0
+[2026-02-07 23:06:29 +0800] CMD: sed -n '1,60p' /Users/pyw/new/MyRecall/v3/evidence/phase1-audit/api_07_upload_screenshot.txt
+[2026-02-07 23:06:29 +0800] EXIT: 0
+[2026-02-07 23:06:30 +0800] CMD: sed -n '1,80p' /Users/pyw/new/MyRecall/v3/evidence/phase1-audit/api_08_upload_video_legacy.txt
+[2026-02-07 23:06:30 +0800] EXIT: 0
+[2026-02-07 23:06:30 +0800] CMD: sed -n '1,80p' /Users/pyw/new/MyRecall/v3/evidence/phase1-audit/api_09_upload_video_v1.txt
+[2026-02-07 23:06:30 +0800] EXIT: 0
+[2026-02-07 23:06:30 +0800] CMD: sed -n '1,80p' /Users/pyw/new/MyRecall/v3/evidence/phase1-audit/api_10_upload_status_legacy.txt
+[2026-02-07 23:06:30 +0800] EXIT: 0
+[2026-02-07 23:06:30 +0800] CMD: sed -n '1,80p' /Users/pyw/new/MyRecall/v3/evidence/phase1-audit/api_11_upload_status_v1.txt
+[2026-02-07 23:06:30 +0800] EXIT: 0
+[2026-02-07 23:06:48 +0800] CMD: python - <<'PY'
+import json, time
+from pathlib import Path
+p=Path('/Users/pyw/new/MyRecall/v3/evidence/phase1-audit')
+sha=(p/'smoke_sha256.txt').read_text().strip()
+ts=int(time.time())
+(p/'meta_ss.json').write_text(json.dumps({timestamp: ts, app_name: Phase1Smoke, window_title: Screenshot}))
+(p/'meta_vid.json').write_text(json.dumps({type: video_chunk, timestamp: ts, device_name: phase1-smoke, checksum: fsha256:{sha}}))
+print(ts)
+PY
+[2026-02-07 23:06:48 +0800] EXIT: 1
+[2026-02-07 23:06:49 +0800] CMD: curl -sS -i -X POST http://127.0.0.1:18083/api/upload -F "file=@/Users/pyw/new/MyRecall/v3/evidence/phase1-audit/smoke.png;type=image/png" -F "metadata=</Users/pyw/new/MyRecall/v3/evidence/phase1-audit/meta_ss.json" > /Users/pyw/new/MyRecall/v3/evidence/phase1-audit/api_07_upload_screenshot.txt
+[2026-02-07 23:06:49 +0800] EXIT: 26
+[2026-02-07 23:06:49 +0800] CMD: curl -sS -i -X POST http://127.0.0.1:18083/api/upload -F "file=@/Users/pyw/new/MyRecall/v3/evidence/phase1-audit/smoke.mp4;type=video/mp4" -F "metadata=</Users/pyw/new/MyRecall/v3/evidence/phase1-audit/meta_vid.json" > /Users/pyw/new/MyRecall/v3/evidence/phase1-audit/api_08_upload_video_legacy.txt
+[2026-02-07 23:06:49 +0800] EXIT: 26
+[2026-02-07 23:06:49 +0800] CMD: curl -sS -i -X POST http://127.0.0.1:18083/api/v1/upload -F "file=@/Users/pyw/new/MyRecall/v3/evidence/phase1-audit/smoke.mp4;type=video/mp4" -F "metadata=</Users/pyw/new/MyRecall/v3/evidence/phase1-audit/meta_vid.json" > /Users/pyw/new/MyRecall/v3/evidence/phase1-audit/api_09_upload_video_v1.txt
+[2026-02-07 23:06:49 +0800] EXIT: 26
+[2026-02-07 23:07:34 +0800] CMD: shasum -a 256 /Users/pyw/new/MyRecall/v3/evidence/phase1-audit/smoke.mp4 | cut -d ' ' -f1 > /Users/pyw/new/MyRecall/v3/evidence/phase1-audit/smoke_sha256.txt
+[2026-02-07 23:07:34 +0800] EXIT: 0
+[2026-02-07 23:07:34 +0800] CMD: curl -sS -i 'http://127.0.0.1:18083/api/health' > '/Users/pyw/new/MyRecall/v3/evidence/phase1-audit/api_01_health.txt'
+[2026-02-07 23:07:34 +0800] EXIT: 0
+[2026-02-07 23:07:34 +0800] CMD: curl -sS -i 'http://127.0.0.1:18083/api/v1/health' > '/Users/pyw/new/MyRecall/v3/evidence/phase1-audit/api_02_v1_health.txt'
+[2026-02-07 23:07:34 +0800] EXIT: 0
+[2026-02-07 23:07:34 +0800] CMD: curl -sS -i 'http://127.0.0.1:18083/api/search?q=smoke&limit=5' > '/Users/pyw/new/MyRecall/v3/evidence/phase1-audit/api_03_search_legacy.txt'
+[2026-02-07 23:07:36 +0800] EXIT: 0
+[2026-02-07 23:07:36 +0800] CMD: curl -sS -i 'http://127.0.0.1:18083/api/v1/search?q=smoke&page=1&page_size=20' > '/Users/pyw/new/MyRecall/v3/evidence/phase1-audit/api_04_search_v1_page.txt'
+[2026-02-07 23:07:37 +0800] EXIT: 0
+[2026-02-07 23:07:37 +0800] CMD: curl -sS -i 'http://127.0.0.1:18083/api/v1/timeline?start_time=0&end_time=4102444800&page=1&page_size=20' > '/Users/pyw/new/MyRecall/v3/evidence/phase1-audit/api_05_timeline_page.txt'
+[2026-02-07 23:07:37 +0800] EXIT: 0
+[2026-02-07 23:07:37 +0800] CMD: curl -sS 'http://127.0.0.1:18083/api/v1/timeline?start_time=0&end_time=4102444800&page=1&page_size=20' > '/Users/pyw/new/MyRecall/v3/evidence/phase1-audit/api_05_timeline_body.json'
+[2026-02-07 23:07:37 +0800] EXIT: 0
+[2026-02-07 23:07:37 +0800] CMD: python - <<'PY'
+import json
+from pathlib import Path
+p = Path('/Users/pyw/new/MyRecall/v3/evidence/phase1-audit/api_05_timeline_body.json')
+obj = json.loads(p.read_text() or '{}')
+fid = ''
+for item in obj.get('data', []):
+    if isinstance(item, dict) and item.get('frame_id') is not None:
+        fid = str(item['frame_id'])
+        break
+Path('/Users/pyw/new/MyRecall/v3/evidence/phase1-audit/frame_id.txt').write_text(fid)
+print(fid)
+PY
+[2026-02-07 23:07:38 +0800] EXIT: 0
+[2026-02-07 23:07:38 +0800] CMD: python - <<'PY'
+import json, time
+from pathlib import Path
+base = Path('/Users/pyw/new/MyRecall/v3/evidence/phase1-audit')
+sha = (base / 'smoke_sha256.txt').read_text().strip()
+ts = int(time.time())
+(base / 'meta_ss.json').write_text(json.dumps({
+    'timestamp': ts,
+    'app_name': 'Phase1Smoke',
+    'window_title': 'Screenshot',
+}))
+(base / 'meta_vid.json').write_text(json.dumps({
+    'type': 'video_chunk',
+    'timestamp': ts,
+    'device_name': 'phase1-smoke',
+    'checksum': f'sha256:{sha}',
+}))
+print(ts)
+PY
+[2026-02-07 23:07:38 +0800] EXIT: 0
+[2026-02-07 23:07:38 +0800] CMD: curl -sS -i -X POST 'http://127.0.0.1:18083/api/upload' -F 'file=@/Users/pyw/new/MyRecall/v3/evidence/phase1-audit/smoke.png;type=image/png' -F 'metadata=</Users/pyw/new/MyRecall/v3/evidence/phase1-audit/meta_ss.json' > '/Users/pyw/new/MyRecall/v3/evidence/phase1-audit/api_07_upload_screenshot.txt'
+[2026-02-07 23:07:38 +0800] EXIT: 0
+[2026-02-07 23:07:38 +0800] CMD: curl -sS -i -X POST 'http://127.0.0.1:18083/api/upload' -F 'file=@/Users/pyw/new/MyRecall/v3/evidence/phase1-audit/smoke.mp4;type=video/mp4' -F 'metadata=</Users/pyw/new/MyRecall/v3/evidence/phase1-audit/meta_vid.json' > '/Users/pyw/new/MyRecall/v3/evidence/phase1-audit/api_08_upload_video_legacy.txt'
+[2026-02-07 23:07:38 +0800] EXIT: 0
+[2026-02-07 23:07:38 +0800] CMD: curl -sS -i -X POST 'http://127.0.0.1:18083/api/v1/upload' -F 'file=@/Users/pyw/new/MyRecall/v3/evidence/phase1-audit/smoke.mp4;type=video/mp4' -F 'metadata=</Users/pyw/new/MyRecall/v3/evidence/phase1-audit/meta_vid.json' > '/Users/pyw/new/MyRecall/v3/evidence/phase1-audit/api_09_upload_video_v1.txt'
+[2026-02-07 23:07:38 +0800] EXIT: 0
+[2026-02-07 23:07:38 +0800] CMD: curl -sS -i 'http://127.0.0.1:18083/api/v1/frames/1' > '/Users/pyw/new/MyRecall/v3/evidence/phase1-audit/api_06_frame_by_id.txt'
+[2026-02-07 23:07:38 +0800] EXIT: 0
+[2026-02-07 23:07:38 +0800] CMD: curl -sS -i 'http://127.0.0.1:18083/api/upload/status?checksum=9016d2b6276ea23e60dd5de5b5fdd4ace273f5a877376268c31bcf4a6efba9ec' > '/Users/pyw/new/MyRecall/v3/evidence/phase1-audit/api_10_upload_status_legacy.txt'
+[2026-02-07 23:07:38 +0800] EXIT: 0
+[2026-02-07 23:07:38 +0800] CMD: curl -sS -i 'http://127.0.0.1:18083/api/v1/upload/status?checksum=9016d2b6276ea23e60dd5de5b5fdd4ace273f5a877376268c31bcf4a6efba9ec' > '/Users/pyw/new/MyRecall/v3/evidence/phase1-audit/api_11_upload_status_v1.txt'
+[2026-02-07 23:07:38 +0800] EXIT: 0
+[2026-02-07 23:08:08 +0800] CMD: for f in api_01_health.txt api_02_v1_health.txt api_03_search_legacy.txt api_04_search_v1_page.txt api_05_timeline_page.txt api_06_frame_by_id.txt api_07_upload_screenshot.txt api_08_upload_video_legacy.txt api_09_upload_video_v1.txt api_10_upload_status_legacy.txt api_11_upload_status_v1.txt; do printf '%s ' "$f"; sed -n '1p' "/Users/pyw/new/MyRecall/v3/evidence/phase1-audit/$f"; done > "/Users/pyw/new/MyRecall/v3/evidence/phase1-audit/api_smoke_status_lines_round1.txt"
+[2026-02-07 23:08:08 +0800] EXIT: 0
+[2026-02-07 23:08:08 +0800] CMD: sed -n '1,120p' '/Users/pyw/new/MyRecall/v3/evidence/phase1-audit/api_smoke_status_lines_round1.txt'
+[2026-02-07 23:08:08 +0800] EXIT: 0
+[2026-02-07 23:08:20 +0800] CMD: pytest tests/test_phase5_buffer.py -k TestUploaderConsumer -v > '/Users/pyw/new/MyRecall/v3/evidence/phase1-audit/test_phase5_buffer_uploader_consumer_after_fix.txt' 2>&1
+[2026-02-07 23:08:23 +0800] EXIT: 0
+[2026-02-07 23:08:23 +0800] CMD: tail -n 30 '/Users/pyw/new/MyRecall/v3/evidence/phase1-audit/test_phase5_buffer_uploader_consumer_after_fix.txt'
+[2026-02-07 23:08:23 +0800] EXIT: 0

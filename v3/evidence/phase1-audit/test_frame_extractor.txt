@@ -1,0 +1,23 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.12.12, pytest-9.0.2, pluggy-1.6.0 -- /opt/homebrew/Caskroom/miniforge/base/bin/python3
+cachedir: .pytest_cache
+rootdir: /Users/pyw/new/MyRecall
+configfile: pytest.ini
+plugins: anyio-4.12.1, xdist-3.8.0, cov-7.0.0
+collecting ... collected 13 items
+
+tests/test_phase1_frame_extractor.py::TestFrameExtractorExtraction::test_extract_frames_returns_list PASSED [  7%]
+tests/test_phase1_frame_extractor.py::TestFrameExtractorExtraction::test_extracted_frames_have_correct_attributes PASSED [ 15%]
+tests/test_phase1_frame_extractor.py::TestFrameExtractorExtraction::test_frame_timestamps_are_sequential PASSED [ 23%]
+tests/test_phase1_frame_extractor.py::TestFrameExtractorExtraction::test_frame_pngs_are_valid_images PASSED [ 30%]
+tests/test_phase1_frame_extractor.py::TestFrameExtractorDedup::test_dedup_with_static_video PASSED [ 38%]
+tests/test_phase1_frame_extractor.py::TestFrameExtractorDedup::test_dedup_threshold_high_keeps_all PASSED [ 46%]
+tests/test_phase1_frame_extractor.py::TestFrameExtractorDedup::test_changing_video_keeps_more_frames PASSED [ 53%]
+tests/test_phase1_frame_extractor.py::TestFrameExtractorFFmpeg::test_run_ffmpeg_extraction PASSED [ 61%]
+tests/test_phase1_frame_extractor.py::TestFrameExtractorFFmpeg::test_run_ffmpeg_invalid_path PASSED [ 69%]
+tests/test_phase1_frame_extractor.py::TestFrameExtractorSingleFrame::test_extract_single_frame PASSED [ 76%]
+tests/test_phase1_frame_extractor.py::TestFrameExtractorSingleFrame::test_extract_single_frame_at_zero PASSED [ 84%]
+tests/test_phase1_frame_extractor.py::TestFrameExtractorSingleFrame::test_extract_single_frame_invalid_path PASSED [ 92%]
+tests/test_phase1_frame_extractor.py::TestFrameExtractorPerformance::test_extraction_latency PASSED [100%]
+
+============================== 13 passed in 0.95s ==============================

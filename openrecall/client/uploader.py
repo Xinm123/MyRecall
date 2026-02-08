@@ -113,9 +113,86 @@ class HTTPUploader:
             else:
                 print(f"Upload failed: {response.status_code} - {response.text}")
                 return False
-                
+
         except requests.RequestException as e:
             print(f"Upload error: {e}")
+            return False
+
+    def upload_video_chunk(
+        self,
+        file_path: str,
+        metadata: dict,
+    ) -> bool:
+        """Upload a video chunk to the server with resume support.
+
+        Args:
+            file_path: Path to the .mp4 video chunk file.
+            metadata: Dictionary with type, checksum, file_size_bytes, etc.
+
+        Returns:
+            True if upload succeeded, False otherwise.
+        """
+        import hashlib
+        from pathlib import Path
+
+        chunk_path = Path(file_path)
+        if not chunk_path.exists():
+            print(f"Video chunk not found: {file_path}")
+            return False
+
+        checksum = metadata.get("checksum", "")
+
+        # Check for resume: query server for bytes already received
+        bytes_received = 0
+        if checksum:
+            try:
+                resp = requests.get(
+                    f"{self.api_url}/upload/status",
+                    params={"checksum": checksum},
+                    timeout=self.timeout,
+                )
+                if resp.status_code == 200:
+                    data = resp.json()
+                    if data.get("status") == "completed":
+                        return True  # Already uploaded
+                    bytes_received = data.get("bytes_received", 0)
+            except requests.RequestException:
+                pass  # Proceed with full upload
+
+        try:
+            total_size = chunk_path.stat().st_size
+            upload_metadata = dict(metadata)
+            upload_metadata["file_size_bytes"] = total_size
+            # Backward compatibility: normalize app/window keys for server ingestion.
+            if "app_name" not in upload_metadata and "active_app" in upload_metadata:
+                upload_metadata["app_name"] = upload_metadata.get("active_app")
+            if "window_title" not in upload_metadata and "active_window" in upload_metadata:
+                upload_metadata["window_title"] = upload_metadata.get("active_window")
+
+            with open(chunk_path, "rb") as f:
+                if bytes_received > 0:
+                    f.seek(bytes_received)
+
+                headers = {}
+                if bytes_received > 0:
+                    headers["X-Upload-Offset"] = str(bytes_received)
+
+                response = requests.post(
+                    f"{self.api_url}/upload",
+                    files={"file": (chunk_path.name, f, "video/mp4")},
+                    data={"metadata": json.dumps(upload_metadata)},
+                    headers=headers,
+                    timeout=max(self.timeout, 120),  # Video uploads need more time
+                )
+
+            if response.status_code in (200, 202):
+                return True
+            else:
+                print(f"Video upload failed: {response.status_code} - {response.text}")
+                return False
+
+        except requests.RequestException as e:
+            print(f"Video upload error: {e}")
             return False
 
 

@@ -1,0 +1,23 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.11.14, pytest-9.0.2, pluggy-1.6.0 -- /opt/homebrew/Caskroom/miniforge/base/envs/v3/bin/python3.11
+cachedir: .pytest_cache
+rootdir: /Users/pyw/new/MyRecall
+configfile: pytest.ini
+plugins: anyio-4.12.1
+collecting ... collected 13 items
+
+tests/test_phase1_degradation.py::TestFFmpegCrashRecovery::test_restart_count_increments PASSED [  7%]
+tests/test_phase1_degradation.py::TestFFmpegCrashRecovery::test_restart_count_resets_after_hour PASSED [ 15%]
+tests/test_phase1_degradation.py::TestFFmpegCrashRecovery::test_restart_count_last_hour_property PASSED [ 23%]
+tests/test_phase1_degradation.py::TestFFmpegCrashRecovery::test_restart_count_last_hour_current_window PASSED [ 30%]
+tests/test_phase1_degradation.py::TestFFmpegCrashRecovery::test_watchdog_detects_crash PASSED [ 38%]
+tests/test_phase1_degradation.py::TestDiskFullDegradation::test_check_disk_full_normal PASSED [ 46%]
+tests/test_phase1_degradation.py::TestDiskFullDegradation::test_check_disk_full_simulated PASSED [ 53%]
+tests/test_phase1_degradation.py::TestDiskFullDegradation::test_disk_full_flag_transitions PASSED [ 61%]
+tests/test_phase1_degradation.py::TestDualModeRecording::test_screenshot_mode PASSED [ 69%]
+tests/test_phase1_degradation.py::TestDualModeRecording::test_video_mode PASSED [ 76%]
+tests/test_phase1_degradation.py::TestDualModeRecording::test_auto_mode_fallback PASSED [ 84%]
+tests/test_phase1_degradation.py::TestUploadResume::test_upload_video_chunk_file_not_found PASSED [ 92%]
+tests/test_phase1_degradation.py::TestUploadResume::test_upload_video_chunk_already_completed PASSED [100%]
+
+============================== 13 passed in 0.55s ==============================

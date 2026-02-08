@@ -1,0 +1,98 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.12.12, pytest-9.0.2, pluggy-1.6.0 -- /opt/homebrew/Caskroom/miniforge/base/bin/python3
+cachedir: .pytest_cache
+rootdir: /Users/pyw/new/MyRecall
+configfile: pytest.ini
+plugins: anyio-4.12.1, xdist-3.8.0, cov-7.0.0
+collecting ... collected 11 items
+
+tests/test_phase1_retention.py::TestRetentionQueries::test_get_expired_video_chunks PASSED [  9%]
+tests/test_phase1_retention.py::TestRetentionQueries::test_non_expired_chunks_not_returned PASSED [ 18%]
+tests/test_phase1_retention.py::TestRetentionQueries::test_pending_expired_chunks_not_returned PASSED [ 27%]
+tests/test_phase1_retention.py::TestCascadeDelete::test_delete_video_chunk_cascade PASSED [ 36%]
+tests/test_phase1_retention.py::TestCascadeDelete::test_fts_cleaned_on_cascade PASSED [ 45%]
+tests/test_phase1_retention.py::TestRetentionWorker::test_cleanup_expired_video_chunks PASSED [ 54%]
+tests/test_phase1_retention.py::TestRetentionWorker::test_retention_worker_stop PASSED [ 63%]
+tests/test_phase1_retention.py::TestRetention30DayPolicy::test_expires_at_31_days_ago_detected PASSED [ 72%]
+tests/test_phase1_retention.py::TestRetention30DayPolicy::test_expires_at_30_days_future_not_detected PASSED [ 81%]
+tests/test_phase1_retention.py::TestRetention30DayPolicy::test_pending_status_31_days_expired_not_cleaned PASSED [ 90%]
+tests/test_phase1_retention.py::TestRetention30DayPolicy::test_full_cascade_31_day_expired FAILED [100%]
+
+=================================== FAILURES ===================================
+__________ TestRetention30DayPolicy.test_full_cascade_31_day_expired ___________
+
+self = <test_phase1_retention.TestRetention30DayPolicy object at 0x1078785f0>
+sql_store = <openrecall.server.database.sql.SQLStore object at 0x11c030e30>
+tmp_path = PosixPath('/private/var/folders/q2/gtfbxhrj7zv1xn9cn6f3pzj40000gn/T/pytest-of-pyw/pytest-78/test_full_cascade_31_day_expir0')
+
+    def test_full_cascade_31_day_expired(self, sql_store, tmp_path):
+        """Full lifecycle: 31-day-expired chunk cascade-deleted with all children."""
+        from openrecall.server.retention import RetentionWorker
+        from openrecall.shared.config import settings
+    
+        # Create video file
+        video_file = tmp_path / "expired_31d.mp4"
+        video_file.write_bytes(b"video data 31 days old")
+    
+        # Insert expired chunk (31 days ago) with frames, OCR, FTS
+        db_path = settings.db_path
+        conn = sqlite3.connect(str(db_path))
+        conn.execute("PRAGMA foreign_keys=ON")
+        conn.execute(
+            "INSERT INTO video_chunks (file_path, status, expires_at) "
+            "VALUES (?, 'COMPLETED', datetime('now', '-31 days'))",
+            (str(video_file),),
+        )
+        chunk_id = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
+    
+        frames_path = settings.frames_path
+        frames_path.mkdir(parents=True, exist_ok=True)
+        frame_ids = []
+        for i in range(3):
+            conn.execute(
+                "INSERT INTO frames (video_chunk_id, offset_index, timestamp) "
+                "VALUES (?, ?, ?)",
+                (chunk_id, i, 2000.0 + i),
+            )
+            fid = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
+            frame_ids.append(fid)
+            conn.execute(
+                "INSERT INTO ocr_text (frame_id, text, text_length) VALUES (?, ?, ?)",
+                (fid, f"retention test frame {i}", 22),
+            )
+            conn.execute(
+                "INSERT INTO ocr_text_fts (text, frame_id) VALUES (?, ?)",
+                (f"retention test frame {i}", fid),
+            )
+            # Create frame PNG
+            img = Image.new("RGB", (100, 100), color="blue")
+            img.save(str(frames_path / f"{fid}.png"))
+        conn.commit()
+        conn.close()
+    
+        # Verify all exist before cleanup
+        assert video_file.exists()
+        for fid in frame_ids:
+            assert (frames_path / f"{fid}.png").exists()
+        conn = sqlite3.connect(str(db_path))
+        fts_count = conn.execute("SELECT COUNT(*) FROM ocr_text_fts").fetchone()[0]
+        conn.close()
+        assert fts_count == 3
+    
+        # Run retention worker cleanup
+        worker = RetentionWorker()
+        worker._cleanup_expired_video_chunks(sql_store)
+    
+        # Video file deleted
+        assert not video_file.exists()
+        # Frame PNGs deleted
+        for fid in frame_ids:
+>           assert not (frames_path / f"{fid}.png").exists()
+E           AssertionError: assert not True
+E            +  where True = exists()
+E            +    where exists = (PosixPath('/private/var/folders/q2/gtfbxhrj7zv1xn9cn6f3pzj40000gn/T/pytest-of-pyw/pytest-78/test_full_cascade_31_day_expir0/MRS/frames') / '1.png').exists
+
+tests/test_phase1_retention.py:343: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_phase1_retention.py::TestRetention30DayPolicy::test_full_cascade_31_day_expired
+========================= 1 failed, 10 passed in 0.74s =========================

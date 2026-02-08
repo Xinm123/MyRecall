@@ -571,6 +571,7 @@
       },
 
       imageSrc(entry) {
+        if (entry?.image_url) return entry.image_url;
         const filename = entry?.filename || `${entry?.timestamp}.png`;
         return `/screenshots/${filename}`;
       },

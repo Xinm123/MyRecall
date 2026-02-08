@@ -1,0 +1,21 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.12.12, pytest-9.0.2, pluggy-1.6.0 -- /opt/homebrew/Caskroom/miniforge/base/bin/python3
+cachedir: .pytest_cache
+rootdir: /Users/pyw/new/MyRecall
+configfile: pytest.ini
+plugins: anyio-4.12.1, xdist-3.8.0, cov-7.0.0
+collecting ... collected 11 items
+
+tests/test_phase1_retention.py::TestRetentionQueries::test_get_expired_video_chunks PASSED [  9%]
+tests/test_phase1_retention.py::TestRetentionQueries::test_non_expired_chunks_not_returned PASSED [ 18%]
+tests/test_phase1_retention.py::TestRetentionQueries::test_pending_expired_chunks_not_returned PASSED [ 27%]
+tests/test_phase1_retention.py::TestCascadeDelete::test_delete_video_chunk_cascade PASSED [ 36%]
+tests/test_phase1_retention.py::TestCascadeDelete::test_fts_cleaned_on_cascade PASSED [ 45%]
+tests/test_phase1_retention.py::TestRetentionWorker::test_cleanup_expired_video_chunks PASSED [ 54%]
+tests/test_phase1_retention.py::TestRetentionWorker::test_retention_worker_stop PASSED [ 63%]
+tests/test_phase1_retention.py::TestRetention30DayPolicy::test_expires_at_31_days_ago_detected PASSED [ 72%]
+tests/test_phase1_retention.py::TestRetention30DayPolicy::test_expires_at_30_days_future_not_detected PASSED [ 81%]
+tests/test_phase1_retention.py::TestRetention30DayPolicy::test_pending_status_31_days_expired_not_cleaned PASSED [ 90%]
+tests/test_phase1_retention.py::TestRetention30DayPolicy::test_full_cascade_31_day_expired PASSED [100%]
+
+============================== 11 passed in 0.73s ==============================

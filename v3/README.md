@@ -16,6 +16,8 @@
   - 架构决策记录（ADR）
 - `results/`
   - 每阶段执行结果、验证报告与回归记录
+- `webui/`
+  - WebUI 文档中台（页面说明、数据流、前后变化、维护模板）
 
 ## Existing Source Mapping
 
@@ -30,3 +32,10 @@
 - `milestones/roadmap-status.md`
 - `decisions/ADR-0001-python-first.md`
 - `results/phase-0-validation.md`
+
+## Current High-Signal Docs
+
+- `plan/03-phase-1-detailed-plan.md` (Phase 1 execution baseline + status addendum)
+- `results/phase-1-validation.md` (engineering validation + gate evidence)
+- `results/phase-1-post-baseline-changelog.md` (bug fixes and hardening after Phase 1 baseline)
+- `webui/README.md` (WebUI 文档入口与维护规则)

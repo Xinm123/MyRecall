@@ -361,8 +361,9 @@
       
       <!-- Card Image -->
       {% set filename = entry.filename if entry.filename else ((entry.timestamp | int) ~ '.png') %}
+      {% set image_src = entry.image_url if entry.image_url else ('/screenshots/' ~ filename) %}
       <img 
-        src="/screenshots/{{ filename }}" 
+        src="{{ image_src }}" 
         alt="Screenshot" 
         class="card-image js-open-modal"
         loading="lazy"

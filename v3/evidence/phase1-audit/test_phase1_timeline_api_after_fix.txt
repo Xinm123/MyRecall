@@ -1,0 +1,27 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.11.14, pytest-9.0.2, pluggy-1.6.0 -- /opt/homebrew/Caskroom/miniforge/base/envs/v3/bin/python3.11
+cachedir: .pytest_cache
+rootdir: /Users/pyw/new/MyRecall
+configfile: pytest.ini
+plugins: anyio-4.12.1
+collecting ... collected 17 items
+
+tests/test_phase1_timeline_api.py::TestTimelineAPI::test_timeline_returns_paginated_response PASSED [  5%]
+tests/test_phase1_timeline_api.py::TestTimelineAPI::test_timeline_time_range_filter PASSED [ 11%]
+tests/test_phase1_timeline_api.py::TestTimelineAPI::test_timeline_pagination PASSED [ 17%]
+tests/test_phase1_timeline_api.py::TestTimelineAPI::test_timeline_frame_urls PASSED [ 23%]
+tests/test_phase1_timeline_api.py::TestTimelineAPI::test_timeline_empty_range PASSED [ 29%]
+tests/test_phase1_timeline_api.py::TestTimelineAPI::test_timeline_accepts_page_and_page_size PASSED [ 35%]
+tests/test_phase1_timeline_api.py::TestTimelineAPI::test_timeline_limit_offset_take_precedence_over_page_aliases PASSED [ 41%]
+tests/test_phase1_timeline_api.py::TestTimelineAPI::test_legacy_timeline_page_uses_frame_urls PASSED [ 47%]
+tests/test_phase1_timeline_api.py::TestTimelineAPI::test_legacy_memories_recent_returns_frame_image_url PASSED [ 52%]
+tests/test_phase1_timeline_api.py::TestFrameServingAPI::test_serve_existing_frame PASSED [ 58%]
+tests/test_phase1_timeline_api.py::TestFrameServingAPI::test_serve_nonexistent_frame PASSED [ 64%]
+tests/test_phase1_timeline_api.py::TestVideoUploadAPI::test_upload_video_chunk PASSED [ 70%]
+tests/test_phase1_timeline_api.py::TestVideoUploadAPI::test_upload_screenshot_still_works PASSED [ 76%]
+tests/test_phase1_timeline_api.py::TestUploadStatusAPI::test_upload_status_not_found PASSED [ 82%]
+tests/test_phase1_timeline_api.py::TestUploadStatusAPI::test_upload_status_missing_checksum PASSED [ 88%]
+tests/test_phase1_timeline_api.py::TestSearchPaginationCompatibility::test_search_accepts_page_and_page_size_when_query_empty PASSED [ 94%]
+tests/test_phase1_timeline_api.py::TestSearchPaginationCompatibility::test_search_limit_offset_take_precedence_when_both_styles_provided PASSED [100%]
+
+============================== 17 passed in 6.86s ==============================

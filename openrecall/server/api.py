@@ -3,6 +3,7 @@
 Provides HTTP endpoints for client-server communication:
 - Health check endpoint
 - Fast screenshot ingestion endpoint (async processing)
+- Legacy compatibility bridge for video-chunk uploads
 """
 
 import logging
@@ -24,6 +25,34 @@ logger = logging.getLogger(__name__)
 api_bp = Blueprint("api", __name__, url_prefix="/api")
 sql_store = SQLStore()
 search_engine = SearchEngine()
+
+
+def _build_vision_status() -> dict:
+    capture_mode = runtime_settings.capture_mode or "unknown"
+    last_error = (runtime_settings.sck_last_error_code or "").strip()
+    selected = list(runtime_settings.selected_monitors or [])
+
+    status = "ok"
+    if last_error == "permission_denied":
+        status = "permission_denied"
+    elif last_error in {"no_displays", "display_not_found"}:
+        status = "no_monitors"
+    elif last_error:
+        status = "error"
+    elif capture_mode == "legacy":
+        status = "degraded_legacy"
+
+    if capture_mode == "paused" and status == "degraded_legacy":
+        status = "ok"
+
+    return {
+        "status": status,
+        "active_mode": capture_mode,
+        "selected_monitors": selected,
+        "last_sck_error_code": last_error,
+        "last_sck_error_at": runtime_settings.sck_last_error_at,
+        "sck_available": bool(runtime_settings.sck_available),
+    }
 
 
 @api_bp.route("/search", methods=["GET"])
@@ -206,6 +235,22 @@ def upload():
     
     try:
         metadata = json.loads(metadata_str)
+
+        # Legacy compatibility:
+        # If a video chunk is posted to /api/upload, forward to the v1 handler
+        # instead of treating it as a screenshot PNG.
+        is_video = (
+            (file.content_type and file.content_type.startswith("video/"))
+            or (file.filename and file.filename.endswith(".mp4"))
+            or metadata.get("type") == "video_chunk"
+        )
+        if is_video:
+            if settings.debug:
+                logger.debug("📥 Legacy /api/upload detected video payload; forwarding to v1 video handler")
+            from openrecall.server.api_v1 import _handle_video_upload
+
+            return _handle_video_upload(file, metadata, start_time)
+
         timestamp = int(metadata.get("timestamp", 0))
         active_app = str(metadata.get("app_name", "Unknown"))
         active_window = str(metadata.get("window_title", "Unknown"))
@@ -264,6 +309,24 @@ def upload():
         return jsonify({"status": "error", "message": str(e)}), 500
 
 
+@api_bp.route("/upload/status", methods=["GET"])
+def upload_status():
+    """Legacy upload status endpoint for resume support."""
+    checksum_raw = request.args.get("checksum", "").strip()
+    checksum = checksum_raw.split(":", 1)[1] if checksum_raw.startswith("sha256:") else checksum_raw
+    if not checksum:
+        return jsonify({"status": "error", "message": "checksum required"}), 400
+
+    video_path = settings.video_chunks_path / f"{checksum}.mp4"
+    partial_path = video_path.with_suffix(".mp4.partial")
+
+    if video_path.exists():
+        return jsonify({"status": "completed", "bytes_received": video_path.stat().st_size}), 200
+    if partial_path.exists():
+        return jsonify({"status": "partial", "bytes_received": partial_path.stat().st_size}), 200
+    return jsonify({"status": "not_found", "bytes_received": 0}), 200
+
+
 @api_bp.route("/config", methods=["GET"])
 def get_config():
     """Get current runtime configuration.
@@ -278,6 +341,13 @@ def get_config():
         config["client_online"] = client_online
     
     return jsonify(config), 200
+
+
+@api_bp.route("/vision/status", methods=["GET"])
+def vision_status():
+    """Read-only capture health endpoint."""
+    with runtime_settings._lock:
+        return jsonify(_build_vision_status()), 200
 
 
 @api_bp.route("/config", methods=["POST"])
@@ -358,6 +428,39 @@ def heartbeat():
     try:
         with runtime_settings._lock:
             runtime_settings.last_heartbeat = time.time()
+            payload = request.get_json(silent=True) or {}
+            if isinstance(payload, dict):
+                capture_mode = payload.get("capture_mode")
+                if isinstance(capture_mode, str) and capture_mode.strip():
+                    runtime_settings.capture_mode = capture_mode.strip()
+
+                sck_available = payload.get("sck_available")
+                if isinstance(sck_available, bool):
+                    runtime_settings.sck_available = sck_available
+
+                sck_last_error = payload.get("sck_last_error_code")
+                if not isinstance(sck_last_error, str):
+                    sck_last_error = payload.get("last_sck_error_code")
+                if isinstance(sck_last_error, str):
+                    runtime_settings.sck_last_error_code = sck_last_error.strip()
+
+                sck_last_error_at = payload.get("sck_last_error_at")
+                if sck_last_error_at is not None:
+                    try:
+                        runtime_settings.sck_last_error_at = float(sck_last_error_at)
+                    except (TypeError, ValueError):
+                        pass
+
+                selected_monitors = payload.get("selected_monitors")
+                if isinstance(selected_monitors, list):
+                    runtime_settings.selected_monitors = [
+                        str(m).strip() for m in selected_monitors if str(m).strip()
+                    ]
+                elif isinstance(selected_monitors, str):
+                    runtime_settings.selected_monitors = [
+                        item.strip() for item in selected_monitors.split(",") if item.strip()
+                    ]
+
             config = runtime_settings.to_dict()
             client_online = (time.time() - runtime_settings.last_heartbeat) < 15
             config["client_online"] = client_online

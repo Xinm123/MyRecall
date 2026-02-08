@@ -1,8 +1,8 @@
 # MyRecall-v3 Master Prompt (Version Control)
 
-**Version**: 1.1
+**Version**: 1.2
 **Last Updated**: 2026-02-06
-**Status**: Active (Phase 0 complete baseline)
+**Status**: Active (Phase 1 execution complete, validation in progress)
 **Original Request**: Retained below for reference
 
 ---
@@ -165,12 +165,13 @@ MyRecall-v3 (Third major version)
 
 ---
 
-## Current Phase (Planning)
+## Current Phase (Validation)
 
-**Stage**: Planning Mode (只产出文档,不修改代码)
+**Stage**: Post-Execution Validation Mode (Phase 1)
 **Constraints**:
-- ✅ 允许: 输出/更新 Markdown 规划文档
-- ❌ 禁止: 修改业务代码、配置、依赖、脚本、数据库结构、接口实现
+- ✅ 允许: 验收审计、证据采集、更新验证文档与里程碑状态
+- ✅ 允许: 为通过 Gate 做最小必要修复（需可追踪）
+- ❌ 禁止: 超范围新功能开发与与当前 Phase 无关改动
 
 ---
 
@@ -198,10 +199,12 @@ MyRecall-v3 (Third major version)
 |---------|------|---------|
 | 1.0 | 2026-02-06 | Initial master prompt (Phase 0 planning baseline) |
 | 1.1 | 2026-02-06 | Phase 0 completion reflected (baseline freeze + trigger update for Phase 1 planning) |
+| 1.2 | 2026-02-06 | Phase state updated to Phase 1 post-execution validation mode; constraints aligned to acceptance workflow. |
 
 ---
 
 **Next Update Trigger**:
-- Phase 1 详细计划定稿后 (sync Phase 0 learnings into next execution phase)
+- Phase 1 长周期证据补齐并完成 Go/No-Go 结论后
+- Phase 2 详细计划定稿后 (sync Phase 1 learnings into next execution phase)
 - 遇到与此 prompt 冲突的新需求
 - 技术栈重大调整

@@ -1,0 +1,13 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.12.12, pytest-9.0.2, pluggy-1.6.0 -- /opt/homebrew/Caskroom/miniforge/base/bin/python3
+cachedir: .pytest_cache
+rootdir: /Users/pyw/new/MyRecall
+configfile: pytest.ini
+plugins: anyio-4.12.1, xdist-3.8.0, cov-7.0.0
+collecting ... collected 3 items
+
+tests/test_phase1_buffer_pool.py::test_pool_allocates_initial_capacity PASSED [ 33%]
+tests/test_phase1_buffer_pool.py::test_pool_expands_to_power_of_two PASSED [ 66%]
+tests/test_phase1_buffer_pool.py::test_pool_uses_temporary_buffer_when_above_limit PASSED [100%]
+
+============================== 3 passed in 0.10s ===============================

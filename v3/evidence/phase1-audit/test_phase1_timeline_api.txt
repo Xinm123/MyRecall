@@ -1,0 +1,23 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.11.14, pytest-9.0.2, pluggy-1.6.0 -- /opt/homebrew/Caskroom/miniforge/base/envs/v3/bin/python3.11
+cachedir: .pytest_cache
+rootdir: /Users/pyw/new/MyRecall
+configfile: pytest.ini
+plugins: anyio-4.12.1
+collecting ... collected 13 items
+
+tests/test_phase1_timeline_api.py::TestTimelineAPI::test_timeline_returns_paginated_response PASSED [  7%]
+tests/test_phase1_timeline_api.py::TestTimelineAPI::test_timeline_time_range_filter PASSED [ 15%]
+tests/test_phase1_timeline_api.py::TestTimelineAPI::test_timeline_pagination PASSED [ 23%]
+tests/test_phase1_timeline_api.py::TestTimelineAPI::test_timeline_frame_urls PASSED [ 30%]
+tests/test_phase1_timeline_api.py::TestTimelineAPI::test_timeline_empty_range PASSED [ 38%]
+tests/test_phase1_timeline_api.py::TestTimelineAPI::test_legacy_timeline_page_uses_frame_urls PASSED [ 46%]
+tests/test_phase1_timeline_api.py::TestTimelineAPI::test_legacy_memories_recent_returns_frame_image_url PASSED [ 53%]
+tests/test_phase1_timeline_api.py::TestFrameServingAPI::test_serve_existing_frame PASSED [ 61%]
+tests/test_phase1_timeline_api.py::TestFrameServingAPI::test_serve_nonexistent_frame PASSED [ 69%]
+tests/test_phase1_timeline_api.py::TestVideoUploadAPI::test_upload_video_chunk PASSED [ 76%]
+tests/test_phase1_timeline_api.py::TestVideoUploadAPI::test_upload_screenshot_still_works PASSED [ 84%]
+tests/test_phase1_timeline_api.py::TestUploadStatusAPI::test_upload_status_not_found PASSED [ 92%]
+tests/test_phase1_timeline_api.py::TestUploadStatusAPI::test_upload_status_missing_checksum PASSED [100%]
+
+============================== 13 passed in 4.79s ==============================

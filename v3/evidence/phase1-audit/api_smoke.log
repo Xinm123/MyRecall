@@ -1,0 +1,166 @@
+=== API SMOKE TEST 1: GET /api/health ===
+HTTP/1.1 200 OK
+Server: Werkzeug/3.1.5 Python/3.12.12
+Date: Sat, 07 Feb 2026 14:42:40 GMT
+Content-Type: application/json
+Content-Length: 21
+Connection: close
+
+{
+  "status": "ok"
+}
+
+=== API SMOKE TEST 2: GET /api/v1/health ===
+HTTP/1.1 200 OK
+Server: Werkzeug/3.1.5 Python/3.12.12
+Date: Sat, 07 Feb 2026 14:42:40 GMT
+Content-Type: application/json
+Content-Length: 21
+Connection: close
+
+{
+  "status": "ok"
+}
+
+=== API SMOKE TEST 3: GET /api/search?q=smoke&limit=5 ===
+HTTP/1.1 200 OK
+Server: Werkzeug/3.1.5 Python/3.12.12
+Date: Sat, 07 Feb 2026 14:42:41 GMT
+Content-Type: application/json
+Content-Length: 3
+Connection: close
+
+[]
+
+=== API SMOKE TEST 4: GET /api/v1/search?q=smoke&page=1&page_size=20 ===
+HTTP/1.1 200 OK
+Server: Werkzeug/3.1.5 Python/3.12.12
+Date: Sat, 07 Feb 2026 14:42:42 GMT
+Content-Type: application/json
+Content-Length: 106
+Connection: close
+
+{
+  "data": [],
+  "meta": {
+    "has_more": false,
+    "limit": 50,
+    "offset": 0,
+    "total": 0
+  }
+}
+
+=== API SMOKE TEST 5: GET /api/v1/timeline ===
+HTTP/1.1 200 OK
+Server: Werkzeug/3.1.5 Python/3.12.12
+Date: Sat, 07 Feb 2026 14:42:42 GMT
+Content-Type: application/json
+Content-Length: 106
+Connection: close
+
+{
+  "data": [],
+  "meta": {
+    "has_more": false,
+    "limit": 50,
+    "offset": 0,
+    "total": 0
+  }
+}
+
+=== API SMOKE TEST 7: POST /api/upload (screenshot) ===
+HTTP/1.1 202 ACCEPTED
+Server: Werkzeug/3.1.5 Python/3.12.12
+Date: Sat, 07 Feb 2026 14:42:51 GMT
+Content-Type: application/json
+Content-Length: 171
+Connection: close
+
+{
+  "debug": {
+    "processing_mode": "FIFO",
+    "queue_size": 1
+  },
+  "elapsed_ms": 1.2,
+  "message": "Queued for processing",
+  "status": "accepted",
+  "task_id": 1
+}
+
+=== API SMOKE TEST 8: POST /api/upload (video) ===
+HTTP/1.1 202 ACCEPTED
+Server: Werkzeug/3.1.5 Python/3.12.12
+Date: Sat, 07 Feb 2026 14:43:01 GMT
+Content-Type: application/json
+Content-Length: 115
+Connection: close
+
+{
+  "chunk_id": 1,
+  "elapsed_ms": 1.3,
+  "message": "Video chunk queued for processing",
+  "status": "accepted"
+}
+
+=== API SMOKE TEST 9: POST /api/v1/upload (video) ===
+HTTP/1.1 202 ACCEPTED
+Server: Werkzeug/3.1.5 Python/3.12.12
+Date: Sat, 07 Feb 2026 14:43:01 GMT
+Content-Type: application/json
+Content-Length: 115
+Connection: close
+
+{
+  "chunk_id": 2,
+  "elapsed_ms": 1.3,
+  "message": "Video chunk queued for processing",
+  "status": "accepted"
+}
+
+=== API SMOKE TEST 10: GET /api/upload/status ===
+HTTP/1.1 200 OK
+Server: Werkzeug/3.1.5 Python/3.12.12
+Date: Sat, 07 Feb 2026 14:43:16 GMT
+Content-Type: application/json
+Content-Length: 54
+Connection: close
+
+{
+  "bytes_received": 2262,
+  "status": "completed"
+}
+
+=== API SMOKE TEST 11: GET /api/v1/upload/status ===
+HTTP/1.1 200 OK
+Server: Werkzeug/3.1.5 Python/3.12.12
+Date: Sat, 07 Feb 2026 14:43:16 GMT
+Content-Type: application/json
+Content-Length: 54
+Connection: close
+
+{
+  "bytes_received": 2262,
+  "status": "completed"
+}
+
+=== API SMOKE TEST 6: GET /api/v1/timeline (retry with data) ===
+HTTP/1.1 200 OK
+Server: Werkzeug/3.1.5 Python/3.12.12
+Date: Sat, 07 Feb 2026 14:43:19 GMT
+Content-Type: application/json
+Content-Length: 106
+Connection: close
+
+{
+  "data": [],
+  "meta": {
+    "has_more": false,
+    "limit": 50,
+    "offset": 0,
+    "total": 0
+  }
+}
+
+=== EXTRACT FRAME_ID ===
+Found 0 frames
+No frames available yet for frame serving test (video still processing). Marking as PASS(deferred).

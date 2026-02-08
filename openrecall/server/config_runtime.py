@@ -40,6 +40,21 @@ class RuntimeSettings:
         # Client state tracking
         self.last_heartbeat: float = time.time()
         """Unix timestamp of last client heartbeat."""
+
+        self.capture_mode: str = "unknown"
+        """Client-reported capture mode: monitor_id|legacy|paused|unknown."""
+
+        self.sck_available: bool = False
+        """Whether client currently reports SCK availability."""
+
+        self.sck_last_error_code: str = ""
+        """Last structured SCK error code reported by client."""
+
+        self.sck_last_error_at: float = 0.0
+        """Unix timestamp when the last structured SCK error happened."""
+
+        self.selected_monitors: list[str] = []
+        """List of monitor IDs selected by the active capture mode."""
         
         # Thread safety
         self._lock = threading.RLock()
@@ -59,6 +74,11 @@ class RuntimeSettings:
                 "ai_processing_version": self.ai_processing_version,
                 "ui_show_ai": self.ui_show_ai,
                 "last_heartbeat": self.last_heartbeat,
+                "capture_mode": self.capture_mode,
+                "sck_available": self.sck_available,
+                "sck_last_error_code": self.sck_last_error_code,
+                "sck_last_error_at": self.sck_last_error_at,
+                "selected_monitors": list(self.selected_monitors),
             }
 
     def notify_change(self) -> None:

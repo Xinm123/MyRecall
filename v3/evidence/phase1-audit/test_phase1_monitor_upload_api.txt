@@ -1,0 +1,15 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.11.14, pytest-9.0.2, pluggy-1.6.0 -- /opt/homebrew/Caskroom/miniforge/base/envs/v3/bin/python3.11
+cachedir: .pytest_cache
+rootdir: /Users/pyw/new/MyRecall
+configfile: pytest.ini
+plugins: anyio-4.12.1
+collecting ... collected 5 items
+
+tests/test_phase1_monitor_upload_api.py::test_upload_status_accepts_sha256_prefix PASSED [ 20%]
+tests/test_phase1_monitor_upload_api.py::test_legacy_upload_status_accepts_sha256_prefix PASSED [ 40%]
+tests/test_phase1_monitor_upload_api.py::test_video_upload_persists_monitor_metadata PASSED [ 60%]
+tests/test_phase1_monitor_upload_api.py::test_legacy_upload_routes_video_chunk_to_video_table PASSED [ 80%]
+tests/test_phase1_monitor_upload_api.py::test_legacy_video_upload_works_without_manual_migration PASSED [100%]
+
+============================== 5 passed in 5.46s ===============================

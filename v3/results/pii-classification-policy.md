@@ -1,9 +1,9 @@
 # MyRecall-v3 PII Classification Policy
 
-**Version**: 1.0
-**Date**: 2026-02-06
-**Phase**: 0 (Foundation)
-**Status**: Approved
+**Version**: 1.1
+**Date**: 2026-02-07
+**Phase**: 0 baseline, refreshed in Phase 1
+**Status**: Approved (Phase 1 monitor-id privacy guidance added)
 
 ---
 
@@ -33,6 +33,26 @@ This document classifies personally identifiable information (PII) that MyRecall
 3. **Retention limits**: All tables include `created_at` and `expires_at` fields. Default retention is 30 days (configurable via `OPENRECALL_RETENTION_DAYS`).
 4. **User control**: User can delete any data at any time. Phase 5 will add a dedicated Deletion API.
 5. **No external data sharing**: All data stays on the user's machine (or their Debian server in Phase 5). No cloud analytics or telemetry.
+
+---
+
+## Multi-Screen Privacy Capture Guide
+
+For multi-monitor setups, configure monitor allowlist explicitly to avoid capturing sensitive side screens.
+
+1. Use `OPENRECALL_VIDEO_MONITOR_IDS` to record only approved displays (comma-separated monitor IDs).
+2. Keep `OPENRECALL_PRIMARY_MONITOR_ONLY=true` when only the primary work screen should be captured.
+3. Keep chat/IM/finance dashboards on excluded monitors when possible.
+4. Verify selected monitor IDs at client startup logs before long recording sessions.
+5. Re-validate monitor mapping after display hot-plug/reboot on Linux/Windows (index ordering can change).
+
+Example:
+
+```bash
+# Record only monitor IDs 69734144 and 69734145
+OPENRECALL_VIDEO_MONITOR_IDS=69734144,69734145
+OPENRECALL_PRIMARY_MONITOR_ONLY=false
+```
 
 ---
 

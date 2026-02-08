@@ -16,6 +16,22 @@ from openrecall.shared.config import settings
 
 logger = logging.getLogger(__name__)
 
+
+def _resolve_snapshot_image_url(snapshot: SemanticSnapshot) -> str:
+    """Resolve a browser URL for a snapshot image path."""
+    raw_path = (snapshot.image_path or "").strip()
+    if not raw_path:
+        return ""
+
+    path = Path(raw_path)
+    # Frame extractor persists images as {frame_id}.png under frames path.
+    if path.suffix.lower() == ".png" and path.stem.isdigit() and settings.frames_path in path.parents:
+        return f"/api/v1/frames/{int(path.stem)}"
+    if path.suffix.lower() == ".png":
+        return f"/screenshots/{path.name}"
+    return ""
+
+
 def construct_rerank_context(snapshot: SemanticSnapshot) -> str:
     # 1. Human-readable Time
     ts = snapshot.context.timestamp
@@ -54,12 +70,48 @@ class SearchEngine:
 
     def search(self, user_query: str, limit: int = 50) -> List[SemanticSnapshot]:
         sorted_results = self._search_impl(user_query=user_query, limit=limit)
-        return [self._attach_score(item['snapshot'], item['score']) for item in sorted_results[:limit]]
+        snapshots: List[SemanticSnapshot] = []
+        for item in sorted_results[:limit]:
+            snap = item.get("snapshot")
+            if snap is None:
+                continue
+            snapshots.append(self._attach_score(snap, item["score"]))
+        return snapshots
 
     def search_debug(self, user_query: str, limit: int = 50) -> List[dict]:
         sorted_results = self._search_impl(user_query=user_query, limit=limit)
         out: List[dict] = []
         for idx, item in enumerate(sorted_results[:limit]):
+            if item.get("snapshot") is None and item.get("source") == "video_frame":
+                vr = item.get("video_data") or {}
+                frame_id = vr.get("frame_id")
+                ts = float(vr.get("timestamp") or 0)
+                dbg = item.get("debug") or {}
+                out.append(
+                    {
+                        "id": f"vframe:{frame_id}",
+                        "timestamp": ts,
+                        "app": vr.get("app_name") or "Unknown",
+                        "title": vr.get("window_name") or "Unknown",
+                        "description": vr.get("text_snippet") or "",
+                        "filename": None,
+                        "image_url": f"/api/v1/frames/{frame_id}" if frame_id is not None else "",
+                        "final_rank": idx + 1,
+                        "final_score": float(item.get("score") or 0.0),
+                        "rerank_rank": dbg.get("rerank_rank"),
+                        "rerank_score": float(dbg.get("rerank_score") or 0.0) if dbg.get("rerank_score") is not None else None,
+                        "combined_rank": dbg.get("combined_rank"),
+                        "vector_rank": dbg.get("vector_rank"),
+                        "vector_score": float(dbg.get("vector_score") or 0.0),
+                        "vector_distance": dbg.get("vector_distance"),
+                        "vector_metric": dbg.get("vector_metric"),
+                        "fts_rank": dbg.get("fts_rank"),
+                        "fts_bm25": dbg.get("fts_bm25"),
+                        "fts_boost": float(dbg.get("fts_boost") or 0.0),
+                    }
+                )
+                continue
+
             snap = item["snapshot"]
             dbg = item["debug"]
             ts = snap.context.timestamp
@@ -71,6 +123,7 @@ class SearchEngine:
                     "title": snap.context.window_title,
                     "description": snap.content.caption,
                     "filename": f"{int(ts)}.png",
+                    "image_url": _resolve_snapshot_image_url(snap),
                     "final_rank": idx + 1,
                     "final_score": float(item["score"]),
                     "rerank_rank": item["debug"].get("rerank_rank"),
@@ -290,7 +343,35 @@ class SearchEngine:
                         
             except Exception as e:
                 logger.exception(f"FTS search failed: {e}")
-                
+
+        # Phase 1: Video FTS search
+        if fts_query:
+            try:
+                video_fts_results = self.sql_store.search_video_fts(fts_query, limit=limit)
+                for vr in video_fts_results:
+                    key = f"vframe:{vr['frame_id']}"
+                    if key not in results_map:
+                        results_map[key] = {
+                            'snapshot': None,
+                            'score': 0.15,
+                            'source': 'video_frame',
+                            'video_data': vr,
+                            'debug': {
+                                'vector_score': 0.0,
+                                'vector_distance': None,
+                                'vector_metric': None,
+                                'base_score': 0.15,
+                                'fts_rank': None,
+                                'fts_boost': 0.0,
+                                'is_fts_match': True,
+                                'fts_bm25': vr.get('score'),
+                            }
+                        }
+                if settings.debug:
+                    logger.debug(f"Video FTS | q='{fts_query}' | candidates={len(video_fts_results)}")
+            except Exception as e:
+                logger.warning(f"Video FTS search failed: {e}")
+
         sorted_results = sorted(
             results_map.values(), 
             key=lambda x: x['score'], 
@@ -302,7 +383,7 @@ class SearchEngine:
             item['debug']['combined_rank'] = rank
 
         # --- Stage 3: Deep Reranking (Top 30) ---
-        candidates = sorted_results[:30]
+        candidates = [c for c in sorted_results[:30] if c.get("snapshot") is not None]
         if candidates and (parsed.text or user_query):
             try:
                 doc_texts = [construct_rerank_context(c['snapshot']) for c in candidates]
@@ -410,15 +491,31 @@ class SearchEngine:
                 )
             logger.debug(f"🔍 Search Debug Report | q='{user_query}' | showing_top={min(limit, len(sorted_results))}")
             for i, item in enumerate(sorted_results[:limit]):
-                snap = item['snapshot']
-                dbg = item['debug']
-                ts = snap.context.timestamp
-                img = f"{int(ts)}.png"
-                
+                snap = item.get("snapshot")
+                dbg = item.get("debug") or {}
+
                 rerank_info = ""
                 if dbg.get('rerank_score') is not None:
                     rerank_info = f" | Rerank={dbg['rerank_score']:.4f} (Rank={dbg.get('rerank_rank')})"
-                
+
+                if snap is None:
+                    video_data = item.get("video_data") or {}
+                    ts = float(video_data.get("timestamp") or 0.0)
+                    img = f"/api/v1/frames/{video_data.get('frame_id')}"
+                    logger.debug(
+                        f"#{i+1} [Score: {item['score']:.4f}] "
+                        f"ID=vframe:{video_data.get('frame_id')} | "
+                        f"Base={dbg.get('base_score', 0.0):.4f} | "
+                        f"Vector={dbg.get('vector_score', 0.0):.4f} "
+                        f"(dist={dbg.get('vector_distance')}, metric={dbg.get('vector_metric')}) | "
+                        f"FTS_Match={'YES' if dbg.get('is_fts_match') else 'NO'} "
+                        f"(Rank={dbg.get('fts_rank')}, bm25={dbg.get('fts_bm25')}, Boost={dbg.get('fts_boost', 0.0):.4f}){rerank_info} | "
+                        f"App='{video_data.get('app_name') or 'Unknown'}' Time={ts} Img={img}"
+                    )
+                    continue
+
+                ts = snap.context.timestamp
+                img = f"{int(ts)}.png"
                 logger.debug(
                     f"#{i+1} [Score: {item['score']:.4f}] "
                     f"ID={snap.id[:8]}... | "

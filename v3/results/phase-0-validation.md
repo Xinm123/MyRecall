@@ -52,6 +52,57 @@
 | 4 | This validation report | `v3/results/phase-0-validation.md` | ✅ Complete |
 | 5 | Roadmap status update | `v3/milestones/roadmap-status.md` | ✅ Updated |
 
+### Request -> Processing -> Storage -> Retrieval Behavior Diagram
+
+```mermaid
+---
+config:
+  layout: dagre
+---
+flowchart LR
+ subgraph REQ["请求层 (Request)"]
+        R1["客户端提交截图<br>POST /api/upload"]
+        R2["v1 客户端请求<br>GET /api/v1/*"]
+        R3["legacy 客户端请求<br>GET /api/*"]
+  end
+ subgraph PROC["处理层 (Processing)"]
+        P1["Flask 路由分发<br>legacy + /api/v1 并存"]
+        P2["Auth Placeholder<br>@require_auth (Phase 0 占位)"]
+        P3["API v1 分页封装<br>PaginatedResponse{data,meta}"]
+        P4["UploadQueue 入队<br>容量/TTL/FIFO/Backoff"]
+        P5["MigrationRunner 启动校验<br>v3 schema + 版本记录"]
+        P6["Rollback / Integrity 工具链<br>回滚与校验"]
+  end
+ subgraph STORE["存储层 (Storage)"]
+        S1["SQLite recall.db<br>entries + v3 multimodal tables"]
+        S2["本地文件存储<br>screenshots / cache / buffer"]
+        S3["配置层<br>local/remote/debian_client/debian_server"]
+  end
+ subgraph RET["检索层 (Retrieval)"]
+        T1["legacy 查询接口<br>/api/memories/* /api/search"]
+        T2["v1 查询接口<br>/api/v1/memories/* /api/v1/search"]
+        T3["运维检索<br>health + migration status"]
+  end
+    R1 --> P1
+    R2 --> P1
+    R3 --> P1
+    P1 --> P2
+    P2 --> P3
+    P1 --> P4
+    P5 --> S1
+    P6 --> S1
+    P4 --> S2
+    P3 --> S1
+    S3 --> P1
+    S3 --> P4
+    R3 --> T1
+    R2 --> T2
+    S1 --> T1
+    S1 --> T2
+    S2 --> T1
+    P5 --> T3
+```
+
 ---
 
 ## 2. Verification Evidence

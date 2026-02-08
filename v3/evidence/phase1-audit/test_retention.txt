@@ -1,0 +1,17 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.12.12, pytest-9.0.2, pluggy-1.6.0 -- /opt/homebrew/Caskroom/miniforge/base/bin/python3
+cachedir: .pytest_cache
+rootdir: /Users/pyw/new/MyRecall
+configfile: pytest.ini
+plugins: anyio-4.12.1, xdist-3.8.0, cov-7.0.0
+collecting ... collected 7 items
+
+tests/test_phase1_retention.py::TestRetentionQueries::test_get_expired_video_chunks PASSED [ 14%]
+tests/test_phase1_retention.py::TestRetentionQueries::test_non_expired_chunks_not_returned PASSED [ 28%]
+tests/test_phase1_retention.py::TestRetentionQueries::test_pending_expired_chunks_not_returned PASSED [ 42%]
+tests/test_phase1_retention.py::TestCascadeDelete::test_delete_video_chunk_cascade PASSED [ 57%]
+tests/test_phase1_retention.py::TestCascadeDelete::test_fts_cleaned_on_cascade PASSED [ 71%]
+tests/test_phase1_retention.py::TestRetentionWorker::test_cleanup_expired_video_chunks PASSED [ 85%]
+tests/test_phase1_retention.py::TestRetentionWorker::test_retention_worker_stop PASSED [100%]
+
+============================== 7 passed in 0.74s ===============================

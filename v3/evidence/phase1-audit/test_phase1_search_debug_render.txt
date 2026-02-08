@@ -1,0 +1,12 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.11.14, pytest-9.0.2, pluggy-1.6.0 -- /opt/homebrew/Caskroom/miniforge/base/envs/v3/bin/python3.11
+cachedir: .pytest_cache
+rootdir: /Users/pyw/new/MyRecall
+configfile: pytest.ini
+plugins: anyio-4.12.1
+collecting ... collected 2 items
+
+tests/test_phase1_search_debug_render.py::test_search_debug_handles_video_frame_only_rows PASSED [ 50%]
+tests/test_phase1_search_debug_render.py::test_search_impl_debug_logging_handles_video_only_candidates PASSED [100%]
+
+============================== 2 passed in 4.47s ===============================

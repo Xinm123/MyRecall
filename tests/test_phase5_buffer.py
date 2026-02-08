@@ -193,6 +193,61 @@ class TestUploaderConsumer:
             # Verify item was deleted
             assert buffer.count() == 0
 
+    def test_consumer_uploads_video_chunk_and_commits(self, buffer_dir, mock_uploader):
+        """Video chunk items should be dispatched to upload_video_chunk."""
+        with patch.dict("os.environ", {"OPENRECALL_DATA_DIR": str(buffer_dir.parent)}):
+            from openrecall.client.buffer import LocalBuffer
+            from openrecall.client.consumer import UploaderConsumer
+
+            buffer = LocalBuffer(storage_dir=buffer_dir)
+
+            src_chunk = buffer_dir.parent / "chunk_test.mp4"
+            src_chunk.write_bytes(b"not-a-real-mp4")
+            metadata = {
+                "type": "video_chunk",
+                "timestamp": 123,
+                "checksum": "abc123",
+                "monitor_id": 1,
+            }
+            buffer.enqueue_file(str(src_chunk), metadata)
+
+            mock_uploader.upload_video_chunk.return_value = True
+
+            consumer = UploaderConsumer(buffer=buffer, uploader=mock_uploader)
+            consumer.start()
+
+            time.sleep(0.5)
+
+            consumer.stop()
+            consumer.join(timeout=2.0)
+
+            mock_uploader.upload_video_chunk.assert_called_once()
+            mock_uploader.upload_screenshot.assert_not_called()
+            assert buffer.count() == 0
+
+    def test_consumer_logs_item_type_and_target_branch(self, buffer_dir, mock_uploader, caplog):
+        """Consumer logs item_type and uploader branch for troubleshooting."""
+        with patch.dict("os.environ", {"OPENRECALL_DATA_DIR": str(buffer_dir.parent)}):
+            from openrecall.client.buffer import LocalBuffer
+            from openrecall.client.consumer import UploaderConsumer
+
+            buffer = LocalBuffer(storage_dir=buffer_dir)
+            src_chunk = buffer_dir.parent / "chunk_log_test.mp4"
+            src_chunk.write_bytes(b"not-a-real-mp4")
+            buffer.enqueue_file(str(src_chunk), {"type": "video_chunk", "timestamp": 456})
+
+            mock_uploader.upload_video_chunk.return_value = True
+            caplog.set_level("INFO", logger="openrecall.client.consumer")
+
+            consumer = UploaderConsumer(buffer=buffer, uploader=mock_uploader)
+            consumer.start()
+            time.sleep(0.5)
+            consumer.stop()
+            consumer.join(timeout=2.0)
+
+            messages = [r.message for r in caplog.records]
+            assert any("Dispatch buffered item" in m and "item_type=video_chunk" in m and "target=upload_video_chunk" in m for m in messages)
+
     def test_consumer_retries_on_failure(self, buffer_dir):
         """Test item preserved on failure (not deleted)."""
         with patch.dict("os.environ", {"OPENRECALL_DATA_DIR": str(buffer_dir.parent)}):

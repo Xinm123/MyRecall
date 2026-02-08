@@ -1,15 +1,15 @@
 # MyRecall-v3 Retention Policy Design
 
-**Version**: 1.0
-**Date**: 2026-02-06
-**Phase**: 0 (Foundation)
-**Status**: Approved
+**Version**: 1.2
+**Date**: 2026-02-07
+**Phase**: 0 design baseline, refreshed after Phase 1 execution
+**Status**: Approved (Phase 1 retention enforcement verified)
 
 ---
 
 ## Purpose
 
-This document describes the data retention mechanism designed in Phase 0 for MyRecall v3. The schema foundation is laid in Phase 0; actual cleanup enforcement is implemented in Phase 1/2 workers.
+This document describes the data retention mechanism designed in Phase 0 for MyRecall v3. The schema foundation was laid in Phase 0, and server-side retention enforcement for video data is implemented and validated in Phase 1.
 
 ---
 
@@ -44,16 +44,20 @@ All data tables include retention-supporting columns:
 
 ## Cleanup Mechanism
 
-### Phase 0 (Current)
+### Phase 0 (Historical)
 - Schema columns created (`created_at`, `expires_at`)
 - No active cleanup job
 - `expires_at` is NULL for all rows (no automatic deletion)
 
-### Phase 1/2 (Future)
-- Background cleanup job runs as part of ProcessingWorker
-- Periodically scans for rows where `expires_at < datetime('now')`
-- Deletes expired rows and associated files (screenshots, video chunks, audio chunks)
-- Runs at configurable interval (default: every 6 hours)
+### Phase 1 (Current)
+- `RetentionWorker` is implemented on server side for video pipeline cleanup.
+- Worker scans rows where `expires_at < datetime('now')`.
+- Deletes expired rows and associated files (video chunks + derived frames/OCR) with consistency cleanup.
+- Validation status: Phase 1 data governance gate for retention is marked PASS in `phase-1-validation.md`.
+
+### Phase 2 (Planned Extension)
+- Extend retention cleanup path to audio chunk and transcription lifecycle.
+- Keep validation criteria aligned with `metrics/phase-gates.md`.
 
 ### Phase 5 (Future)
 - Server-side enforcement of retention policy

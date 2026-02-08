@@ -1,0 +1,40 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.12.12, pytest-9.0.2, pluggy-1.6.0 -- /opt/homebrew/Caskroom/miniforge/base/bin/python3
+cachedir: .pytest_cache
+rootdir: /Users/pyw/new/MyRecall
+configfile: pytest.ini
+plugins: anyio-4.12.1, xdist-3.8.0, cov-7.0.0
+collecting ... collected 30 items
+
+tests/test_phase1_video_recorder.py::TestFFmpegManagerCommand::test_build_command_has_required_flags PASSED [  3%]
+tests/test_phase1_video_recorder.py::TestFFmpegManagerCommand::test_build_command_platform_specific PASSED [  6%]
+tests/test_phase1_video_recorder.py::TestFFmpegManagerCommand::test_build_command_darwin_detects_screen_index PASSED [ 10%]
+tests/test_phase1_video_recorder.py::TestFFmpegManagerCommand::test_build_command_darwin_honors_device_override PASSED [ 13%]
+tests/test_phase1_video_recorder.py::TestFFmpegManagerCommand::test_build_command_darwin_fallbacks_to_screen_name PASSED [ 16%]
+tests/test_phase1_video_recorder.py::TestFFmpegManagerCommand::test_build_command_includes_segment_list PASSED [ 20%]
+tests/test_phase1_video_recorder.py::TestFFmpegManagerCommand::test_custom_resolution_adds_scale_filter PASSED [ 23%]
+tests/test_phase1_video_recorder.py::TestFFmpegManagerLifecycle::test_check_ffmpeg_available PASSED [ 26%]
+tests/test_phase1_video_recorder.py::TestFFmpegManagerLifecycle::test_start_creates_process PASSED [ 30%]
+tests/test_phase1_video_recorder.py::TestFFmpegManagerLifecycle::test_stop_terminates_process PASSED [ 33%]
+tests/test_phase1_video_recorder.py::TestFFmpegManagerLifecycle::test_restart_increments_counter PASSED [ 36%]
+tests/test_phase1_video_recorder.py::TestFFmpegManagerLifecycle::test_restart_count_resets_after_hour PASSED [ 40%]
+tests/test_phase1_video_recorder.py::TestFFmpegManagerLifecycle::test_restart_count_last_hour_property PASSED [ 43%]
+tests/test_phase1_video_recorder.py::TestFFmpegManagerLifecycle::test_restart_count_last_hour_current PASSED [ 46%]
+tests/test_phase1_video_recorder.py::TestFFmpegManagerLifecycle::test_start_raises_without_ffmpeg PASSED [ 50%]
+tests/test_phase1_video_recorder.py::TestFFmpegRawVideoProfile::test_start_with_profile_builds_rawvideo_input PASSED [ 53%]
+tests/test_phase1_video_recorder.py::TestFFmpegRawVideoProfile::test_reconfigure_restarts_on_profile_change PASSED [ 56%]
+tests/test_phase1_video_recorder.py::TestFFmpegSegmentPolling::test_read_segment_list_empty PASSED [ 60%]
+tests/test_phase1_video_recorder.py::TestFFmpegSegmentPolling::test_read_segment_list_csv PASSED [ 63%]
+tests/test_phase1_video_recorder.py::TestFFmpegSegmentPolling::test_poll_segments_detects_new PASSED [ 66%]
+tests/test_phase1_video_recorder.py::TestFFmpegSegmentPolling::test_poll_segments_no_duplicate PASSED [ 70%]
+tests/test_phase1_video_recorder.py::TestFFmpegSegmentPolling::test_on_chunk_complete_callback PASSED [ 73%]
+tests/test_phase1_video_recorder.py::TestVideoRecorder::test_on_chunk_complete_builds_metadata PASSED [ 76%]
+tests/test_phase1_video_recorder.py::TestVideoRecorder::test_on_chunk_complete_skips_empty PASSED [ 80%]
+tests/test_phase1_video_recorder.py::TestVideoRecorder::test_on_chunk_complete_skips_missing PASSED [ 83%]
+tests/test_phase1_video_recorder.py::TestVideoRecorder::test_check_disk_full PASSED [ 86%]
+tests/test_phase1_video_recorder.py::TestVideoRecorder::test_compute_checksum PASSED [ 90%]
+tests/test_phase1_video_recorder.py::TestVideoRecorder::test_stop_sets_flag PASSED [ 93%]
+tests/test_phase1_video_recorder.py::TestVideoRecorder::test_runtime_pause_stops_sources_not_pipelines PASSED [ 96%]
+tests/test_phase1_video_recorder.py::TestVideoRecorder::test_runtime_resume_restarts_sources_from_existing_pipelines PASSED [100%]
+
+============================== 30 passed in 3.87s ==============================

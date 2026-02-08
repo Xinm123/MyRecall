@@ -33,6 +33,22 @@ def main():
     logger.info(f"Capture interval: {settings.capture_interval}s")
     logger.info(f"Upload timeout: {settings.upload_timeout}s")
     logger.info(f"Primary monitor only: {settings.primary_monitor_only}")
+    logger.info(
+        "Video monitor IDs: %s",
+        settings.video_monitor_id_list if settings.video_monitor_id_list else "auto",
+    )
+    logger.info(
+        "Profile-change restart: %s | Pool max bytes: %s",
+        settings.video_pipeline_restart_on_profile_change,
+        settings.video_pool_max_bytes,
+    )
+    logger.info(
+        "SCK retries: max=%s backoff=%ss perm_backoff=%ss auto_recover=%s",
+        settings.sck_start_retry_max,
+        settings.sck_retry_backoff_seconds,
+        settings.sck_permission_backoff_seconds,
+        settings.sck_auto_recover_from_legacy,
+    )
     logger.info("=" * 50)
 
     # Get recorder (manages Producer + Consumer)

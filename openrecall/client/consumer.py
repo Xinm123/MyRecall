@@ -71,23 +71,44 @@ class UploaderConsumer(threading.Thread):
                 # Check if stop requested before upload
                 if self._stop_event.is_set():
                     break
-                    
-                # Load image from disk
-                pil_image = Image.open(item.image_path)
-                image_array = np.array(pil_image)
-                
-                # Attempt upload
-                success = self.uploader.upload_screenshot(
-                    image=image_array,
-                    timestamp=item.metadata.get("timestamp", 0),
-                    active_app=item.metadata.get("active_app", "Unknown"),
-                    active_window=item.metadata.get("active_window", "Unknown"),
+
+                item_type = item.metadata.get("type")
+                target_uploader = "upload_video_chunk" if item_type == "video_chunk" else "upload_screenshot"
+                logger.info(
+                    "Dispatch buffered item | id=%s | item_type=%s | target=%s",
+                    item.id,
+                    item_type or "screenshot",
+                    target_uploader,
                 )
+                if item_type == "video_chunk":
+                    upload_meta = {
+                        k: v
+                        for k, v in item.metadata.items()
+                        if not str(k).startswith("_")
+                    }
+                    success = self.uploader.upload_video_chunk(
+                        file_path=str(item.image_path),
+                        metadata=upload_meta,
+                    )
+                else:
+                    # Legacy/default path: screenshot image upload.
+                    with Image.open(item.image_path) as pil_image:
+                        image_array = np.array(pil_image)
+
+                    success = self.uploader.upload_screenshot(
+                        image=image_array,
+                        timestamp=item.metadata.get("timestamp", 0),
+                        active_app=item.metadata.get("active_app", "Unknown"),
+                        active_window=item.metadata.get("active_window", "Unknown"),
+                    )
                 
                 if success:
                     # Success: delete from buffer
-                    app_name = item.metadata.get("active_app", "Unknown")
-                    logger.info(f"📤 Uploaded: {app_name} | ts={item.metadata.get('timestamp', 0)}")
+                    if item_type == "video_chunk":
+                        logger.info("📤 Uploaded video chunk | ts=%s", item.metadata.get("timestamp", 0))
+                    else:
+                        app_name = item.metadata.get("active_app", "Unknown")
+                        logger.info(f"📤 Uploaded: {app_name} | ts={item.metadata.get('timestamp', 0)}")
                     self.buffer.commit([item.id])
                     self._retry_count = 0
                 else:

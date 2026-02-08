@@ -1,0 +1,42 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.11.14, pytest-9.0.2, pluggy-1.6.0 -- /opt/homebrew/Caskroom/miniforge/base/envs/v3/bin/python3.11
+cachedir: .pytest_cache
+rootdir: /Users/pyw/new/MyRecall
+configfile: pytest.ini
+plugins: anyio-4.12.1
+collecting ... collected 22 items
+
+tests/test_phase1_gates.py::TestGate1F01Recording::test_ffmpeg_command_builds PASSED [  4%]
+tests/test_phase1_gates.py::TestGate1F01Recording::test_video_recorder_chunk_metadata PASSED [  9%]
+tests/test_phase1_gates.py::TestGate1F02FramesInDB::test_frames_inserted_after_processing PASSED [ 13%]
+tests/test_phase1_gates.py::TestGate1F03OCRInFTS::test_ocr_text_in_fts PASSED [ 18%]
+tests/test_phase1_gates.py::TestGate1F04TimelineAPI::test_timeline_query PASSED [ 22%]
+tests/test_phase1_gates.py::TestGate1F05SearchReturnsVideo::test_video_fts_search_returns_results PASSED [ 27%]
+tests/test_phase1_gates.py::TestGate1P01ExtractionLatency::test_extraction_performance PASSED [ 31%]
+tests/test_phase1_gates.py::TestGate1D01CrashRestart::test_restart_mechanism PASSED [ 36%]
+tests/test_phase1_gates.py::TestGate1D02DiskFull::test_disk_full_detection PASSED [ 40%]
+tests/test_phase1_gates.py::TestGate1D04NetworkDown::test_upload_failure_returns_false PASSED [ 45%]
+tests/test_phase1_gates.py::TestGate1DG01FilesystemEncryption::test_filevault_status_check PASSED [ 50%]
+tests/test_phase1_gates.py::TestGate1DG02AutoDelete::test_expired_chunks_detected PASSED [ 54%]
+tests/test_phase1_gates.py::TestGate1DG02AutoDelete::test_cascade_delete_works PASSED [ 59%]
+tests/test_phase1_gates.py::TestGate1S01Stability::test_7_day_stability SKIPPED [ 63%]
+tests/test_phase1_gates.py::TestGate1S02UploadSuccess::test_upload_success_rate SKIPPED [ 68%]
+tests/test_phase1_gates.py::TestGate1R01DiskUsage::test_disk_usage SKIPPED [ 72%]
+tests/test_phase1_gates.py::TestGate1R02MemoryUsage::test_memory_usage SKIPPED [ 77%]
+tests/test_phase1_gates.py::TestGate1P02E2ELatency::test_e2e_latency SKIPPED [ 81%]
+tests/test_phase1_gates.py::TestGate1P03CPUOverhead::test_cpu_overhead SKIPPED [ 86%]
+tests/test_phase1_gates.py::TestGate1Q01OCRAccuracy::test_ocr_accuracy SKIPPED [ 90%]
+tests/test_phase1_gates.py::TestGate1Q02DedupAccuracy::test_dedup_accuracy SKIPPED [ 95%]
+tests/test_phase1_gates.py::TestGate1DG03PIIDetection::test_pii_detection SKIPPED [100%]
+
+=========================== short test summary info ============================
+SKIPPED [1] tests/test_phase1_gates.py:324: Requires 7 calendar days of runtime observation
+SKIPPED [1] tests/test_phase1_gates.py:332: Requires 24h runtime monitoring
+SKIPPED [1] tests/test_phase1_gates.py:340: Requires 24h disk usage measurement
+SKIPPED [1] tests/test_phase1_gates.py:348: Requires runtime memory measurement
+SKIPPED [1] tests/test_phase1_gates.py:356: Requires real video recording and processing pipeline
+SKIPPED [1] tests/test_phase1_gates.py:364: Requires 1h CPU measurement
+SKIPPED [1] tests/test_phase1_gates.py:372: Requires 100-frame curated test dataset
+SKIPPED [1] tests/test_phase1_gates.py:380: Requires manual review of 100 deduplicated frames
+SKIPPED [1] tests/test_phase1_gates.py:388: Optional gate - PII detection not implemented in Phase 1
+======================== 13 passed, 9 skipped in 1.69s =========================

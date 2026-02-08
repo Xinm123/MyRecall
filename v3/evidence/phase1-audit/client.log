@@ -1,0 +1,104 @@
+22:57:59 | INFO    | openrecall.client | ==================================================
+22:57:59 | INFO    | openrecall.client | OpenRecall Client Starting
+22:57:59 | INFO    | openrecall.client | ==================================================
+22:57:59 | INFO    | openrecall.client | Debug mode: ON
+22:57:59 | INFO    | openrecall.client | Buffer path: /Users/pyw/MRC/buffer
+22:57:59 | INFO    | openrecall.client | Client screenshots: /Users/pyw/MRC/screenshots (enabled=False)
+22:57:59 | INFO    | openrecall.client | Cache folder: /Users/pyw/MRS/cache
+22:57:59 | INFO    | openrecall.client | Server API: http://localhost:18083/api
+22:57:59 | INFO    | openrecall.client | Capture interval: 20s
+22:57:59 | INFO    | openrecall.client | Upload timeout: 180s
+22:57:59 | INFO    | openrecall.client | Primary monitor only: True
+22:57:59 | INFO    | openrecall.client | Video monitor IDs: auto
+22:57:59 | INFO    | openrecall.client | Profile-change restart: True | Pool max bytes: 67108864
+22:57:59 | INFO    | openrecall.client | ==================================================
+22:57:59 | INFO    | openrecall.client.recorder | Recording mode: auto -> video (FFmpeg available)
+22:57:59 | INFO    | openrecall.client.video_recorder | Video recorder started (monitor-id pipeline)
+22:57:59 | INFO    | openrecall.client.video_recorder |   Chunk duration: 60s
+22:57:59 | INFO    | openrecall.client.video_recorder |   FPS: 30, CRF: 23
+22:57:59 | INFO    | openrecall.client.consumer | 🚀 Consumer started | Pending uploads: 0
+22:57:59 | INFO    | openrecall.client.video_recorder |   Output dir: /Users/pyw/MRC/video_chunks
+22:57:59 | INFO    | openrecall.client.video_recorder | Selected monitors: 1
+22:57:59 | INFO    | openrecall.client.ffmpeg_manager | Starting FFmpeg: ffmpeg -f rawvideo -pixel_format nv12 -video_size 1512x982 -framerate 30 -color_range tv -i - -c:v h264_videotoolbox -pix_fmt yuv420p -allow_sw 1 -f segment -segment_time 60 -segment_format mp4 -segment_list /Users/pyw/MRC/video_chunks/monitor_1/segments_1.csv -segment_list_type csv -reset_timestamps 1 -y /Users/pyw/MRC/video_chunks/monitor_1/chunk_%04d.mp4
+22:57:59 | INFO    | openrecall.client.ffmpeg_manager | FFmpeg watchdog started
+22:57:59 | INFO    | openrecall.client.ffmpeg_manager | FFmpeg started (PID=14071)
+22:58:59 | WARNING | openrecall.client.video_recorder | Slow ffmpeg stdin write monitor=1 latency=106.80ms
+22:59:02 | INFO    | openrecall.client.buffer | Buffered file (video_chunk): chunk_0000.mp4 | Queue: 1 items
+22:59:02 | INFO    | openrecall.client.video_recorder | Video chunk enqueued: chunk_0000.mp4 (28.0MB monitor_id=1)
+22:59:02 | WARNING | openrecall.client.video_recorder | Slow ffmpeg stdin write monitor=1 latency=70.34ms
+22:59:03 | INFO    | openrecall.client.consumer | Dispatch buffered item | id=20260207_225902_265641_8ed338c3 | item_type=video_chunk | target=upload_video_chunk
+22:59:03 | INFO    | openrecall.client.consumer | 📤 Uploaded video chunk | ts=1770476342
+22:59:03 | INFO    | openrecall.client.buffer | ✅ Committed: 20260207_225902_2656... | Remaining: 0 items
+22:59:08 | WARNING | openrecall.client.video_recorder | Slow ffmpeg stdin write monitor=1 latency=58.13ms
+22:59:08 | WARNING | openrecall.client.video_recorder | Slow ffmpeg stdin write monitor=1 latency=109.19ms
+22:59:10 | WARNING | openrecall.client.video_recorder | Slow ffmpeg stdin write monitor=1 latency=112.90ms
+22:59:14 | WARNING | openrecall.client.video_recorder | Slow ffmpeg stdin write monitor=1 latency=58.88ms
+22:59:15 | WARNING | openrecall.client.video_recorder | Slow ffmpeg stdin write monitor=1 latency=56.25ms
+22:59:16 | WARNING | openrecall.client.video_recorder | Slow ffmpeg stdin write monitor=1 latency=114.17ms
+22:59:23 | WARNING | openrecall.client.video_recorder | Slow ffmpeg stdin write monitor=1 latency=59.91ms
+22:59:29 | WARNING | openrecall.client.video_recorder | Slow ffmpeg stdin write monitor=1 latency=146.00ms
+22:59:33 | WARNING | openrecall.client.video_recorder | Slow ffmpeg stdin write monitor=1 latency=53.66ms
+23:00:03 | INFO    | openrecall.client.buffer | Buffered file (video_chunk): chunk_0001.mp4 | Queue: 1 items
+23:00:03 | INFO    | openrecall.client.video_recorder | Video chunk enqueued: chunk_0001.mp4 (26.2MB monitor_id=1)
+23:00:04 | INFO    | openrecall.client.consumer | Dispatch buffered item | id=20260207_230003_524996_77d5b769 | item_type=video_chunk | target=upload_video_chunk
+23:00:04 | INFO    | openrecall.client.consumer | 📤 Uploaded video chunk | ts=1770476403
+23:00:04 | INFO    | openrecall.client.buffer | ✅ Committed: 20260207_230003_5249... | Remaining: 0 items
+23:01:04 | INFO    | openrecall.client.buffer | Buffered file (video_chunk): chunk_0002.mp4 | Queue: 1 items
+23:01:04 | INFO    | openrecall.client.video_recorder | Video chunk enqueued: chunk_0002.mp4 (34.4MB monitor_id=1)
+23:01:05 | INFO    | openrecall.client.consumer | Dispatch buffered item | id=20260207_230104_768313_18389d1b | item_type=video_chunk | target=upload_video_chunk
+23:01:05 | INFO    | openrecall.client.consumer | 📤 Uploaded video chunk | ts=1770476464
+23:01:05 | INFO    | openrecall.client.buffer | ✅ Committed: 20260207_230104_7683... | Remaining: 0 items
+23:01:52 | WARNING | openrecall.client.video_recorder | Slow ffmpeg stdin write monitor=1 latency=53.60ms
+23:01:54 | WARNING | openrecall.client.video_recorder | Slow ffmpeg stdin write monitor=1 latency=103.81ms
+23:02:03 | WARNING | openrecall.client.video_recorder | Slow ffmpeg stdin write monitor=1 latency=100.01ms
+23:02:05 | WARNING | openrecall.client.video_recorder | Slow ffmpeg stdin write monitor=1 latency=95.27ms
+23:02:06 | INFO    | openrecall.client.buffer | Buffered file (video_chunk): chunk_0003.mp4 | Queue: 1 items
+23:02:06 | INFO    | openrecall.client.video_recorder | Video chunk enqueued: chunk_0003.mp4 (36.5MB monitor_id=1)
+23:02:06 | INFO    | openrecall.client.consumer | Dispatch buffered item | id=20260207_230206_041756_eff8a289 | item_type=video_chunk | target=upload_video_chunk
+23:02:07 | INFO    | openrecall.client.consumer | 📤 Uploaded video chunk | ts=1770476526
+23:02:07 | INFO    | openrecall.client.buffer | ✅ Committed: 20260207_230206_0417... | Remaining: 0 items
+23:03:07 | INFO    | openrecall.client.buffer | Buffered file (video_chunk): chunk_0004.mp4 | Queue: 1 items
+23:03:07 | INFO    | openrecall.client.video_recorder | Video chunk enqueued: chunk_0004.mp4 (43.2MB monitor_id=1)
+23:03:07 | INFO    | openrecall.client.consumer | Dispatch buffered item | id=20260207_230307_304098_3d31baf5 | item_type=video_chunk | target=upload_video_chunk
+23:03:07 | INFO    | openrecall.client.consumer | 📤 Uploaded video chunk | ts=1770476587
+23:03:07 | INFO    | openrecall.client.buffer | ✅ Committed: 20260207_230307_3040... | Remaining: 0 items
+23:03:24 | WARNING | openrecall.client.video_recorder | Slow ffmpeg stdin write monitor=1 latency=88.13ms
+23:03:45 | WARNING | openrecall.client.video_recorder | Slow ffmpeg stdin write monitor=1 latency=124.89ms
+23:03:57 | WARNING | openrecall.client.video_recorder | Slow ffmpeg stdin write monitor=1 latency=102.48ms
+23:03:59 | WARNING | openrecall.client.video_recorder | Slow ffmpeg stdin write monitor=1 latency=97.93ms
+23:04:08 | INFO    | openrecall.client.buffer | Buffered file (video_chunk): chunk_0005.mp4 | Queue: 1 items
+23:04:08 | INFO    | openrecall.client.video_recorder | Video chunk enqueued: chunk_0005.mp4 (40.2MB monitor_id=1)
+23:04:08 | INFO    | openrecall.client.consumer | Dispatch buffered item | id=20260207_230408_571532_d6c0933d | item_type=video_chunk | target=upload_video_chunk
+23:04:08 | INFO    | openrecall.client.consumer | 📤 Uploaded video chunk | ts=1770476648
+23:04:08 | INFO    | openrecall.client.buffer | ✅ Committed: 20260207_230408_5715... | Remaining: 0 items
+23:15:39 | WARNING | openrecall.client.video_recorder | Heartbeat failed (network): ('Connection aborted.', ConnectionResetError(54, 'Connection reset by peer'))
+23:15:44 | WARNING | openrecall.client.video_recorder | Heartbeat failed (network): HTTPConnectionPool(host='localhost', port=18083): Max retries exceeded with url: /api/heartbeat (Caused by NewConnectionError("HTTPConnection(host='localhost', port=18083): Failed to establish a new connection: [Errno 61] Connection refused"))
+23:15:49 | WARNING | openrecall.client.video_recorder | Heartbeat failed (network): HTTPConnectionPool(host='localhost', port=18083): Max retries exceeded with url: /api/heartbeat (Caused by NewConnectionError("HTTPConnection(host='localhost', port=18083): Failed to establish a new connection: [Errno 61] Connection refused"))
+23:15:54 | WARNING | openrecall.client.video_recorder | Heartbeat failed (network): HTTPConnectionPool(host='localhost', port=18083): Max retries exceeded with url: /api/heartbeat (Caused by NewConnectionError("HTTPConnection(host='localhost', port=18083): Failed to establish a new connection: [Errno 61] Connection refused"))
+23:15:59 | WARNING | openrecall.client.video_recorder | Heartbeat failed (network): HTTPConnectionPool(host='localhost', port=18083): Max retries exceeded with url: /api/heartbeat (Caused by NewConnectionError("HTTPConnection(host='localhost', port=18083): Failed to establish a new connection: [Errno 61] Connection refused"))
+23:16:04 | WARNING | openrecall.client.video_recorder | Heartbeat failed (network): HTTPConnectionPool(host='localhost', port=18083): Max retries exceeded with url: /api/heartbeat (Caused by NewConnectionError("HTTPConnection(host='localhost', port=18083): Failed to establish a new connection: [Errno 61] Connection refused"))
+23:16:09 | WARNING | openrecall.client.video_recorder | Heartbeat failed (network): HTTPConnectionPool(host='localhost', port=18083): Max retries exceeded with url: /api/heartbeat (Caused by NewConnectionError("HTTPConnection(host='localhost', port=18083): Failed to establish a new connection: [Errno 61] Connection refused"))
+23:16:14 | WARNING | openrecall.client.video_recorder | Heartbeat failed (network): HTTPConnectionPool(host='localhost', port=18083): Max retries exceeded with url: /api/heartbeat (Caused by NewConnectionError("HTTPConnection(host='localhost', port=18083): Failed to establish a new connection: [Errno 61] Connection refused"))
+23:17:19 | WARNING | openrecall.client.video_recorder | Heartbeat failed (network): HTTPConnectionPool(host='localhost', port=18083): Max retries exceeded with url: /api/heartbeat (Caused by NewConnectionError("HTTPConnection(host='localhost', port=18083): Failed to establish a new connection: [Errno 61] Connection refused"))
+23:17:24 | WARNING | openrecall.client.video_recorder | Heartbeat failed (network): HTTPConnectionPool(host='localhost', port=18083): Max retries exceeded with url: /api/heartbeat (Caused by NewConnectionError("HTTPConnection(host='localhost', port=18083): Failed to establish a new connection: [Errno 61] Connection refused"))
+23:17:29 | WARNING | openrecall.client.video_recorder | Heartbeat failed (network): HTTPConnectionPool(host='localhost', port=18083): Max retries exceeded with url: /api/heartbeat (Caused by NewConnectionError("HTTPConnection(host='localhost', port=18083): Failed to establish a new connection: [Errno 61] Connection refused"))
+23:17:34 | WARNING | openrecall.client.video_recorder | Heartbeat failed (network): HTTPConnectionPool(host='localhost', port=18083): Max retries exceeded with url: /api/heartbeat (Caused by NewConnectionError("HTTPConnection(host='localhost', port=18083): Failed to establish a new connection: [Errno 61] Connection refused"))
+23:17:40 | WARNING | openrecall.client.video_recorder | Heartbeat failed (network): HTTPConnectionPool(host='localhost', port=18083): Max retries exceeded with url: /api/heartbeat (Caused by NewConnectionError("HTTPConnection(host='localhost', port=18083): Failed to establish a new connection: [Errno 61] Connection refused"))
+23:17:42 | INFO    | openrecall.client | 
+23:17:42 | INFO    | openrecall.client | Received shutdown signal, stopping client...
+23:17:44 | INFO    | openrecall.client.ffmpeg_manager | FFmpeg watchdog stopped
+00:38:58 | INFO    | openrecall.client.consumer | Dispatch buffered item | id=20260208_003857_491647_a9bd6f89 | item_type=video_chunk | target=upload_video_chunk
+00:38:58 | INFO    | openrecall.client.consumer | 📤 Uploaded video chunk | ts=1770482337
+00:38:58 | INFO    | openrecall.client.buffer | ✅ Committed: 20260208_003857_4916... | Remaining: 0 items
+00:40:01 | INFO    | openrecall.client.consumer | Dispatch buffered item | id=20260208_004000_800864_1bb8acde | item_type=video_chunk | target=upload_video_chunk
+00:40:01 | INFO    | openrecall.client.consumer | 📤 Uploaded video chunk | ts=1770482400
+00:40:01 | INFO    | openrecall.client.buffer | ✅ Committed: 20260208_004000_8008... | Remaining: 0 items
+00:41:04 | INFO    | openrecall.client.consumer | Dispatch buffered item | id=20260208_004104_098940_cbbaf86b | item_type=video_chunk | target=upload_video_chunk
+00:41:04 | INFO    | openrecall.client.consumer | 📤 Uploaded video chunk | ts=1770482464
+00:41:04 | INFO    | openrecall.client.buffer | ✅ Committed: 20260208_004104_0989... | Remaining: 0 items
+00:42:07 | INFO    | openrecall.client.consumer | Dispatch buffered item | id=20260208_004206_376111_f247121d | item_type=video_chunk | target=upload_video_chunk
+00:42:07 | INFO    | openrecall.client.consumer | 📤 Uploaded video chunk | ts=1770482526
+00:43:09 | INFO    | openrecall.client.consumer | Dispatch buffered item | id=20260208_004308_643319_99ed609c | item_type=video_chunk | target=upload_video_chunk
+00:43:09 | INFO    | openrecall.client.consumer | 📤 Uploaded video chunk | ts=1770482588
+00:44:10 | INFO    | openrecall.client.consumer | Dispatch buffered item | id=20260208_004409_921141_da9ed0bb | item_type=video_chunk | target=upload_video_chunk
+00:44:10 | INFO    | openrecall.client.consumer | 📤 Uploaded video chunk | ts=1770482649

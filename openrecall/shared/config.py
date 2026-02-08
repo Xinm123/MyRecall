@@ -38,6 +38,17 @@ class Settings(BaseSettings):
     - OPENRECALL_EMBEDDING_API_BASE: Optional override for embedding API base URL
     - OPENRECALL_UPLOAD_TIMEOUT: Client upload timeout in seconds
     - OPENRECALL_EMBEDDING_MODEL: Embedding model name for semantic search
+    - OPENRECALL_VIDEO_MONITOR_IDS: Comma-separated monitor IDs for monitor-id recording
+    - OPENRECALL_VIDEO_PIPELINE_RESTART_ON_PROFILE_CHANGE: Restart pipeline on profile change
+    - OPENRECALL_VIDEO_POOL_MAX_BYTES: Max persistent frame buffer size per monitor
+    - OPENRECALL_VIDEO_SEGMENT_STAGGER_SECONDS: Startup stagger for multi-monitor pipelines
+    - OPENRECALL_VIDEO_PIPE_WRITE_WARN_MS: Warn threshold for ffmpeg stdin write latency
+    - OPENRECALL_VIDEO_COLOR_RANGE: Raw input color range policy (auto|tv|pc)
+    - OPENRECALL_SCK_START_RETRY_MAX: Max short-retry count before degrading to legacy mode
+    - OPENRECALL_SCK_RETRY_BACKOFF_SECONDS: Backoff seconds between short SCK retries
+    - OPENRECALL_SCK_PERMISSION_BACKOFF_SECONDS: Backoff seconds after permission denied
+    - OPENRECALL_SCK_RECOVERY_PROBE_SECONDS: Probe interval to recover from legacy to SCK
+    - OPENRECALL_SCK_AUTO_RECOVER_FROM_LEGACY: Whether to auto-probe and recover to SCK
     """
     
     debug: bool = Field(default=True, alias="OPENRECALL_DEBUG")
@@ -285,6 +296,103 @@ class Settings(BaseSettings):
         alias="OPENRECALL_DEPLOYMENT_MODE",
         description="Deployment mode: local, remote, debian_client, debian_server"
     )
+
+    # Phase 1: Video Recording Configuration
+    recording_mode: str = Field(
+        default="auto",
+        alias="OPENRECALL_RECORDING_MODE",
+        description="Recording mode: video, screenshot, auto (auto tries video first, falls back to screenshot)"
+    )
+    video_chunk_duration: int = Field(
+        default=60,
+        alias="OPENRECALL_VIDEO_CHUNK_DURATION",
+        description="Video chunk duration in seconds (default: 60 = 1 minute)"
+    )
+    video_fps: int = Field(
+        default=30,
+        alias="OPENRECALL_VIDEO_FPS",
+        description="Video recording FPS"
+    )
+    video_crf: int = Field(
+        default=23,
+        alias="OPENRECALL_VIDEO_CRF",
+        description="Video encoding quality (lower=better quality, 0-51)"
+    )
+    video_monitor_ids: str = Field(
+        default="",
+        alias="OPENRECALL_VIDEO_MONITOR_IDS",
+        description="Comma-separated monitor IDs for monitor-id capture. Empty means auto-select."
+    )
+    video_pipeline_restart_on_profile_change: bool = Field(
+        default=True,
+        alias="OPENRECALL_VIDEO_PIPELINE_RESTART_ON_PROFILE_CHANGE",
+        description="Immediately restart per-monitor pipeline on input profile changes."
+    )
+    video_pool_max_bytes: int = Field(
+        default=64 * 1024 * 1024,
+        alias="OPENRECALL_VIDEO_POOL_MAX_BYTES",
+        description="Maximum persistent frame buffer size per monitor (bytes)."
+    )
+    video_segment_stagger_seconds: int = Field(
+        default=2,
+        alias="OPENRECALL_VIDEO_SEGMENT_STAGGER_SECONDS",
+        description="Delay applied between multi-monitor pipeline starts to reduce simultaneous segment IO bursts."
+    )
+    video_pipe_write_warn_ms: int = Field(
+        default=50,
+        alias="OPENRECALL_VIDEO_PIPE_WRITE_WARN_MS",
+        description="Warn when a single ffmpeg stdin frame write exceeds this latency (ms)."
+    )
+    video_color_range: str = Field(
+        default="auto",
+        alias="OPENRECALL_VIDEO_COLOR_RANGE",
+        description="Raw input color range policy: auto|tv|pc."
+    )
+    sck_start_retry_max: int = Field(
+        default=3,
+        alias="OPENRECALL_SCK_START_RETRY_MAX",
+        description="How many short SCK startup retries are attempted before falling back to legacy capture."
+    )
+    sck_retry_backoff_seconds: int = Field(
+        default=2,
+        alias="OPENRECALL_SCK_RETRY_BACKOFF_SECONDS",
+        description="Backoff between regular SCK startup retries (seconds)."
+    )
+    sck_permission_backoff_seconds: int = Field(
+        default=30,
+        alias="OPENRECALL_SCK_PERMISSION_BACKOFF_SECONDS",
+        description="Backoff after SCK permission_denied before retrying (seconds)."
+    )
+    sck_recovery_probe_seconds: int = Field(
+        default=5,
+        alias="OPENRECALL_SCK_RECOVERY_PROBE_SECONDS",
+        description="Probe interval to recover from legacy fallback back to monitor-id/SCK mode."
+    )
+    sck_auto_recover_from_legacy: bool = Field(
+        default=True,
+        alias="OPENRECALL_SCK_AUTO_RECOVER_FROM_LEGACY",
+        description="Whether to automatically probe and recover from legacy fallback to SCK mode."
+    )
+    frame_extraction_interval: float = Field(
+        default=5.0,
+        alias="OPENRECALL_FRAME_EXTRACTION_INTERVAL",
+        description="Seconds between extracted frames (default: 5.0 = 1 frame per 5s)"
+    )
+    frame_dedup_threshold: float = Field(
+        default=0.95,
+        alias="OPENRECALL_FRAME_DEDUP_THRESHOLD",
+        description="MSSIM threshold for frame deduplication (0.0-1.0)"
+    )
+    retention_days: int = Field(
+        default=30,
+        alias="OPENRECALL_RETENTION_DAYS",
+        description="Number of days to retain data before auto-deletion"
+    )
+    retention_check_interval: int = Field(
+        default=21600,
+        alias="OPENRECALL_RETENTION_CHECK_INTERVAL",
+        description="Seconds between retention cleanup runs (default: 21600 = 6 hours)"
+    )
     
     @field_validator(
         "server_data_dir", 
@@ -347,6 +455,26 @@ class Settings(BaseSettings):
     def buffer_path(self) -> Path:
         """Directory for local buffering when server is unavailable."""
         return self.client_data_dir / "buffer"
+
+    @property
+    def frames_path(self) -> Path:
+        """Directory for storing extracted frame images (Server side)."""
+        return self.server_data_dir / "frames"
+
+    @property
+    def video_chunks_path(self) -> Path:
+        """Directory for storing video chunk files (Server side)."""
+        return self.server_data_dir / "video_chunks"
+
+    @property
+    def client_video_chunks_path(self) -> Path:
+        """Directory for client-side video chunk output."""
+        return self.client_data_dir / "video_chunks"
+
+    @property
+    def video_monitor_id_list(self) -> list[str]:
+        """Parsed list for OPENRECALL_VIDEO_MONITOR_IDS."""
+        return [item.strip() for item in self.video_monitor_ids.split(",") if item.strip()]
     
     @property
     def model_cache_path(self) -> Path:
@@ -369,6 +497,9 @@ class Settings(BaseSettings):
             self.lancedb_path,
             self.model_cache_path,
             self.cache_path,
+            self.frames_path,
+            self.video_chunks_path,
+            self.client_video_chunks_path,
         ]
         
         for directory in directories:

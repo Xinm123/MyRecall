@@ -1,0 +1,26 @@
+HTTP/1.1 200 OK
+Server: Werkzeug/3.1.5 Python/3.12.12
+Date: Sat, 07 Feb 2026 15:07:37 GMT
+Content-Type: application/json
+Content-Length: 683
+Connection: close
+
+{
+  "data": [
+    {
+      "app_name": "Unknown",
+      "caption": "The screen is entirely filled with a solid red color, indicating a possible error, loading state, or intentional display of a red background. There are no visible elements, text, or icons. The user's intent may be to view this red screen, perhaps as part of a test, a system error, or a design element.",
+      "id": "d16210ad-541b-435e-bc97-43f04b63d7f1",
+      "image_path": "/Users/pyw/MRS/screenshots/1770475371.png",
+      "scene_tag": "error",
+      "timestamp": 1770475371.0,
+      "window_title": "Unknown"
+    }
+  ],
+  "meta": {
+    "has_more": false,
+    "limit": 50,
+    "offset": 0,
+    "total": 1
+  }
+}

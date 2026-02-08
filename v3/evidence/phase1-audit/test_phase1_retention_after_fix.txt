@@ -1,0 +1,75 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.11.14, pytest-9.0.2, pluggy-1.6.0 -- /opt/homebrew/Caskroom/miniforge/base/envs/v3/bin/python3.11
+cachedir: .pytest_cache
+rootdir: /Users/pyw/new/MyRecall
+configfile: pytest.ini
+plugins: anyio-4.12.1
+collecting ... collected 10 items
+
+tests/test_phase1_retention.py::TestRetentionQueries::test_get_expired_video_chunks PASSED [ 10%]
+tests/test_phase1_retention.py::TestRetentionQueries::test_non_expired_chunks_not_returned PASSED [ 20%]
+tests/test_phase1_retention.py::TestRetentionQueries::test_chunks_expired_over_30_days_are_returned PASSED [ 30%]
+tests/test_phase1_retention.py::TestRetentionQueries::test_chunks_expiring_in_30_days_are_not_returned PASSED [ 40%]
+tests/test_phase1_retention.py::TestRetentionQueries::test_pending_expired_chunks_not_returned PASSED [ 50%]
+tests/test_phase1_retention.py::TestCascadeDelete::test_delete_video_chunk_cascade PASSED [ 60%]
+tests/test_phase1_retention.py::TestCascadeDelete::test_fts_cleaned_on_cascade PASSED [ 70%]
+tests/test_phase1_retention.py::TestRetentionWorker::test_cleanup_expired_video_chunks PASSED [ 80%]
+tests/test_phase1_retention.py::TestRetentionWorker::test_cleanup_31_day_expired_chunk_deletes_all_related_data FAILED [ 90%]
+tests/test_phase1_retention.py::TestRetentionWorker::test_retention_worker_stop PASSED [100%]
+
+=================================== FAILURES ===================================
+_ TestRetentionWorker.test_cleanup_31_day_expired_chunk_deletes_all_related_data _
+
+self = <test_phase1_retention.TestRetentionWorker object at 0x1103bf490>
+sql_store = <openrecall.server.database.sql.SQLStore object at 0x168ae8f10>
+tmp_path = PosixPath('/private/var/folders/q2/gtfbxhrj7zv1xn9cn6f3pzj40000gn/T/pytest-of-pyw/pytest-95/test_cleanup_31_day_expired_ch0')
+
+    def test_cleanup_31_day_expired_chunk_deletes_all_related_data(self, sql_store, tmp_path):
+        """31-day expired COMPLETED chunk cleanup deletes DB rows + files + FTS."""
+        from openrecall.server.retention import RetentionWorker
+        from openrecall.shared.config import settings
+    
+        video_file = tmp_path / "expired31_video.mp4"
+        video_file.write_bytes(b"video data")
+        chunk_id, frame_ids = _seed_expired_chunk(
+            settings.db_path,
+            str(video_file),
+            settings.frames_path,
+            num_frames=2,
+            days_ago=31,
+        )
+    
+        conn = sqlite3.connect(str(settings.db_path))
+        frame_count_before = conn.execute(
+            "SELECT COUNT(*) FROM frames WHERE video_chunk_id=?",
+            (chunk_id,),
+        ).fetchone()[0]
+        ocr_count_before = conn.execute(
+            "SELECT COUNT(*) FROM ocr_text WHERE frame_id IN (SELECT id FROM frames WHERE video_chunk_id=?)",
+            (chunk_id,),
+        ).fetchone()[0]
+        fts_count_before = conn.execute(
+            "SELECT COUNT(*) FROM ocr_text_fts WHERE frame_id IN (SELECT id FROM frames WHERE video_chunk_id=?)",
+            (chunk_id,),
+        ).fetchone()[0]
+        conn.close()
+    
+        assert frame_count_before == 2
+        assert ocr_count_before == 2
+        assert fts_count_before == 2
+    
+        worker = RetentionWorker()
+        worker._cleanup_expired_video_chunks(sql_store)
+    
+        assert not video_file.exists()
+        for fid in frame_ids:
+>           assert not (settings.frames_path / f"{fid}.png").exists()
+E           AssertionError: assert not True
+E            +  where True = exists()
+E            +    where exists = (PosixPath('/private/var/folders/q2/gtfbxhrj7zv1xn9cn6f3pzj40000gn/T/pytest-of-pyw/pytest-95/test_cleanup_31_day_expired_ch0/MRS/frames') / '1.png').exists
+E            +      where PosixPath('/private/var/folders/q2/gtfbxhrj7zv1xn9cn6f3pzj40000gn/T/pytest-of-pyw/pytest-95/test_cleanup_31_day_expired_ch0/MRS/frames') = Settings(debug=True, capture_interval=10, host='127.0.0.1', port=8083, primary_monitor_only=True, server_data_dir=PosixPath('/private/var/folders/q2/gtfbxhrj7zv1xn9cn6f3pzj40000gn/T/pytest-of-pyw/pytest-95/test_cleanup_31_day_expired_ch0/MRS'), client_data_dir=PosixPath('/private/var/folders/q2/gtfbxhrj7zv1xn9cn6f3pzj40000gn/T/pytest-of-pyw/pytest-95/test_cleanup_31_day_expired_ch0/MRC'), base_path_legacy=PosixPath('/private/var/folders/q2/gtfbxhrj7zv1xn9cn6f3pzj40000gn/T/pytest-of-pyw/pytest-95/test_cleanup_31_day_expired_ch0'), cache_dir=None, client_screenshots_dir=None, api_url='http://localhost:8083/api', device='cpu', upload_timeout=180, ai_request_timeout=120, preload_models=True, ai_provider='local', ai_model_name='', ai_api_key='', ai_api_base='', vision_provider='', vision_model_name='', vision_api_key='', vision_api_base='', ocr_provider='', ocr_model_name='', ocr_api_key='', ocr_api_base='', ocr_rapid_use_local=False, ocr_rapid_model_dir=None, ocr_rapid_det_model=None, ocr_rapid_rec_model=None, ocr_rapid_cls_model=None, embedding_provider='', embedding_api_model_name='', embedding_api_key='', embedding_api_base='', embedding_model_name='qwen-text-v1', keyword_strategy='local', embedding_dim=1024, reranker_mode='api', reranker_url='http://localhost:8080/rerank', reranker_model='Qwen/Qwen3-Reranker-0.6B', reranker_api_key='', processing_lifo_threshold=10, show_ai_description=True, user_idle_threshold_seconds=60, similarity_threshold=0.98, disable_similarity_filter=False, client_save_local_screenshots=False, fusion_log_enabled=False, deployment_mode='local', recording_mode='auto', video_chunk_duration=60, video_fps=30, video_crf=23, video_monitor_ids='', video_pipeline_restart_on_profile_change=True, video_pool_max_bytes=67108864, video_segment_stagger_seconds=2, video_pipe_write_warn_ms=50, video_color_range='auto', frame_extraction_interval=5.0, frame_dedup_threshold=0.95, retention_days=30, retention_check_interval=21600).frames_path
+
+tests/test_phase1_retention.py:292: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_phase1_retention.py::TestRetentionWorker::test_cleanup_31_day_expired_chunk_deletes_all_related_data
+========================= 1 failed, 9 passed in 1.50s ==========================

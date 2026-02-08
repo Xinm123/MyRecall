@@ -7,6 +7,7 @@ zero data loss even when the server is unavailable.
 import json
 import logging
 import os
+import shutil
 import uuid
 from dataclasses import dataclass
 from datetime import datetime
@@ -91,7 +92,48 @@ class LocalBuffer:
         
         app_name = metadata.get("active_app", "Unknown")
         buffer_count = self.count()
-        logger.info(f"📥 Buffered: {app_name} | Queue: {buffer_count} items")
+        logger.info(f"Buffered: {app_name} | Queue: {buffer_count} items")
+        return unique_id
+
+    def enqueue_file(self, file_path: str, metadata: Dict[str, Any]) -> str:
+        """Add an arbitrary file (e.g., video chunk) and metadata to the buffer queue.
+
+        Copies the file into the buffer directory with a unique name,
+        then writes metadata atomically.
+
+        Args:
+            file_path: Path to the file to buffer.
+            metadata: Dictionary with type, timestamp, checksum, etc.
+
+        Returns:
+            The unique ID of the buffered item.
+        """
+        timestamp_str = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+        unique_id = f"{timestamp_str}_{uuid.uuid4().hex[:8]}"
+
+        src = Path(file_path)
+        suffix = src.suffix or ".bin"
+        dest_path = self.storage_dir / f"{unique_id}{suffix}"
+        meta_tmp_path = self.storage_dir / f"{unique_id}.json.tmp"
+        meta_path = self.storage_dir / f"{unique_id}.json"
+
+        # Step 1: Copy or move file into buffer
+        shutil.copy2(str(src), str(dest_path))
+
+        # Step 2: Write metadata (include the buffer-local filename)
+        serializable_meta = self._serialize_metadata(metadata)
+        serializable_meta["_buffer_file"] = dest_path.name
+        serializable_meta["_original_path"] = str(src)
+
+        with open(meta_tmp_path, "w", encoding="utf-8") as f:
+            json.dump(serializable_meta, f, ensure_ascii=False, indent=2)
+
+        # Step 3: Atomic commit
+        os.rename(meta_tmp_path, meta_path)
+
+        file_type = metadata.get("type", "unknown")
+        buffer_count = self.count()
+        logger.info(f"Buffered file ({file_type}): {src.name} | Queue: {buffer_count} items")
         return unique_id
     
     def _serialize_metadata(self, metadata: Dict[str, Any]) -> Dict[str, Any]:
@@ -115,49 +157,57 @@ class LocalBuffer:
     
     def get_next_batch(self, limit: int = 1) -> List[BufferItem]:
         """Get the next batch of items from the buffer (FIFO order).
-        
-        Scans for .json files, validates corresponding .webp exists,
+
+        Scans for .json files, validates corresponding data file exists
+        (.webp for screenshots, .mp4 for video chunks, etc.),
         and returns items sorted by filename (oldest first).
-        
+
         Args:
             limit: Maximum number of items to return.
-            
+
         Returns:
             List of BufferItem objects. Does NOT load images into memory.
         """
         items: List[BufferItem] = []
-        
+
         # Scan for .json files (not .json.tmp - those are incomplete)
         json_files = sorted(self.storage_dir.glob("*.json"))
-        
+
         for json_path in json_files[:limit * 2]:  # Check extra in case of orphans
             if len(items) >= limit:
                 break
-                
+
             item_id = json_path.stem  # filename without extension
-            image_path = self.storage_dir / f"{item_id}.webp"
-            
-            # Validate: corresponding image must exist
-            if not image_path.exists():
-                logger.warning(f"Orphan metadata found (no image): {json_path}")
-                # Clean up orphan
-                try:
-                    json_path.unlink()
-                except OSError as e:
-                    logger.error(f"Failed to delete orphan: {e}")
-                continue
-            
-            # Load metadata
+
+            # Load metadata first to determine file type
             try:
                 with open(json_path, "r", encoding="utf-8") as f:
                     metadata = json.load(f)
             except (json.JSONDecodeError, OSError) as e:
                 logger.error(f"Failed to read metadata {json_path}: {e}")
                 continue
-            
+
+            # Determine the data file path
+            buffer_file = metadata.get("_buffer_file")
+            if buffer_file:
+                # File-based item (video chunk, etc.)
+                data_path = self.storage_dir / buffer_file
+            else:
+                # Legacy screenshot item
+                data_path = self.storage_dir / f"{item_id}.webp"
+
+            # Validate: corresponding data file must exist
+            if not data_path.exists():
+                logger.warning(f"Orphan metadata found (no data file): {json_path}")
+                try:
+                    json_path.unlink()
+                except OSError as e:
+                    logger.error(f"Failed to delete orphan: {e}")
+                continue
+
             items.append(BufferItem(
                 id=item_id,
-                image_path=image_path,
+                image_path=data_path,
                 metadata=metadata,
             ))
         
@@ -165,18 +215,33 @@ class LocalBuffer:
     
     def commit(self, file_ids: List[str]) -> None:
         """Delete successfully uploaded items from the buffer.
-        
+
         Called after server confirms successful upload.
-        
+
         Args:
             file_ids: List of item IDs to remove.
         """
         for item_id in file_ids:
-            image_path = self.storage_dir / f"{item_id}.webp"
             meta_path = self.storage_dir / f"{item_id}.json"
-            
+
+            # Read metadata to find actual data file
+            data_paths = []
+            if meta_path.exists():
+                try:
+                    with open(meta_path, "r", encoding="utf-8") as f:
+                        metadata = json.load(f)
+                    buffer_file = metadata.get("_buffer_file")
+                    if buffer_file:
+                        data_paths.append(self.storage_dir / buffer_file)
+                except Exception:
+                    pass
+
+            # Fallback: try webp (legacy screenshot)
+            if not data_paths:
+                data_paths.append(self.storage_dir / f"{item_id}.webp")
+
             deleted = False
-            for path in [image_path, meta_path]:
+            for path in [*data_paths, meta_path]:
                 try:
                     if path.exists():
                         path.unlink()
