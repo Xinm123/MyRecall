@@ -86,7 +86,6 @@ class AudioChunk(BaseModel):
     expires_at: str | None = None
     encrypted: int = 0
     checksum: str | None = None
-    status: str = "PENDING"
 
 
 class AudioTranscription(BaseModel):

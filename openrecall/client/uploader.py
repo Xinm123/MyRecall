@@ -195,49 +195,6 @@ class HTTPUploader:
             print(f"Video upload error: {e}")
             return False
 
-    def upload_audio_chunk(
-        self,
-        file_path: str,
-        metadata: dict,
-    ) -> bool:
-        """Upload an audio chunk (WAV) to the server.
-
-        Args:
-            file_path: Path to the .wav audio chunk file.
-            metadata: Dictionary with type, checksum, file_size_bytes, device_name, etc.
-
-        Returns:
-            True if upload succeeded, False otherwise.
-        """
-        from pathlib import Path
-
-        chunk_path = Path(file_path)
-        if not chunk_path.exists():
-            print(f"Audio chunk not found: {file_path}")
-            return False
-
-        try:
-            upload_metadata = dict(metadata)
-            upload_metadata["file_size_bytes"] = chunk_path.stat().st_size
-
-            with open(chunk_path, "rb") as f:
-                response = requests.post(
-                    f"{self.api_url}/upload",
-                    files={"file": (chunk_path.name, f, "audio/wav")},
-                    data={"metadata": json.dumps(upload_metadata)},
-                    timeout=max(self.timeout, 60),
-                )
-
-            if response.status_code in (200, 202):
-                return True
-            else:
-                print(f"Audio upload failed: {response.status_code} - {response.text}")
-                return False
-
-        except requests.RequestException as e:
-            print(f"Audio upload error: {e}")
-            return False
-
 
 # Module-level singleton for convenience
 _uploader: Optional[HTTPUploader] = None

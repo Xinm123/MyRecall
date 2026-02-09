@@ -77,8 +77,6 @@ class UploaderConsumer(threading.Thread):
                 item_type = item.metadata.get("type")
                 if item_type == "video_chunk":
                     target_uploader = "upload_video_chunk"
-                elif item_type == "audio_chunk":
-                    target_uploader = "upload_audio_chunk"
                 else:
                     target_uploader = "upload_screenshot"
                 logger.info(
@@ -114,28 +112,6 @@ class UploaderConsumer(threading.Thread):
                         file_path=str(item.image_path),
                         metadata=upload_meta,
                     )
-                elif item_type == "audio_chunk":
-                    audio_path = Path(item.image_path)
-                    audio_name = str(item.metadata.get("chunk_filename") or audio_path.name)
-                    file_size_bytes = int(
-                        item.metadata.get("file_size_bytes")
-                        or (audio_path.stat().st_size if audio_path.exists() else 0)
-                    )
-                    logger.info(
-                        "Uploading audio chunk | id=%s | file=%s | size_mb=%.1f",
-                        item.id,
-                        audio_name,
-                        file_size_bytes / (1024 * 1024),
-                    )
-                    upload_meta = {
-                        k: v
-                        for k, v in item.metadata.items()
-                        if not str(k).startswith("_")
-                    }
-                    success = self.uploader.upload_audio_chunk(
-                        file_path=str(item.image_path),
-                        metadata=upload_meta,
-                    )
                 else:
                     # Legacy/default path: screenshot image upload.
                     with Image.open(item.image_path) as pil_image:
@@ -160,15 +136,6 @@ class UploaderConsumer(threading.Thread):
                             chunk_name,
                             file_size_bytes / (1024 * 1024),
                             monitor_id,
-                            elapsed_s,
-                            remaining,
-                        )
-                    elif item_type == "audio_chunk":
-                        self.buffer.commit([item.id])
-                        remaining = self.buffer.count()
-                        logger.info(
-                            "📤 Uploaded audio chunk | file=%s | elapsed=%.2fs | remaining=%s",
-                            item.metadata.get("chunk_filename", "unknown"),
                             elapsed_s,
                             remaining,
                         )

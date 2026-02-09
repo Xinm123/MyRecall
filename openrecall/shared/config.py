@@ -391,72 +391,6 @@ class Settings(BaseSettings):
         alias="OPENRECALL_SCK_AUTO_RECOVER_FROM_LEGACY",
         description="Whether to automatically probe and recover from legacy fallback to SCK mode."
     )
-    # Phase 2: Audio Recording Configuration
-    audio_enabled: bool = Field(
-        default=True,
-        alias="OPENRECALL_AUDIO_ENABLED",
-        description="Enable audio capture (mic recording)"
-    )
-    audio_sample_rate: int = Field(
-        default=16000,
-        alias="OPENRECALL_AUDIO_SAMPLE_RATE",
-        description="Audio sample rate in Hz (16000 for speech)"
-    )
-    audio_channels: int = Field(
-        default=1,
-        alias="OPENRECALL_AUDIO_CHANNELS",
-        description="Audio channels (1=mono, recommended for speech)"
-    )
-    audio_chunk_duration: int = Field(
-        default=60,
-        alias="OPENRECALL_AUDIO_CHUNK_DURATION",
-        description="Audio chunk duration in seconds"
-    )
-    audio_format: str = Field(
-        default="wav",
-        alias="OPENRECALL_AUDIO_FORMAT",
-        description="Audio file format (wav)"
-    )
-    audio_device_mic: str = Field(
-        default="",
-        alias="OPENRECALL_AUDIO_DEVICE_MIC",
-        description="Microphone device name or index (empty = system default)"
-    )
-    audio_device_system: str = Field(
-        default="",
-        alias="OPENRECALL_AUDIO_DEVICE_SYSTEM",
-        description="System audio device (e.g. BlackHole). Empty = disabled"
-    )
-    audio_vad_threshold: float = Field(
-        default=0.5,
-        alias="OPENRECALL_AUDIO_VAD_THRESHOLD",
-        description="VAD speech probability threshold (0.0-1.0)"
-    )
-    audio_vad_backend: str = Field(
-        default="silero",
-        alias="OPENRECALL_AUDIO_VAD_BACKEND",
-        description="VAD backend: silero (primary) or webrtcvad (fallback)"
-    )
-    audio_whisper_model: str = Field(
-        default="base",
-        alias="OPENRECALL_AUDIO_WHISPER_MODEL",
-        description="Whisper model size: tiny, base, small, medium, large-v3"
-    )
-    audio_whisper_compute_type: str = Field(
-        default="int8",
-        alias="OPENRECALL_AUDIO_WHISPER_COMPUTE_TYPE",
-        description="Whisper compute type: int8, float16, float32"
-    )
-    audio_whisper_language: str = Field(
-        default="",
-        alias="OPENRECALL_AUDIO_WHISPER_LANGUAGE",
-        description="Whisper language code (empty = auto-detect)"
-    )
-    audio_whisper_beam_size: int = Field(
-        default=5,
-        alias="OPENRECALL_AUDIO_WHISPER_BEAM_SIZE",
-        description="Whisper beam search size"
-    )
 
     frame_extraction_interval: float = Field(
         default=5.0,
@@ -565,16 +499,6 @@ class Settings(BaseSettings):
         return self.client_data_dir / "video_chunks"
 
     @property
-    def server_audio_path(self) -> Path:
-        """Directory for storing audio chunk WAV files (Server side)."""
-        return self.server_data_dir / "audio_chunks"
-
-    @property
-    def client_audio_chunks_path(self) -> Path:
-        """Directory for client-side audio chunk output."""
-        return self.client_data_dir / "audio_chunks"
-
-    @property
     def video_monitor_id_list(self) -> list[str]:
         """Parsed list for OPENRECALL_VIDEO_MONITOR_IDS."""
         return [item.strip() for item in self.video_monitor_ids.split(",") if item.strip()]
@@ -603,8 +527,6 @@ class Settings(BaseSettings):
             self.frames_path,
             self.video_chunks_path,
             self.client_video_chunks_path,
-            self.server_audio_path,
-            self.client_audio_chunks_path,
         ]
         
         for directory in directories:
