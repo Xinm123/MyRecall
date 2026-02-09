@@ -115,6 +115,10 @@ class TestLegacyApiUntouched:
         # Queue status
         resp = client_migrated.get("/api/queue/status")
         assert resp.status_code == 200
+        queue_data = resp.get_json()
+        assert "video_queue" in queue_data
+        assert "completed" in queue_data["video_queue"]
+        assert "pending" in queue_data["video_queue"]
 
         # Config
         resp = client_migrated.get("/api/config")

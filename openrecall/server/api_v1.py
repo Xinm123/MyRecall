@@ -265,6 +265,14 @@ def _handle_video_upload(file, metadata, start_time):
         if actual_checksum != checksum:
             logger.warning(f"Checksum mismatch: expected {checksum}, got {actual_checksum}")
 
+    # Extract chunk time boundaries (Phase 1.5: for offset guard validation)
+    chunk_start_time = metadata.get("start_time")
+    if chunk_start_time is not None:
+        chunk_start_time = float(chunk_start_time)
+    chunk_end_time = metadata.get("end_time")
+    if chunk_end_time is not None:
+        chunk_end_time = float(chunk_end_time)
+
     # Insert into database
     chunk_id = sql_store.insert_video_chunk(
         file_path=str(video_path),
@@ -278,6 +286,8 @@ def _handle_video_upload(file, metadata, start_time):
         monitor_is_primary=monitor_is_primary,
         monitor_backend=monitor_backend,
         monitor_fingerprint=monitor_fingerprint,
+        start_time=chunk_start_time,
+        end_time=chunk_end_time,
     )
 
     elapsed_ms = (time.perf_counter() - start_time) * 1000
@@ -317,16 +327,53 @@ def search_api():
         results = search_engine.search(q, limit=limit + offset)
 
         serialized = []
-        for snap in results:
-            flat = {
-                "id": snap.id,
-                "timestamp": snap.context.timestamp,
-                "app_name": snap.context.app_name,
-                "window_title": snap.context.window_title,
-                "caption": snap.content.caption,
-                "scene_tag": snap.content.scene_tag,
-                "image_path": snap.image_path,
-            }
+        for item in results:
+            flat = None
+
+            # Newer search engine result shape: dict with snapshot/video_data.
+            if isinstance(item, dict):
+                snap = item.get("snapshot")
+                if snap is not None:
+                    flat = {
+                        "id": snap.id,
+                        "timestamp": snap.context.timestamp,
+                        "app_name": snap.context.app_name,
+                        "window_title": snap.context.window_title,
+                        "caption": snap.content.caption,
+                        "scene_tag": snap.content.scene_tag,
+                        "image_path": snap.image_path,
+                        # Phase 1.5 additive optional fields (None when unknown/unavailable)
+                        "focused": None,
+                        "browser_url": None,
+                    }
+                else:
+                    video_data = item.get("video_data") or {}
+                    frame_id = video_data.get("frame_id")
+                    flat = {
+                        "id": f"vframe:{frame_id}" if frame_id is not None else "vframe:unknown",
+                        "timestamp": float(video_data.get("timestamp") or 0.0),
+                        "app_name": video_data.get("app_name") or "",
+                        "window_title": video_data.get("window_name") or "",
+                        "caption": video_data.get("text_snippet") or "",
+                        "scene_tag": "video_frame",
+                        "image_path": f"/api/v1/frames/{frame_id}" if frame_id is not None else "",
+                        "focused": video_data.get("focused"),
+                        "browser_url": video_data.get("browser_url"),
+                    }
+            else:
+                # Legacy shape: SemanticSnapshot object.
+                flat = {
+                    "id": item.id,
+                    "timestamp": item.context.timestamp,
+                    "app_name": item.context.app_name,
+                    "window_title": item.context.window_title,
+                    "caption": item.content.caption,
+                    "scene_tag": item.content.scene_tag,
+                    "image_path": item.image_path,
+                    "focused": None,
+                    "browser_url": None,
+                }
+
             serialized.append(flat)
 
         total = len(serialized)
@@ -395,6 +442,7 @@ def queue_status():
             cursor = conn.cursor()
             cursor.execute("SELECT status, COUNT(*) FROM entries GROUP BY status")
             status_counts = dict(cursor.fetchall())
+            video_status_counts = sql_store.get_video_chunk_status_counts(conn)
 
         processing_mode = "LIFO" if pending > settings.processing_lifo_threshold else "FIFO"
 
@@ -404,6 +452,12 @@ def queue_status():
                 "processing": status_counts.get("PROCESSING", 0),
                 "completed": status_counts.get("COMPLETED", 0),
                 "failed": status_counts.get("FAILED", 0),
+            },
+            "video_queue": {
+                "pending": video_status_counts.get("PENDING", 0),
+                "processing": video_status_counts.get("PROCESSING", 0),
+                "completed": video_status_counts.get("COMPLETED", 0),
+                "failed": video_status_counts.get("FAILED", 0),
             },
             "config": {
                 "lifo_threshold": settings.processing_lifo_threshold,

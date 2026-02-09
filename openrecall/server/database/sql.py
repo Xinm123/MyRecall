@@ -372,14 +372,16 @@ class SQLStore:
         cursor = conn.cursor()
         if since is None:
             sql = (
-                "SELECT f.id AS frame_id, f.timestamp, f.app_name, f.window_name, ot.text AS ocr_text "
+                "SELECT f.id AS frame_id, f.video_chunk_id, f.timestamp, f.app_name, f.window_name, "
+                "f.focused, f.browser_url, ot.text AS ocr_text "
                 "FROM frames f LEFT JOIN ocr_text ot ON ot.frame_id = f.id "
                 "ORDER BY f.timestamp DESC LIMIT ?"
             )
             cursor.execute(sql, (limit if limit is not None else 200,))
         else:
             sql = (
-                "SELECT f.id AS frame_id, f.timestamp, f.app_name, f.window_name, ot.text AS ocr_text "
+                "SELECT f.id AS frame_id, f.video_chunk_id, f.timestamp, f.app_name, f.window_name, "
+                "f.focused, f.browser_url, ot.text AS ocr_text "
                 "FROM frames f LEFT JOIN ocr_text ot ON ot.frame_id = f.id "
                 "WHERE f.timestamp > ? ORDER BY f.timestamp DESC"
             )
@@ -389,6 +391,10 @@ class SQLStore:
             frame_id = int(row["frame_id"])
             ts = float(row["timestamp"])
             ocr_text = row["ocr_text"] or ""
+            raw_focused = row["focused"]
+            focused_val = bool(raw_focused) if raw_focused is not None else None
+            raw_url = row["browser_url"]
+            browser_url_val = raw_url if raw_url else None
             memories.append(
                 {
                     "id": f"frame-{frame_id}",
@@ -401,8 +407,11 @@ class SQLStore:
                     "filename": None,
                     "image_url": f"/api/v1/frames/{frame_id}",
                     "frame_id": frame_id,
+                    "video_chunk_id": row["video_chunk_id"],
                     "app_name": row["app_name"] or "Unknown",
                     "window_title": row["window_name"] or "Unknown",
+                    "focused": focused_val,
+                    "browser_url": browser_url_val,
                 }
             )
         return memories
@@ -466,6 +475,30 @@ class SQLStore:
     # Phase 1: Video Chunk Methods
     # =========================================================================
 
+    def get_video_chunk_status_counts(self, conn: Optional[sqlite3.Connection] = None) -> dict[str, int]:
+        """Get video_chunks count grouped by status.
+
+        Returns empty counts when the table does not exist yet.
+        """
+        counts: dict[str, int] = {}
+        try:
+            if conn is None:
+                with sqlite3.connect(str(self.db_path)) as local_conn:
+                    if not self._table_exists(local_conn, "video_chunks"):
+                        return counts
+                    cursor = local_conn.cursor()
+                    cursor.execute("SELECT status, COUNT(*) FROM video_chunks GROUP BY status")
+                    counts = {str(status): int(count) for status, count in cursor.fetchall()}
+            else:
+                if not self._table_exists(conn, "video_chunks"):
+                    return counts
+                cursor = conn.cursor()
+                cursor.execute("SELECT status, COUNT(*) FROM video_chunks GROUP BY status")
+                counts = {str(status): int(count) for status, count in cursor.fetchall()}
+        except sqlite3.Error as e:
+            logger.error(f"Failed to get video chunk status counts: {e}")
+        return counts
+
     def insert_video_chunk(
         self,
         file_path: str,
@@ -480,6 +513,8 @@ class SQLStore:
         monitor_is_primary: int = 0,
         monitor_backend: str = "",
         monitor_fingerprint: str = "",
+        start_time: Optional[float] = None,
+        end_time: Optional[float] = None,
     ) -> Optional[int]:
         """Insert a new video chunk with PENDING status."""
         days = retention_days if retention_days is not None else settings.retention_days
@@ -500,6 +535,8 @@ class SQLStore:
                     "monitor_is_primary": monitor_is_primary,
                     "monitor_backend": monitor_backend,
                     "monitor_fingerprint": monitor_fingerprint,
+                    "start_time": start_time,
+                    "end_time": end_time,
                 }
                 for column, value in optional_values.items():
                     if column in columns:
@@ -623,16 +660,20 @@ class SQLStore:
 
     def insert_frame(
         self, video_chunk_id: int, offset_index: int, timestamp: float,
-        app_name: str = "", window_name: str = "",
+        app_name: Optional[str] = None, window_name: Optional[str] = None,
+        focused: Optional[bool] = None, browser_url: Optional[str] = None,
     ) -> Optional[int]:
         """Insert a single frame record."""
         try:
             with sqlite3.connect(str(self.db_path)) as conn:
                 cursor = conn.cursor()
+                focused_val = (1 if focused else 0) if focused is not None else None
                 cursor.execute(
-                    """INSERT INTO frames (video_chunk_id, offset_index, timestamp, app_name, window_name)
-                       VALUES (?, ?, ?, ?, ?)""",
-                    (video_chunk_id, offset_index, timestamp, app_name, window_name),
+                    """INSERT INTO frames (video_chunk_id, offset_index, timestamp,
+                                          app_name, window_name, focused, browser_url)
+                       VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                    (video_chunk_id, offset_index, timestamp,
+                     app_name, window_name, focused_val, browser_url),
                 )
                 conn.commit()
                 return cursor.lastrowid
@@ -647,15 +688,20 @@ class SQLStore:
             with sqlite3.connect(str(self.db_path)) as conn:
                 cursor = conn.cursor()
                 for frame in frames:
+                    raw_focused = frame.get("focused")
+                    focused_val = (1 if raw_focused else 0) if raw_focused is not None else None
                     cursor.execute(
-                        """INSERT INTO frames (video_chunk_id, offset_index, timestamp, app_name, window_name)
-                           VALUES (?, ?, ?, ?, ?)""",
+                        """INSERT INTO frames (video_chunk_id, offset_index, timestamp,
+                                              app_name, window_name, focused, browser_url)
+                           VALUES (?, ?, ?, ?, ?, ?, ?)""",
                         (
                             frame["video_chunk_id"],
                             frame["offset_index"],
                             frame["timestamp"],
-                            frame.get("app_name", ""),
-                            frame.get("window_name", ""),
+                            frame.get("app_name"),
+                            frame.get("window_name"),
+                            focused_val,
+                            frame.get("browser_url"),
                         ),
                     )
                     frame_ids.append(cursor.lastrowid)
@@ -702,7 +748,8 @@ class SQLStore:
                 # Fetch page with OCR text
                 cursor.execute(
                     """SELECT f.id AS frame_id, f.video_chunk_id, f.offset_index, f.timestamp,
-                              f.app_name, f.window_name, ot.text AS ocr_text
+                              f.app_name, f.window_name, f.focused, f.browser_url,
+                              ot.text AS ocr_text
                        FROM frames f
                        LEFT JOIN ocr_text ot ON f.id = ot.frame_id
                        WHERE f.timestamp >= ? AND f.timestamp <= ?
@@ -713,6 +760,12 @@ class SQLStore:
                 for row in cursor.fetchall():
                     d = dict(row)
                     d["frame_url"] = f"/api/v1/frames/{d['frame_id']}"
+                    # Normalize focused: NULL -> None, 0 -> False, 1 -> True
+                    raw_focused = d.get("focused")
+                    d["focused"] = bool(raw_focused) if raw_focused is not None else None
+                    # Normalize browser_url: empty string -> None
+                    raw_url = d.get("browser_url")
+                    d["browser_url"] = raw_url if raw_url else None
                     frames.append(d)
         except sqlite3.Error as e:
             logger.error(f"Failed to query frames by time range: {e}")
@@ -766,7 +819,8 @@ class SQLStore:
                     """SELECT fts.frame_id, fts.app_name, fts.window_name,
                               snippet(ocr_text_fts, 0, '<b>', '</b>', '...', 32) AS text_snippet,
                               bm25(ocr_text_fts) AS score,
-                              f.timestamp, f.video_chunk_id, f.offset_index
+                              f.timestamp, f.video_chunk_id, f.offset_index,
+                              f.focused, f.browser_url
                        FROM ocr_text_fts fts
                        JOIN frames f ON fts.frame_id = f.id
                        WHERE ocr_text_fts MATCH ?
@@ -775,7 +829,14 @@ class SQLStore:
                     (query, limit),
                 )
                 for row in cursor.fetchall():
-                    results.append(dict(row))
+                    d = dict(row)
+                    # Normalize focused: NULL -> None, 0 -> False, 1 -> True
+                    raw_focused = d.get("focused")
+                    d["focused"] = bool(raw_focused) if raw_focused is not None else None
+                    # Normalize browser_url: empty string -> None
+                    raw_url = d.get("browser_url")
+                    d["browser_url"] = raw_url if raw_url else None
+                    results.append(d)
         except sqlite3.Error as e:
             logger.error(f"Video FTS search failed: {e}")
         return results

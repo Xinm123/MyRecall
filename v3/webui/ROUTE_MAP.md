@@ -63,6 +63,22 @@ flowchart LR
 | `POST /api/v1/upload` | v1 视频上传入口 | client uploader（间接影响 UI 数据新鲜度） |
 | `GET /api/v1/upload/status` | v1 上传断点状态查询 | client uploader（间接影响 UI 数据新鲜度） |
 
+### 4.3 Phase 1.5 API Response Extensions
+
+Phase 1.5 在 timeline/search 返回中支持以下可选字段（向后兼容，旧客户端忽略新字段）：
+
+| Field | Type | Source | Before Phase 1.5 | After Phase 1.5 | Breaking? |
+|---|---|---|---|---|---|
+| `focused` | `bool \| null` | `frames.focused` | _(absent)_ | `true`/`false`/`null` | No (additive) |
+| `browser_url` | `string \| null` | `frames.browser_url` | _(absent)_ | URL string or `null` | No (additive) |
+
+适用接口：
+- `GET /api/v1/timeline` — 每个 frame dict 包含 `focused` 和 `browser_url`
+- `GET /api/v1/search` — video-frame 结果返回真实 `focused/browser_url`，snapshot 结果返回 `null`（字段始终可选）
+- `GET /api/memories/recent` / `GET /api/memories/latest` — frame memories 包含 `focused` 和 `browser_url`
+
+NULL 语义：`null` = 未知（非 `false` / 非空字符串）。
+
 ## 5. 上传链路与页面可见性映射
 
 ```mermaid
@@ -97,3 +113,12 @@ flowchart LR
 - Legacy API：`/Users/pyw/new/MyRecall/openrecall/server/api.py`
 - v1 API：`/Users/pyw/new/MyRecall/openrecall/server/api_v1.py`
 - 布局模板：`/Users/pyw/new/MyRecall/openrecall/server/templates/layout.html`
+
+## 8. Phase 1.5 Evidence Matrix
+
+| Change | Code Path | Test Command | Result | UTC Timestamp |
+|---|---|---|---|---|
+| Timeline response includes additive optional `focused/browser_url` | `/Users/pyw/new/MyRecall/openrecall/server/database/sql.py`, `/Users/pyw/new/MyRecall/openrecall/server/api_v1.py` | `python3 -m pytest tests/test_phase1_5_focused_browser_url.py::TestTimelineAPIFocusedBrowserUrl::test_timeline_response_includes_focused_and_browser_url -v` | 1 passed | 2026-02-08T07:50:52Z |
+| Search response keeps old fields and adds optional `focused/browser_url` for compatibility | `/Users/pyw/new/MyRecall/openrecall/server/api_v1.py` | `python3 -m pytest tests/test_phase1_5_focused_browser_url.py::TestSearchAPIFocusedBrowserUrlCompatibility -v` | 2 passed | 2026-02-08T07:50:52Z |
+| SQL video search path reads and normalizes `focused/browser_url` | `/Users/pyw/new/MyRecall/openrecall/server/database/sql.py` | `python3 -m pytest tests/test_phase1_5_focused_browser_url.py::TestQueryReturnsFocusedBrowserUrl::test_search_video_fts_returns_focused_browser_url -v` | 1 passed | 2026-02-08T07:50:52Z |
+| Route-level regression remains stable after additive fields | `/Users/pyw/new/MyRecall/openrecall/server/api_v1.py` | `python3 -m pytest tests/test_phase1_timeline_api.py tests/test_phase1_search_integration.py -v` | 28 passed | 2026-02-08T07:50:25Z |

@@ -175,6 +175,17 @@ class TestTimelineAPI:
         assert isinstance(data, list)
         assert len(data) > 0
         assert data[0]["image_url"].startswith("/api/v1/frames/")
+        assert "video_chunk_id" in data[0]
+        assert isinstance(data[0]["video_chunk_id"], int)
+
+    def test_legacy_queue_status_includes_video_counts(self, client):
+        """Legacy queue status should include video chunk counters."""
+        resp = client.get("/api/queue/status")
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert "video_queue" in data
+        assert data["video_queue"]["completed"] >= 1
+        assert data["video_queue"]["pending"] == 0
 
 
 class TestFrameServingAPI:

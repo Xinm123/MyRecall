@@ -59,14 +59,16 @@ class VideoProcessingWorker(threading.Thread):
                     chunk_id = chunk["id"]
                     chunk_path = chunk["file_path"]
 
-                    # Parse start time from created_at or use 0
-                    chunk_start_time = 0.0
-                    try:
-                        import datetime
-                        dt = datetime.datetime.fromisoformat(chunk["created_at"])
-                        chunk_start_time = dt.timestamp()
-                    except Exception:
-                        pass
+                    # Phase 1.5: Use stored start_time if available, fallback to created_at
+                    chunk_start_time = chunk.get("start_time")
+                    if chunk_start_time is None:
+                        chunk_start_time = 0.0
+                        try:
+                            import datetime
+                            dt = datetime.datetime.fromisoformat(chunk["created_at"])
+                            chunk_start_time = dt.timestamp()
+                        except Exception:
+                            pass
 
                     logger.info(f"Processing video chunk {chunk_id}: {chunk_path}")
 

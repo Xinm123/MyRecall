@@ -309,9 +309,10 @@ Key groups:
 
 1. `video_recorder.py` 选择 monitor source（macOS 优先 `ScreenCaptureKit`，其余平台 `mss`）
 2. 原始帧进入 `FFmpegManager`（rawvideo stdin，按 profile 构造 `-pixel_format/-video_size`）
-3. 按 chunk 落盘后由 `UploaderConsumer` 作为 `video_chunk` 上传
-4. server `api_v1` 写入 `video_chunks`，`VideoProcessingWorker` 异步处理
-5. `FrameExtractor` 抽帧，`VideoChunkProcessor` OCR 并写入 `ocr_text` + `ocr_text_fts`
+3. 本地视频 chunk 文件采用 UTC 命名：`monitor_{monitor_id}_{YYYY-MM-DD_HH-MM-SS}.mp4`
+4. 按 chunk 落盘后由 `UploaderConsumer` 作为 `video_chunk` 上传
+5. server `api_v1` 写入 `video_chunks`，`VideoProcessingWorker` 异步处理
+6. `FrameExtractor` 抽帧，`VideoChunkProcessor` OCR 并写入 `ocr_text` + `ocr_text_fts`
 
 截图模式（降级或显式设置）：
 
@@ -324,8 +325,9 @@ Video path:
 
 1. `video_recorder.py` selects monitor sources (`ScreenCaptureKit` on macOS when available, otherwise `mss`)
 2. Raw frames are piped to FFmpeg stdin with profile-aware input args
-3. Chunk files are uploaded as `video_chunk`
-4. Server persists chunk metadata, then async worker extracts frames + OCR + FTS
+3. Local chunk files use UTC naming: `monitor_{monitor_id}_{YYYY-MM-DD_HH-MM-SS}.mp4`
+4. Chunk files are uploaded as `video_chunk`
+5. Server persists chunk metadata, then async worker extracts frames + OCR + FTS
 
 Screenshot path:
 

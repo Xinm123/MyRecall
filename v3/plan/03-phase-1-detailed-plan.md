@@ -194,7 +194,8 @@ ffmpeg -f rawvideo \                    # stdin raw frame stream
   -f segment -segment_time 60 \         # 1-minute chunks
   -segment_format mp4 \                # MP4 container
   -reset_timestamps 1 \                # Reset timestamps per chunk
-  chunk_%04d.mp4                        # Output pattern
+  -strftime 1 \                        # Use strftime pattern expansion
+  monitor_{monitor_id}_%Y-%m-%d_%H-%M-%S.mp4   # UTC output pattern
 ```
 
 **Verification**:

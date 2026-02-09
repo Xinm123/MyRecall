@@ -34,6 +34,8 @@ class AIProvider(ABC):
 
 
 class OCRProvider(ABC):
+    engine_name: str = "unknown"
+
     @abstractmethod
     def extract_text(self, image_path: str) -> str:
         raise NotImplementedError

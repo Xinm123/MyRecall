@@ -181,6 +181,7 @@ def queue_status():
             cursor = conn.cursor()
             cursor.execute("SELECT status, COUNT(*) FROM entries GROUP BY status")
             status_counts = dict(cursor.fetchall())
+            video_status_counts = sql_store.get_video_chunk_status_counts(conn)
         
         processing_mode = "LIFO" if pending > settings.processing_lifo_threshold else "FIFO"
         
@@ -190,6 +191,12 @@ def queue_status():
                 "processing": status_counts.get("PROCESSING", 0),
                 "completed": status_counts.get("COMPLETED", 0),
                 "failed": status_counts.get("FAILED", 0),
+            },
+            "video_queue": {
+                "pending": video_status_counts.get("PENDING", 0),
+                "processing": video_status_counts.get("PROCESSING", 0),
+                "completed": video_status_counts.get("COMPLETED", 0),
+                "failed": video_status_counts.get("FAILED", 0),
             },
             "config": {
                 "lifo_threshold": settings.processing_lifo_threshold,

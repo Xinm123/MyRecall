@@ -78,7 +78,8 @@ def main():
     except KeyboardInterrupt:
         pass
     finally:
-        recorder.stop()
+        if not _shutting_down:
+            recorder.stop()
 
 
 if __name__ == "__main__":

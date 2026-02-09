@@ -34,6 +34,8 @@ class _FallbackVisionProvider:
 
 
 class _FallbackOCRProvider:
+    engine_name = "fallback"
+
     def extract_text(self, image_path: str) -> str:
         return ""
 

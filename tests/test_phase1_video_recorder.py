@@ -28,6 +28,10 @@ class TestFFmpegManagerCommand:
         assert "libx264" in cmd
         assert "-crf" in cmd
         assert "23" in cmd
+        assert "-strftime" in cmd
+        strftime_idx = cmd.index("-strftime")
+        assert cmd[strftime_idx + 1] == "1"
+        assert cmd[-1].endswith("monitor_default_%Y-%m-%d_%H-%M-%S.mp4")
 
     def test_build_command_platform_specific(self, tmp_path):
         """Command uses correct input format for the platform."""
@@ -98,6 +102,14 @@ class TestFFmpegManagerCommand:
         csv_idx = cmd.index("-segment_list") + 1
         assert cmd[csv_idx].endswith("segments.csv")
 
+    def test_build_command_uses_monitor_timestamp_pattern(self, tmp_path):
+        """Output filename pattern includes monitor id and UTC strftime placeholders."""
+        from openrecall.client.ffmpeg_manager import FFmpegManager
+
+        mgr = FFmpegManager(output_dir=tmp_path, monitor_id="1")
+        cmd = mgr._build_ffmpeg_command()
+        assert cmd[-1].endswith("monitor_1_%Y-%m-%d_%H-%M-%S.mp4")
+
     def test_custom_resolution_adds_scale_filter(self, tmp_path):
         """Custom resolution parameter inserts a -vf scale filter."""
         from openrecall.client.ffmpeg_manager import FFmpegManager
@@ -154,6 +166,30 @@ class TestFFmpegManagerLifecycle:
             time.sleep(0.1)
             mgr.stop()
             mock_proc.terminate.assert_called()
+
+    def test_stop_skips_stdin_close_when_write_lock_held(self, tmp_path):
+        """stop() must not block on stdin.close when writer thread is in-flight."""
+        from openrecall.client.ffmpeg_manager import FFmpegManager
+
+        mgr = FFmpegManager(output_dir=tmp_path)
+
+        mock_proc = MagicMock()
+        mock_proc.poll.return_value = None
+        mock_proc.stdin = MagicMock()
+        mock_proc.stderr = MagicMock()
+        mock_proc.stderr.read.return_value = b""
+        mgr._process = mock_proc
+
+        # Simulate writer thread holding the stdin write lock during shutdown.
+        mgr._stdin_lock.acquire()
+        try:
+            mgr.stop()
+        finally:
+            mgr._stdin_lock.release()
+
+        mock_proc.terminate.assert_called_once()
+        mock_proc.wait.assert_called_once_with(timeout=10)
+        mock_proc.stdin.close.assert_not_called()
 
     def test_restart_increments_counter(self, tmp_path):
         """restart() increments the restart counter."""
@@ -233,6 +269,8 @@ class TestFFmpegRawVideoProfile:
         assert "30" in cmd
         assert "-i" in cmd
         assert "-" in cmd
+        assert "-strftime" in cmd
+        assert cmd[-1].endswith("monitor_default_%Y-%m-%d_%H-%M-%S.mp4")
 
     def test_reconfigure_restarts_on_profile_change(self, tmp_path):
         from openrecall.client.ffmpeg_manager import FFmpegManager
@@ -265,12 +303,13 @@ class TestFFmpegSegmentPolling:
         mgr = FFmpegManager(output_dir=tmp_path)
         csv_path = tmp_path / "segments.csv"
         csv_path.write_text(
-            "chunk_0000.mp4,0.000,300.000\nchunk_0001.mp4,300.000,600.000\n"
+            "monitor_1_2026-02-08_21-45-30.mp4,0.000,300.000\n"
+            "monitor_1_2026-02-08_21-46-30.mp4,300.000,600.000\n"
         )
         segments = mgr._read_segment_list()
         assert len(segments) == 2
-        assert segments[0] == "chunk_0000.mp4"
-        assert segments[1] == "chunk_0001.mp4"
+        assert segments[0] == "monitor_1_2026-02-08_21-45-30.mp4"
+        assert segments[1] == "monitor_1_2026-02-08_21-46-30.mp4"
 
     def test_poll_segments_detects_new(self, tmp_path):
         """_poll_segments detects newly added segments."""
@@ -278,25 +317,56 @@ class TestFFmpegSegmentPolling:
 
         mgr = FFmpegManager(output_dir=tmp_path)
         # Create segment file and CSV
-        (tmp_path / "chunk_0000.mp4").write_bytes(b"fake video")
+        segment_name = "monitor_1_2026-02-08_21-45-30.mp4"
+        (tmp_path / segment_name).write_bytes(b"fake video")
         csv_path = tmp_path / "segments.csv"
-        csv_path.write_text("chunk_0000.mp4,0.000,300.000\n")
+        csv_path.write_text(f"{segment_name},0.000,300.000\n")
         new = mgr._poll_segments()
         assert len(new) == 1
-        assert "chunk_0000.mp4" in new[0]
+        assert new[0].endswith(".mp4")
+        assert "monitor_1_" in new[0]
 
     def test_poll_segments_no_duplicate(self, tmp_path):
         """_poll_segments does not re-report known segments."""
         from openrecall.client.ffmpeg_manager import FFmpegManager
 
         mgr = FFmpegManager(output_dir=tmp_path)
-        (tmp_path / "chunk_0000.mp4").write_bytes(b"fake video")
+        segment_name = "monitor_1_2026-02-08_21-45-30.mp4"
+        (tmp_path / segment_name).write_bytes(b"fake video")
         csv_path = tmp_path / "segments.csv"
-        csv_path.write_text("chunk_0000.mp4,0.000,300.000\n")
+        csv_path.write_text(f"{segment_name},0.000,300.000\n")
         first = mgr._poll_segments()
         assert len(first) == 1
         second = mgr._poll_segments()
         assert len(second) == 0  # Already known
+
+    def test_current_chunk_path_uses_last_detected_segment(self, tmp_path):
+        """current_chunk_path returns latest discovered segment path."""
+        from openrecall.client.ffmpeg_manager import FFmpegManager
+
+        mgr = FFmpegManager(output_dir=tmp_path)
+        segment_name = "monitor_1_2026-02-08_21-45-30.mp4"
+        segment_path = tmp_path / segment_name
+        segment_path.write_bytes(b"fake video")
+        (tmp_path / "segments.csv").write_text(f"{segment_name},0.000,300.000\n")
+
+        mgr._poll_segments()
+        assert mgr.current_chunk_path == str(segment_path)
+
+    def test_current_chunk_path_falls_back_to_csv_last_existing(self, tmp_path):
+        """current_chunk_path falls back to last existing CSV segment when cache is empty."""
+        from openrecall.client.ffmpeg_manager import FFmpegManager
+
+        mgr = FFmpegManager(output_dir=tmp_path)
+        first = "monitor_1_2026-02-08_21-45-30.mp4"
+        second = "monitor_1_2026-02-08_21-46-30.mp4"
+        first_path = tmp_path / first
+        second_path = tmp_path / second
+        first_path.write_bytes(b"fake video")
+        second_path.write_bytes(b"fake video")
+        (tmp_path / "segments.csv").write_text(f"{first},0.000,300.000\n{second},300.000,600.000\n")
+
+        assert mgr.current_chunk_path == str(second_path)
 
     def test_on_chunk_complete_callback(self, tmp_path):
         """Callback fires for each new segment."""
@@ -306,9 +376,10 @@ class TestFFmpegSegmentPolling:
         mgr = FFmpegManager(
             output_dir=tmp_path, on_chunk_complete=lambda p: received.append(p)
         )
-        (tmp_path / "chunk_0000.mp4").write_bytes(b"fake")
+        segment_name = "monitor_1_2026-02-08_21-45-30.mp4"
+        (tmp_path / segment_name).write_bytes(b"fake")
         csv_path = tmp_path / "segments.csv"
-        csv_path.write_text("chunk_0000.mp4,0.000,300.000\n")
+        csv_path.write_text(f"{segment_name},0.000,300.000\n")
 
         # Simulate watchdog iteration
         new_segments = mgr._poll_segments()

@@ -88,6 +88,7 @@ flowchart LR
 - Capture health builder 从 `runtime_settings` 生成只读诊断视图（`status/active_mode/last_sck_error_code/...`）。
 - Upload API 负责接收截图/视频并写入 PENDING 记录，再交由 worker 处理。
 - Worker 管道负责采集后数据处理（抽帧/OCR/清理），间接影响 WebUI 展示内容。
+- Phase 1.5: Worker 管道新增 **metadata_resolver**（`app/window/focused/browser_url` 均按 `frame > chunk > null` 解析）和 **offset_guard**（帧-chunk 对齐预检验），在抽帧与帧写入之间执行；OCR 引擎名通过 `engine_name` 写入 `ocr_text.ocr_engine`。
 
 ### Storage
 - `recall.db`：页面核心数据来源（entries + video tables）。
@@ -98,7 +99,8 @@ flowchart LR
 ### Retrieval
 - Web 页面主要通过 server 渲染与 API 拉取展示结果。
 - 搜索页可视化显示多阶段评分字段（debug 视角）。
-- 帧服务支持“已存在文件直出 + 按需抽帧 fallback”。
+- 帧服务支持"已存在文件直出 + 按需抽帧 fallback"。
+- Phase 1.5: Timeline/Search 检索结果支持 `focused` (bool|null) 和 `browser_url` (string|null) 字段；`/api/v1/search` 中 video-frame 行返回真实值，snapshot 行返回 `null`（可选字段，兼容旧客户端）。
 - Control Center 排障可配合 capture health 端点确认当前是 `monitor_id`、`legacy` 还是 `paused`。
 
 ## 3. 关键子链路
@@ -196,3 +198,12 @@ sequenceDiagram
 - `/Users/pyw/new/MyRecall/openrecall/server/templates/layout.html`
 - `/Users/pyw/new/MyRecall/openrecall/server/templates/index.html`
 - `/Users/pyw/new/MyRecall/v3/results/phase-1-post-baseline-changelog.md`
+
+## 6. Phase 1.5 Evidence Matrix
+
+| Change | Code Path | Test Command | Result | UTC Timestamp |
+|---|---|---|---|---|
+| Frame-level metadata flow uses resolver chain (`frame > chunk > null`) | `/Users/pyw/new/MyRecall/openrecall/server/video/metadata_resolver.py`, `/Users/pyw/new/MyRecall/openrecall/server/video/processor.py` | `python3 -m pytest tests/test_phase1_5_metadata_resolver.py -v` | 12 passed | 2026-02-08T07:50:52Z |
+| Upload/process/retrieval flow carries `focused/browser_url` with null semantics | `/Users/pyw/new/MyRecall/openrecall/server/database/sql.py`, `/Users/pyw/new/MyRecall/openrecall/server/api_v1.py` | `python3 -m pytest tests/test_phase1_5_focused_browser_url.py -v` | 10 passed | 2026-02-08T07:50:52Z |
+| Offset guard reject path observability in processing chain | `/Users/pyw/new/MyRecall/openrecall/server/video/processor.py` | `python3 -m pytest tests/test_phase1_5_offset_guard.py -v` | 8 passed | 2026-02-08T07:50:52Z |
+| Full dataflow regression closure | `/Users/pyw/new/MyRecall/openrecall/server/video/metadata_resolver.py`, `/Users/pyw/new/MyRecall/openrecall/server/video/processor.py`, `/Users/pyw/new/MyRecall/openrecall/server/api_v1.py`, `/Users/pyw/new/MyRecall/openrecall/server/database/sql.py` | `python3 -m pytest tests/test_phase1_* -v` | 170 passed, 8 skipped | 2026-02-08T07:50:08Z |

@@ -50,6 +50,7 @@ class FFmpegManager:
         self._restart_count_window_start: float = 0.0
         self._last_start_time: float = 0.0
         self._chunk_counter: int = 0
+        self._last_detected_chunk_path: Optional[str] = None
         self._darwin_input_spec: Optional[str] = None
 
         self._stdin_lock = threading.Lock()
@@ -70,9 +71,17 @@ class FFmpegManager:
 
     @property
     def current_chunk_path(self) -> Optional[str]:
-        pattern = f"chunk_{self._chunk_counter:04d}.mp4"
-        path = self.output_dir / pattern
-        return str(path) if path.exists() else None
+        if self._last_detected_chunk_path:
+            last_path = Path(self._last_detected_chunk_path)
+            if last_path.exists():
+                return str(last_path)
+
+        segments = self._read_segment_list()
+        for segment in reversed(segments):
+            segment_path = self.output_dir / segment
+            if segment_path.exists():
+                return str(segment_path)
+        return None
 
     def is_alive(self) -> bool:
         return self._process is not None and self._process.poll() is None
@@ -119,11 +128,7 @@ class FFmpegManager:
         process = self._process
         if process is not None and process.poll() is None:
             try:
-                if process.stdin:
-                    try:
-                        process.stdin.close()
-                    except Exception:
-                        pass
+                self._close_stdin_if_safe(process)
                 process.terminate()
                 process.wait(timeout=10)
             except subprocess.TimeoutExpired:
@@ -167,11 +172,7 @@ class FFmpegManager:
         process = self._process
         if process is not None:
             try:
-                if process.stdin:
-                    try:
-                        process.stdin.close()
-                    except Exception:
-                        pass
+                self._close_stdin_if_safe(process)
                 process.kill()
                 process.wait(timeout=5)
             except Exception:
@@ -198,11 +199,14 @@ class FFmpegManager:
 
         logger.info("Starting FFmpeg: %s", " ".join(cmd))
         stdin_target = subprocess.PIPE if use_pipe_input else subprocess.DEVNULL
+        process_env = os.environ.copy()
+        process_env["TZ"] = "UTC"
         self._process = subprocess.Popen(
             cmd,
             stdout=subprocess.DEVNULL,
             stderr=subprocess.PIPE,
             stdin=stdin_target,
+            env=process_env,
         )
         self._last_start_time = time.time()
         self._stop_event.clear()
@@ -223,8 +227,18 @@ class FFmpegManager:
             return self._build_rawvideo_command(self._input_profile)
         return self._build_platform_capture_command()
 
+    def _sanitize_monitor_id(self) -> str:
+        monitor_id = (self.monitor_id or "").strip()
+        sanitized = re.sub(r"[^A-Za-z0-9_-]+", "_", monitor_id).strip("_-")
+        return sanitized or "default"
+
+    def _segment_output_pattern(self) -> str:
+        monitor_id = self._sanitize_monitor_id()
+        filename = f"monitor_{monitor_id}_%Y-%m-%d_%H-%M-%S.mp4"
+        return str(self.output_dir / filename)
+
     def _build_platform_capture_command(self) -> list[str]:
-        output_pattern = str(self.output_dir / "chunk_%04d.mp4")
+        output_pattern = self._segment_output_pattern()
         system = platform.system()
 
         if system == "Darwin":
@@ -284,6 +298,8 @@ class FFmpegManager:
             "csv",
             "-reset_timestamps",
             "1",
+            "-strftime",
+            "1",
             "-y",
             output_pattern,
         ]
@@ -296,7 +312,7 @@ class FFmpegManager:
         return cmd
 
     def _build_rawvideo_command(self, profile: PixelFormatProfile) -> list[str]:
-        output_pattern = str(self.output_dir / "chunk_%04d.mp4")
+        output_pattern = self._segment_output_pattern()
 
         cmd = [
             "ffmpeg",
@@ -330,6 +346,8 @@ class FFmpegManager:
                 "-segment_list_type",
                 "csv",
                 "-reset_timestamps",
+                "1",
+                "-strftime",
                 "1",
                 "-y",
                 output_pattern,
@@ -437,6 +455,23 @@ class FFmpegManager:
 
         logger.info("FFmpeg watchdog stopped")
 
+    def _close_stdin_if_safe(self, process: subprocess.Popen) -> None:
+        stdin = process.stdin
+        if stdin is None:
+            return
+
+        # Avoid deadlock during shutdown/restart when writer thread is flushing stdin.
+        lock_acquired = self._stdin_lock.acquire(blocking=False)
+        if not lock_acquired:
+            logger.warning("Skipping FFmpeg stdin close because writer lock is busy")
+            return
+        try:
+            stdin.close()
+        except Exception:
+            pass
+        finally:
+            self._stdin_lock.release()
+
     def _poll_segments(self) -> list[str]:
         new_segments: list[str] = []
         current_segments = self._read_segment_list()
@@ -449,6 +484,7 @@ class FFmpegManager:
                 new_segments.append(segment_path)
                 self._known_segments.add(segment)
                 self._chunk_counter += 1
+                self._last_detected_chunk_path = segment_path
 
         return new_segments
 

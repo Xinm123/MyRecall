@@ -1,8 +1,8 @@
 # MyRecall-v3 Phase 1 Validation Report
 
-**Version**: 1.4
-**Last Updated**: 2026-02-07
-**Status**: GO-ENGINEERING -- Non-long-run gates passed; long-run gates formalized as `PENDING (LONGRUN)`
+**Version**: 1.6
+**Last Updated**: 2026-02-08T07:50:52Z
+**Status**: GO-ENGINEERING -- Non-long-run gates passed; long-run gates formalized as `PENDING (LONGRUN)`. Phase 1.5 metadata precision upgrade complete.
 **Authority**: Gate criteria sourced from `/Users/pyw/new/MyRecall/v3/metrics/phase-gates.md`
 
 ---
@@ -41,6 +41,11 @@
 | 25 | Runtime recording toggle pause/resume semantics for monitor pipelines | `openrecall/client/video_recorder.py` | Done |
 | 26 | SCK delayed fallback + legacy auto-recover probe + monitor watcher | `openrecall/client/video_recorder.py` | Done |
 | 27 | Capture health status API (`/api/vision/status`, `/api/v1/vision/status`) | `openrecall/server/api.py`, `openrecall/server/api_v1.py` | Done |
+| 28 | Phase 1.5: Frame metadata resolver (frame > chunk > null priority) | `openrecall/server/video/metadata_resolver.py` | Done |
+| 29 | Phase 1.5: Offset guard (frame-to-chunk alignment validation) | `openrecall/server/video/processor.py` | Done |
+| 30 | Phase 1.5: OCR engine identity (real provider name in ocr_text) | `openrecall/server/ai/base.py`, `openrecall/server/ai/providers.py` | Done |
+| 31 | Phase 1.5: focused/browser_url explicit pipeline | `openrecall/server/database/sql.py`, `openrecall/server/video/processor.py` | Done |
+| 32 | Phase 1.5: v3_005 migration (video_chunks start_time/end_time) | `openrecall/server/database/migrations/v3_005_add_video_chunk_timestamps.sql` | Done |
 
 ### Test Deliverables
 
@@ -66,6 +71,10 @@
 | 18 | `tests/test_video_recorder_fallback_policy.py` | Delayed fallback policy and permission backoff | 2 passed |
 | 19 | `tests/test_video_recorder_recovery_probe.py` | Legacy auto-recovery probe behavior | 2 passed |
 | 20 | `tests/test_vision_status_api.py` | Vision status API + heartbeat capture health payload | 3 passed |
+| 21 | `tests/test_phase1_5_metadata_resolver.py` | Phase 1.5 frame metadata resolver priority chain | 12 passed |
+| 22 | `tests/test_phase1_5_offset_guard.py` | Phase 1.5 offset guard validation + structured logging | 8 passed |
+| 23 | `tests/test_phase1_5_ocr_engine.py` | Phase 1.5 OCR engine name propagation | 3 passed |
+| 24 | `tests/test_phase1_5_focused_browser_url.py` | Phase 1.5 focused/browser_url write + read + API | 10 passed |
 
 ### Request -> Processing -> Storage -> Retrieval Behavior Diagram
 
@@ -89,8 +98,11 @@ flowchart LR
         P4["Upload API 接收视频<br>落盘并写 video_chunks(status=PENDING)"]
         P5["VideoProcessingWorker 轮询 PENDING"]
         P6["FrameExtractor 抽帧 + MSSIM 去重"]
+        P6a["Offset Guard<br>timestamp/offset/source_key 预检验"]
+        P6b["Metadata Resolver<br>frame > chunk > null + source"]
         P7["OCR Provider 提取文本"]
-        P8["写入 frames / ocr_text / ocr_text_fts<br>并更新 chunk 状态"]
+        P8["写入 frames（app/window/focused/browser_url）<br>并更新 chunk 状态"]
+        P8a["写入 ocr_text / ocr_text_fts<br>ocr_engine=provider.engine_name"]
         P9["RetentionWorker 定期清理 expires_at 过期数据"]
         PF["Fallback: video 异常时切回 screenshot 模式"]
   end
@@ -115,10 +127,14 @@ flowchart LR
     P4 --> S3
     P4 --> P5
     P5 --> P6
-    P6 --> P7
-    P7 --> P8
+    P6 --> P6a
+    P6a --> P6b
+    P6b --> P8
+    P8 --> P7
+    P7 --> P8a
     P8 --> S2
     P8 --> S3
+    P8a --> S3
     P9 --> S2
     P9 --> S3
     R3 --> T1
@@ -179,6 +195,33 @@ tests/test_phase1_search_debug_render.py 2 passed
 tests/test_phase1_server_startup.py 3 passed
 tests/test_phase1_gates.py              14 passed, 8 skipped
 ```
+
+### Phase 1.5 Test Breakdown (2026-02-08)
+
+```
+tests/test_phase1_5_metadata_resolver.py  12 passed
+tests/test_phase1_5_offset_guard.py        8 passed
+tests/test_phase1_5_ocr_engine.py          3 passed
+tests/test_phase1_5_focused_browser_url.py 10 passed
+```
+
+### Phase 1 + 1.5 Full Regression (2026-02-08)
+
+```
+python3 -m pytest tests/test_phase1_* -v
+=> 170 passed, 8 skipped, 0 failed
+```
+
+### Phase 1.5 Evidence Matrix
+
+| Change | Code Path | Test Command | Result | UTC Timestamp |
+|---|---|---|---|---|
+| Resolver priority chain covers `app/window/focused/browser_url` with `frame > chunk > null` | `/Users/pyw/new/MyRecall/openrecall/server/video/metadata_resolver.py` | `python3 -m pytest tests/test_phase1_5_metadata_resolver.py -v` | 12 passed | 2026-02-08T07:50:52Z |
+| `focused/browser_url` explicit write path + timeline/search optional fields | `/Users/pyw/new/MyRecall/openrecall/server/video/processor.py`, `/Users/pyw/new/MyRecall/openrecall/server/database/sql.py`, `/Users/pyw/new/MyRecall/openrecall/server/api_v1.py` | `python3 -m pytest tests/test_phase1_5_focused_browser_url.py -v` | 10 passed | 2026-02-08T07:50:52Z |
+| `ocr_text.ocr_engine` persisted as real provider `engine_name` | `/Users/pyw/new/MyRecall/openrecall/server/ai/base.py`, `/Users/pyw/new/MyRecall/openrecall/server/ai/providers.py`, `/Users/pyw/new/MyRecall/openrecall/server/video/processor.py` | `python3 -m pytest tests/test_phase1_5_ocr_engine.py -v` | 3 passed | 2026-02-08T07:50:52Z |
+| Offset mismatch reject path logs required observability fields | `/Users/pyw/new/MyRecall/openrecall/server/video/processor.py` | `python3 -m pytest tests/test_phase1_5_offset_guard.py -v` | 8 passed | 2026-02-08T07:50:52Z |
+| Baseline regression re-check (`timeline/search/gates`) | `/Users/pyw/new/MyRecall/openrecall/server/api_v1.py`, `/Users/pyw/new/MyRecall/openrecall/server/database/sql.py` | `python3 -m pytest tests/test_phase1_timeline_api.py tests/test_phase1_search_integration.py tests/test_phase1_gates.py -v` | 42 passed, 8 skipped | 2026-02-08T07:50:27Z |
+| Full Phase 1 + 1.5 closure regression | `/Users/pyw/new/MyRecall/openrecall/server/video/metadata_resolver.py`, `/Users/pyw/new/MyRecall/openrecall/server/video/processor.py`, `/Users/pyw/new/MyRecall/openrecall/server/api_v1.py`, `/Users/pyw/new/MyRecall/openrecall/server/database/sql.py` | `python3 -m pytest tests/test_phase1_* -v` | 170 passed, 8 skipped | 2026-02-08T07:50:08Z |
 
 ### Phase 1 Audit Round (2026-02-07)
 
@@ -373,6 +416,6 @@ All gate criteria sourced from `/Users/pyw/new/MyRecall/v3/metrics/phase-gates.m
 
 ## 5. Last Updated
 
-**Date**: 2026-02-07
-**Updated By**: Phase 1 Implementation + Post-baseline Hardening
-**Status**: GO-ENGINEERING -- Long-run gates remain `PENDING (LONGRUN)`
+**Date**: 2026-02-08T07:50:52Z
+**Updated By**: Phase 1.5 Metadata Precision Upgrade
+**Status**: GO-ENGINEERING -- Long-run gates remain `PENDING (LONGRUN)`. Phase 1.5 requirements A/B/C/D verified.

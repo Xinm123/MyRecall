@@ -23,6 +23,7 @@ class ExtractedFrame:
     offset_index: int
     timestamp: float
     kept: bool = True
+    metadata: Optional[dict] = None
 
 
 class FrameExtractor:

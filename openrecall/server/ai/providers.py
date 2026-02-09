@@ -332,6 +332,8 @@ class OpenAIProvider(AIProvider):
 
 
 class DoctrOCRProvider(OCRProvider):
+    engine_name = "doctr"
+
     def extract_text(self, image_path: str) -> str:
         # Import Doctr backend lazily to avoid triggering model downloads
         # when this provider is not in use.
@@ -351,12 +353,16 @@ class DoctrOCRProvider(OCRProvider):
 
 
 class LocalOCRProvider(OCRProvider):
+    engine_name = "local"
+
     def extract_text(self, image_path: str) -> str:
         # Backward compatibility: Use RapidOCR as the default local provider
         return RapidOCRBackend().extract_text(image_path)
 
 
 class OpenAIOCRProvider(OCRProvider):
+    engine_name = "openai"
+
     def __init__(self, api_key: str, model_name: str, api_base: str = "") -> None:
         api_key = api_key.strip().strip("`\"' ")
         model_name = model_name.strip().strip("`\"' ")
@@ -431,6 +437,8 @@ class OpenAIOCRProvider(OCRProvider):
 
 
 class DashScopeOCRProvider(OCRProvider):
+    engine_name = "dashscope"
+
     def __init__(self, api_key: str, model_name: str) -> None:
         if not api_key:
             raise AIProviderConfigError("DashScope api_key is required")
@@ -611,6 +619,8 @@ class DashScopeEmbeddingProvider(EmbeddingProvider):
 
 
 class RapidOCRProvider(OCRProvider):
+    engine_name = "rapidocr"
+
     def extract_text(self, image_path: str) -> str:
         path = Path(image_path)
         if not path.is_file():

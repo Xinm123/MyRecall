@@ -174,6 +174,9 @@ class TestV1QueueStatus:
         assert resp.status_code == 200
         data = resp.get_json()
         assert "queue" in data
+        assert "video_queue" in data
+        assert "completed" in data["video_queue"]
+        assert "pending" in data["video_queue"]
 
 
 class TestAuthDecorator:

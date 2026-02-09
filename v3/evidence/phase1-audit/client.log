@@ -102,3 +102,36 @@
 00:43:09 | INFO    | openrecall.client.consumer | 📤 Uploaded video chunk | ts=1770482588
 00:44:10 | INFO    | openrecall.client.consumer | Dispatch buffered item | id=20260208_004409_921141_da9ed0bb | item_type=video_chunk | target=upload_video_chunk
 00:44:10 | INFO    | openrecall.client.consumer | 📤 Uploaded video chunk | ts=1770482649
+20:39:35 | INFO    | openrecall.client.consumer | Dispatch buffered item | id=20260208_203935_234972_9127cd53 | item_type=video_chunk | target=upload_video_chunk
+20:39:35 | INFO    | openrecall.client.consumer | 📤 Uploaded video chunk | ts=1770554375
+20:39:35 | INFO    | openrecall.client.buffer | ✅ Committed: 20260208_203935_2349... | Remaining: 0 items
+20:40:37 | INFO    | openrecall.client.consumer | Dispatch buffered item | id=20260208_204037_526330_15292fdd | item_type=video_chunk | target=upload_video_chunk
+20:40:37 | INFO    | openrecall.client.consumer | 📤 Uploaded video chunk | ts=1770554437
+20:40:37 | INFO    | openrecall.client.buffer | ✅ Committed: 20260208_204037_5263... | Remaining: 0 items
+20:41:40 | INFO    | openrecall.client.consumer | Dispatch buffered item | id=20260208_204139_819235_dc4977d9 | item_type=video_chunk | target=upload_video_chunk
+20:41:40 | INFO    | openrecall.client.consumer | 📤 Uploaded video chunk | ts=1770554499
+20:41:40 | INFO    | openrecall.client.buffer | ✅ Committed: 20260208_204139_8192... | Remaining: 0 items
+20:42:42 | INFO    | openrecall.client.consumer | Dispatch buffered item | id=20260208_204242_100479_5f8bf46a | item_type=video_chunk | target=upload_video_chunk
+20:42:42 | INFO    | openrecall.client.consumer | 📤 Uploaded video chunk | ts=1770554562
+20:42:42 | INFO    | openrecall.client.buffer | ✅ Committed: 20260208_204242_1004... | Remaining: 0 items
+20:43:43 | INFO    | openrecall.client.consumer | Dispatch buffered item | id=20260208_204343_388372_a720c76e | item_type=video_chunk | target=upload_video_chunk
+20:43:43 | INFO    | openrecall.client.consumer | 📤 Uploaded video chunk | ts=1770554623
+20:44:45 | INFO    | openrecall.client.consumer | Dispatch buffered item | id=20260208_204444_663109_14bc378a | item_type=video_chunk | target=upload_video_chunk
+20:44:45 | INFO    | openrecall.client.consumer | 📤 Uploaded video chunk | ts=1770554684
+21:27:36 | INFO    | openrecall.client.consumer | Dispatch buffered item | id=20260208_212736_027922_6db1edca | item_type=video_chunk | target=upload_video_chunk
+21:27:36 | INFO    | openrecall.client.consumer | 📤 Uploaded video chunk | ts=1770557256
+21:28:40 | INFO    | openrecall.client.consumer | Dispatch buffered item | id=20260208_212839_328139_437a2fc4 | item_type=video_chunk | target=upload_video_chunk
+21:28:40 | INFO    | openrecall.client.consumer | 📤 Uploaded video chunk | ts=1770557319
+21:28:40 | INFO    | openrecall.client.buffer | ✅ Committed: 20260208_212839_3281... | Remaining: 0 items
+21:29:42 | INFO    | openrecall.client.consumer | Dispatch buffered item | id=20260208_212941_614059_906afc30 | item_type=video_chunk | target=upload_video_chunk
+21:29:42 | INFO    | openrecall.client.consumer | 📤 Uploaded video chunk | ts=1770557381
+21:30:43 | INFO    | openrecall.client.consumer | Dispatch buffered item | id=20260208_213043_893582_7d5113d6 | item_type=video_chunk | target=upload_video_chunk
+21:30:44 | INFO    | openrecall.client.consumer | 📤 Uploaded video chunk | ts=1770557443
+21:30:44 | INFO    | openrecall.client.buffer | ✅ Committed: 20260208_213043_8935... | Remaining: 0 items
+21:47:35 | INFO    | openrecall.client.consumer | Dispatch buffered item | id=20260208_214735_333822_26d8d013 | item_type=video_chunk | target=upload_video_chunk
+21:47:36 | INFO    | openrecall.client.consumer | 📤 Uploaded video chunk | ts=1770558455
+21:47:36 | INFO    | openrecall.client.buffer | ✅ Committed: 20260208_214735_3338... | Remaining: 0 items
+21:48:38 | INFO    | openrecall.client.consumer | Dispatch buffered item | id=20260208_214837_656596_e5c43634 | item_type=video_chunk | target=upload_video_chunk
+21:48:38 | INFO    | openrecall.client.consumer | 📤 Uploaded video chunk | ts=1770558517
+21:49:40 | INFO    | openrecall.client.consumer | Dispatch buffered item | id=20260208_214939_960956_089a5446 | item_type=video_chunk | target=upload_video_chunk
+21:49:40 | INFO    | openrecall.client.consumer | 📤 Uploaded video chunk | ts=1770558579

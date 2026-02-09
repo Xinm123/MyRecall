@@ -1,6 +1,6 @@
 # MyRecall-v3 Roadmap Status Tracker
 
-**Last Updated**: 2026-02-07
+**Last Updated**: 2026-02-08T13:31:36Z
 **Overall Status**: 🟩 Phase 0 Complete / 🟩 Phase 1 GO-ENGINEERING (long-run gates pending as LONGRUN)
 **Target Completion**: Week 20 (2026-06-20) for MVP (P0-P4 deployed). Phase 5 deployment starts Week 16. Week 23+ for P7 Memory (不与Phase 6 Week 21-22重叠).
 
@@ -129,6 +129,11 @@ Legend: ⬜️ Not Started | 🟨 In Progress | 🟩 Complete | 🟥 Blocked
 - [x] Post-Day 20 hardening: runtime recording toggle supports pause/resume monitor sources without full pipeline teardown
 - [x] Post-Day 20 hardening: server startup now includes OCR warm-up for local OCR providers
 - [x] Post-Day 20 documentation: established WebUI documentation hub (`v3/webui`) and added phase-level maintenance constraint (`results/README.md` -> sync `webui/CHANGELOG.md` + impacted `webui/pages/*.md`)
+- [x] Phase 1.5: Frame metadata resolver (frame > chunk > null priority chain with source traceability)
+- [x] Phase 1.5: focused/browser_url explicit pipeline (NULL = unknown, not schema default)
+- [x] Phase 1.5: OCR engine true value (real provider name: rapidocr/doctr/openai/etc.)
+- [x] Phase 1.5: Offset guard (pre-insertion validation with structured RFC3339 logging)
+- [x] Phase 1.5: v3_005 migration (video_chunks start_time/end_time for precise offset bounds)
 
 **Go/No-Go Gates** (authority: `v3/metrics/phase-gates.md`):
 - [x] 1-F-01: 1-hour recording → valid video chunks (unit validated)
@@ -159,11 +164,54 @@ Legend: ⬜️ Not Started | 🟨 In Progress | 🟩 Complete | 🟥 Blocked
 
 **Rationale**: 本轮审计范围内（非长时 gate）无失败，且无未解决 P0/P1；>30 天策略逻辑模拟通过（`-31d` 过期、`+30d` 不清理、`PENDING` 过期不清理、级联删除覆盖 DB+文件）；API 烟测 11/11 通过。长时 gate 按规则保留 `FormalStatus=PENDING, PendingReason=LONGRUN`。
 
-**Test Results**: Post-audit regression: `tests/test_phase1_*` = 137 passed, 8 skipped, 0 failed；`tests/test_phase1_gates.py` = 14 passed, 8 skipped, 0 failed；`tests/test_phase5_buffer.py -k TestUploaderConsumer` = 6 passed.
+**Test Results**: Post-Phase 1.5 regression: `tests/test_phase1_*` = 170 passed, 8 skipped, 0 failed；Phase 1.5 suite: 33 passed；`tests/test_phase1_gates.py` = 14 passed, 8 skipped, 0 failed；`tests/test_phase5_buffer.py -k TestUploaderConsumer` = 6 passed.
 
 **Blockers**: 无工程阻塞；仅存在 7 个长时 gate 待日历时间观测（统一 `PENDING/LONGRUN`）。
 
 **Evidence**: `/Users/pyw/new/MyRecall/v3/evidence/phase1-audit/commands.log`, `/Users/pyw/new/MyRecall/v3/evidence/phase1-audit/api_smoke_status_lines_round1.txt`, `/Users/pyw/new/MyRecall/v3/evidence/phase1-audit/test_phase1_all_after_fix2.txt`
+
+**Phase 1.5 Evidence Matrix**
+
+| Change | Code Path | Test Command | Result | UTC Timestamp |
+|---|---|---|---|---|
+| Resolver `frame > chunk > null` for `app/window/focused/browser_url` | `/Users/pyw/new/MyRecall/openrecall/server/video/metadata_resolver.py` | `python3 -m pytest tests/test_phase1_5_metadata_resolver.py -v` | 12 passed | 2026-02-08T07:50:52Z |
+| focused/browser_url explicit pipeline and query/read compatibility | `/Users/pyw/new/MyRecall/openrecall/server/video/processor.py`, `/Users/pyw/new/MyRecall/openrecall/server/database/sql.py`, `/Users/pyw/new/MyRecall/openrecall/server/api_v1.py` | `python3 -m pytest tests/test_phase1_5_focused_browser_url.py -v` | 10 passed | 2026-02-08T07:50:52Z |
+| OCR engine true-value persistence | `/Users/pyw/new/MyRecall/openrecall/server/ai/base.py`, `/Users/pyw/new/MyRecall/openrecall/server/ai/providers.py`, `/Users/pyw/new/MyRecall/openrecall/server/video/processor.py` | `python3 -m pytest tests/test_phase1_5_ocr_engine.py -v` | 3 passed | 2026-02-08T07:50:52Z |
+| Offset guard reject-write protection and structured logging | `/Users/pyw/new/MyRecall/openrecall/server/video/processor.py` | `python3 -m pytest tests/test_phase1_5_offset_guard.py -v` | 8 passed | 2026-02-08T07:50:52Z |
+| Phase 1 + 1.5 full closure regression | `/Users/pyw/new/MyRecall/openrecall/server/video/metadata_resolver.py`, `/Users/pyw/new/MyRecall/openrecall/server/video/processor.py`, `/Users/pyw/new/MyRecall/openrecall/server/api_v1.py`, `/Users/pyw/new/MyRecall/openrecall/server/database/sql.py` | `python3 -m pytest tests/test_phase1_* -v` | 170 passed, 8 skipped | 2026-02-08T07:50:08Z |
+
+---
+
+### Phase 1.x (Future): Frame-Accurate Metadata Signal Pipeline
+**Status**: ⬜️ Proposed (Future Backlog)
+**Planned**: TBD (schedule after Phase 2.0 scope lock)
+**Actual**: N/A
+**Owner**: Tech Lead (architecture) + Solo Developer (implementation)
+**Purpose**: Upgrade from "resolver-ready but signal-sparse" to true frame-aligned metadata while keeping API contracts backward compatible.
+
+**Recommended Architecture (locked for future planning)**:
+- Keep **server-side frame extraction + OCR** as primary path (no architectural flip in this round).
+- Add **client-side metadata sidecar stream** (sample + event-driven), containing: `ts`, `app_name`, `window_title`, `focused`, `browser_url`, `monitor_id`.
+- Sidecar is uploaded with each chunk (same chunk_id association), not mixed into legacy fields.
+- Processor resolves per frame by `frame_ts` alignment to sidecar points (nearest-left within tolerance), then fallback `frame > chunk > null`.
+- Maintain source traceability (`source=frame|chunk|none`) and preserve existing offset guard behavior.
+- Do **not** migrate to "multi-window one frame" in this phase; align principles (atomic timing + offset correctness) without large schema/API reshaping.
+
+**Execution Plan (future)**:
+- [ ] Define sidecar contract and retention policy (JSON schema + size budget + privacy filters).
+- [ ] Implement client signal collector (200-500ms cadence + focus/URL/app/window change trigger).
+- [ ] Add upload/storage linkage for sidecar to `video_chunk_id` (backward compatible).
+- [ ] Implement server-side frame_ts join and tolerance strategy with reject logging for unmatched windows.
+- [ ] Extend tests: same chunk with changing app/window/focused/url must map to distinct frames.
+- [ ] Add metrics dashboard: `focused/browser_url null-rate`, metadata source distribution, resolver hit ratio.
+
+**Go/No-Go Gates (future)**:
+- [ ] API compatibility unchanged (old fields stable, new fields optional, unknown=`null`).
+- [ ] In browser-active sessions, `focused/browser_url` null-rate reduced vs Phase 1.5 baseline.
+- [ ] Frame metadata source `frame` share increases materially (vs chunk fallback baseline).
+- [ ] No offset mismatch regressions in timeline/search retrieval.
+
+**Blockers**: None (planning item only; sequencing depends on Phase 2.0 priorities).
 
 ---
 
@@ -477,6 +525,8 @@ This section tracks questions that have been resolved through architectural deci
 | 2026-02-06 | Phase 1 Engineering | All Phase 1 code + tests implemented (15 source files, 8 test files, 254 passed/9 skipped/0 failures). 13/21 gates passed. 7 pending long-run evidence. Go/No-Go: NO-GO (pending calendar-time evidence) | Phase 2 unblocked for planning; long-run evidence collection required |
 | 2026-02-07 | Phase 1 Post-Baseline Hardening | Added regression fixes for consumer dispatch, legacy upload forwarding, search debug rendering, runtime pause/resume semantics, and OCR startup warm-up; aligned docs/config authority for 60s chunk duration | Improves operational stability and troubleshooting clarity while keeping Phase 1 gate state unchanged |
 | 2026-02-07 | WebUI Documentation Governance | Added dedicated `v3/webui` documentation hub (route map/dataflow/comparison/page docs/templates) and linked maintenance rule into results workflow | Keeps phase results and WebUI behavior docs synchronized and auditable |
+| 2026-02-08 | Phase 1.5 Metadata Precision | Frame metadata resolver (A), focused/browser_url pipeline (B), OCR engine true value (C), offset guard (D), v3_005 migration, API v1 search compatibility serialization, 33 tests (170 total passed) | Precise per-frame metadata, NULL semantics, pre-insertion validation, real OCR engine name, additive API compatibility |
+| 2026-02-08 | Roadmap Addition | Added future Phase 1.x plan for frame-accurate metadata signal pipeline (server-side extraction/OCR + client sidecar + frame_ts alignment) | Establishes recommended evolution path without adopting multi-window-per-frame architecture in current scope |
 
 ---
 

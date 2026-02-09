@@ -104,6 +104,23 @@
     color: var(--text-secondary);
     font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
   }
+
+  .card-meta {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+
+  .card-seq {
+    font-size: 0.68rem;
+    color: var(--text-secondary);
+    background: rgba(0, 0, 0, 0.05);
+    border-radius: 999px;
+    padding: 1px 6px;
+    line-height: 1.3;
+  }
   
   /* Card Image */
   .card-image {
@@ -364,6 +381,18 @@
           <span>Pending</span>
           <span class="stat-value" x-text="stats().pending"></span>
         </div>
+        <div class="stat-item">
+          <span>Video Completed</span>
+          <span class="stat-value" x-text="videoStats.completed"></span>
+        </div>
+        <div class="stat-item">
+          <span>Video Processing</span>
+          <span class="stat-value" x-text="videoStats.processing"></span>
+        </div>
+        <div class="stat-item">
+          <span>Video Pending</span>
+          <span class="stat-value" x-text="videoStats.pending"></span>
+        </div>
       </div>
 
       <div class="memory-grid">
@@ -371,7 +400,11 @@
           <article class="memory-card">
             <div class="card-header">
               <span class="card-app" x-text="entry.app || 'Unknown'"></span>
-              <span class="card-time" x-text="formatTime(entry.timestamp)"></span>
+              <div class="card-meta">
+                <span class="card-time" x-text="formatTime(entry.timestamp)"></span>
+                <span class="card-seq" x-text="`V:${videoSequence(entry)}`"></span>
+                <span class="card-seq" x-text="`I:${imageSequence(entry)}`"></span>
+              </div>
             </div>
 
             <img
@@ -440,6 +473,7 @@
     return {
       entries: window.initialEntries || [],
       config: window.initialConfig || { show_ai_description: false },
+      videoStats: { completed: 0, processing: 0, pending: 0 },
       lastCheck: 0,
       selectedIndex: null,
 
@@ -469,7 +503,10 @@
         setInterval(() => {
           this.checkNew();
           this.refreshRecent();
-        }, 5000);
+          this.refreshVideoStats();
+        }, 2000);
+
+        this.refreshVideoStats();
       },
 
       async checkNew() {
@@ -552,6 +589,22 @@
         }
       },
 
+      async refreshVideoStats() {
+        try {
+          const res = await fetch("/api/queue/status");
+          if (!res.ok) return;
+          const payload = await res.json();
+          const videoQueue = payload?.video_queue || {};
+          this.videoStats = {
+            completed: Number(videoQueue.completed) || 0,
+            processing: Number(videoQueue.processing) || 0,
+            pending: Number(videoQueue.pending) || 0,
+          };
+        } catch (_e) {
+          return;
+        }
+      },
+
       stats() {
         const out = { completed: 0, pending: 0, processing: 0 };
         for (const entry of this.entries) {
@@ -568,6 +621,33 @@
         const d = new Date(n * 1000);
         const pad = (v) => String(v).padStart(2, "0");
         return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+      },
+
+      videoSequence(entry) {
+        const chunkId = Number(entry?.video_chunk_id);
+        if (Number.isFinite(chunkId) && chunkId > 0) return chunkId;
+
+        return "-";
+      },
+
+      imageSequence(entry) {
+        const id = entry?.id;
+        if (typeof id === "number" && Number.isFinite(id) && id > 0) return id;
+
+        if (typeof id === "string") {
+          if (id.startsWith("frame-")) {
+            const frameParsed = Number(id.slice(6));
+            if (Number.isFinite(frameParsed) && frameParsed > 0) return frameParsed;
+          }
+
+          const parsed = Number(id);
+          if (Number.isFinite(parsed) && parsed > 0) return parsed;
+        }
+
+        const frameId = Number(entry?.frame_id);
+        if (Number.isFinite(frameId) && frameId > 0) return frameId;
+
+        return "-";
       },
 
       imageSrc(entry) {
