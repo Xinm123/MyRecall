@@ -1,118 +1,286 @@
-14:47:35 | INFO    | openrecall.client | ==================================================
-14:47:35 | INFO    | openrecall.client | OpenRecall Client Starting
-14:47:35 | INFO    | openrecall.client | ==================================================
-14:47:35 | INFO    | openrecall.client | Debug mode: ON
-14:47:35 | INFO    | openrecall.client | Buffer path: /Users/pyw/MRC/buffer
-14:47:35 | INFO    | openrecall.client | Client screenshots: /Users/pyw/MRC/screenshots (enabled=False)
-14:47:35 | INFO    | openrecall.client | Cache folder: /Users/pyw/MRS/cache
-14:47:35 | INFO    | openrecall.client | Server API: http://localhost:18083/api
-14:47:35 | INFO    | openrecall.client | Capture interval: 20s
-14:47:35 | INFO    | openrecall.client | Upload timeout: 180s
-14:47:35 | INFO    | openrecall.client | Primary monitor only: True
-14:47:35 | INFO    | openrecall.client | Video monitor IDs: auto
-14:47:35 | INFO    | openrecall.client | Profile-change restart: True | Pool max bytes: 67108864
-14:47:35 | INFO    | openrecall.client | SCK retries: max=3 backoff=2s perm_backoff=30s auto_recover=True
-14:47:35 | INFO    | openrecall.client | ==================================================
-14:47:35 | INFO    | openrecall.client.recorder | Recording mode: auto -> video (FFmpeg available)
-14:47:35 | INFO    | openrecall.client.video_recorder | Video recorder started (monitor-id pipeline)
-14:47:35 | INFO    | openrecall.client.video_recorder |   Chunk duration: 60s
-14:47:35 | INFO    | openrecall.client.video_recorder |   FPS: 30, CRF: 23
-14:47:35 | INFO    | openrecall.client.video_recorder |   Pipeline mode: chunk_process | Pipe write timeout: 1500ms | No-progress timeout: 180s
-14:47:35 | INFO    | openrecall.client.video_recorder |   Output dir: /Users/pyw/MRC/video_chunks
-14:47:35 | INFO    | openrecall.client.consumer | 🚀 Consumer started | Pending uploads: 0
-14:47:35 | INFO    | openrecall.client.video_recorder | Selected monitors: 1
-14:47:35 | INFO    | openrecall.client.video_recorder | Client status | state=recording | monitor_chunks=1:initializing | pending_uploads=0
-14:47:35 | INFO    | openrecall.client.ffmpeg_manager | Starting FFmpeg: ffmpeg -f rawvideo -pixel_format nv12 -video_size 1512x982 -framerate 30 -use_wallclock_as_timestamps 1 -color_range tv -i - -c:v h264_videotoolbox -pix_fmt yuv420p -allow_sw 1 -y /Users/pyw/MRC/video_chunks/monitor_1/monitor_1_2026-02-09_06-47-35.mp4
-14:47:35 | INFO    | openrecall.client.ffmpeg_manager | FFmpeg watchdog started
-14:47:35 | INFO    | openrecall.client.ffmpeg_manager | FFmpeg started (PID=97760)
-14:47:35 | INFO    | openrecall.client.ffmpeg_manager | Video chunk recording started | file=monitor_1_2026-02-09_06-47-35.mp4 | monitor_id=1
-14:47:55 | INFO    | openrecall.client.video_recorder | Client status | state=recording | monitor_chunks=1:monitor_1_2026-02-09_06-47-35.mp4 | pending_uploads=0
-14:48:15 | INFO    | openrecall.client.video_recorder | Client status | state=recording | monitor_chunks=1:monitor_1_2026-02-09_06-47-35.mp4 | pending_uploads=0
-14:48:35 | INFO    | openrecall.client.video_recorder | Client status | state=recording | monitor_chunks=1:monitor_1_2026-02-09_06-47-35.mp4 | pending_uploads=0
-14:48:55 | INFO    | openrecall.client.video_recorder | Client status | state=recording | monitor_chunks=1:monitor_1_2026-02-09_06-47-35.mp4 | pending_uploads=0
-14:49:04 | INFO    | openrecall.client.video_recorder | Video chunk recording ended | file=monitor_1_2026-02-09_06-47-35.mp4 | size_mb=56.3 | monitor_id=1
-14:49:04 | INFO    | openrecall.client.buffer | Buffered file (video_chunk): monitor_1_2026-02-09_06-47-35.mp4 | Queue: 1 items
-14:49:04 | INFO    | openrecall.client.video_recorder | Video chunk enqueued: monitor_1_2026-02-09_06-47-35.mp4 (56.3MB monitor_id=1)
-14:49:04 | INFO    | openrecall.client.ffmpeg_manager | Starting FFmpeg: ffmpeg -f rawvideo -pixel_format nv12 -video_size 1512x982 -framerate 30 -use_wallclock_as_timestamps 1 -color_range tv -i - -c:v h264_videotoolbox -pix_fmt yuv420p -allow_sw 1 -y /Users/pyw/MRC/video_chunks/monitor_1/monitor_1_2026-02-09_06-49-04.mp4
-14:49:04 | INFO    | openrecall.client.ffmpeg_manager | FFmpeg started (PID=98377)
-14:49:04 | INFO    | openrecall.client.ffmpeg_manager | Video chunk recording started | file=monitor_1_2026-02-09_06-49-04.mp4 | monitor_id=1
-14:49:05 | INFO    | openrecall.client.consumer | Dispatch buffered item | id=20260209_144904_927836_5cb264b1 | item_type=video_chunk | target=upload_video_chunk
-14:49:05 | INFO    | openrecall.client.consumer | Uploading video chunk | id=20260209_144904_927836_5cb264b1 | file=monitor_1_2026-02-09_06-47-35.mp4 | size_mb=56.3 | monitor_id=1
-14:49:05 | INFO    | openrecall.client.buffer | ✅ Committed: 20260209_144904_9278... | Remaining: 0 items
-14:49:05 | INFO    | openrecall.client.consumer | 📤 Uploaded video chunk | file=monitor_1_2026-02-09_06-47-35.mp4 | size_mb=56.3 | monitor_id=1 | elapsed=0.10s | remaining=0
-14:49:15 | INFO    | openrecall.client.video_recorder | Client status | state=recording | monitor_chunks=1:monitor_1_2026-02-09_06-49-04.mp4 | pending_uploads=0
-14:49:28 | WARNING | openrecall.client.video_recorder | Slow ffmpeg stdin write monitor=1 latency=90.60ms
-14:49:35 | INFO    | openrecall.client.video_recorder | Client status | state=recording | monitor_chunks=1:monitor_1_2026-02-09_06-49-04.mp4 | pending_uploads=0
-14:49:55 | INFO    | openrecall.client.video_recorder | Client status | state=recording | monitor_chunks=1:monitor_1_2026-02-09_06-49-04.mp4 | pending_uploads=0
-14:50:15 | INFO    | openrecall.client.video_recorder | Client status | state=recording | monitor_chunks=1:monitor_1_2026-02-09_06-49-04.mp4 | pending_uploads=0
-14:50:33 | INFO    | openrecall.client.video_recorder | Video chunk recording ended | file=monitor_1_2026-02-09_06-49-04.mp4 | size_mb=55.5 | monitor_id=1
-14:50:33 | INFO    | openrecall.client.buffer | Buffered file (video_chunk): monitor_1_2026-02-09_06-49-04.mp4 | Queue: 1 items
-14:50:33 | INFO    | openrecall.client.video_recorder | Video chunk enqueued: monitor_1_2026-02-09_06-49-04.mp4 (55.5MB monitor_id=1)
-14:50:33 | INFO    | openrecall.client.ffmpeg_manager | Starting FFmpeg: ffmpeg -f rawvideo -pixel_format nv12 -video_size 1512x982 -framerate 30 -use_wallclock_as_timestamps 1 -color_range tv -i - -c:v h264_videotoolbox -pix_fmt yuv420p -allow_sw 1 -y /Users/pyw/MRC/video_chunks/monitor_1/monitor_1_2026-02-09_06-50-33.mp4
-14:50:33 | INFO    | openrecall.client.ffmpeg_manager | FFmpeg started (PID=98855)
-14:50:33 | INFO    | openrecall.client.ffmpeg_manager | Video chunk recording started | file=monitor_1_2026-02-09_06-50-33.mp4 | monitor_id=1
-14:50:33 | INFO    | openrecall.client.consumer | Dispatch buffered item | id=20260209_145033_595625_f8002cc2 | item_type=video_chunk | target=upload_video_chunk
-14:50:33 | INFO    | openrecall.client.consumer | Uploading video chunk | id=20260209_145033_595625_f8002cc2 | file=monitor_1_2026-02-09_06-49-04.mp4 | size_mb=55.5 | monitor_id=1
-14:50:34 | INFO    | openrecall.client.buffer | ✅ Committed: 20260209_145033_5956... | Remaining: 0 items
-14:50:34 | INFO    | openrecall.client.consumer | 📤 Uploaded video chunk | file=monitor_1_2026-02-09_06-49-04.mp4 | size_mb=55.5 | monitor_id=1 | elapsed=0.13s | remaining=0
-14:50:36 | INFO    | openrecall.client.video_recorder | Client status | state=recording | monitor_chunks=1:monitor_1_2026-02-09_06-50-33.mp4 | pending_uploads=0
-14:50:56 | INFO    | openrecall.client.video_recorder | Client status | state=recording | monitor_chunks=1:monitor_1_2026-02-09_06-50-33.mp4 | pending_uploads=0
-14:51:16 | INFO    | openrecall.client.video_recorder | Client status | state=recording | monitor_chunks=1:monitor_1_2026-02-09_06-50-33.mp4 | pending_uploads=0
-14:51:36 | INFO    | openrecall.client.video_recorder | Client status | state=recording | monitor_chunks=1:monitor_1_2026-02-09_06-50-33.mp4 | pending_uploads=0
-14:51:43 | WARNING | openrecall.client.video_recorder | Slow ffmpeg stdin write monitor=1 latency=86.32ms
-14:51:56 | INFO    | openrecall.client.video_recorder | Client status | state=recording | monitor_chunks=1:monitor_1_2026-02-09_06-50-33.mp4 | pending_uploads=0
-14:51:58 | INFO    | openrecall.client.video_recorder | Video chunk recording ended | file=monitor_1_2026-02-09_06-50-33.mp4 | size_mb=63.6 | monitor_id=1
-14:51:58 | INFO    | openrecall.client.buffer | Buffered file (video_chunk): monitor_1_2026-02-09_06-50-33.mp4 | Queue: 1 items
-14:51:58 | INFO    | openrecall.client.video_recorder | Video chunk enqueued: monitor_1_2026-02-09_06-50-33.mp4 (63.6MB monitor_id=1)
-14:51:58 | INFO    | openrecall.client.ffmpeg_manager | Starting FFmpeg: ffmpeg -f rawvideo -pixel_format nv12 -video_size 1512x982 -framerate 30 -use_wallclock_as_timestamps 1 -color_range tv -i - -c:v h264_videotoolbox -pix_fmt yuv420p -allow_sw 1 -y /Users/pyw/MRC/video_chunks/monitor_1/monitor_1_2026-02-09_06-51-58.mp4
-14:51:58 | INFO    | openrecall.client.ffmpeg_manager | FFmpeg started (PID=99396)
-14:51:58 | INFO    | openrecall.client.ffmpeg_manager | Video chunk recording started | file=monitor_1_2026-02-09_06-51-58.mp4 | monitor_id=1
-14:51:59 | INFO    | openrecall.client.consumer | Dispatch buffered item | id=20260209_145158_770387_74bd610e | item_type=video_chunk | target=upload_video_chunk
-14:51:59 | INFO    | openrecall.client.consumer | Uploading video chunk | id=20260209_145158_770387_74bd610e | file=monitor_1_2026-02-09_06-50-33.mp4 | size_mb=63.6 | monitor_id=1
-14:51:59 | INFO    | openrecall.client.buffer | ✅ Committed: 20260209_145158_7703... | Remaining: 0 items
-14:51:59 | INFO    | openrecall.client.consumer | 📤 Uploaded video chunk | file=monitor_1_2026-02-09_06-50-33.mp4 | size_mb=63.6 | monitor_id=1 | elapsed=0.23s | remaining=0
-14:52:16 | INFO    | openrecall.client.video_recorder | Client status | state=recording | monitor_chunks=1:monitor_1_2026-02-09_06-51-58.mp4 | pending_uploads=0
-14:52:36 | INFO    | openrecall.client.video_recorder | Client status | state=recording | monitor_chunks=1:monitor_1_2026-02-09_06-51-58.mp4 | pending_uploads=0
-14:52:38 | WARNING | openrecall.client.video_recorder | Slow ffmpeg stdin write monitor=1 latency=68.96ms
-14:52:38 | WARNING | openrecall.client.video_recorder | Slow ffmpeg stdin write monitor=1 latency=59.24ms
-14:52:56 | INFO    | openrecall.client.video_recorder | Client status | state=recording | monitor_chunks=1:monitor_1_2026-02-09_06-51-58.mp4 | pending_uploads=0
-14:53:14 | INFO    | openrecall.client.video_recorder | Video chunk recording ended | file=monitor_1_2026-02-09_06-51-58.mp4 | size_mb=64.1 | monitor_id=1
-14:53:14 | INFO    | openrecall.client.buffer | Buffered file (video_chunk): monitor_1_2026-02-09_06-51-58.mp4 | Queue: 1 items
-14:53:14 | INFO    | openrecall.client.video_recorder | Video chunk enqueued: monitor_1_2026-02-09_06-51-58.mp4 (64.1MB monitor_id=1)
-14:53:14 | INFO    | openrecall.client.ffmpeg_manager | Starting FFmpeg: ffmpeg -f rawvideo -pixel_format nv12 -video_size 1512x982 -framerate 30 -use_wallclock_as_timestamps 1 -color_range tv -i - -c:v h264_videotoolbox -pix_fmt yuv420p -allow_sw 1 -y /Users/pyw/MRC/video_chunks/monitor_1/monitor_1_2026-02-09_06-53-14.mp4
-14:53:14 | INFO    | openrecall.client.ffmpeg_manager | FFmpeg started (PID=99791)
-14:53:14 | INFO    | openrecall.client.ffmpeg_manager | Video chunk recording started | file=monitor_1_2026-02-09_06-53-14.mp4 | monitor_id=1
-14:53:14 | INFO    | openrecall.client.consumer | Dispatch buffered item | id=20260209_145314_527787_254253e3 | item_type=video_chunk | target=upload_video_chunk
-14:53:14 | INFO    | openrecall.client.consumer | Uploading video chunk | id=20260209_145314_527787_254253e3 | file=monitor_1_2026-02-09_06-51-58.mp4 | size_mb=64.1 | monitor_id=1
-14:53:15 | INFO    | openrecall.client.buffer | ✅ Committed: 20260209_145314_5277... | Remaining: 0 items
-14:53:15 | INFO    | openrecall.client.consumer | 📤 Uploaded video chunk | file=monitor_1_2026-02-09_06-51-58.mp4 | size_mb=64.1 | monitor_id=1 | elapsed=0.13s | remaining=0
-14:53:16 | INFO    | openrecall.client.video_recorder | Client status | state=recording | monitor_chunks=1:monitor_1_2026-02-09_06-53-14.mp4 | pending_uploads=0
-14:53:36 | INFO    | openrecall.client.video_recorder | Client status | state=recording | monitor_chunks=1:monitor_1_2026-02-09_06-53-14.mp4 | pending_uploads=0
-14:53:56 | INFO    | openrecall.client.video_recorder | Client status | state=recording | monitor_chunks=1:monitor_1_2026-02-09_06-53-14.mp4 | pending_uploads=0
-14:54:17 | INFO    | openrecall.client.video_recorder | Client status | state=recording | monitor_chunks=1:monitor_1_2026-02-09_06-53-14.mp4 | pending_uploads=0
-14:54:20 | INFO    | openrecall.client.video_recorder | Video chunk recording ended | file=monitor_1_2026-02-09_06-53-14.mp4 | size_mb=48.4 | monitor_id=1
-14:54:20 | INFO    | openrecall.client.buffer | Buffered file (video_chunk): monitor_1_2026-02-09_06-53-14.mp4 | Queue: 1 items
-14:54:20 | INFO    | openrecall.client.video_recorder | Video chunk enqueued: monitor_1_2026-02-09_06-53-14.mp4 (48.4MB monitor_id=1)
-14:54:20 | INFO    | openrecall.client.ffmpeg_manager | Starting FFmpeg: ffmpeg -f rawvideo -pixel_format nv12 -video_size 1512x982 -framerate 30 -use_wallclock_as_timestamps 1 -color_range tv -i - -c:v h264_videotoolbox -pix_fmt yuv420p -allow_sw 1 -y /Users/pyw/MRC/video_chunks/monitor_1/monitor_1_2026-02-09_06-54-20.mp4
-14:54:20 | INFO    | openrecall.client.ffmpeg_manager | FFmpeg started (PID=423)
-14:54:20 | INFO    | openrecall.client.ffmpeg_manager | Video chunk recording started | file=monitor_1_2026-02-09_06-54-20.mp4 | monitor_id=1
-14:54:21 | INFO    | openrecall.client.consumer | Dispatch buffered item | id=20260209_145420_835926_59fcb469 | item_type=video_chunk | target=upload_video_chunk
-14:54:21 | INFO    | openrecall.client.consumer | Uploading video chunk | id=20260209_145420_835926_59fcb469 | file=monitor_1_2026-02-09_06-53-14.mp4 | size_mb=48.4 | monitor_id=1
-14:54:21 | INFO    | openrecall.client.buffer | ✅ Committed: 20260209_145420_8359... | Remaining: 0 items
-14:54:21 | INFO    | openrecall.client.consumer | 📤 Uploaded video chunk | file=monitor_1_2026-02-09_06-53-14.mp4 | size_mb=48.4 | monitor_id=1 | elapsed=0.16s | remaining=0
-14:54:37 | INFO    | openrecall.client.video_recorder | Client status | state=recording | monitor_chunks=1:monitor_1_2026-02-09_06-54-20.mp4 | pending_uploads=0
-14:54:57 | INFO    | openrecall.client.video_recorder | Client status | state=recording | monitor_chunks=1:monitor_1_2026-02-09_06-54-20.mp4 | pending_uploads=0
-14:55:17 | INFO    | openrecall.client.video_recorder | Client status | state=recording | monitor_chunks=1:monitor_1_2026-02-09_06-54-20.mp4 | pending_uploads=0
-14:55:22 | INFO    | openrecall.client.video_recorder | Video chunk recording ended | file=monitor_1_2026-02-09_06-54-20.mp4 | size_mb=50.6 | monitor_id=1
-14:55:22 | INFO    | openrecall.client.buffer | Buffered file (video_chunk): monitor_1_2026-02-09_06-54-20.mp4 | Queue: 1 items
-14:55:22 | INFO    | openrecall.client.video_recorder | Video chunk enqueued: monitor_1_2026-02-09_06-54-20.mp4 (50.6MB monitor_id=1)
-14:55:22 | INFO    | openrecall.client.ffmpeg_manager | Starting FFmpeg: ffmpeg -f rawvideo -pixel_format nv12 -video_size 1512x982 -framerate 30 -use_wallclock_as_timestamps 1 -color_range tv -i - -c:v h264_videotoolbox -pix_fmt yuv420p -allow_sw 1 -y /Users/pyw/MRC/video_chunks/monitor_1/monitor_1_2026-02-09_06-55-22.mp4
-14:55:22 | INFO    | openrecall.client.ffmpeg_manager | FFmpeg started (PID=760)
-14:55:22 | INFO    | openrecall.client.ffmpeg_manager | Video chunk recording started | file=monitor_1_2026-02-09_06-55-22.mp4 | monitor_id=1
-14:55:23 | INFO    | openrecall.client.consumer | Dispatch buffered item | id=20260209_145522_656831_c3136254 | item_type=video_chunk | target=upload_video_chunk
-14:55:23 | INFO    | openrecall.client.consumer | Uploading video chunk | id=20260209_145522_656831_c3136254 | file=monitor_1_2026-02-09_06-54-20.mp4 | size_mb=50.6 | monitor_id=1
-14:55:23 | INFO    | openrecall.client.buffer | ✅ Committed: 20260209_145522_6568... | Remaining: 0 items
-14:55:23 | INFO    | openrecall.client.consumer | 📤 Uploaded video chunk | file=monitor_1_2026-02-09_06-54-20.mp4 | size_mb=50.6 | monitor_id=1 | elapsed=0.13s | remaining=0
-14:55:37 | INFO    | openrecall.client.video_recorder | Client status | state=recording | monitor_chunks=1:monitor_1_2026-02-09_06-55-22.mp4 | pending_uploads=0
-14:55:41 | WARNING | openrecall.client.video_recorder | Slow ffmpeg stdin write monitor=1 latency=178.49ms
-14:55:57 | INFO    | openrecall.client.video_recorder | Client status | state=recording | monitor_chunks=1:monitor_1_2026-02-09_06-55-22.mp4 | pending_uploads=0
+15:59:44 | INFO    | openrecall.client | ==================================================
+15:59:44 | INFO    | openrecall.client | OpenRecall Client Starting
+15:59:44 | INFO    | openrecall.client | ==================================================
+15:59:44 | INFO    | openrecall.client | Debug mode: ON
+15:59:44 | INFO    | openrecall.client | Buffer path: /Users/tiiny/MRC/buffer
+15:59:44 | INFO    | openrecall.client | Client screenshots: /Users/tiiny/MRC/screenshots (enabled=False)
+15:59:44 | INFO    | openrecall.client | Cache folder: /Users/tiiny/MRS/cache
+15:59:44 | INFO    | openrecall.client | Server API: http://localhost:18083/api
+15:59:44 | INFO    | openrecall.client | Capture interval: 20s
+15:59:44 | INFO    | openrecall.client | Upload timeout: 180s
+15:59:44 | INFO    | openrecall.client | Primary monitor only: True
+15:59:44 | INFO    | openrecall.client | Video monitor IDs: auto
+15:59:44 | INFO    | openrecall.client | Profile-change restart: True | Pool max bytes: 67108864
+15:59:44 | INFO    | openrecall.client | SCK retries: max=3 backoff=2s perm_backoff=30s auto_recover=True
+15:59:44 | INFO    | openrecall.client | ==================================================
+15:59:44 | INFO    | openrecall.client.recorder | Recording mode: auto -> video (FFmpeg available)
+15:59:44 | INFO    | openrecall.client.consumer | 🚀 Consumer started | Pending uploads: 0
+15:59:44 | INFO    | openrecall.client.video_recorder | Video recorder started (monitor-id pipeline)
+15:59:44 | INFO    | openrecall.client.video_recorder |   Chunk duration: 60s
+15:59:44 | INFO    | openrecall.client.video_recorder |   FPS: 30, CRF: 23
+15:59:44 | INFO    | openrecall.client.video_recorder |   Pipeline mode: chunk_process | Pipe write timeout: 1500ms | No-progress timeout: 180s
+15:59:44 | INFO    | openrecall.client.video_recorder |   Output dir: /Users/tiiny/MRC/video_chunks
+15:59:44 | INFO    | openrecall.client.video_recorder | Selected monitors: 1
+15:59:44 | INFO    | openrecall.client.video_recorder | Client status | state=recording | monitor_chunks=1:initializing | pending_uploads=0
+15:59:44 | INFO    | openrecall.client.ffmpeg_manager | Starting FFmpeg: ffmpeg -f rawvideo -pixel_format nv12 -video_size 1470x956 -framerate 30 -use_wallclock_as_timestamps 1 -color_range tv -i - -c:v h264_videotoolbox -pix_fmt yuv420p -allow_sw 1 -y /Users/tiiny/MRC/video_chunks/monitor_1/monitor_1_2026-02-09_07-59-44.mp4
+15:59:44 | INFO    | openrecall.client.ffmpeg_manager | FFmpeg watchdog started
+15:59:44 | INFO    | openrecall.client.ffmpeg_manager | FFmpeg started (PID=2815)
+15:59:44 | INFO    | openrecall.client.ffmpeg_manager | Video chunk recording started | file=monitor_1_2026-02-09_07-59-44.mp4 | monitor_id=1
+16:00:04 | INFO    | openrecall.client.video_recorder | Client status | state=recording | monitor_chunks=1:monitor_1_2026-02-09_07-59-44.mp4 | pending_uploads=0
+16:00:24 | INFO    | openrecall.client.video_recorder | Client status | state=recording | monitor_chunks=1:monitor_1_2026-02-09_07-59-44.mp4 | pending_uploads=0
+16:00:44 | INFO    | openrecall.client.video_recorder | Client status | state=recording | monitor_chunks=1:monitor_1_2026-02-09_07-59-44.mp4 | pending_uploads=0
+16:01:04 | INFO    | openrecall.client.video_recorder | Client status | state=recording | monitor_chunks=1:monitor_1_2026-02-09_07-59-44.mp4 | pending_uploads=0
+16:01:24 | INFO    | openrecall.client.video_recorder | Client status | state=recording | monitor_chunks=1:monitor_1_2026-02-09_07-59-44.mp4 | pending_uploads=0
+16:01:30 | INFO    | openrecall.client.video_recorder | Video chunk recording ended | file=monitor_1_2026-02-09_07-59-44.mp4 | size_mb=50.1 | monitor_id=1
+16:01:30 | INFO    | openrecall.client.buffer | Buffered file (video_chunk): monitor_1_2026-02-09_07-59-44.mp4 | Queue: 1 items
+16:01:30 | INFO    | openrecall.client.video_recorder | Video chunk enqueued: monitor_1_2026-02-09_07-59-44.mp4 (50.1MB monitor_id=1)
+16:01:30 | INFO    | openrecall.client.ffmpeg_manager | Starting FFmpeg: ffmpeg -f rawvideo -pixel_format nv12 -video_size 1470x956 -framerate 30 -use_wallclock_as_timestamps 1 -color_range tv -i - -c:v h264_videotoolbox -pix_fmt yuv420p -allow_sw 1 -y /Users/tiiny/MRC/video_chunks/monitor_1/monitor_1_2026-02-09_08-01-30.mp4
+16:01:30 | INFO    | openrecall.client.ffmpeg_manager | FFmpeg started (PID=2910)
+16:01:30 | INFO    | openrecall.client.ffmpeg_manager | Video chunk recording started | file=monitor_1_2026-02-09_08-01-30.mp4 | monitor_id=1
+16:01:30 | INFO    | openrecall.client.consumer | Dispatch buffered item | id=20260209_160130_261072_6a54ffd1 | item_type=video_chunk | target=upload_video_chunk
+16:01:30 | INFO    | openrecall.client.consumer | Uploading video chunk | id=20260209_160130_261072_6a54ffd1 | file=monitor_1_2026-02-09_07-59-44.mp4 | size_mb=50.1 | monitor_id=1
+16:01:30 | INFO    | openrecall.client.buffer | ✅ Committed: 20260209_160130_2610... | Remaining: 0 items
+16:01:30 | INFO    | openrecall.client.consumer | 📤 Uploaded video chunk | file=monitor_1_2026-02-09_07-59-44.mp4 | size_mb=50.1 | monitor_id=1 | elapsed=0.18s | remaining=0
+16:01:45 | INFO    | openrecall.client.video_recorder | Client status | state=recording | monitor_chunks=1:monitor_1_2026-02-09_08-01-30.mp4 | pending_uploads=0
+16:02:05 | INFO    | openrecall.client.video_recorder | Client status | state=recording | monitor_chunks=1:monitor_1_2026-02-09_08-01-30.mp4 | pending_uploads=0
+16:02:25 | INFO    | openrecall.client.video_recorder | Client status | state=recording | monitor_chunks=1:monitor_1_2026-02-09_08-01-30.mp4 | pending_uploads=0
+16:02:45 | INFO    | openrecall.client.video_recorder | Client status | state=recording | monitor_chunks=1:monitor_1_2026-02-09_08-01-30.mp4 | pending_uploads=0
+16:03:05 | INFO    | openrecall.client.video_recorder | Client status | state=recording | monitor_chunks=1:monitor_1_2026-02-09_08-01-30.mp4 | pending_uploads=0
+16:03:25 | INFO    | openrecall.client.video_recorder | Client status | state=recording | monitor_chunks=1:monitor_1_2026-02-09_08-01-30.mp4 | pending_uploads=0
+16:03:45 | INFO    | openrecall.client.video_recorder | Client status | state=recording | monitor_chunks=1:monitor_1_2026-02-09_08-01-30.mp4 | pending_uploads=0
+16:03:59 | INFO    | openrecall.client.video_recorder | Video chunk recording ended | file=monitor_1_2026-02-09_08-01-30.mp4 | size_mb=63.0 | monitor_id=1
+16:03:59 | INFO    | openrecall.client.buffer | Buffered file (video_chunk): monitor_1_2026-02-09_08-01-30.mp4 | Queue: 1 items
+16:03:59 | INFO    | openrecall.client.video_recorder | Video chunk enqueued: monitor_1_2026-02-09_08-01-30.mp4 (63.0MB monitor_id=1)
+16:03:59 | INFO    | openrecall.client.ffmpeg_manager | Starting FFmpeg: ffmpeg -f rawvideo -pixel_format nv12 -video_size 1470x956 -framerate 30 -use_wallclock_as_timestamps 1 -color_range tv -i - -c:v h264_videotoolbox -pix_fmt yuv420p -allow_sw 1 -y /Users/tiiny/MRC/video_chunks/monitor_1/monitor_1_2026-02-09_08-03-59.mp4
+16:03:59 | INFO    | openrecall.client.ffmpeg_manager | FFmpeg started (PID=3040)
+16:03:59 | INFO    | openrecall.client.ffmpeg_manager | Video chunk recording started | file=monitor_1_2026-02-09_08-03-59.mp4 | monitor_id=1
+16:04:00 | INFO    | openrecall.client.consumer | Dispatch buffered item | id=20260209_160359_937218_d26593af | item_type=video_chunk | target=upload_video_chunk
+16:04:00 | INFO    | openrecall.client.consumer | Uploading video chunk | id=20260209_160359_937218_d26593af | file=monitor_1_2026-02-09_08-01-30.mp4 | size_mb=63.0 | monitor_id=1
+16:04:00 | INFO    | openrecall.client.buffer | ✅ Committed: 20260209_160359_9372... | Remaining: 0 items
+16:04:00 | INFO    | openrecall.client.consumer | 📤 Uploaded video chunk | file=monitor_1_2026-02-09_08-01-30.mp4 | size_mb=63.0 | monitor_id=1 | elapsed=0.20s | remaining=0
+16:04:05 | INFO    | openrecall.client.video_recorder | Client status | state=recording | monitor_chunks=1:monitor_1_2026-02-09_08-03-59.mp4 | pending_uploads=0
+16:04:25 | INFO    | openrecall.client.video_recorder | Client status | state=recording | monitor_chunks=1:monitor_1_2026-02-09_08-03-59.mp4 | pending_uploads=0
+16:04:45 | INFO    | openrecall.client.video_recorder | Client status | state=recording | monitor_chunks=1:monitor_1_2026-02-09_08-03-59.mp4 | pending_uploads=0
+16:05:05 | INFO    | openrecall.client.video_recorder | Client status | state=recording | monitor_chunks=1:monitor_1_2026-02-09_08-03-59.mp4 | pending_uploads=0
+16:05:26 | INFO    | openrecall.client.video_recorder | Client status | state=recording | monitor_chunks=1:monitor_1_2026-02-09_08-03-59.mp4 | pending_uploads=0
+16:05:46 | INFO    | openrecall.client.video_recorder | Client status | state=recording | monitor_chunks=1:monitor_1_2026-02-09_08-03-59.mp4 | pending_uploads=0
+16:06:06 | INFO    | openrecall.client.video_recorder | Client status | state=recording | monitor_chunks=1:monitor_1_2026-02-09_08-03-59.mp4 | pending_uploads=0
+16:06:26 | INFO    | openrecall.client.video_recorder | Client status | state=recording | monitor_chunks=1:monitor_1_2026-02-09_08-03-59.mp4 | pending_uploads=0
+16:06:46 | INFO    | openrecall.client.video_recorder | Client status | state=recording | monitor_chunks=1:monitor_1_2026-02-09_08-03-59.mp4 | pending_uploads=0
+16:07:06 | INFO    | openrecall.client.video_recorder | Client status | state=recording | monitor_chunks=1:monitor_1_2026-02-09_08-03-59.mp4 | pending_uploads=0
+16:07:26 | INFO    | openrecall.client.video_recorder | Client status | state=recording | monitor_chunks=1:monitor_1_2026-02-09_08-03-59.mp4 | pending_uploads=0
+16:07:39 | INFO    | openrecall.client.video_recorder | Video chunk recording ended | file=monitor_1_2026-02-09_08-03-59.mp4 | size_mb=75.7 | monitor_id=1
+16:07:39 | INFO    | openrecall.client.buffer | Buffered file (video_chunk): monitor_1_2026-02-09_08-03-59.mp4 | Queue: 1 items
+16:07:39 | INFO    | openrecall.client.video_recorder | Video chunk enqueued: monitor_1_2026-02-09_08-03-59.mp4 (75.7MB monitor_id=1)
+16:07:39 | INFO    | openrecall.client.ffmpeg_manager | Starting FFmpeg: ffmpeg -f rawvideo -pixel_format nv12 -video_size 1470x956 -framerate 30 -use_wallclock_as_timestamps 1 -color_range tv -i - -c:v h264_videotoolbox -pix_fmt yuv420p -allow_sw 1 -y /Users/tiiny/MRC/video_chunks/monitor_1/monitor_1_2026-02-09_08-07-39.mp4
+16:07:39 | INFO    | openrecall.client.ffmpeg_manager | FFmpeg started (PID=3213)
+16:07:39 | INFO    | openrecall.client.ffmpeg_manager | Video chunk recording started | file=monitor_1_2026-02-09_08-07-39.mp4 | monitor_id=1
+16:07:39 | INFO    | openrecall.client.consumer | Dispatch buffered item | id=20260209_160739_634967_89ba9f12 | item_type=video_chunk | target=upload_video_chunk
+16:07:39 | INFO    | openrecall.client.consumer | Uploading video chunk | id=20260209_160739_634967_89ba9f12 | file=monitor_1_2026-02-09_08-03-59.mp4 | size_mb=75.7 | monitor_id=1
+16:07:40 | INFO    | openrecall.client.buffer | ✅ Committed: 20260209_160739_6349... | Remaining: 0 items
+16:07:40 | INFO    | openrecall.client.consumer | 📤 Uploaded video chunk | file=monitor_1_2026-02-09_08-03-59.mp4 | size_mb=75.7 | monitor_id=1 | elapsed=0.31s | remaining=0
+16:07:46 | INFO    | openrecall.client.video_recorder | Client status | state=recording | monitor_chunks=1:monitor_1_2026-02-09_08-07-39.mp4 | pending_uploads=0
+16:08:06 | INFO    | openrecall.client.video_recorder | Client status | state=recording | monitor_chunks=1:monitor_1_2026-02-09_08-07-39.mp4 | pending_uploads=0
+16:08:07 | WARNING | openrecall.client.video_recorder | Slow ffmpeg stdin write monitor=1 latency=83.86ms
+16:08:26 | INFO    | openrecall.client.video_recorder | Client status | state=recording | monitor_chunks=1:monitor_1_2026-02-09_08-07-39.mp4 | pending_uploads=0
+16:08:46 | INFO    | openrecall.client.video_recorder | Client status | state=recording | monitor_chunks=1:monitor_1_2026-02-09_08-07-39.mp4 | pending_uploads=0
+16:09:07 | INFO    | openrecall.client.video_recorder | Client status | state=recording | monitor_chunks=1:monitor_1_2026-02-09_08-07-39.mp4 | pending_uploads=0
+16:09:23 | INFO    | openrecall.client.video_recorder | Video chunk recording ended | file=monitor_1_2026-02-09_08-07-39.mp4 | size_mb=75.0 | monitor_id=1
+16:09:24 | INFO    | openrecall.client.buffer | Buffered file (video_chunk): monitor_1_2026-02-09_08-07-39.mp4 | Queue: 1 items
+16:09:24 | INFO    | openrecall.client.video_recorder | Video chunk enqueued: monitor_1_2026-02-09_08-07-39.mp4 (75.0MB monitor_id=1)
+16:09:24 | INFO    | openrecall.client.ffmpeg_manager | Starting FFmpeg: ffmpeg -f rawvideo -pixel_format nv12 -video_size 1470x956 -framerate 30 -use_wallclock_as_timestamps 1 -color_range tv -i - -c:v h264_videotoolbox -pix_fmt yuv420p -allow_sw 1 -y /Users/tiiny/MRC/video_chunks/monitor_1/monitor_1_2026-02-09_08-09-24.mp4
+16:09:24 | INFO    | openrecall.client.ffmpeg_manager | FFmpeg started (PID=3349)
+16:09:24 | INFO    | openrecall.client.ffmpeg_manager | Video chunk recording started | file=monitor_1_2026-02-09_08-09-24.mp4 | monitor_id=1
+16:09:24 | INFO    | openrecall.client.consumer | Dispatch buffered item | id=20260209_160924_038307_0e14a6a1 | item_type=video_chunk | target=upload_video_chunk
+16:09:24 | INFO    | openrecall.client.consumer | Uploading video chunk | id=20260209_160924_038307_0e14a6a1 | file=monitor_1_2026-02-09_08-07-39.mp4 | size_mb=75.0 | monitor_id=1
+16:09:24 | INFO    | openrecall.client.buffer | ✅ Committed: 20260209_160924_0383... | Remaining: 0 items
+16:09:24 | INFO    | openrecall.client.consumer | 📤 Uploaded video chunk | file=monitor_1_2026-02-09_08-07-39.mp4 | size_mb=75.0 | monitor_id=1 | elapsed=0.26s | remaining=0
+16:09:27 | INFO    | openrecall.client.video_recorder | Client status | state=recording | monitor_chunks=1:monitor_1_2026-02-09_08-09-24.mp4 | pending_uploads=0
+16:09:47 | INFO    | openrecall.client.video_recorder | Client status | state=recording | monitor_chunks=1:monitor_1_2026-02-09_08-09-24.mp4 | pending_uploads=0
+16:10:07 | INFO    | openrecall.client.video_recorder | Client status | state=recording | monitor_chunks=1:monitor_1_2026-02-09_08-09-24.mp4 | pending_uploads=0
+16:10:27 | INFO    | openrecall.client.video_recorder | Client status | state=recording | monitor_chunks=1:monitor_1_2026-02-09_08-09-24.mp4 | pending_uploads=0
+16:10:47 | INFO    | openrecall.client.video_recorder | Client status | state=recording | monitor_chunks=1:monitor_1_2026-02-09_08-09-24.mp4 | pending_uploads=0
+16:11:07 | INFO    | openrecall.client.video_recorder | Client status | state=recording | monitor_chunks=1:monitor_1_2026-02-09_08-09-24.mp4 | pending_uploads=0
+16:11:27 | INFO    | openrecall.client.video_recorder | Client status | state=recording | monitor_chunks=1:monitor_1_2026-02-09_08-09-24.mp4 | pending_uploads=0
+16:11:47 | INFO    | openrecall.client.video_recorder | Client status | state=recording | monitor_chunks=1:monitor_1_2026-02-09_08-09-24.mp4 | pending_uploads=0
+16:12:07 | INFO    | openrecall.client.video_recorder | Client status | state=recording | monitor_chunks=1:monitor_1_2026-02-09_08-09-24.mp4 | pending_uploads=0
+16:12:27 | INFO    | openrecall.client.video_recorder | Client status | state=recording | monitor_chunks=1:monitor_1_2026-02-09_08-09-24.mp4 | pending_uploads=0
+16:12:48 | INFO    | openrecall.client.video_recorder | Client status | state=recording | monitor_chunks=1:monitor_1_2026-02-09_08-09-24.mp4 | pending_uploads=0
+16:13:08 | INFO    | openrecall.client.video_recorder | Client status | state=recording | monitor_chunks=1:monitor_1_2026-02-09_08-09-24.mp4 | pending_uploads=0
+16:13:28 | INFO    | openrecall.client.video_recorder | Client status | state=recording | monitor_chunks=1:monitor_1_2026-02-09_08-09-24.mp4 | pending_uploads=0
+16:13:45 | ERROR   | openrecall.client.video_recorder | Stalled pipeline detected | monitor_id=1 | chunk=monitor_1_2026-02-09_08-09-24.mp4 | stagnant_for=260.6s | seconds_since_write=5.6s | write_stuck_for=5.6s | writer_alive=True | mode=chunk_process | no_chunk_progress=False
+16:13:45 | ERROR   | openrecall.client.video_recorder | Detected stalled monitor-id pipeline(s): 1; forcing SCK backend restart
+16:13:47 | INFO    | openrecall.client.ffmpeg_manager | FFmpeg watchdog stopped
+16:13:49 | WARNING | openrecall.client.ffmpeg_manager | FFmpeg did not close chunk in time, killing process
+16:13:49 | INFO    | openrecall.client.video_recorder | Video chunk recording ended | file=monitor_1_2026-02-09_08-09-24.mp4 | size_mb=77.3 | monitor_id=1
+16:13:49 | INFO    | openrecall.client.video_recorder | Video chunk recording ended | file=monitor_1_2026-02-09_08-09-24.mp4 | size_mb=77.3 | monitor_id=1
+16:13:49 | INFO    | openrecall.client.buffer | Buffered file (video_chunk): monitor_1_2026-02-09_08-09-24.mp4 | Queue: 1 items
+16:13:49 | INFO    | openrecall.client.video_recorder | Video chunk enqueued: monitor_1_2026-02-09_08-09-24.mp4 (77.3MB monitor_id=1)
+16:13:49 | INFO    | openrecall.client.buffer | Buffered file (video_chunk): monitor_1_2026-02-09_08-09-24.mp4 | Queue: 2 items
+16:13:49 | INFO    | openrecall.client.video_recorder | Video chunk enqueued: monitor_1_2026-02-09_08-09-24.mp4 (77.3MB monitor_id=1)
+16:13:49 | INFO    | openrecall.client.video_recorder | Selected monitors: 1
+16:13:49 | INFO    | openrecall.client.ffmpeg_manager | Starting FFmpeg: ffmpeg -f rawvideo -pixel_format nv12 -video_size 1470x956 -framerate 30 -use_wallclock_as_timestamps 1 -color_range tv -i - -c:v h264_videotoolbox -pix_fmt yuv420p -allow_sw 1 -y /Users/tiiny/MRC/video_chunks/monitor_1/monitor_1_2026-02-09_08-13-49.mp4
+16:13:49 | INFO    | openrecall.client.ffmpeg_manager | FFmpeg watchdog started
+16:13:49 | INFO    | openrecall.client.ffmpeg_manager | FFmpeg started (PID=3538)
+16:13:49 | INFO    | openrecall.client.ffmpeg_manager | Video chunk recording started | file=monitor_1_2026-02-09_08-13-49.mp4 | monitor_id=1
+16:13:49 | INFO    | openrecall.client.ffmpeg_manager | FFmpeg watchdog stopped
+16:13:50 | INFO    | openrecall.client.video_recorder | Video chunk recording ended | file=monitor_1_2026-02-09_08-13-49.mp4 | size_mb=0.2 | monitor_id=1
+16:13:50 | INFO    | openrecall.client.buffer | Buffered file (video_chunk): monitor_1_2026-02-09_08-13-49.mp4 | Queue: 3 items
+16:13:50 | INFO    | openrecall.client.video_recorder | Video chunk enqueued: monitor_1_2026-02-09_08-13-49.mp4 (0.2MB monitor_id=1)
+16:13:50 | INFO    | openrecall.client.video_recorder | Selected monitors: 1
+16:13:50 | INFO    | openrecall.client.ffmpeg_manager | Starting FFmpeg: ffmpeg -f rawvideo -pixel_format nv12 -video_size 1470x956 -framerate 30 -use_wallclock_as_timestamps 1 -color_range tv -i - -c:v h264_videotoolbox -pix_fmt yuv420p -allow_sw 1 -y /Users/tiiny/MRC/video_chunks/monitor_1/monitor_1_2026-02-09_08-13-50.mp4
+16:13:50 | INFO    | openrecall.client.ffmpeg_manager | FFmpeg watchdog started
+16:13:50 | INFO    | openrecall.client.ffmpeg_manager | FFmpeg started (PID=3545)
+16:13:50 | INFO    | openrecall.client.ffmpeg_manager | Video chunk recording started | file=monitor_1_2026-02-09_08-13-50.mp4 | monitor_id=1
+16:13:50 | INFO    | openrecall.client.consumer | Dispatch buffered item | id=20260209_161349_710891_ed51c2f3 | item_type=video_chunk | target=upload_video_chunk
+16:13:50 | INFO    | openrecall.client.consumer | Uploading video chunk | id=20260209_161349_710891_ed51c2f3 | file=monitor_1_2026-02-09_08-09-24.mp4 | size_mb=77.3 | monitor_id=1
+16:13:50 | INFO    | openrecall.client.buffer | ✅ Committed: 20260209_161349_7108... | Remaining: 2 items
+16:13:50 | INFO    | openrecall.client.consumer | 📤 Uploaded video chunk | file=monitor_1_2026-02-09_08-09-24.mp4 | size_mb=77.3 | monitor_id=1 | elapsed=0.19s | remaining=2
+16:13:50 | INFO    | openrecall.client.consumer | Dispatch buffered item | id=20260209_161349_737549_2bc579a0 | item_type=video_chunk | target=upload_video_chunk
+16:13:50 | INFO    | openrecall.client.consumer | Uploading video chunk | id=20260209_161349_737549_2bc579a0 | file=monitor_1_2026-02-09_08-09-24.mp4 | size_mb=77.3 | monitor_id=1
+16:13:50 | INFO    | openrecall.client.buffer | ✅ Committed: 20260209_161349_7375... | Remaining: 1 items
+16:13:50 | INFO    | openrecall.client.consumer | 📤 Uploaded video chunk | file=monitor_1_2026-02-09_08-09-24.mp4 | size_mb=77.3 | monitor_id=1 | elapsed=0.00s | remaining=1
+16:13:50 | INFO    | openrecall.client.consumer | Dispatch buffered item | id=20260209_161350_080999_5e52aac8 | item_type=video_chunk | target=upload_video_chunk
+16:13:50 | INFO    | openrecall.client.consumer | Uploading video chunk | id=20260209_161350_080999_5e52aac8 | file=monitor_1_2026-02-09_08-13-49.mp4 | size_mb=0.2 | monitor_id=1
+16:13:50 | INFO    | openrecall.client.buffer | ✅ Committed: 20260209_161350_0809... | Remaining: 0 items
+16:13:50 | INFO    | openrecall.client.consumer | 📤 Uploaded video chunk | file=monitor_1_2026-02-09_08-13-49.mp4 | size_mb=0.2 | monitor_id=1 | elapsed=0.00s | remaining=0
+16:13:51 | INFO    | openrecall.client.video_recorder | Client status | state=recording | monitor_chunks=1:monitor_1_2026-02-09_08-13-50.mp4 | pending_uploads=0
+16:14:11 | INFO    | openrecall.client.video_recorder | Client status | state=recording | monitor_chunks=1:monitor_1_2026-02-09_08-13-50.mp4 | pending_uploads=0
+16:14:31 | INFO    | openrecall.client.video_recorder | Client status | state=recording | monitor_chunks=1:monitor_1_2026-02-09_08-13-50.mp4 | pending_uploads=0
+16:14:51 | INFO    | openrecall.client.video_recorder | Client status | state=recording | monitor_chunks=1:monitor_1_2026-02-09_08-13-50.mp4 | pending_uploads=0
+16:15:11 | INFO    | openrecall.client.video_recorder | Client status | state=recording | monitor_chunks=1:monitor_1_2026-02-09_08-13-50.mp4 | pending_uploads=0
+16:15:31 | INFO    | openrecall.client.video_recorder | Client status | state=recording | monitor_chunks=1:monitor_1_2026-02-09_08-13-50.mp4 | pending_uploads=0
+16:15:51 | INFO    | openrecall.client.video_recorder | Client status | state=recording | monitor_chunks=1:monitor_1_2026-02-09_08-13-50.mp4 | pending_uploads=0
+16:16:12 | INFO    | openrecall.client.video_recorder | Client status | state=recording | monitor_chunks=1:monitor_1_2026-02-09_08-13-50.mp4 | pending_uploads=0
+16:16:32 | INFO    | openrecall.client.video_recorder | Client status | state=recording | monitor_chunks=1:monitor_1_2026-02-09_08-13-50.mp4 | pending_uploads=0
+16:16:52 | INFO    | openrecall.client.video_recorder | Client status | state=recording | monitor_chunks=1:monitor_1_2026-02-09_08-13-50.mp4 | pending_uploads=0
+16:17:12 | INFO    | openrecall.client.video_recorder | Client status | state=recording | monitor_chunks=1:monitor_1_2026-02-09_08-13-50.mp4 | pending_uploads=0
+16:17:32 | INFO    | openrecall.client.video_recorder | Client status | state=recording | monitor_chunks=1:monitor_1_2026-02-09_08-13-50.mp4 | pending_uploads=0
+16:17:52 | INFO    | openrecall.client.video_recorder | Client status | state=recording | monitor_chunks=1:monitor_1_2026-02-09_08-13-50.mp4 | pending_uploads=0
+16:18:13 | INFO    | openrecall.client.video_recorder | Client status | state=recording | monitor_chunks=1:monitor_1_2026-02-09_08-13-50.mp4 | pending_uploads=0
+16:18:33 | INFO    | openrecall.client.video_recorder | Client status | state=recording | monitor_chunks=1:monitor_1_2026-02-09_08-13-50.mp4 | pending_uploads=0
+16:18:53 | INFO    | openrecall.client.video_recorder | Client status | state=recording | monitor_chunks=1:monitor_1_2026-02-09_08-13-50.mp4 | pending_uploads=0
+16:19:13 | INFO    | openrecall.client.video_recorder | Client status | state=recording | monitor_chunks=1:monitor_1_2026-02-09_08-13-50.mp4 | pending_uploads=0
+16:19:33 | INFO    | openrecall.client.video_recorder | Client status | state=recording | monitor_chunks=1:monitor_1_2026-02-09_08-13-50.mp4 | pending_uploads=0
+16:19:53 | INFO    | openrecall.client.video_recorder | Client status | state=recording | monitor_chunks=1:monitor_1_2026-02-09_08-13-50.mp4 | pending_uploads=0
+16:20:14 | INFO    | openrecall.client.video_recorder | Client status | state=recording | monitor_chunks=1:monitor_1_2026-02-09_08-13-50.mp4 | pending_uploads=0
+16:20:34 | INFO    | openrecall.client.video_recorder | Client status | state=recording | monitor_chunks=1:monitor_1_2026-02-09_08-13-50.mp4 | pending_uploads=0
+16:20:54 | INFO    | openrecall.client.video_recorder | Client status | state=recording | monitor_chunks=1:monitor_1_2026-02-09_08-13-50.mp4 | pending_uploads=0
+16:21:14 | INFO    | openrecall.client.video_recorder | Client status | state=recording | monitor_chunks=1:monitor_1_2026-02-09_08-13-50.mp4 | pending_uploads=0
+16:21:34 | INFO    | openrecall.client.video_recorder | Client status | state=recording | monitor_chunks=1:monitor_1_2026-02-09_08-13-50.mp4 | pending_uploads=0
+16:21:54 | INFO    | openrecall.client.video_recorder | Client status | state=recording | monitor_chunks=1:monitor_1_2026-02-09_08-13-50.mp4 | pending_uploads=0
+16:22:15 | INFO    | openrecall.client.video_recorder | Client status | state=recording | monitor_chunks=1:monitor_1_2026-02-09_08-13-50.mp4 | pending_uploads=0
+16:22:28 | ERROR   | openrecall.client.video_recorder | Stalled pipeline detected | monitor_id=1 | chunk=monitor_1_2026-02-09_08-13-50.mp4 | stagnant_for=518.0s | seconds_since_write=5.2s | write_stuck_for=5.2s | writer_alive=True | mode=chunk_process | no_chunk_progress=False
+16:22:28 | ERROR   | openrecall.client.video_recorder | Detected stalled monitor-id pipeline(s): 1; forcing SCK backend restart
+16:22:30 | INFO    | openrecall.client.ffmpeg_manager | FFmpeg watchdog stopped
+16:22:33 | WARNING | openrecall.client.ffmpeg_manager | FFmpeg did not close chunk in time, killing process
+16:22:33 | INFO    | openrecall.client.video_recorder | Video chunk recording ended | file=monitor_1_2026-02-09_08-13-50.mp4 | size_mb=80.0 | monitor_id=1
+16:22:33 | INFO    | openrecall.client.video_recorder | Video chunk recording ended | file=monitor_1_2026-02-09_08-13-50.mp4 | size_mb=80.0 | monitor_id=1
+16:22:33 | INFO    | openrecall.client.buffer | Buffered file (video_chunk): monitor_1_2026-02-09_08-13-50.mp4 | Queue: 1 items
+16:22:33 | INFO    | openrecall.client.video_recorder | Video chunk enqueued: monitor_1_2026-02-09_08-13-50.mp4 (80.0MB monitor_id=1)
+16:22:33 | INFO    | openrecall.client.buffer | Buffered file (video_chunk): monitor_1_2026-02-09_08-13-50.mp4 | Queue: 2 items
+16:22:33 | INFO    | openrecall.client.video_recorder | Video chunk enqueued: monitor_1_2026-02-09_08-13-50.mp4 (80.0MB monitor_id=1)
+16:22:33 | INFO    | openrecall.client.video_recorder | Selected monitors: 1
+16:22:33 | INFO    | openrecall.client.ffmpeg_manager | Starting FFmpeg: ffmpeg -f rawvideo -pixel_format nv12 -video_size 1470x956 -framerate 30 -use_wallclock_as_timestamps 1 -color_range tv -i - -c:v h264_videotoolbox -pix_fmt yuv420p -allow_sw 1 -y /Users/tiiny/MRC/video_chunks/monitor_1/monitor_1_2026-02-09_08-22-33.mp4
+16:22:33 | INFO    | openrecall.client.ffmpeg_manager | FFmpeg watchdog started
+16:22:33 | INFO    | openrecall.client.ffmpeg_manager | FFmpeg started (PID=3977)
+16:22:33 | INFO    | openrecall.client.ffmpeg_manager | Video chunk recording started | file=monitor_1_2026-02-09_08-22-33.mp4 | monitor_id=1
+16:22:33 | INFO    | openrecall.client.ffmpeg_manager | FFmpeg watchdog stopped
+16:22:34 | INFO    | openrecall.client.video_recorder | Video chunk recording ended | file=monitor_1_2026-02-09_08-22-33.mp4 | size_mb=0.2 | monitor_id=1
+16:22:34 | INFO    | openrecall.client.buffer | Buffered file (video_chunk): monitor_1_2026-02-09_08-22-33.mp4 | Queue: 3 items
+16:22:34 | INFO    | openrecall.client.video_recorder | Video chunk enqueued: monitor_1_2026-02-09_08-22-33.mp4 (0.2MB monitor_id=1)
+16:22:34 | INFO    | openrecall.client.video_recorder | Selected monitors: 1
+16:22:34 | INFO    | openrecall.client.ffmpeg_manager | Starting FFmpeg: ffmpeg -f rawvideo -pixel_format nv12 -video_size 1470x956 -framerate 30 -use_wallclock_as_timestamps 1 -color_range tv -i - -c:v h264_videotoolbox -pix_fmt yuv420p -allow_sw 1 -y /Users/tiiny/MRC/video_chunks/monitor_1/monitor_1_2026-02-09_08-22-34.mp4
+16:22:34 | INFO    | openrecall.client.ffmpeg_manager | FFmpeg watchdog started
+16:22:34 | INFO    | openrecall.client.ffmpeg_manager | FFmpeg started (PID=3981)
+16:22:34 | INFO    | openrecall.client.ffmpeg_manager | Video chunk recording started | file=monitor_1_2026-02-09_08-22-34.mp4 | monitor_id=1
+16:22:34 | INFO    | openrecall.client.consumer | Dispatch buffered item | id=20260209_162233_740213_acac30e9 | item_type=video_chunk | target=upload_video_chunk
+16:22:34 | INFO    | openrecall.client.consumer | Uploading video chunk | id=20260209_162233_740213_acac30e9 | file=monitor_1_2026-02-09_08-13-50.mp4 | size_mb=80.0 | monitor_id=1
+16:22:34 | INFO    | openrecall.client.buffer | ✅ Committed: 20260209_162233_7402... | Remaining: 2 items
+16:22:34 | INFO    | openrecall.client.consumer | 📤 Uploaded video chunk | file=monitor_1_2026-02-09_08-13-50.mp4 | size_mb=80.0 | monitor_id=1 | elapsed=0.21s | remaining=2
+16:22:34 | INFO    | openrecall.client.consumer | Dispatch buffered item | id=20260209_162233_740778_06b676fe | item_type=video_chunk | target=upload_video_chunk
+16:22:34 | INFO    | openrecall.client.consumer | Uploading video chunk | id=20260209_162233_740778_06b676fe | file=monitor_1_2026-02-09_08-13-50.mp4 | size_mb=80.0 | monitor_id=1
+16:22:34 | INFO    | openrecall.client.buffer | ✅ Committed: 20260209_162233_7407... | Remaining: 1 items
+16:22:34 | INFO    | openrecall.client.consumer | 📤 Uploaded video chunk | file=monitor_1_2026-02-09_08-13-50.mp4 | size_mb=80.0 | monitor_id=1 | elapsed=0.00s | remaining=1
+16:22:34 | INFO    | openrecall.client.consumer | Dispatch buffered item | id=20260209_162234_032686_cb8a6dcd | item_type=video_chunk | target=upload_video_chunk
+16:22:34 | INFO    | openrecall.client.consumer | Uploading video chunk | id=20260209_162234_032686_cb8a6dcd | file=monitor_1_2026-02-09_08-22-33.mp4 | size_mb=0.2 | monitor_id=1
+16:22:34 | INFO    | openrecall.client.buffer | ✅ Committed: 20260209_162234_0326... | Remaining: 0 items
+16:22:34 | INFO    | openrecall.client.consumer | 📤 Uploaded video chunk | file=monitor_1_2026-02-09_08-22-33.mp4 | size_mb=0.2 | monitor_id=1 | elapsed=0.01s | remaining=0
+16:22:35 | INFO    | openrecall.client.video_recorder | Client status | state=recording | monitor_chunks=1:monitor_1_2026-02-09_08-22-34.mp4 | pending_uploads=0
+16:22:55 | INFO    | openrecall.client.video_recorder | Client status | state=recording | monitor_chunks=1:monitor_1_2026-02-09_08-22-34.mp4 | pending_uploads=0
+16:23:15 | INFO    | openrecall.client.video_recorder | Client status | state=recording | monitor_chunks=1:monitor_1_2026-02-09_08-22-34.mp4 | pending_uploads=0
+16:23:35 | INFO    | openrecall.client.video_recorder | Client status | state=recording | monitor_chunks=1:monitor_1_2026-02-09_08-22-34.mp4 | pending_uploads=0
+16:23:55 | INFO    | openrecall.client.video_recorder | Client status | state=recording | monitor_chunks=1:monitor_1_2026-02-09_08-22-34.mp4 | pending_uploads=0
+16:24:16 | INFO    | openrecall.client.video_recorder | Client status | state=recording | monitor_chunks=1:monitor_1_2026-02-09_08-22-34.mp4 | pending_uploads=0
+16:24:36 | INFO    | openrecall.client.video_recorder | Client status | state=recording | monitor_chunks=1:monitor_1_2026-02-09_08-22-34.mp4 | pending_uploads=0
+16:24:56 | INFO    | openrecall.client.video_recorder | Client status | state=recording | monitor_chunks=1:monitor_1_2026-02-09_08-22-34.mp4 | pending_uploads=0
+16:25:16 | INFO    | openrecall.client.video_recorder | Client status | state=recording | monitor_chunks=1:monitor_1_2026-02-09_08-22-34.mp4 | pending_uploads=0
+16:25:36 | INFO    | openrecall.client.video_recorder | Client status | state=recording | monitor_chunks=1:monitor_1_2026-02-09_08-22-34.mp4 | pending_uploads=0
+16:25:56 | INFO    | openrecall.client.video_recorder | Client status | state=recording | monitor_chunks=1:monitor_1_2026-02-09_08-22-34.mp4 | pending_uploads=0
+16:26:17 | INFO    | openrecall.client.video_recorder | Client status | state=recording | monitor_chunks=1:monitor_1_2026-02-09_08-22-34.mp4 | pending_uploads=0
+16:26:37 | INFO    | openrecall.client.video_recorder | Client status | state=recording | monitor_chunks=1:monitor_1_2026-02-09_08-22-34.mp4 | pending_uploads=0
+16:26:57 | INFO    | openrecall.client.video_recorder | Client status | state=recording | monitor_chunks=1:monitor_1_2026-02-09_08-22-34.mp4 | pending_uploads=0
+16:27:17 | INFO    | openrecall.client.video_recorder | Client status | state=recording | monitor_chunks=1:monitor_1_2026-02-09_08-22-34.mp4 | pending_uploads=0
+16:27:37 | INFO    | openrecall.client.video_recorder | Client status | state=recording | monitor_chunks=1:monitor_1_2026-02-09_08-22-34.mp4 | pending_uploads=0
+16:27:58 | INFO    | openrecall.client.video_recorder | Client status | state=recording | monitor_chunks=1:monitor_1_2026-02-09_08-22-34.mp4 | pending_uploads=0
+16:28:18 | INFO    | openrecall.client.video_recorder | Client status | state=recording | monitor_chunks=1:monitor_1_2026-02-09_08-22-34.mp4 | pending_uploads=0
+16:28:38 | INFO    | openrecall.client.video_recorder | Client status | state=recording | monitor_chunks=1:monitor_1_2026-02-09_08-22-34.mp4 | pending_uploads=0
+16:28:58 | INFO    | openrecall.client.video_recorder | Client status | state=recording | monitor_chunks=1:monitor_1_2026-02-09_08-22-34.mp4 | pending_uploads=0
+16:29:18 | INFO    | openrecall.client.video_recorder | Client status | state=recording | monitor_chunks=1:monitor_1_2026-02-09_08-22-34.mp4 | pending_uploads=0
+16:29:38 | INFO    | openrecall.client.video_recorder | Client status | state=recording | monitor_chunks=1:monitor_1_2026-02-09_08-22-34.mp4 | pending_uploads=0
+16:29:58 | INFO    | openrecall.client.video_recorder | Client status | state=recording | monitor_chunks=1:monitor_1_2026-02-09_08-22-34.mp4 | pending_uploads=0
+16:30:19 | INFO    | openrecall.client.video_recorder | Client status | state=recording | monitor_chunks=1:monitor_1_2026-02-09_08-22-34.mp4 | pending_uploads=0
+16:30:39 | INFO    | openrecall.client.video_recorder | Client status | state=recording | monitor_chunks=1:monitor_1_2026-02-09_08-22-34.mp4 | pending_uploads=0
+16:30:59 | INFO    | openrecall.client.video_recorder | Client status | state=recording | monitor_chunks=1:monitor_1_2026-02-09_08-22-34.mp4 | pending_uploads=0
+16:31:19 | INFO    | openrecall.client.video_recorder | Client status | state=recording | monitor_chunks=1:monitor_1_2026-02-09_08-22-34.mp4 | pending_uploads=0
+16:31:39 | INFO    | openrecall.client.video_recorder | Client status | state=recording | monitor_chunks=1:monitor_1_2026-02-09_08-22-34.mp4 | pending_uploads=0
+16:31:50 | ERROR   | openrecall.client.video_recorder | Stalled pipeline detected | monitor_id=1 | chunk=monitor_1_2026-02-09_08-22-34.mp4 | stagnant_for=555.3s | seconds_since_write=5.2s | write_stuck_for=5.1s | writer_alive=True | mode=chunk_process | no_chunk_progress=False
+16:31:50 | ERROR   | openrecall.client.video_recorder | Detected stalled monitor-id pipeline(s): 1; forcing SCK backend restart
+16:31:52 | INFO    | openrecall.client.ffmpeg_manager | FFmpeg watchdog stopped
+16:31:54 | WARNING | openrecall.client.ffmpeg_manager | FFmpeg did not close chunk in time, killing process
+16:31:54 | INFO    | openrecall.client.video_recorder | Video chunk recording ended | file=monitor_1_2026-02-09_08-22-34.mp4 | size_mb=81.8 | monitor_id=1
+16:31:54 | INFO    | openrecall.client.video_recorder | Video chunk recording ended | file=monitor_1_2026-02-09_08-22-34.mp4 | size_mb=81.8 | monitor_id=1
+16:31:55 | INFO    | openrecall.client.buffer | Buffered file (video_chunk): monitor_1_2026-02-09_08-22-34.mp4 | Queue: 1 items
+16:31:55 | INFO    | openrecall.client.video_recorder | Video chunk enqueued: monitor_1_2026-02-09_08-22-34.mp4 (81.8MB monitor_id=1)
+16:31:55 | INFO    | openrecall.client.buffer | Buffered file (video_chunk): monitor_1_2026-02-09_08-22-34.mp4 | Queue: 2 items
+16:31:55 | INFO    | openrecall.client.video_recorder | Video chunk enqueued: monitor_1_2026-02-09_08-22-34.mp4 (81.8MB monitor_id=1)
+16:31:55 | INFO    | openrecall.client.video_recorder | Selected monitors: 1
+16:31:55 | INFO    | openrecall.client.ffmpeg_manager | Starting FFmpeg: ffmpeg -f rawvideo -pixel_format nv12 -video_size 1470x956 -framerate 30 -use_wallclock_as_timestamps 1 -color_range tv -i - -c:v h264_videotoolbox -pix_fmt yuv420p -allow_sw 1 -y /Users/tiiny/MRC/video_chunks/monitor_1/monitor_1_2026-02-09_08-31-55.mp4
+16:31:55 | INFO    | openrecall.client.ffmpeg_manager | FFmpeg watchdog started
+16:31:55 | INFO    | openrecall.client.ffmpeg_manager | FFmpeg started (PID=4387)
+16:31:55 | INFO    | openrecall.client.ffmpeg_manager | Video chunk recording started | file=monitor_1_2026-02-09_08-31-55.mp4 | monitor_id=1
+16:31:55 | INFO    | openrecall.client.consumer | Dispatch buffered item | id=20260209_163155_067993_50ebdc22 | item_type=video_chunk | target=upload_video_chunk
+16:31:55 | INFO    | openrecall.client.consumer | Uploading video chunk | id=20260209_163155_067993_50ebdc22 | file=monitor_1_2026-02-09_08-22-34.mp4 | size_mb=81.8 | monitor_id=1
+16:31:55 | WARNING | openrecall.client.video_recorder | Slow ffmpeg stdin write monitor=1 latency=62.60ms
+16:31:55 | INFO    | openrecall.client.ffmpeg_manager | FFmpeg watchdog stopped
+16:31:55 | INFO    | openrecall.client.buffer | ✅ Committed: 20260209_163155_0679... | Remaining: 1 items
+16:31:55 | INFO    | openrecall.client.consumer | 📤 Uploaded video chunk | file=monitor_1_2026-02-09_08-22-34.mp4 | size_mb=81.8 | monitor_id=1 | elapsed=0.23s | remaining=1
+16:31:55 | INFO    | openrecall.client.consumer | Dispatch buffered item | id=20260209_163155_068273_a543ff72 | item_type=video_chunk | target=upload_video_chunk
+16:31:55 | INFO    | openrecall.client.consumer | Uploading video chunk | id=20260209_163155_068273_a543ff72 | file=monitor_1_2026-02-09_08-22-34.mp4 | size_mb=81.8 | monitor_id=1
+16:31:55 | INFO    | openrecall.client.buffer | ✅ Committed: 20260209_163155_0682... | Remaining: 0 items
+16:31:55 | INFO    | openrecall.client.consumer | 📤 Uploaded video chunk | file=monitor_1_2026-02-09_08-22-34.mp4 | size_mb=81.8 | monitor_id=1 | elapsed=0.00s | remaining=0
+16:31:55 | INFO    | openrecall.client.video_recorder | Video chunk recording ended | file=monitor_1_2026-02-09_08-31-55.mp4 | size_mb=0.2 | monitor_id=1
+16:31:55 | INFO    | openrecall.client.buffer | Buffered file (video_chunk): monitor_1_2026-02-09_08-31-55.mp4 | Queue: 1 items
+16:31:55 | INFO    | openrecall.client.video_recorder | Video chunk enqueued: monitor_1_2026-02-09_08-31-55.mp4 (0.2MB monitor_id=1)
+16:31:55 | INFO    | openrecall.client.video_recorder | Selected monitors: 1
+16:31:55 | INFO    | openrecall.client.ffmpeg_manager | Starting FFmpeg: ffmpeg -f rawvideo -pixel_format nv12 -video_size 1470x956 -framerate 30 -use_wallclock_as_timestamps 1 -color_range tv -i - -c:v h264_videotoolbox -pix_fmt yuv420p -allow_sw 1 -y /Users/tiiny/MRC/video_chunks/monitor_1/monitor_1_2026-02-09_08-31-55_01.mp4
+16:31:55 | INFO    | openrecall.client.ffmpeg_manager | FFmpeg watchdog started
+16:31:55 | INFO    | openrecall.client.ffmpeg_manager | FFmpeg started (PID=4394)
+16:31:55 | INFO    | openrecall.client.ffmpeg_manager | Video chunk recording started | file=monitor_1_2026-02-09_08-31-55_01.mp4 | monitor_id=1
+16:31:56 | INFO    | openrecall.client.consumer | Dispatch buffered item | id=20260209_163155_544849_ea95d21d | item_type=video_chunk | target=upload_video_chunk
+16:31:56 | INFO    | openrecall.client.consumer | Uploading video chunk | id=20260209_163155_544849_ea95d21d | file=monitor_1_2026-02-09_08-31-55.mp4 | size_mb=0.2 | monitor_id=1
+16:31:56 | INFO    | openrecall.client.buffer | ✅ Committed: 20260209_163155_5448... | Remaining: 0 items
+16:31:56 | INFO    | openrecall.client.consumer | 📤 Uploaded video chunk | file=monitor_1_2026-02-09_08-31-55.mp4 | size_mb=0.2 | monitor_id=1 | elapsed=0.02s | remaining=0
+16:32:00 | INFO    | openrecall.client.video_recorder | Client status | state=recording | monitor_chunks=1:monitor_1_2026-02-09_08-31-55_01.mp4 | pending_uploads=0
+16:32:20 | INFO    | openrecall.client.video_recorder | Client status | state=recording | monitor_chunks=1:monitor_1_2026-02-09_08-31-55_01.mp4 | pending_uploads=0
+16:32:41 | INFO    | openrecall.client.video_recorder | Client status | state=recording | monitor_chunks=1:monitor_1_2026-02-09_08-31-55_01.mp4 | pending_uploads=0
+16:33:01 | INFO    | openrecall.client.video_recorder | Client status | state=recording | monitor_chunks=1:monitor_1_2026-02-09_08-31-55_01.mp4 | pending_uploads=0
+16:33:21 | INFO    | openrecall.client.video_recorder | Client status | state=recording | monitor_chunks=1:monitor_1_2026-02-09_08-31-55_01.mp4 | pending_uploads=0
+16:33:41 | INFO    | openrecall.client.video_recorder | Client status | state=recording | monitor_chunks=1:monitor_1_2026-02-09_08-31-55_01.mp4 | pending_uploads=0
+16:34:01 | INFO    | openrecall.client.video_recorder | Client status | state=recording | monitor_chunks=1:monitor_1_2026-02-09_08-31-55_01.mp4 | pending_uploads=0
+16:34:21 | INFO    | openrecall.client.video_recorder | Client status | state=recording | monitor_chunks=1:monitor_1_2026-02-09_08-31-55_01.mp4 | pending_uploads=0
+16:34:42 | INFO    | openrecall.client.video_recorder | Client status | state=recording | monitor_chunks=1:monitor_1_2026-02-09_08-31-55_01.mp4 | pending_uploads=0
+16:35:02 | INFO    | openrecall.client.video_recorder | Client status | state=recording | monitor_chunks=1:monitor_1_2026-02-09_08-31-55_01.mp4 | pending_uploads=0
+16:35:22 | INFO    | openrecall.client.video_recorder | Client status | state=recording | monitor_chunks=1:monitor_1_2026-02-09_08-31-55_01.mp4 | pending_uploads=0
+16:35:42 | INFO    | openrecall.client.video_recorder | Client status | state=recording | monitor_chunks=1:monitor_1_2026-02-09_08-31-55_01.mp4 | pending_uploads=0
+16:36:02 | INFO    | openrecall.client.video_recorder | Client status | state=recording | monitor_chunks=1:monitor_1_2026-02-09_08-31-55_01.mp4 | pending_uploads=0
