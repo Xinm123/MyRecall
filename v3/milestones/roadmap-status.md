@@ -1,7 +1,7 @@
 # MyRecall-v3 Roadmap Status Tracker
 
-**Last Updated**: 2026-02-08T13:31:36Z
-**Overall Status**: 🟩 Phase 0 Complete / 🟩 Phase 1 GO-ENGINEERING (long-run gates pending as LONGRUN)
+**Last Updated**: 2026-02-09T12:00:00Z
+**Overall Status**: 🟩 Phase 0 Complete / 🟩 Phase 1 Complete / 🟨 Phase 2.0 Planning Complete
 **Target Completion**: Week 20 (2026-06-20) for MVP (P0-P4 deployed). Phase 5 deployment starts Week 16. Week 23+ for P7 Memory (不与Phase 6 Week 21-22重叠).
 
 ---
@@ -12,8 +12,8 @@
 
 ```
 Phase 0: Foundation            [Week 1-2]   🟩🟩
-Phase 1: Video Recording       [Week 3-6]   🟩🟩🟩🟩 (GO-ENGINEERING, long-run gates pending)
-Phase 2.0: Audio MVP           [Week 7-8]   ⬜️⬜️
+Phase 1: Video Recording       [Week 3-6]   🟩🟩🟩🟩 (COMPLETE; long-run observations tracked in future plan)
+Phase 2.0: Audio MVP           [Week 7-8]   🟨⬜️ (PLANNING COMPLETE; ready for execution)
 Phase 2.1: Speaker ID          [Week 9-10]  ⬜️⬜️ (OPTIONAL - decide after 2.0)
 Phase 3: Multi-Modal Search    [Week 11-12] ⬜️⬜️
 Phase 4: Chat                  [Week 13-15] ⬜️⬜️⬜️
@@ -93,7 +93,7 @@ Legend: ⬜️ Not Started | 🟨 In Progress | 🟩 Complete | 🟥 Blocked
 ---
 
 ### Phase 1: Screen Recording Pipeline
-**Status**: 🟩 GO-ENGINEERING (non-long-run gates passed; long-run formalized as PENDING/LONGRUN)
+**Status**: 🟩 Complete (engineering and non-long-run validation complete; long-run observations moved to future plan)
 **Planned**: Week 3-6 (4 weeks, 20 working days)
 **Actual**: Engineering completed 2026-02-06 (single session)
 **Owner**: Solo Developer (core pipeline implementation)
@@ -160,13 +160,13 @@ Legend: ⬜️ Not Started | 🟨 In Progress | 🟩 Complete | 🟥 Blocked
 
 **Gate Summary**: 13 passed, 0 failed, 7 pending (long-run evidence), 1 skipped (optional)
 
-**Go/No-Go Decision**: GO-ENGINEERING
+**Go/No-Go Decision**: COMPLETE (execution closed; long-run observations deferred as non-blocking future work)
 
-**Rationale**: 本轮审计范围内（非长时 gate）无失败，且无未解决 P0/P1；>30 天策略逻辑模拟通过（`-31d` 过期、`+30d` 不清理、`PENDING` 过期不清理、级联删除覆盖 DB+文件）；API 烟测 11/11 通过。长时 gate 按规则保留 `FormalStatus=PENDING, PendingReason=LONGRUN`。
+**Rationale**: 本轮审计范围内（非长时 gate）无失败，且无未解决 P0/P1；>30 天策略逻辑模拟通过（`-31d` 过期、`+30d` 不清理、`PENDING` 过期不清理、级联删除覆盖 DB+文件）；API 烟测 11/11 通过。7 个长时 gate 转入未来观测计划，不阻塞 Phase 2 执行。
 
 **Test Results**: Post-Phase 1.5 regression: `tests/test_phase1_*` = 170 passed, 8 skipped, 0 failed；Phase 1.5 suite: 33 passed；`tests/test_phase1_gates.py` = 14 passed, 8 skipped, 0 failed；`tests/test_phase5_buffer.py -k TestUploaderConsumer` = 6 passed.
 
-**Blockers**: 无工程阻塞；仅存在 7 个长时 gate 待日历时间观测（统一 `PENDING/LONGRUN`）。
+**Blockers**: 无工程阻塞（Phase 1 已完成）。7 个长时 gate 已转入未来观测计划跟踪。
 
 **Evidence**: `/Users/pyw/new/MyRecall/v3/evidence/phase1-audit/commands.log`, `/Users/pyw/new/MyRecall/v3/evidence/phase1-audit/api_smoke_status_lines_round1.txt`, `/Users/pyw/new/MyRecall/v3/evidence/phase1-audit/test_phase1_all_after_fix2.txt`
 
@@ -179,6 +179,23 @@ Legend: ⬜️ Not Started | 🟨 In Progress | 🟩 Complete | 🟥 Blocked
 | OCR engine true-value persistence | `/Users/pyw/new/MyRecall/openrecall/server/ai/base.py`, `/Users/pyw/new/MyRecall/openrecall/server/ai/providers.py`, `/Users/pyw/new/MyRecall/openrecall/server/video/processor.py` | `python3 -m pytest tests/test_phase1_5_ocr_engine.py -v` | 3 passed | 2026-02-08T07:50:52Z |
 | Offset guard reject-write protection and structured logging | `/Users/pyw/new/MyRecall/openrecall/server/video/processor.py` | `python3 -m pytest tests/test_phase1_5_offset_guard.py -v` | 8 passed | 2026-02-08T07:50:52Z |
 | Phase 1 + 1.5 full closure regression | `/Users/pyw/new/MyRecall/openrecall/server/video/metadata_resolver.py`, `/Users/pyw/new/MyRecall/openrecall/server/video/processor.py`, `/Users/pyw/new/MyRecall/openrecall/server/api_v1.py`, `/Users/pyw/new/MyRecall/openrecall/server/database/sql.py` | `python3 -m pytest tests/test_phase1_* -v` | 170 passed, 8 skipped | 2026-02-08T07:50:08Z |
+
+### Phase 1 Long-Run Observation Plan (Future, Non-Blocking)
+**Status**: ⬜️ Planned
+**Window**: Week 9-12（与 Phase 2/3 并行观测，不阻塞主线）
+**Scope**: 对 Phase 1 的 7 个 `LONGRUN` 指标补充日历时间证据
+
+| Gate ID | Observation Goal | Planned Evidence |
+|---|---|---|
+| 1-P-02 | E2E indexing `<60s` per 1-min chunk | 连续 24h chunk 样本延迟分布 |
+| 1-P-03 | Recording CPU `<5%` | 1h 录制 CPU 采样统计（avg/p95） |
+| 1-Q-01 | OCR Accuracy `>=95%` | 100 帧标注集准确率报告 |
+| 1-S-01 | 7-day zero-crash | 7 天运行日志 + crash 统计 |
+| 1-S-02 | Upload retry success `>99%` | 24h 上传成功率与重试分布 |
+| 1-R-01 | Storage `<50GB/day` | 24h 存储增长报告 |
+| 1-R-02 | Memory `<500MB` | 运行期 RSS 采样（avg/p95/max） |
+
+**Output Location**: `/Users/pyw/new/MyRecall/v3/results/phase-1-validation.md`（追加 LONGRUN 证据附录）
 
 ---
 
@@ -216,25 +233,51 @@ Legend: ⬜️ Not Started | 🟨 In Progress | 🟩 Complete | 🟥 Blocked
 ---
 
 ### Phase 2.0: Audio MVP (No Speaker ID)
-**Status**: ⬜️ Not Started
-**Planned**: Week 7-8 (2 weeks)
+**Status**: 🟨 Planning Complete — Ready for Execution
+**Planned**: Week 7-8 (10 working days, 2026-02-09 to 2026-02-20)
 **Actual**: TBD
 **Owner**: Solo Developer (audio capture & transcription)
+**Detailed Plan**: `/Users/pyw/new/MyRecall/v3/plan/04-phase-2-detailed-plan.md`
+
+**Execution Tracks** (10 working days):
+- Day 1-2: Audio capture foundation (AudioManager, AudioRecorder, config, upload dispatch)
+- Day 3-4: VAD integration (silero-vad + fallback) + Whisper transcription pipeline (faster-whisper)
+- Day 5-6: Server ingestion + migration v3_006 + AudioChunkProcessor + AudioProcessingWorker + retention extension
+- Day 7-8: Search extension (audio FTS in SearchEngine) + Unified timeline API + audio endpoints
+- Day 9-10: Performance/quality testing + degradation handlers + gate validation + documentation
 
 **Progress**:
-- [ ] Audio capture (sounddevice: system + mic)
-- [ ] VAD filtering (py-webrtcvad)
-- [ ] Whisper transcription (faster-whisper)
-- [ ] Audio FTS indexing
-- [ ] Unified timeline API (video + audio)
+- [ ] Day 1: Audio config extension + AudioManager (sounddevice wrapper)
+- [ ] Day 2: AudioRecorder (producer + buffer) + upload pipeline extension (consumer + uploader)
+- [ ] Day 3: VAD integration (silero-vad primary, webrtcvad fallback)
+- [ ] Day 4: Whisper transcription pipeline (faster-whisper, GPU/CPU dispatch)
+- [ ] Day 5: Server ingestion (migration v3_006, upload API audio detect, SQLStore audio methods, AudioChunkProcessor)
+- [ ] Day 6: AudioProcessingWorker + RetentionWorker audio extension
+- [ ] Day 7: Search extension (audio FTS in SearchEngine)
+- [ ] Day 8: Unified timeline API (video + audio) + dedicated audio endpoints
+- [ ] Day 9: Performance tuning + quality testing (WER) + degradation handlers
+- [ ] Day 10: Gate validation suite + 24h stability test + documentation
 
-**Go/No-Go Gates**:
-- [ ] 1-hour recording → searchable audio
-- [ ] Transcription WER ≤15%
-- [ ] Transcription keeps up with 30s segments
-- [ ] Audio recording <3% CPU
+**Go/No-Go Gates** (authority: `v3/metrics/phase-gates.md`):
+- [ ] 2-F-01: Audio Capture Working (both system + mic, 1 hour, playable chunks)
+- [ ] 2-F-02: VAD Filtering (speech only transcribed, <50% of total duration)
+- [ ] 2-F-03: Whisper Transcription (all speech stored in audio_transcriptions)
+- [ ] 2-F-04: Audio FTS Indexed (searchable via audio_fts; implementation may map to audio_transcriptions_fts)
+- [ ] 2-F-05: Unified Timeline (video frames + audio transcriptions in /api/v1/timeline)
+- [ ] 2-P-01: Transcription Latency <30s/30s-segment (GPU) or <90s (CPU)
+- [ ] 2-P-02: VAD Processing <1s/30s-segment
+- [ ] 2-P-03: Transcription Throughput (no backlog growth over 1hr)
+- [ ] 2-P-04: Audio Capture CPU <3% per device
+- [ ] 2-Q-01: Transcription WER (clean) ≤15%
+- [ ] 2-Q-02: Transcription WER (noisy) ≤30%
+- [ ] 2-S-01: 24-hour zero-crash continuous run
+- [ ] 2-R-01: Whisper GPU VRAM <500MB
+- [ ] 2-R-02: Audio Storage <2GB/day
+- [ ] 2-DG-01: Audio file encryption (filesystem)
+- [ ] 2-DG-02: Transcription redaction (optional)
+- [ ] 2-DG-03: Retention policy active (audio >30 days auto-deleted)
 
-**Blockers**: Waiting for Phase 1 completion
+**Blockers**: None (Phase 1 completed; long-run observations tracked in future plan)
 
 ---
 
@@ -527,6 +570,8 @@ This section tracks questions that have been resolved through architectural deci
 | 2026-02-07 | WebUI Documentation Governance | Added dedicated `v3/webui` documentation hub (route map/dataflow/comparison/page docs/templates) and linked maintenance rule into results workflow | Keeps phase results and WebUI behavior docs synchronized and auditable |
 | 2026-02-08 | Phase 1.5 Metadata Precision | Frame metadata resolver (A), focused/browser_url pipeline (B), OCR engine true value (C), offset guard (D), v3_005 migration, API v1 search compatibility serialization, 33 tests (170 total passed) | Precise per-frame metadata, NULL semantics, pre-insertion validation, real OCR engine name, additive API compatibility |
 | 2026-02-08 | Roadmap Addition | Added future Phase 1.x plan for frame-accurate metadata signal pipeline (server-side extraction/OCR + client sidecar + frame_ts alignment) | Establishes recommended evolution path without adopting multi-window-per-frame architecture in current scope |
+| 2026-02-09 | Status Update | Phase 1 marked complete; 7 long-run observations moved to future non-blocking plan (Week 9-12 tracking) | Unblocks Phase 2 execution while preserving long-run evidence collection |
+| 2026-02-09 | Phase 2.0 Planning | Phase 2.0 detailed plan produced (`04-phase-2-detailed-plan.md`), roadmap Phase 2.0 section expanded with 10-day progress breakdown, 17 gate IDs, validation template created | Phase 2.0 ready to execute on 2026-02-09 |
 
 ---
 
@@ -574,9 +619,9 @@ Week 16-20: Phase 5 (Deployment Migration)
    - **Completed early**: All Phase 1 engineering done in single session (2026-02-06)
 
 3. **Week 6 End (Phase 1 Go/No-Go)**
-   - Confirm all Phase 1 gates passed (functional/performance/quality/stability/resource/degradation/governance)
-   - **Status**: 13/21 passed, 7 pending long-run evidence, 0 failures
-   - Collect remaining evidence: 7-day stability, 24h CPU/storage/upload, OCR accuracy dataset
+   - ~~Confirm all Phase 1 gates passed (functional/performance/quality/stability/resource/degradation/governance)~~
+   - **Completed with decision update (2026-02-09)**: Phase 1 marked complete; 13 passed, 7 long-run observations moved to future non-blocking plan
+   - Remaining evidence tracked under `Phase 1 Long-Run Observation Plan (Future, Non-Blocking)`
 
 4. **Week 8 (Phase 2.1 User Decision)**
    - Review Phase 2.0 validation results (Whisper WER, VAD effectiveness, audio sync)

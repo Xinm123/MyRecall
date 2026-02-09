@@ -174,8 +174,17 @@ def upload():
             or metadata.get("type") == "video_chunk"
         )
 
+        # Detect audio upload
+        is_audio = (
+            (file.content_type and file.content_type.startswith("audio/"))
+            or (file.filename and file.filename.endswith(".wav"))
+            or metadata.get("type") == "audio_chunk"
+        )
+
         if is_video:
             return _handle_video_upload(file, metadata, start_time)
+        elif is_audio:
+            return _handle_audio_upload(file, metadata, start_time)
         else:
             return _handle_screenshot_upload(file, metadata, start_time)
 

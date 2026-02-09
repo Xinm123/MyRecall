@@ -43,6 +43,9 @@ class Settings(BaseSettings):
     - OPENRECALL_VIDEO_POOL_MAX_BYTES: Max persistent frame buffer size per monitor
     - OPENRECALL_VIDEO_SEGMENT_STAGGER_SECONDS: Startup stagger for multi-monitor pipelines
     - OPENRECALL_VIDEO_PIPE_WRITE_WARN_MS: Warn threshold for ffmpeg stdin write latency
+    - OPENRECALL_VIDEO_PIPELINE_MODE: Video pipeline mode (segment|chunk_process)
+    - OPENRECALL_VIDEO_PIPE_WRITE_TIMEOUT_MS: Timeout for single ffmpeg stdin write (ms)
+    - OPENRECALL_VIDEO_NO_CHUNK_PROGRESS_TIMEOUT_SECONDS: Restart when chunk boundary has no progress
     - OPENRECALL_VIDEO_COLOR_RANGE: Raw input color range policy (auto|tv|pc)
     - OPENRECALL_SCK_START_RETRY_MAX: Max short-retry count before degrading to legacy mode
     - OPENRECALL_SCK_RETRY_BACKOFF_SECONDS: Backoff seconds between short SCK retries
@@ -343,6 +346,21 @@ class Settings(BaseSettings):
         alias="OPENRECALL_VIDEO_PIPE_WRITE_WARN_MS",
         description="Warn when a single ffmpeg stdin frame write exceeds this latency (ms)."
     )
+    video_pipeline_mode: str = Field(
+        default="chunk_process",
+        alias="OPENRECALL_VIDEO_PIPELINE_MODE",
+        description="Video pipeline mode: segment|chunk_process."
+    )
+    video_pipe_write_timeout_ms: int = Field(
+        default=1500,
+        alias="OPENRECALL_VIDEO_PIPE_WRITE_TIMEOUT_MS",
+        description="Timeout for a single ffmpeg stdin write in milliseconds."
+    )
+    video_no_chunk_progress_timeout_seconds: int = Field(
+        default=180,
+        alias="OPENRECALL_VIDEO_NO_CHUNK_PROGRESS_TIMEOUT_SECONDS",
+        description="Restart pipeline when chunk boundary has no progress for this many seconds."
+    )
     video_color_range: str = Field(
         default="auto",
         alias="OPENRECALL_VIDEO_COLOR_RANGE",
@@ -373,6 +391,73 @@ class Settings(BaseSettings):
         alias="OPENRECALL_SCK_AUTO_RECOVER_FROM_LEGACY",
         description="Whether to automatically probe and recover from legacy fallback to SCK mode."
     )
+    # Phase 2: Audio Recording Configuration
+    audio_enabled: bool = Field(
+        default=True,
+        alias="OPENRECALL_AUDIO_ENABLED",
+        description="Enable audio capture (mic recording)"
+    )
+    audio_sample_rate: int = Field(
+        default=16000,
+        alias="OPENRECALL_AUDIO_SAMPLE_RATE",
+        description="Audio sample rate in Hz (16000 for speech)"
+    )
+    audio_channels: int = Field(
+        default=1,
+        alias="OPENRECALL_AUDIO_CHANNELS",
+        description="Audio channels (1=mono, recommended for speech)"
+    )
+    audio_chunk_duration: int = Field(
+        default=60,
+        alias="OPENRECALL_AUDIO_CHUNK_DURATION",
+        description="Audio chunk duration in seconds"
+    )
+    audio_format: str = Field(
+        default="wav",
+        alias="OPENRECALL_AUDIO_FORMAT",
+        description="Audio file format (wav)"
+    )
+    audio_device_mic: str = Field(
+        default="",
+        alias="OPENRECALL_AUDIO_DEVICE_MIC",
+        description="Microphone device name or index (empty = system default)"
+    )
+    audio_device_system: str = Field(
+        default="",
+        alias="OPENRECALL_AUDIO_DEVICE_SYSTEM",
+        description="System audio device (e.g. BlackHole). Empty = disabled"
+    )
+    audio_vad_threshold: float = Field(
+        default=0.5,
+        alias="OPENRECALL_AUDIO_VAD_THRESHOLD",
+        description="VAD speech probability threshold (0.0-1.0)"
+    )
+    audio_vad_backend: str = Field(
+        default="silero",
+        alias="OPENRECALL_AUDIO_VAD_BACKEND",
+        description="VAD backend: silero (primary) or webrtcvad (fallback)"
+    )
+    audio_whisper_model: str = Field(
+        default="base",
+        alias="OPENRECALL_AUDIO_WHISPER_MODEL",
+        description="Whisper model size: tiny, base, small, medium, large-v3"
+    )
+    audio_whisper_compute_type: str = Field(
+        default="int8",
+        alias="OPENRECALL_AUDIO_WHISPER_COMPUTE_TYPE",
+        description="Whisper compute type: int8, float16, float32"
+    )
+    audio_whisper_language: str = Field(
+        default="",
+        alias="OPENRECALL_AUDIO_WHISPER_LANGUAGE",
+        description="Whisper language code (empty = auto-detect)"
+    )
+    audio_whisper_beam_size: int = Field(
+        default=5,
+        alias="OPENRECALL_AUDIO_WHISPER_BEAM_SIZE",
+        description="Whisper beam search size"
+    )
+
     frame_extraction_interval: float = Field(
         default=5.0,
         alias="OPENRECALL_FRAME_EXTRACTION_INTERVAL",
@@ -407,6 +492,14 @@ class Settings(BaseSettings):
         if v is None:
             return None
         return Path(str(v)).expanduser().resolve()
+
+    @field_validator("video_pipeline_mode")
+    @classmethod
+    def validate_video_pipeline_mode(cls, v: str) -> str:
+        normalized = (v or "").strip().lower()
+        if normalized not in {"segment", "chunk_process"}:
+            raise ValueError("OPENRECALL_VIDEO_PIPELINE_MODE must be one of: segment, chunk_process")
+        return normalized
 
     model_config = {
         "env_prefix": "",
@@ -472,6 +565,16 @@ class Settings(BaseSettings):
         return self.client_data_dir / "video_chunks"
 
     @property
+    def server_audio_path(self) -> Path:
+        """Directory for storing audio chunk WAV files (Server side)."""
+        return self.server_data_dir / "audio_chunks"
+
+    @property
+    def client_audio_chunks_path(self) -> Path:
+        """Directory for client-side audio chunk output."""
+        return self.client_data_dir / "audio_chunks"
+
+    @property
     def video_monitor_id_list(self) -> list[str]:
         """Parsed list for OPENRECALL_VIDEO_MONITOR_IDS."""
         return [item.strip() for item in self.video_monitor_ids.split(",") if item.strip()]
@@ -500,6 +603,8 @@ class Settings(BaseSettings):
             self.frames_path,
             self.video_chunks_path,
             self.client_video_chunks_path,
+            self.server_audio_path,
+            self.client_audio_chunks_path,
         ]
         
         for directory in directories:

@@ -6,6 +6,8 @@ Reads from LocalBuffer and uploads to server with retry/backoff.
 
 import logging
 import threading
+import time
+from pathlib import Path
 from typing import Callable, Optional
 
 import numpy as np
@@ -73,20 +75,64 @@ class UploaderConsumer(threading.Thread):
                     break
 
                 item_type = item.metadata.get("type")
-                target_uploader = "upload_video_chunk" if item_type == "video_chunk" else "upload_screenshot"
+                if item_type == "video_chunk":
+                    target_uploader = "upload_video_chunk"
+                elif item_type == "audio_chunk":
+                    target_uploader = "upload_audio_chunk"
+                else:
+                    target_uploader = "upload_screenshot"
                 logger.info(
                     "Dispatch buffered item | id=%s | item_type=%s | target=%s",
                     item.id,
                     item_type or "screenshot",
                     target_uploader,
                 )
+                upload_started_at = time.monotonic()
+                video_details = None
                 if item_type == "video_chunk":
+                    chunk_path = Path(item.image_path)
+                    chunk_name = str(item.metadata.get("chunk_filename") or chunk_path.name)
+                    file_size_bytes = int(
+                        item.metadata.get("file_size_bytes")
+                        or (chunk_path.stat().st_size if chunk_path.exists() else 0)
+                    )
+                    monitor_id = str(item.metadata.get("monitor_id", "") or "legacy")
+                    video_details = (chunk_name, file_size_bytes, monitor_id)
+                    logger.info(
+                        "Uploading video chunk | id=%s | file=%s | size_mb=%.1f | monitor_id=%s",
+                        item.id,
+                        chunk_name,
+                        file_size_bytes / (1024 * 1024),
+                        monitor_id,
+                    )
                     upload_meta = {
                         k: v
                         for k, v in item.metadata.items()
                         if not str(k).startswith("_")
                     }
                     success = self.uploader.upload_video_chunk(
+                        file_path=str(item.image_path),
+                        metadata=upload_meta,
+                    )
+                elif item_type == "audio_chunk":
+                    audio_path = Path(item.image_path)
+                    audio_name = str(item.metadata.get("chunk_filename") or audio_path.name)
+                    file_size_bytes = int(
+                        item.metadata.get("file_size_bytes")
+                        or (audio_path.stat().st_size if audio_path.exists() else 0)
+                    )
+                    logger.info(
+                        "Uploading audio chunk | id=%s | file=%s | size_mb=%.1f",
+                        item.id,
+                        audio_name,
+                        file_size_bytes / (1024 * 1024),
+                    )
+                    upload_meta = {
+                        k: v
+                        for k, v in item.metadata.items()
+                        if not str(k).startswith("_")
+                    }
+                    success = self.uploader.upload_audio_chunk(
                         file_path=str(item.image_path),
                         metadata=upload_meta,
                     )
@@ -104,16 +150,44 @@ class UploaderConsumer(threading.Thread):
                 
                 if success:
                     # Success: delete from buffer
+                    elapsed_s = time.monotonic() - upload_started_at
                     if item_type == "video_chunk":
-                        logger.info("📤 Uploaded video chunk | ts=%s", item.metadata.get("timestamp", 0))
+                        chunk_name, file_size_bytes, monitor_id = video_details or ("unknown", 0, "legacy")
+                        self.buffer.commit([item.id])
+                        remaining = self.buffer.count()
+                        logger.info(
+                            "📤 Uploaded video chunk | file=%s | size_mb=%.1f | monitor_id=%s | elapsed=%.2fs | remaining=%s",
+                            chunk_name,
+                            file_size_bytes / (1024 * 1024),
+                            monitor_id,
+                            elapsed_s,
+                            remaining,
+                        )
+                    elif item_type == "audio_chunk":
+                        self.buffer.commit([item.id])
+                        remaining = self.buffer.count()
+                        logger.info(
+                            "📤 Uploaded audio chunk | file=%s | elapsed=%.2fs | remaining=%s",
+                            item.metadata.get("chunk_filename", "unknown"),
+                            elapsed_s,
+                            remaining,
+                        )
                     else:
                         app_name = item.metadata.get("active_app", "Unknown")
                         logger.info(f"📤 Uploaded: {app_name} | ts={item.metadata.get('timestamp', 0)}")
-                    self.buffer.commit([item.id])
+                        self.buffer.commit([item.id])
                     self._retry_count = 0
                 else:
                     # Failure: keep files, apply backoff (unless stopping)
                     if not self._stop_event.is_set():
+                        if item_type == "video_chunk":
+                            chunk_name, file_size_bytes, monitor_id = video_details or ("unknown", 0, "legacy")
+                            logger.warning(
+                                "Video chunk upload failed | file=%s | size_mb=%.1f | monitor_id=%s",
+                                chunk_name,
+                                file_size_bytes / (1024 * 1024),
+                                monitor_id,
+                            )
                         self._handle_failure()
                     
             except Exception as e:

@@ -267,8 +267,12 @@ class TestFFmpegRawVideoProfile:
         assert "1920x1080" in cmd
         assert "-framerate" in cmd
         assert "30" in cmd
+        assert "-use_wallclock_as_timestamps" in cmd
+        assert "1" in cmd
         assert "-i" in cmd
         assert "-" in cmd
+        assert "-force_key_frames" in cmd
+        assert "expr:gte(t,n_forced*60)" in cmd
         assert "-strftime" in cmd
         assert cmd[-1].endswith("monitor_default_%Y-%m-%d_%H-%M-%S.mp4")
 
@@ -284,6 +288,79 @@ class TestFFmpegRawVideoProfile:
 
         assert changed is True
         mock_restart.assert_called_once()
+
+    def test_build_rawvideo_command_chunk_process_has_single_output(self, tmp_path):
+        from openrecall.client.ffmpeg_manager import FFmpegManager
+        from openrecall.client.sck_stream import PixelFormatProfile
+
+        profile = PixelFormatProfile(
+            pix_fmt="nv12",
+            width=1920,
+            height=1080,
+            fps=30,
+            color_range="tv",
+        )
+
+        output_file = str(tmp_path / "monitor_1_2026-02-09_05-00-00.mp4")
+        mgr = FFmpegManager(output_dir=tmp_path, pipeline_mode="chunk_process")
+        cmd = mgr._build_rawvideo_command(profile, output_file=output_file)
+
+        assert "-segment_time" not in cmd
+        assert "-segment_list" not in cmd
+        assert cmd[-1] == output_file
+
+    def test_chunk_process_rotates_and_emits_chunk_completion(self, tmp_path):
+        from openrecall.client.ffmpeg_manager import FFmpegManager
+        from openrecall.client.sck_stream import PixelFormatProfile
+
+        completed: list[str] = []
+        profile = PixelFormatProfile("nv12", 640, 480, 2, "tv")
+        mgr = FFmpegManager(
+            output_dir=tmp_path,
+            chunk_duration=1,
+            fps=2,
+            pipeline_mode="chunk_process",
+            on_chunk_complete=completed.append,
+        )
+        mgr._input_profile = profile
+        mgr._frames_per_chunk = 2
+        chunk_path = tmp_path / "monitor_1_2026-02-09_05-00-00.mp4"
+        chunk_path.write_bytes(b"fake")
+        mgr._active_chunk_path = str(chunk_path)
+
+        process = MagicMock()
+        process.poll.return_value = None
+        process.stdin = MagicMock()
+        mgr._process = process
+
+        with patch.object(mgr, "_write_with_timeout", return_value=None):
+            with patch.object(mgr, "_start_rawvideo_process") as mock_start_next:
+                mgr.write_frame(b"frame-a")
+                mgr.write_frame(b"frame-b")
+
+        assert completed == [str(chunk_path)]
+        mock_start_next.assert_called_once_with(profile)
+
+    def test_write_frame_timeout_raises_timeout_error(self, tmp_path):
+        from openrecall.client.ffmpeg_manager import FFmpegManager
+
+        mgr = FFmpegManager(
+            output_dir=tmp_path,
+            pipeline_mode="chunk_process",
+            pipe_write_timeout_ms=1,
+        )
+        process = MagicMock()
+        process.poll.return_value = None
+        process.stdin = MagicMock()
+        mgr._process = process
+
+        with patch.object(
+            mgr,
+            "_write_with_timeout",
+            side_effect=TimeoutError("FFmpeg stdin write timed out"),
+        ):
+            with pytest.raises(TimeoutError):
+                mgr.write_frame(b"frame")
 
 
 class TestFFmpegSegmentPolling:
@@ -390,6 +467,71 @@ class TestFFmpegSegmentPolling:
         assert len(received) == 1
 
 
+class TestMonitorPipelineController:
+    def test_controller_reconfigures_when_ffmpeg_write_times_out(self):
+        from openrecall.client.sck_stream import PixelFormatProfile, RawFrame
+        from openrecall.client.video_recorder import MonitorPipelineController
+
+        ffmpeg_manager = MagicMock()
+        ffmpeg_manager.write_frame.side_effect = TimeoutError("write timeout")
+        controller = MonitorPipelineController(
+            monitor_id="1",
+            ffmpeg_manager=ffmpeg_manager,
+            restart_on_profile_change=True,
+        )
+        profile = PixelFormatProfile("nv12", 1920, 1080, 30, "tv")
+        controller._profile = profile
+        controller._state = controller.STATE_RUNNING
+        controller._generation = 1
+        controller._queue.put((1, RawFrame(data=b"frame", profile=profile, pts_ns=0)))
+
+        with patch.object(controller, "_reconfigure_pipeline") as mock_reconfigure:
+            controller._drain_once(block=False)
+
+        mock_reconfigure.assert_called_once_with(profile)
+        assert controller.stats.broken_pipe_events == 1
+
+    def test_logs_chunk_start_once_per_new_active_file(self, tmp_path, caplog):
+        """FFmpeg manager logs chunk start when active output file changes."""
+        from openrecall.client.ffmpeg_manager import FFmpegManager
+
+        mgr = FFmpegManager(output_dir=tmp_path, monitor_id="1")
+        mgr._last_start_time = time.time() - 1
+
+        active_chunk = tmp_path / "monitor_1_2026-02-09_04-50-00.mp4"
+        active_chunk.write_bytes(b"chunk-data")
+
+        caplog.set_level("INFO", logger="openrecall.client.ffmpeg_manager")
+        first = mgr._poll_active_chunk_start()
+        second = mgr._poll_active_chunk_start()
+
+        assert first == str(active_chunk)
+        assert second is None
+        messages = [r.message for r in caplog.records]
+        assert sum("Video chunk recording started" in m for m in messages) == 1
+        assert any("monitor_1_2026-02-09_04-50-00.mp4" in m for m in messages)
+
+    def test_logs_chunk_start_is_idempotent_when_detector_flaps(self, tmp_path, caplog):
+        """Chunk-start logs should not repeat when detector alternates between known files."""
+        from openrecall.client.ffmpeg_manager import FFmpegManager
+
+        mgr = FFmpegManager(output_dir=tmp_path, monitor_id="1")
+        file_a = str(tmp_path / "monitor_1_2026-02-09_04-50-00.mp4")
+        file_b = str(tmp_path / "monitor_1_2026-02-09_04-51-00.mp4")
+
+        caplog.set_level("INFO", logger="openrecall.client.ffmpeg_manager")
+        with patch.object(
+            mgr,
+            "_detect_active_chunk_path",
+            side_effect=[file_a, file_b, file_a, file_b, None],
+        ):
+            for _ in range(5):
+                mgr._poll_active_chunk_start()
+
+        messages = [r.message for r in caplog.records]
+        assert sum("Video chunk recording started" in m for m in messages) == 2
+
+
 class TestVideoRecorder:
     """Test VideoRecorder integration."""
 
@@ -428,6 +570,29 @@ class TestVideoRecorder:
         assert meta["codec"] == "h264"
         assert meta["file_size_bytes"] == 1024
         assert meta["checksum"].startswith("sha256:")
+
+    def test_on_chunk_complete_logs_chunk_end(self, tmp_path, monkeypatch, caplog):
+        """_on_chunk_complete logs chunk-end event in client terminal."""
+        monkeypatch.setenv("OPENRECALL_DATA_DIR", str(tmp_path))
+        monkeypatch.setenv("OPENRECALL_SERVER_DATA_DIR", str(tmp_path / "MRS"))
+        monkeypatch.setenv("OPENRECALL_CLIENT_DATA_DIR", str(tmp_path / "MRC"))
+        self._reload_modules()
+
+        from openrecall.client.video_recorder import VideoRecorder
+
+        mock_buffer = MagicMock()
+        mock_consumer = MagicMock()
+        mock_consumer.is_alive.return_value = False
+        recorder = VideoRecorder(buffer=mock_buffer, consumer=mock_consumer)
+
+        chunk_path = tmp_path / "chunk_end_test.mp4"
+        chunk_path.write_bytes(b"x" * 1024)
+        caplog.set_level("INFO", logger="openrecall.client.video_recorder")
+
+        recorder._on_chunk_complete(str(chunk_path))
+
+        messages = [r.message for r in caplog.records]
+        assert any("Video chunk recording ended" in m and "chunk_end_test.mp4" in m for m in messages)
 
     def test_on_chunk_complete_skips_empty(self, tmp_path, monkeypatch):
         """_on_chunk_complete skips empty chunk files."""
@@ -589,3 +754,174 @@ class TestVideoRecorder:
         assert started is True
         source.start.assert_called_once()
         assert recorder._sources["1"] is source
+
+    def test_periodic_status_logs_current_chunk(self, tmp_path, monkeypatch, caplog):
+        """Periodic status logs should include current recording chunk filename."""
+        monkeypatch.setenv("OPENRECALL_DATA_DIR", str(tmp_path))
+        monkeypatch.setenv("OPENRECALL_SERVER_DATA_DIR", str(tmp_path / "MRS"))
+        monkeypatch.setenv("OPENRECALL_CLIENT_DATA_DIR", str(tmp_path / "MRC"))
+        self._reload_modules()
+
+        from openrecall.client.video_recorder import CaptureModeState, VideoRecorder
+
+        mock_buffer = MagicMock()
+        mock_buffer.count.return_value = 2
+        mock_consumer = MagicMock()
+        mock_consumer.is_alive.return_value = False
+
+        recorder = VideoRecorder(buffer=mock_buffer, consumer=mock_consumer)
+        recorder._capture_state = CaptureModeState.SCK_ACTIVE
+        controller = MagicMock()
+        controller.ffmpeg_manager.current_chunk_path = "/tmp/chunk_0007.mp4"
+        recorder._pipelines = {"1": controller}
+
+        caplog.set_level("INFO", logger="openrecall.client.video_recorder")
+        recorder._log_periodic_status()
+
+        messages = [r.message for r in caplog.records]
+        assert any(
+            "Client status" in m
+            and "chunk_0007.mp4" in m
+            and "pending_uploads=2" in m
+            for m in messages
+        )
+
+    def test_periodic_status_prefers_active_chunk_name(self, tmp_path, monkeypatch, caplog):
+        """Periodic status should show active recording chunk when available."""
+        monkeypatch.setenv("OPENRECALL_DATA_DIR", str(tmp_path))
+        monkeypatch.setenv("OPENRECALL_SERVER_DATA_DIR", str(tmp_path / "MRS"))
+        monkeypatch.setenv("OPENRECALL_CLIENT_DATA_DIR", str(tmp_path / "MRC"))
+        self._reload_modules()
+
+        from openrecall.client.video_recorder import CaptureModeState, VideoRecorder
+
+        mock_buffer = MagicMock()
+        mock_buffer.count.return_value = 0
+        mock_consumer = MagicMock()
+        mock_consumer.is_alive.return_value = False
+
+        recorder = VideoRecorder(buffer=mock_buffer, consumer=mock_consumer)
+        recorder._capture_state = CaptureModeState.SCK_ACTIVE
+
+        ffmpeg = MagicMock()
+        ffmpeg.active_chunk_path = "/tmp/active_chunk_0008.mp4"
+        ffmpeg.current_chunk_path = "/tmp/old_chunk_0007.mp4"
+        controller = MagicMock()
+        controller.ffmpeg_manager = ffmpeg
+        recorder._pipelines = {"1": controller}
+
+        caplog.set_level("INFO", logger="openrecall.client.video_recorder")
+        recorder._log_periodic_status()
+
+        messages = [r.message for r in caplog.records]
+        assert any("active_chunk_0008.mp4" in m for m in messages)
+
+    def test_watcher_restarts_pipeline_when_chunk_stagnates(self, tmp_path, monkeypatch):
+        """Watcher should force pipeline restart when chunk stays unchanged for too long."""
+        monkeypatch.setenv("OPENRECALL_DATA_DIR", str(tmp_path))
+        monkeypatch.setenv("OPENRECALL_SERVER_DATA_DIR", str(tmp_path / "MRS"))
+        monkeypatch.setenv("OPENRECALL_CLIENT_DATA_DIR", str(tmp_path / "MRC"))
+        self._reload_modules()
+
+        from openrecall.client.video_recorder import CaptureModeState, VideoRecorder
+
+        mock_buffer = MagicMock()
+        mock_consumer = MagicMock()
+        mock_consumer.is_alive.return_value = False
+        recorder = VideoRecorder(buffer=mock_buffer, consumer=mock_consumer)
+        recorder._capture_state = CaptureModeState.SCK_ACTIVE
+        recorder._pipeline_stall_timeout_seconds = 10.0
+        recorder._write_stall_timeout_seconds = 5.0
+        recorder._monitor_sync_interval = 9999
+
+        ffmpeg = MagicMock()
+        ffmpeg.active_chunk_path = "/tmp/stale_chunk.mp4"
+        ffmpeg.current_chunk_path = "/tmp/stale_chunk.mp4"
+        ffmpeg.write_stuck_seconds = 8.0
+        controller = MagicMock()
+        controller.ffmpeg_manager = ffmpeg
+        controller.seconds_since_last_write.return_value = 8.0
+        controller.writer_alive = True
+        recorder._pipelines = {"1": controller}
+        recorder._chunk_progress_by_monitor = {
+            "1": ("stale_chunk.mp4", time.time() - 12.0),
+        }
+
+        with patch.object(recorder, "_attempt_sck_start_once", return_value=True) as mock_restart:
+            recorder._watcher_tick()
+
+        mock_restart.assert_called_once_with(force=True)
+
+    def test_watcher_restarts_segment_mode_on_no_chunk_progress(self, tmp_path, monkeypatch):
+        """Segment mode should restart on chunk stagnation even if writes are still flowing."""
+        monkeypatch.setenv("OPENRECALL_DATA_DIR", str(tmp_path))
+        monkeypatch.setenv("OPENRECALL_SERVER_DATA_DIR", str(tmp_path / "MRS"))
+        monkeypatch.setenv("OPENRECALL_CLIENT_DATA_DIR", str(tmp_path / "MRC"))
+        self._reload_modules()
+
+        from openrecall.client.video_recorder import CaptureModeState, VideoRecorder
+
+        mock_buffer = MagicMock()
+        mock_consumer = MagicMock()
+        mock_consumer.is_alive.return_value = False
+        recorder = VideoRecorder(buffer=mock_buffer, consumer=mock_consumer)
+        recorder._capture_state = CaptureModeState.SCK_ACTIVE
+        recorder._pipeline_stall_timeout_seconds = 10.0
+        recorder._write_stall_timeout_seconds = 5.0
+        recorder._monitor_sync_interval = 9999
+
+        ffmpeg = MagicMock()
+        ffmpeg.pipeline_mode = "segment"
+        ffmpeg.active_chunk_path = "/tmp/stale_segment.mp4"
+        ffmpeg.current_chunk_path = "/tmp/stale_segment.mp4"
+        ffmpeg.write_stuck_seconds = 0.0
+        controller = MagicMock()
+        controller.ffmpeg_manager = ffmpeg
+        controller.seconds_since_last_write.return_value = 1.0
+        controller.writer_alive = True
+        recorder._pipelines = {"1": controller}
+        recorder._chunk_progress_by_monitor = {
+            "1": ("stale_segment.mp4", time.time() - 12.0),
+        }
+
+        with patch.object(recorder, "_attempt_sck_start_once", return_value=True) as mock_restart:
+            recorder._watcher_tick()
+
+        mock_restart.assert_called_once_with(force=True)
+
+    def test_watcher_does_not_restart_chunk_process_on_chunk_name_stagnation(self, tmp_path, monkeypatch):
+        """Chunk-process mode should not restart if writes are healthy and writer thread is alive."""
+        monkeypatch.setenv("OPENRECALL_DATA_DIR", str(tmp_path))
+        monkeypatch.setenv("OPENRECALL_SERVER_DATA_DIR", str(tmp_path / "MRS"))
+        monkeypatch.setenv("OPENRECALL_CLIENT_DATA_DIR", str(tmp_path / "MRC"))
+        self._reload_modules()
+
+        from openrecall.client.video_recorder import CaptureModeState, VideoRecorder
+
+        mock_buffer = MagicMock()
+        mock_consumer = MagicMock()
+        mock_consumer.is_alive.return_value = False
+        recorder = VideoRecorder(buffer=mock_buffer, consumer=mock_consumer)
+        recorder._capture_state = CaptureModeState.SCK_ACTIVE
+        recorder._pipeline_stall_timeout_seconds = 10.0
+        recorder._write_stall_timeout_seconds = 5.0
+        recorder._monitor_sync_interval = 9999
+
+        ffmpeg = MagicMock()
+        ffmpeg.pipeline_mode = "chunk_process"
+        ffmpeg.active_chunk_path = "/tmp/chunk_process_current.mp4"
+        ffmpeg.current_chunk_path = "/tmp/chunk_process_current.mp4"
+        ffmpeg.write_stuck_seconds = 0.0
+        controller = MagicMock()
+        controller.ffmpeg_manager = ffmpeg
+        controller.seconds_since_last_write.return_value = 1.0
+        controller.writer_alive = True
+        recorder._pipelines = {"1": controller}
+        recorder._chunk_progress_by_monitor = {
+            "1": ("chunk_process_current.mp4", time.time() - 12.0),
+        }
+
+        with patch.object(recorder, "_attempt_sck_start_once", return_value=True) as mock_restart:
+            recorder._watcher_tick()
+
+        mock_restart.assert_not_called()

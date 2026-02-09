@@ -34,6 +34,7 @@ from openrecall.shared.utils import get_active_app_name, get_active_window_title
 logger = logging.getLogger(__name__)
 
 MIN_DISK_FREE_BYTES = 10 * 1024 * 1024 * 1024  # 10 GB
+STATUS_LOG_INTERVAL_SECONDS = 20
 
 
 class CaptureModeState:
@@ -60,6 +61,7 @@ class MonitorPipelineController:
     STATE_RUNNING = "RUNNING"
     STATE_RESTARTING = "RESTARTING"
     STATE_STOPPING = "STOPPING"
+    KEEPALIVE_INTERVAL_SECONDS = 1.0
 
     def __init__(
         self,
@@ -85,6 +87,10 @@ class MonitorPipelineController:
         self._writer_thread: Optional[threading.Thread] = None
         self._write_latencies_ms: deque[float] = deque(maxlen=512)
         self._broken_pipe_recovering = False
+        self._last_frame_data: Optional[bytes] = None
+        self._last_source_frame_monotonic: float = 0.0
+        self._last_write_monotonic: float = 0.0
+        self._keepalive_stall_warned = False
 
     def start(self, profile: PixelFormatProfile) -> None:
         with self._pipeline_lock:
@@ -95,6 +101,10 @@ class MonitorPipelineController:
             self._profile = profile
             self._generation += 1
             self._state = self.STATE_RUNNING
+            self._last_frame_data = None
+            self._last_source_frame_monotonic = 0.0
+            self._last_write_monotonic = 0.0
+            self._keepalive_stall_warned = False
 
         self.ffmpeg_manager.start_with_profile(profile)
         self._start_writer_thread_if_needed()
@@ -113,6 +123,10 @@ class MonitorPipelineController:
         with self._pipeline_lock:
             self._state = self.STATE_STOPPED
             self._profile = None
+            self._last_frame_data = None
+            self._last_source_frame_monotonic = 0.0
+            self._last_write_monotonic = 0.0
+            self._keepalive_stall_warned = False
 
     def submit_frame(self, frame: RawFrame) -> None:
         if self._state == self.STATE_STOPPING:
@@ -124,6 +138,11 @@ class MonitorPipelineController:
         if self.restart_on_profile_change and frame.profile != self._profile:
             self._reconfigure_pipeline(frame.profile)
 
+        self._last_frame_data = frame.data
+        self._last_source_frame_monotonic = time.monotonic()
+        if self._keepalive_stall_warned:
+            logger.info("Source frames resumed monitor=%s", self.monitor_id)
+            self._keepalive_stall_warned = False
         self._enqueue_for_generation(frame, generation=self._generation)
 
     def _reconfigure_pipeline(self, profile: PixelFormatProfile) -> None:
@@ -135,6 +154,10 @@ class MonitorPipelineController:
             self._state = self.STATE_RESTARTING
             self._generation += 1
             self._profile = profile
+            self._last_frame_data = None
+            self._last_source_frame_monotonic = 0.0
+            self._last_write_monotonic = 0.0
+            self._keepalive_stall_warned = False
 
         self.stats.profile_change_restarts += 1
         self.ffmpeg_manager.reconfigure(profile)
@@ -189,11 +212,22 @@ class MonitorPipelineController:
         idx = max(0, int(0.95 * (len(samples) - 1)))
         return float(samples[idx])
 
+    @property
+    def writer_alive(self) -> bool:
+        return bool(self._writer_thread and self._writer_thread.is_alive())
+
+    def seconds_since_last_write(self, now_monotonic: Optional[float] = None) -> Optional[float]:
+        if self._last_write_monotonic <= 0:
+            return None
+        now = now_monotonic if now_monotonic is not None else time.monotonic()
+        return max(0.0, now - self._last_write_monotonic)
+
     def _drain_once(self, block: bool) -> None:
         timeout = 0.2 if block else 0.0
         try:
             generation, frame = self._queue.get(timeout=timeout)
         except queue.Empty:
+            self._emit_keepalive_frame_if_due()
             return
 
         try:
@@ -203,6 +237,7 @@ class MonitorPipelineController:
 
             elapsed = self.ffmpeg_manager.write_frame(frame.data)
             self._broken_pipe_recovering = False
+            self._last_write_monotonic = time.monotonic()
             elapsed_ms = float(elapsed or 0.0) * 1000.0
             self._write_latencies_ms.append(elapsed_ms)
             if elapsed_ms >= self.pipe_write_warn_ms:
@@ -220,6 +255,48 @@ class MonitorPipelineController:
                     self._reconfigure_pipeline(self._profile)
         finally:
             self._queue.task_done()
+
+    def _emit_keepalive_frame_if_due(self) -> None:
+        if self._state == self.STATE_STOPPING:
+            return
+        if self._last_frame_data is None:
+            return
+
+        now = time.monotonic()
+        last_write = self._last_write_monotonic or self._last_source_frame_monotonic
+        if last_write and (now - last_write) < self.KEEPALIVE_INTERVAL_SECONDS:
+            return
+
+        if (
+            self._last_source_frame_monotonic
+            and (now - self._last_source_frame_monotonic) >= self.KEEPALIVE_INTERVAL_SECONDS * 2
+            and not self._keepalive_stall_warned
+        ):
+            logger.warning(
+                "No new source frames monitor=%s for %.1fs, emitting keepalive frames",
+                self.monitor_id,
+                now - self._last_source_frame_monotonic,
+            )
+            self._keepalive_stall_warned = True
+
+        try:
+            elapsed = self.ffmpeg_manager.write_frame(self._last_frame_data)
+            self._broken_pipe_recovering = False
+            self._last_write_monotonic = now
+            elapsed_ms = float(elapsed or 0.0) * 1000.0
+            self._write_latencies_ms.append(elapsed_ms)
+            if elapsed_ms >= self.pipe_write_warn_ms:
+                logger.warning(
+                    "Slow ffmpeg keepalive write monitor=%s latency=%.2fms",
+                    self.monitor_id,
+                    elapsed_ms,
+                )
+        except (BrokenPipeError, OSError):
+            if not self._broken_pipe_recovering:
+                self.stats.broken_pipe_events += 1
+                self._broken_pipe_recovering = True
+                if self.restart_on_profile_change and self._profile is not None:
+                    self._reconfigure_pipeline(self._profile)
 
 
 class VideoRecorder:
@@ -271,6 +348,17 @@ class VideoRecorder:
         self._last_sck_error_code = ""
         self._last_sck_error_at = 0.0
         self._sck_available = False
+        self._status_log_interval_seconds = STATUS_LOG_INTERVAL_SECONDS
+        self._last_status_log_at = 0.0
+        self._pipeline_stall_timeout_seconds = max(
+            30.0,
+            float(settings.video_no_chunk_progress_timeout_seconds),
+        )
+        self._write_stall_timeout_seconds = max(
+            5.0,
+            min(60.0, (float(settings.video_pipe_write_timeout_ms) / 1000.0) * 2.0),
+        )
+        self._chunk_progress_by_monitor: dict[str, tuple[str, float]] = {}
 
         self.consumer = consumer or UploaderConsumer(
             buffer=self.buffer,
@@ -300,6 +388,12 @@ class VideoRecorder:
         logger.info("Video recorder started (monitor-id pipeline)")
         logger.info("  Chunk duration: %ss", settings.video_chunk_duration)
         logger.info("  FPS: %s, CRF: %s", settings.video_fps, settings.video_crf)
+        logger.info(
+            "  Pipeline mode: %s | Pipe write timeout: %sms | No-progress timeout: %ss",
+            settings.video_pipeline_mode,
+            settings.video_pipe_write_timeout_ms,
+            settings.video_no_chunk_progress_timeout_seconds,
+        )
         logger.info("  Output dir: %s", self.output_dir)
 
         self._start_recording_backend()
@@ -309,6 +403,8 @@ class VideoRecorder:
             if now - self.last_heartbeat_time > 5:
                 self._send_heartbeat()
                 self.last_heartbeat_time = now
+            if now - self._last_status_log_at >= self._status_log_interval_seconds:
+                self._log_periodic_status(now)
 
             if not self.recording_enabled:
                 if not self._runtime_recording_paused:
@@ -357,6 +453,79 @@ class VideoRecorder:
                         )
 
             time.sleep(1)
+
+    def _log_periodic_status(self, now: Optional[float] = None) -> None:
+        current_time = now or time.time()
+        self._last_status_log_at = current_time
+
+        pending_uploads = self.buffer.count()
+
+        if self._capture_state == CaptureModeState.PAUSED_BY_TOGGLE or not self.recording_enabled:
+            logger.info("Client status | state=paused | pending_uploads=%s", pending_uploads)
+            return
+
+        if self._disk_full_paused:
+            logger.info("Client status | state=disk_full_paused | pending_uploads=%s", pending_uploads)
+            return
+
+        if self._use_legacy_mode or self._capture_state == CaptureModeState.LEGACY_ACTIVE:
+            legacy_chunk = self._chunk_name_for_manager(self._legacy_ffmpeg)
+            logger.info(
+                "Client status | state=recording_legacy | current_chunk=%s | pending_uploads=%s",
+                legacy_chunk,
+                pending_uploads,
+            )
+            return
+
+        if self._capture_state == CaptureModeState.SCK_ACTIVE:
+            monitor_chunks = []
+            for monitor_id in sorted(self._pipelines.keys()):
+                controller = self._pipelines[monitor_id]
+                chunk_name = self._chunk_name_for_manager(controller.ffmpeg_manager)
+                monitor_chunks.append(f"{monitor_id}:{chunk_name}")
+
+            logger.info(
+                "Client status | state=recording | monitor_chunks=%s | pending_uploads=%s",
+                ", ".join(monitor_chunks) if monitor_chunks else "initializing",
+                pending_uploads,
+            )
+            return
+
+        retry_in_seconds = max(0, int(self._next_sck_retry_at - current_time))
+        logger.info(
+            "Client status | state=retrying_capture | retry_in=%ss | pending_uploads=%s",
+            retry_in_seconds,
+            pending_uploads,
+        )
+
+    @staticmethod
+    def _chunk_name_from_path(chunk_path: object) -> str:
+        if not isinstance(chunk_path, str) or not chunk_path:
+            return "initializing"
+        return Path(chunk_path).name
+
+    @staticmethod
+    def _chunk_name_for_manager(ffmpeg_manager: FFmpegManager) -> str:
+        active_chunk_path = getattr(ffmpeg_manager, "active_chunk_path", None)
+        chunk_name = VideoRecorder._chunk_name_from_path(active_chunk_path)
+        if chunk_name != "initializing":
+            return chunk_name
+
+        chunk_name = VideoRecorder._chunk_name_from_path(ffmpeg_manager.current_chunk_path)
+        if chunk_name != "initializing":
+            return chunk_name
+
+        try:
+            latest_file = max(
+                ffmpeg_manager.output_dir.glob("*.mp4"),
+                key=lambda p: p.stat().st_mtime,
+                default=None,
+            )
+            if latest_file is not None:
+                return latest_file.name
+        except Exception:
+            pass
+        return chunk_name
 
     def _backend_alive(self) -> bool:
         if self._capture_state == CaptureModeState.PAUSED_BY_TOGGLE:
@@ -475,6 +644,7 @@ class VideoRecorder:
                 except Exception:
                     logger.exception("Failed stopping monitor pipeline")
         self._pipelines.clear()
+        self._chunk_progress_by_monitor.clear()
 
         if clear_metadata:
             self._monitor_by_id = {}
@@ -602,6 +772,8 @@ class VideoRecorder:
                     on_chunk_complete=lambda path, m=monitor: self._on_chunk_complete(path, m),
                     monitor_id=monitor.monitor_id,
                     segment_list_filename=f"segments_{monitor.monitor_id}.csv",
+                    pipeline_mode=settings.video_pipeline_mode,
+                    pipe_write_timeout_ms=settings.video_pipe_write_timeout_ms,
                 )
 
                 controller = MonitorPipelineController(
@@ -682,6 +854,16 @@ class VideoRecorder:
 
         if self._capture_state == CaptureModeState.SCK_ACTIVE:
             now = time.time()
+            stalled_monitors = self._detect_stalled_pipelines(now)
+            if stalled_monitors:
+                logger.error(
+                    "Detected stalled monitor-id pipeline(s): %s; forcing SCK backend restart",
+                    ", ".join(stalled_monitors),
+                )
+                if not self._attempt_sck_start_once(force=True):
+                    self._capture_state = CaptureModeState.SCK_DEGRADED_RETRYING
+                    self._schedule_sck_retry()
+                return
             if now - self._last_monitor_sync_at >= self._monitor_sync_interval:
                 self._last_monitor_sync_at = now
                 self._sync_monitors()
@@ -693,6 +875,61 @@ class VideoRecorder:
 
         if self._capture_state == CaptureModeState.LEGACY_ACTIVE and settings.sck_auto_recover_from_legacy:
             self._try_recover_from_legacy()
+
+    def _detect_stalled_pipelines(self, now_wallclock: Optional[float] = None) -> list[str]:
+        now = now_wallclock if now_wallclock is not None else time.time()
+        now_monotonic = time.monotonic()
+        active_ids = set(self._pipelines.keys())
+        for monitor_id in list(self._chunk_progress_by_monitor.keys()):
+            if monitor_id not in active_ids:
+                self._chunk_progress_by_monitor.pop(monitor_id, None)
+
+        stalled: list[str] = []
+        for monitor_id, controller in self._pipelines.items():
+            manager = controller.ffmpeg_manager
+            chunk_name = self._chunk_name_for_manager(manager)
+
+            progress = self._chunk_progress_by_monitor.get(monitor_id)
+            if progress is None or progress[0] != chunk_name:
+                self._chunk_progress_by_monitor[monitor_id] = (chunk_name, now)
+                continue
+
+            stagnant_for = now - progress[1]
+            if stagnant_for < self._pipeline_stall_timeout_seconds:
+                continue
+
+            seconds_since_write = controller.seconds_since_last_write(now_monotonic)
+            write_stuck_for = float(getattr(manager, "write_stuck_seconds", 0.0) or 0.0)
+            writer_alive = bool(getattr(controller, "writer_alive", False))
+            pipeline_mode = str(getattr(manager, "pipeline_mode", "segment") or "segment")
+            no_write_progress = (
+                seconds_since_write is None
+                or seconds_since_write >= self._write_stall_timeout_seconds
+            )
+            write_blocked = write_stuck_for >= self._write_stall_timeout_seconds
+            no_chunk_progress = pipeline_mode == "segment"
+
+            if no_chunk_progress or no_write_progress or write_blocked or not writer_alive:
+                since_write_value = (
+                    f"{seconds_since_write:.1f}s"
+                    if seconds_since_write is not None
+                    else "n/a"
+                )
+                logger.error(
+                    "Stalled pipeline detected | monitor_id=%s | chunk=%s | stagnant_for=%.1fs | "
+                    "seconds_since_write=%s | write_stuck_for=%.1fs | writer_alive=%s | mode=%s | no_chunk_progress=%s",
+                    monitor_id,
+                    chunk_name,
+                    stagnant_for,
+                    since_write_value,
+                    write_stuck_for,
+                    writer_alive,
+                    pipeline_mode,
+                    no_chunk_progress,
+                )
+                stalled.append(monitor_id)
+
+        return stalled
 
     def _sync_monitors(self) -> None:
         with self._state_lock:
@@ -766,6 +1003,14 @@ class VideoRecorder:
                 logger.warning("Empty chunk file: %s", chunk_path)
                 return
 
+            monitor_id = monitor.monitor_id if monitor else "legacy"
+            logger.info(
+                "Video chunk recording ended | file=%s | size_mb=%.1f | monitor_id=%s",
+                path.name,
+                file_size / (1024 * 1024),
+                monitor_id,
+            )
+
             checksum = self._compute_checksum(chunk_path)
             timestamp = int(time.time())
 
@@ -787,6 +1032,7 @@ class VideoRecorder:
                 "fps": settings.video_fps,
                 "codec": "h264",
                 "crf": settings.video_crf,
+                "chunk_filename": path.name,
                 "file_size_bytes": file_size,
                 "checksum": f"sha256:{checksum}",
             }
@@ -799,7 +1045,7 @@ class VideoRecorder:
                 "Video chunk enqueued: %s (%.1fMB monitor_id=%s)",
                 path.name,
                 file_size / (1024 * 1024),
-                metadata["monitor_id"] or "legacy",
+                metadata["monitor_id"] or monitor_id,
             )
         except Exception:
             logger.exception("Error processing completed chunk %s", chunk_path)

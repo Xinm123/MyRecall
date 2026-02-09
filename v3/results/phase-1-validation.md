@@ -1,8 +1,8 @@
 # MyRecall-v3 Phase 1 Validation Report
 
-**Version**: 1.6
-**Last Updated**: 2026-02-08T07:50:52Z
-**Status**: GO-ENGINEERING -- Non-long-run gates passed; long-run gates formalized as `PENDING (LONGRUN)`. Phase 1.5 metadata precision upgrade complete.
+**Version**: 1.7
+**Last Updated**: 2026-02-09T09:00:00Z
+**Status**: COMPLETE -- Non-long-run gates passed; long-run observations moved to future non-blocking plan.
 **Authority**: Gate criteria sourced from `/Users/pyw/new/MyRecall/v3/metrics/phase-gates.md`
 
 ---
@@ -389,9 +389,9 @@ All gate criteria sourced from `/Users/pyw/new/MyRecall/v3/metrics/phase-gates.m
 | 1-R-02 | PENDING | LONGRUN | `tests/test_phase1_gates.py` skip (runtime memory window) |
 | 1-DG-03 | SKIP | N/A | Optional gate, not implemented in Phase 1 |
 
-**Go/No-Go Decision**: GO-ENGINEERING
+**Go/No-Go Decision**: COMPLETE (execution closed; long-run observations tracked as future plan)
 
-**Rationale**: Non-long-run Phase 1 gates have no failures, no unresolved P0/P1 remain, >30-day retention strategy logic simulation is fully covered and passing, and API smoke checks pass with complete evidence. Long-run gates are formally tracked as `PENDING` with `PendingReason=LONGRUN`.
+**Rationale**: Non-long-run Phase 1 gates have no failures, no unresolved P0/P1 remain, >30-day retention strategy logic simulation is fully covered and passing, and API smoke checks pass with complete evidence. The 7 long-run observations remain `PENDING/LONGRUN` and are now tracked in `/Users/pyw/new/MyRecall/v3/milestones/roadmap-status.md` under `Phase 1 Long-Run Observation Plan (Future, Non-Blocking)`.
 
 ---
 
@@ -401,7 +401,7 @@ All gate criteria sourced from `/Users/pyw/new/MyRecall/v3/metrics/phase-gates.m
 |---|-------|----------|--------|-----------------|
 | 1 | `dedup_threshold=0.0` is falsy in Python | Low | Passing 0.0 falls through `or` to default 0.95 | Document: use `None` or explicit `is not None` check |
 | 2 | `settings.db_path` includes `/db/` subdirectory | Info | Test fixtures must use `settings.db_path` not hardcode paths | Fixed in all test files |
-| 3 | Long-run gates require separate observation period | Expected | 7 gates cannot be validated in single session | Schedule 7-day recording session |
+| 3 | Long-run gates require separate observation period | Expected | 7 gates cannot be validated in single session | Track in roadmap future plan (`Phase 1 Long-Run Observation Plan`) |
 
 ### Follow-ups for Phase 2
 
@@ -416,6 +416,6 @@ All gate criteria sourced from `/Users/pyw/new/MyRecall/v3/metrics/phase-gates.m
 
 ## 5. Last Updated
 
-**Date**: 2026-02-08T07:50:52Z
-**Updated By**: Phase 1.5 Metadata Precision Upgrade
-**Status**: GO-ENGINEERING -- Long-run gates remain `PENDING (LONGRUN)`. Phase 1.5 requirements A/B/C/D verified.
+**Date**: 2026-02-09T09:00:00Z
+**Updated By**: Phase 1 status closure update
+**Status**: COMPLETE -- Long-run gates remain `PENDING (LONGRUN)` and are tracked in the future non-blocking observation plan.

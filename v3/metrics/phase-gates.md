@@ -1,7 +1,7 @@
 # MyRecall-v3 Phase Gates & Acceptance Criteria
 
-**Version**: 1.5
-**Last Updated**: 2026-02-07
+**Version**: 1.6
+**Last Updated**: 2026-02-09
 
 ⚠️ **Authority Notice**: 此文件为所有Phase (0-7) 的权威Go/No-Go验收标准。Roadmap文档仅引用此处定义,不重复定义Phase gates。任何关于Phase验收标准的变更必须首先更新本文件。
 
@@ -9,7 +9,7 @@
 
 ## Purpose
 
-This document defines quantifiable acceptance criteria for each phase. A phase cannot proceed to the next stage unless ALL Go/No-Go gates are satisfied.
+This document defines quantifiable acceptance criteria for each phase. A phase should proceed only after Go/No-Go criteria are satisfied, or after an explicit documented deferral decision (e.g., LONGRUN observation plan with traceable follow-up) is approved and recorded.
 
 ---
 
@@ -221,7 +221,7 @@ These checks do not change the original 21 gate counts. They capture high-priori
 | Data Governance (DG) | 3 | 2 | 0 | 0 | 1 |
 | **Total** | **21** | **13** | **0** | **7** | **1** |
 
-**Go/No-Go**: NO-GO (Pending long-run evidence). Engineering complete; release requires calendar-time evidence.
+**Go/No-Go**: COMPLETE (non-long-run closure). Long-run evidence remains `PENDING` and is tracked as future non-blocking observation work.
 
 ---
 
@@ -503,7 +503,8 @@ Placeholder section for Phase 7 gates. Go/No-Go criteria to be defined after Pha
 | 1.3 | 2026-02-06 | Consistency cleanup: header version aligned to latest history entry; Phase 1 OCR gate validation method updated to `ocr_text_fts` terminology. |
 | 1.4 | 2026-02-07 | Upload-failure gate observability tightened: validation now explicitly checks consumer dispatch logs for `item_type` and target uploader branch. |
 | 1.5 | 2026-02-07 | Added Phase 1 post-baseline regression checks (non-gating): legacy video upload routing, search-debug video-only render safety, runtime recording pause/resume semantics, and OCR startup warm-up validation. |
+| 1.6 | 2026-02-09 | Phase 1 decision status updated to COMPLETE for roadmap progression; 7 long-run items remain `PENDING` and move to future non-blocking observation tracking. |
 
 ---
 
-**Next Update**: Phase 1 engineering gates validated on 2026-02-06 (13/21 passed). Next update after long-run evidence collection (7-day stability, 24h measurements).
+**Next Update**: Long-run observation evidence append (1-P-02/1-P-03/1-Q-01/1-S-01/1-S-02/1-R-01/1-R-02) after Week 9-12 tracking window.

@@ -248,6 +248,48 @@ class TestUploaderConsumer:
             messages = [r.message for r in caplog.records]
             assert any("Dispatch buffered item" in m and "item_type=video_chunk" in m and "target=upload_video_chunk" in m for m in messages)
 
+    def test_consumer_logs_video_upload_details(self, buffer_dir, mock_uploader, caplog):
+        """Video uploads should log filename/size/monitor details."""
+        with patch.dict("os.environ", {"OPENRECALL_DATA_DIR": str(buffer_dir.parent)}):
+            from openrecall.client.buffer import LocalBuffer
+            from openrecall.client.consumer import UploaderConsumer
+
+            buffer = LocalBuffer(storage_dir=buffer_dir)
+            src_chunk = buffer_dir.parent / "chunk_detail_test.mp4"
+            src_chunk.write_bytes(b"video-data-for-log-test")
+            buffer.enqueue_file(
+                str(src_chunk),
+                {
+                    "type": "video_chunk",
+                    "timestamp": 456,
+                    "monitor_id": "1",
+                    "chunk_filename": "chunk_detail_test.mp4",
+                },
+            )
+
+            mock_uploader.upload_video_chunk.return_value = True
+            caplog.set_level("INFO", logger="openrecall.client.consumer")
+
+            consumer = UploaderConsumer(buffer=buffer, uploader=mock_uploader)
+            consumer.start()
+            time.sleep(0.5)
+            consumer.stop()
+            consumer.join(timeout=2.0)
+
+            messages = [r.message for r in caplog.records]
+            assert any(
+                "Uploading video chunk" in m
+                and "chunk_detail_test.mp4" in m
+                and "monitor_id=1" in m
+                for m in messages
+            )
+            assert any(
+                "Uploaded video chunk" in m
+                and "chunk_detail_test.mp4" in m
+                and "remaining=" in m
+                for m in messages
+            )
+
     def test_consumer_retries_on_failure(self, buffer_dir):
         """Test item preserved on failure (not deleted)."""
         with patch.dict("os.environ", {"OPENRECALL_DATA_DIR": str(buffer_dir.parent)}):

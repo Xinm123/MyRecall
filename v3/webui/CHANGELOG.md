@@ -109,6 +109,34 @@
 
 ---
 
+## Phase 2.0 (Planning Baseline)
+
+### 新增
+- 新增 `/Users/pyw/new/MyRecall/v3/results/phase-2-validation.md` 模板，用于 Phase 2.0 执行后回填验收证据。
+
+### 修改
+- 补充 `/Users/pyw/new/MyRecall/v3/webui/pages/timeline.md`：标注统一 timeline 的 audio 并入目标已进入 Phase 2.0 规划，当前页面尚未生效。
+- 补充 `/Users/pyw/new/MyRecall/v3/webui/pages/search.md`：标注音频 FTS 检索链路处于执行前规划基线，当前页面仍以视觉检索呈现为主。
+- 文档口径对齐：Phase 2 gate `2-F-04` 的验收语句保持与 gate 真源一致（`audio_fts`）；若实现表名为 `audio_transcriptions_fts`，须在验证报告提供映射证据。
+
+### 废弃
+- 无。
+
+### 影响面
+- 本次仅文档治理更新，不引入运行时 WebUI 行为变化。
+
+### 验证
+- 文档一致性检查：Phase 2 计划、roadmap、validation 模板与 WebUI 页面说明对齐。
+
+### 证据
+- `/Users/pyw/new/MyRecall/v3/plan/04-phase-2-detailed-plan.md`
+- `/Users/pyw/new/MyRecall/v3/milestones/roadmap-status.md`
+- `/Users/pyw/new/MyRecall/v3/results/phase-2-validation.md`
+- `/Users/pyw/new/MyRecall/v3/webui/pages/timeline.md`
+- `/Users/pyw/new/MyRecall/v3/webui/pages/search.md`
+
+---
+
 ## 未来维护规则（强约束）
 
 每次新增 `phase-*-validation.md` 时：
