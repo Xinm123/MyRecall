@@ -12,7 +12,7 @@ MyRecall 是一个本地优先的数字记忆系统，聚焦“持续屏幕采�
 
 - [x] Phase 0: Foundation & Client-Server Boundary（已完成）
 - [ ] Phase 1: Screen Recording Pipeline（工程完成，仍需长时证据收集）
-- [ ] Phase 2.0: Audio MVP（未开始）
+- [ ] Phase 2.0: Audio MVP（工程完成，仍需24h稳定性证据）
 - [ ] Phase 2.1: Speaker Identification（可选，未开始）
 - [ ] Phase 3: Multi-Modal Search Integration（未开始）
 - [ ] Phase 4: Chat Capability（未开始）
@@ -26,7 +26,7 @@ Status source: `/Users/pyw/new/MyRecall/v3/milestones/roadmap-status.md`
 
 - [x] Phase 0: Foundation & client-server boundary
 - [ ] Phase 1: Screen recording pipeline (engineering complete, long-run evidence pending)
-- [ ] Phase 2.0: Audio MVP
+- [ ] Phase 2.0: Audio MVP (engineering complete, 24h stability pending)
 - [ ] Phase 2.1: Speaker identification (optional)
 - [ ] Phase 3: Multi-modal search integration
 - [ ] Phase 4: Chat capability
@@ -59,7 +59,7 @@ This README is intentionally practical: whole-program context plus execution-rea
 |---|---|---|
 | Phase 0 | 数据与接口基础（schema/migration/api-v1/上传队列） | 已完成 |
 | Phase 1 | 视频采集与 OCR 索引（monitor-id 管线） | 工程完成，待长时证据 |
-| Phase 2.0 | 音频采集与转写 MVP | 未开始 |
+| Phase 2.0 | 音频采集与转写 MVP | 工程完成，待24h稳定性证据 |
 | Phase 2.1 | 说话人识别（可选） | 未开始 |
 | Phase 3 | 多模态统一检索（vision+audio） | 未开始 |
 | Phase 4 | Chat 能力与工具调用 | 未开始 |
@@ -75,7 +75,7 @@ This README is intentionally practical: whole-program context plus execution-rea
 |---|---|---|
 | Phase 0 | Data/API foundation (schema, migration, api-v1, upload queue) | Completed |
 | Phase 1 | Video capture + OCR indexing (monitor-id pipeline) | Engineering complete, long-run evidence pending |
-| Phase 2.0 | Audio capture + transcription MVP | Not started |
+| Phase 2.0 | Audio capture + transcription MVP | Engineering complete, 24h stability pending |
 | Phase 2.1 | Speaker identification (optional) | Not started |
 | Phase 3 | Unified multimodal retrieval (vision+audio) | Not started |
 | Phase 4 | Chat capability and tool orchestration | Not started |

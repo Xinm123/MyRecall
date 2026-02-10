@@ -1,0 +1,22 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.11.14, pytest-9.0.2, pluggy-1.6.0 -- /opt/homebrew/Caskroom/miniforge/base/envs/v3/bin/python3
+cachedir: .pytest_cache
+rootdir: /Users/pyw/new/MyRecall
+configfile: pytest.ini
+plugins: anyio-4.12.1
+collecting ... collected 8 items
+
+tests/test_phase2_vad.py::TestSpeechSegment::test_fields PASSED          [ 12%]
+tests/test_phase2_vad.py::TestVoiceActivityDetector::test_init_defaults PASSED [ 25%]
+tests/test_phase2_vad.py::TestVoiceActivityDetector::test_init_custom PASSED [ 37%]
+tests/test_phase2_vad.py::TestVoiceActivityDetector::test_no_model_returns_empty PASSED [ 50%]
+tests/test_phase2_vad.py::TestVoiceActivityDetector::test_has_speech_delegates_to_get_segments PASSED [ 62%]
+tests/test_phase2_vad.py::TestVoiceActivityDetector::test_webrtcvad_segments_on_silence SKIPPED [ 75%]
+tests/test_phase2_vad.py::TestVoiceActivityDetector::test_webrtcvad_segments_on_noise SKIPPED [ 87%]
+tests/test_phase2_vad.py::TestVoiceActivityDetector::test_invalid_wav_returns_empty PASSED [100%]
+
+=========================== short test summary info ============================
+SKIPPED [1] tests/test_phase2_vad.py:97: webrtcvad not installed
+SKIPPED [1] tests/test_phase2_vad.py:119: webrtcvad not installed
+========================= 6 passed, 2 skipped in 0.22s =========================
+

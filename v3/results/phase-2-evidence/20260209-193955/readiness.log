@@ -1,0 +1,6 @@
+[2026-02-09 19:42:40 +0800] readiness try=1 api=000 apiv1=000
+[2026-02-09 19:42:42 +0800] readiness try=2 api=000 apiv1=000
+[2026-02-09 19:42:43 +0800] readiness try=3 api=000 apiv1=000
+[2026-02-09 19:42:44 +0800] readiness try=4 api=000 apiv1=000
+[2026-02-09 19:42:45 +0800] readiness try=5 api=200 apiv1=200
+READY=1

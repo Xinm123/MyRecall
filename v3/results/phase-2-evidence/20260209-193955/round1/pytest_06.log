@@ -1,0 +1,25 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.11.14, pytest-9.0.2, pluggy-1.6.0 -- /opt/homebrew/Caskroom/miniforge/base/envs/v3/bin/python3
+cachedir: .pytest_cache
+rootdir: /Users/pyw/new/MyRecall
+configfile: pytest.ini
+plugins: anyio-4.12.1
+collecting ... collected 15 items
+
+tests/test_phase2_worker.py::TestAudioProcessingResult::test_defaults PASSED [  6%]
+tests/test_phase2_worker.py::TestAudioProcessingResult::test_with_error PASSED [ 13%]
+tests/test_phase2_worker.py::TestAudioChunkProcessor::test_init_lazy PASSED [ 20%]
+tests/test_phase2_worker.py::TestAudioChunkProcessor::test_process_missing_file PASSED [ 26%]
+tests/test_phase2_worker.py::TestAudioChunkProcessor::test_process_no_speech PASSED [ 33%]
+tests/test_phase2_worker.py::TestAudioChunkProcessor::test_process_with_speech PASSED [ 40%]
+tests/test_phase2_worker.py::TestAudioProcessingWorker::test_init PASSED [ 46%]
+tests/test_phase2_worker.py::TestAudioProcessingWorker::test_stop_event PASSED [ 53%]
+tests/test_phase2_worker.py::TestSQLStoreAudioLifecycle::test_insert_audio_chunk PASSED [ 60%]
+tests/test_phase2_worker.py::TestSQLStoreAudioLifecycle::test_get_audio_chunk_by_id PASSED [ 66%]
+tests/test_phase2_worker.py::TestSQLStoreAudioLifecycle::test_pending_processing_completed_lifecycle PASSED [ 73%]
+tests/test_phase2_worker.py::TestSQLStoreAudioLifecycle::test_pending_processing_failed_lifecycle PASSED [ 80%]
+tests/test_phase2_worker.py::TestSQLStoreAudioLifecycle::test_reset_stuck_audio_chunks PASSED [ 86%]
+tests/test_phase2_worker.py::TestSQLStoreAudioLifecycle::test_get_next_pending_audio_chunk PASSED [ 93%]
+tests/test_phase2_worker.py::TestSQLStoreAudioLifecycle::test_audio_chunk_status_counts PASSED [100%]
+
+============================== 15 passed in 4.60s ==============================

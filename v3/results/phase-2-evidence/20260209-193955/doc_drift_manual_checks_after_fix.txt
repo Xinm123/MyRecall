@@ -1,0 +1,9 @@
+MANUAL_DOC_DRIFT_BEGIN
+v3/results/phase-2-validation.md:86:  6. search_audio_fts(phrase) -> FTS match found with text_snippet
+v3/results/phase-2-validation.md:114:| 2-F-04 | Audio FTS Indexed | Transcriptions searchable via FTS. `audio_transcriptions_fts MATCH` returns results. | FTS5 virtual table `audio_transcriptions_fts` created. insert_audio_transcription_fts() + search_audio_fts() verified by test_phase2_search.py (8 passed) + test_phase2_smoke.py. | ✅ |
+v3/results/phase-2-validation.md:207:        SE["SearchEngine"] -->|search_audio_fts| FTS
+v3/plan/04-phase-2-detailed-plan.md:44:| **Search Extension** | Extend `SearchEngine` and `SQLStore.search_audio_fts()` to include audio FTS results |
+v3/plan/04-phase-2-detailed-plan.md:227:| Add `search_audio_fts()` to SQLStore | Query `audio_transcriptions_fts` using FTS5 MATCH, join with `audio_transcriptions` for timestamp/metadata, return list of dicts |
+v3/plan/04-phase-2-detailed-plan.md:503:def search_audio_fts(self, query, limit=50) -> List[dict]
+v3/plan/04-phase-2-detailed-plan.md:636:**Dependencies**: WB-07 (SQLStore.search_audio_fts)
+MANUAL_DOC_DRIFT_END

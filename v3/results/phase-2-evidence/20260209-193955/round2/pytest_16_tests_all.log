@@ -1,0 +1,341 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.9.6, pytest-8.4.2, pluggy-1.6.0 -- /Applications/Xcode.app/Contents/Developer/usr/bin/python3
+cachedir: .pytest_cache
+rootdir: /Users/pyw/new/MyRecall
+configfile: pytest.ini
+collecting ... collected 217 items / 31 errors / 2 deselected / 215 selected
+
+==================================== ERRORS ====================================
+________________ ERROR collecting tests/test_ai_engine_qwen3.py ________________
+ImportError while importing test module '/Users/pyw/new/MyRecall/tests/test_ai_engine_qwen3.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/importlib/__init__.py:127: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+tests/test_ai_engine_qwen3.py:12: in <module>
+    from PIL import Image
+E   ModuleNotFoundError: No module named 'PIL'
+_______ ERROR collecting tests/test_ai_provider_openai_embedding_ocr.py ________
+ImportError while importing test module '/Users/pyw/new/MyRecall/tests/test_ai_provider_openai_embedding_ocr.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/importlib/__init__.py:127: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+tests/test_ai_provider_openai_embedding_ocr.py:1: in <module>
+    import numpy as np
+E   ModuleNotFoundError: No module named 'numpy'
+______________________ ERROR collecting tests/test_nlp.py ______________________
+ImportError while importing test module '/Users/pyw/new/MyRecall/tests/test_nlp.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/importlib/__init__.py:127: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+tests/test_nlp.py:2: in <module>
+    import numpy as np
+E   ModuleNotFoundError: No module named 'numpy'
+_______________ ERROR collecting tests/test_nlp_engine_mocked.py _______________
+ImportError while importing test module '/Users/pyw/new/MyRecall/tests/test_nlp_engine_mocked.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/importlib/__init__.py:127: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+tests/test_nlp_engine_mocked.py:1: in <module>
+    import numpy as np
+E   ModuleNotFoundError: No module named 'numpy'
+_________________ ERROR collecting tests/test_phase0_models.py _________________
+ImportError while importing test module '/Users/pyw/new/MyRecall/tests/test_phase0_models.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/importlib/__init__.py:127: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+tests/test_phase0_models.py:5: in <module>
+    from openrecall.shared.models import (
+openrecall/shared/models.py:5: in <module>
+    import numpy as np
+E   ModuleNotFoundError: No module named 'numpy'
+______________ ERROR collecting tests/test_phase0_upload_queue.py ______________
+ImportError while importing test module '/Users/pyw/new/MyRecall/tests/test_phase0_upload_queue.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/importlib/__init__.py:127: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+tests/test_phase0_upload_queue.py:9: in <module>
+    from PIL import Image
+E   ModuleNotFoundError: No module named 'PIL'
+_________ ERROR collecting tests/test_phase1_5_focused_browser_url.py __________
+ImportError while importing test module '/Users/pyw/new/MyRecall/tests/test_phase1_5_focused_browser_url.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/importlib/__init__.py:127: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+tests/test_phase1_5_focused_browser_url.py:8: in <module>
+    from PIL import Image
+E   ModuleNotFoundError: No module named 'PIL'
+______________ ERROR collecting tests/test_phase1_5_ocr_engine.py ______________
+ImportError while importing test module '/Users/pyw/new/MyRecall/tests/test_phase1_5_ocr_engine.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/importlib/__init__.py:127: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+tests/test_phase1_5_ocr_engine.py:8: in <module>
+    from PIL import Image
+E   ModuleNotFoundError: No module named 'PIL'
+_____________ ERROR collecting tests/test_phase1_5_offset_guard.py _____________
+ImportError while importing test module '/Users/pyw/new/MyRecall/tests/test_phase1_5_offset_guard.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/importlib/__init__.py:127: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+tests/test_phase1_5_offset_guard.py:6: in <module>
+    from openrecall.server.video.processor import _validate_frame_offset
+openrecall/server/video/processor.py:10: in <module>
+    from openrecall.shared.config import settings
+openrecall/shared/config.py:8: in <module>
+    from pydantic import Field, model_validator, field_validator
+E   ModuleNotFoundError: No module named 'pydantic'
+______________ ERROR collecting tests/test_phase1_buffer_pool.py _______________
+ImportError while importing test module '/Users/pyw/new/MyRecall/tests/test_phase1_buffer_pool.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/importlib/__init__.py:127: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+tests/test_phase1_buffer_pool.py:3: in <module>
+    from openrecall.client.sck_stream import FrameBufferPool
+openrecall/client/sck_stream.py:20: in <module>
+    import mss
+E   ModuleNotFoundError: No module named 'mss'
+____________ ERROR collecting tests/test_phase1_frame_extractor.py _____________
+ImportError while importing test module '/Users/pyw/new/MyRecall/tests/test_phase1_frame_extractor.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/importlib/__init__.py:127: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+tests/test_phase1_frame_extractor.py:9: in <module>
+    import numpy as np
+E   ModuleNotFoundError: No module named 'numpy'
+_________________ ERROR collecting tests/test_phase1_gates.py __________________
+ImportError while importing test module '/Users/pyw/new/MyRecall/tests/test_phase1_gates.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/importlib/__init__.py:127: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+tests/test_phase1_gates.py:16: in <module>
+    from PIL import Image
+E   ModuleNotFoundError: No module named 'PIL'
+________ ERROR collecting tests/test_phase1_pipeline_profile_change.py _________
+ImportError while importing test module '/Users/pyw/new/MyRecall/tests/test_phase1_pipeline_profile_change.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/importlib/__init__.py:127: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+tests/test_phase1_pipeline_profile_change.py:7: in <module>
+    from openrecall.client.sck_stream import PixelFormatProfile, RawFrame
+openrecall/client/sck_stream.py:20: in <module>
+    import mss
+E   ModuleNotFoundError: No module named 'mss'
+_______________ ERROR collecting tests/test_phase1_retention.py ________________
+ImportError while importing test module '/Users/pyw/new/MyRecall/tests/test_phase1_retention.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/importlib/__init__.py:127: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+tests/test_phase1_retention.py:9: in <module>
+    from PIL import Image
+E   ModuleNotFoundError: No module named 'PIL'
+__________ ERROR collecting tests/test_phase1_sck_stride_unpadding.py __________
+ImportError while importing test module '/Users/pyw/new/MyRecall/tests/test_phase1_sck_stride_unpadding.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/importlib/__init__.py:127: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+tests/test_phase1_sck_stride_unpadding.py:3: in <module>
+    from openrecall.client.sck_stream import pack_bgra_plane, pack_nv12_planes
+openrecall/client/sck_stream.py:20: in <module>
+    import mss
+E   ModuleNotFoundError: No module named 'mss'
+__________ ERROR collecting tests/test_phase1_search_debug_render.py ___________
+ImportError while importing test module '/Users/pyw/new/MyRecall/tests/test_phase1_search_debug_render.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/importlib/__init__.py:127: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+tests/test_phase1_search_debug_render.py:5: in <module>
+    from openrecall.server.search.engine import SearchEngine
+openrecall/server/search/engine.py:8: in <module>
+    from openrecall.server.database.vector_store import VectorStore
+openrecall/server/database/__init__.py:1: in <module>
+    from .vector_store import VectorStore
+openrecall/server/database/vector_store.py:4: in <module>
+    import lancedb
+E   ModuleNotFoundError: No module named 'lancedb'
+______________ ERROR collecting tests/test_phase1_timeline_api.py ______________
+ImportError while importing test module '/Users/pyw/new/MyRecall/tests/test_phase1_timeline_api.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/importlib/__init__.py:127: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+tests/test_phase1_timeline_api.py:10: in <module>
+    from PIL import Image
+E   ModuleNotFoundError: No module named 'PIL'
+_____________ ERROR collecting tests/test_phase2_audio_manager.py ______________
+ImportError while importing test module '/Users/pyw/new/MyRecall/tests/test_phase2_audio_manager.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/importlib/__init__.py:127: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+tests/test_phase2_audio_manager.py:9: in <module>
+    import numpy as np
+E   ModuleNotFoundError: No module named 'numpy'
+_____________ ERROR collecting tests/test_phase2_audio_recorder.py _____________
+ImportError while importing test module '/Users/pyw/new/MyRecall/tests/test_phase2_audio_recorder.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/importlib/__init__.py:127: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+tests/test_phase2_audio_recorder.py:8: in <module>
+    import numpy as np
+E   ModuleNotFoundError: No module named 'numpy'
+_________________ ERROR collecting tests/test_phase2_gates.py __________________
+ImportError while importing test module '/Users/pyw/new/MyRecall/tests/test_phase2_gates.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/importlib/__init__.py:127: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+tests/test_phase2_gates.py:27: in <module>
+    import numpy as np
+E   ModuleNotFoundError: No module named 'numpy'
+_______________ ERROR collecting tests/test_phase2_ingestion.py ________________
+ImportError while importing test module '/Users/pyw/new/MyRecall/tests/test_phase2_ingestion.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/importlib/__init__.py:127: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+tests/test_phase2_ingestion.py:10: in <module>
+    import numpy as np
+E   ModuleNotFoundError: No module named 'numpy'
+______________ ERROR collecting tests/test_phase2_performance.py _______________
+ImportError while importing test module '/Users/pyw/new/MyRecall/tests/test_phase2_performance.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/importlib/__init__.py:127: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+tests/test_phase2_performance.py:17: in <module>
+    import numpy as np
+E   ModuleNotFoundError: No module named 'numpy'
+________________ ERROR collecting tests/test_phase2_quality.py _________________
+ImportError while importing test module '/Users/pyw/new/MyRecall/tests/test_phase2_quality.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/importlib/__init__.py:127: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+tests/test_phase2_quality.py:12: in <module>
+    import numpy as np
+E   ModuleNotFoundError: No module named 'numpy'
+_________________ ERROR collecting tests/test_phase2_smoke.py __________________
+ImportError while importing test module '/Users/pyw/new/MyRecall/tests/test_phase2_smoke.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/importlib/__init__.py:127: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+tests/test_phase2_smoke.py:11: in <module>
+    import numpy as np
+E   ModuleNotFoundError: No module named 'numpy'
+________________ ERROR collecting tests/test_phase2_timeline.py ________________
+ImportError while importing test module '/Users/pyw/new/MyRecall/tests/test_phase2_timeline.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/importlib/__init__.py:127: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+tests/test_phase2_timeline.py:11: in <module>
+    import numpy as np
+E   ModuleNotFoundError: No module named 'numpy'
+______________ ERROR collecting tests/test_phase2_transcriber.py _______________
+ImportError while importing test module '/Users/pyw/new/MyRecall/tests/test_phase2_transcriber.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/importlib/__init__.py:127: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+tests/test_phase2_transcriber.py:8: in <module>
+    import numpy as np
+E   ModuleNotFoundError: No module named 'numpy'
+__________________ ERROR collecting tests/test_phase2_vad.py ___________________
+ImportError while importing test module '/Users/pyw/new/MyRecall/tests/test_phase2_vad.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/importlib/__init__.py:127: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+tests/test_phase2_vad.py:7: in <module>
+    import numpy as np
+E   ModuleNotFoundError: No module named 'numpy'
+_________________ ERROR collecting tests/test_phase5_buffer.py _________________
+ImportError while importing test module '/Users/pyw/new/MyRecall/tests/test_phase5_buffer.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/importlib/__init__.py:127: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+tests/test_phase5_buffer.py:13: in <module>
+    import numpy as np
+E   ModuleNotFoundError: No module named 'numpy'
+_________________ ERROR collecting tests/test_phase7_fusion.py _________________
+ImportError while importing test module '/Users/pyw/new/MyRecall/tests/test_phase7_fusion.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/importlib/__init__.py:127: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+tests/test_phase7_fusion.py:8: in <module>
+    import numpy as np
+E   ModuleNotFoundError: No module named 'numpy'
+__________ ERROR collecting tests/test_phase8_2_logic_integration.py ___________
+ImportError while importing test module '/Users/pyw/new/MyRecall/tests/test_phase8_2_logic_integration.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/importlib/__init__.py:127: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+tests/test_phase8_2_logic_integration.py:19: in <module>
+    import numpy as np
+E   ModuleNotFoundError: No module named 'numpy'
+___________ ERROR collecting tests/test_sck_error_classification.py ____________
+ImportError while importing test module '/Users/pyw/new/MyRecall/tests/test_sck_error_classification.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/importlib/__init__.py:127: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+tests/test_sck_error_classification.py:3: in <module>
+    from openrecall.client.sck_stream import classify_sck_error
+openrecall/client/sck_stream.py:20: in <module>
+    import mss
+E   ModuleNotFoundError: No module named 'mss'
+=========================== short test summary info ============================
+ERROR tests/test_ai_engine_qwen3.py
+ERROR tests/test_ai_provider_openai_embedding_ocr.py
+ERROR tests/test_nlp.py
+ERROR tests/test_nlp_engine_mocked.py
+ERROR tests/test_phase0_models.py
+ERROR tests/test_phase0_upload_queue.py
+ERROR tests/test_phase1_5_focused_browser_url.py
+ERROR tests/test_phase1_5_ocr_engine.py
+ERROR tests/test_phase1_5_offset_guard.py
+ERROR tests/test_phase1_buffer_pool.py
+ERROR tests/test_phase1_frame_extractor.py
+ERROR tests/test_phase1_gates.py
+ERROR tests/test_phase1_pipeline_profile_change.py
+ERROR tests/test_phase1_retention.py
+ERROR tests/test_phase1_sck_stride_unpadding.py
+ERROR tests/test_phase1_search_debug_render.py
+ERROR tests/test_phase1_timeline_api.py
+ERROR tests/test_phase2_audio_manager.py
+ERROR tests/test_phase2_audio_recorder.py
+ERROR tests/test_phase2_gates.py
+ERROR tests/test_phase2_ingestion.py
+ERROR tests/test_phase2_performance.py
+ERROR tests/test_phase2_quality.py
+ERROR tests/test_phase2_smoke.py
+ERROR tests/test_phase2_timeline.py
+ERROR tests/test_phase2_transcriber.py
+ERROR tests/test_phase2_vad.py
+ERROR tests/test_phase5_buffer.py
+ERROR tests/test_phase7_fusion.py
+ERROR tests/test_phase8_2_logic_integration.py
+ERROR tests/test_sck_error_classification.py
+!!!!!!!!!!!!!!!!!!! Interrupted: 31 errors during collection !!!!!!!!!!!!!!!!!!!
+======================= 2 deselected, 31 errors in 0.51s =======================

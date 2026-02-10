@@ -1,0 +1,14 @@
+{
+  "samples": [
+    {
+      "sample_id": "meeting_room_clean",
+      "path": "meeting_room_clean.wav",
+      "has_speech": true
+    },
+    {
+      "sample_id": "keyboard_noise_only",
+      "path": "keyboard_noise_only.wav",
+      "has_speech": false
+    }
+  ]
+}

@@ -1,0 +1,20 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.11.14, pytest-9.0.2, pluggy-1.6.0 -- /opt/homebrew/Caskroom/miniforge/base/envs/v3/bin/python3
+cachedir: .pytest_cache
+rootdir: /Users/pyw/new/MyRecall
+configfile: pytest.ini
+plugins: anyio-4.12.1
+collecting ... collected 10 items
+
+tests/test_phase2_ingestion.py::TestAudioUploadAPI::test_audio_upload_accepted PASSED [ 10%]
+tests/test_phase2_ingestion.py::TestAudioUploadAPI::test_audio_upload_creates_db_entry PASSED [ 20%]
+tests/test_phase2_ingestion.py::TestAudioUploadAPI::test_audio_upload_by_content_type PASSED [ 30%]
+tests/test_phase2_ingestion.py::TestAudioUploadAPI::test_audio_upload_by_filename PASSED [ 40%]
+tests/test_phase2_ingestion.py::TestAudioUploadAPI::test_upload_no_file_returns_400 PASSED [ 50%]
+tests/test_phase2_ingestion.py::TestAudioUploadAPI::test_upload_no_metadata_returns_400 PASSED [ 60%]
+tests/test_phase2_ingestion.py::TestAudioChunksListAPI::test_list_audio_chunks_empty PASSED [ 70%]
+tests/test_phase2_ingestion.py::TestAudioChunksListAPI::test_list_audio_chunks_after_upload PASSED [ 80%]
+tests/test_phase2_ingestion.py::TestAudioChunksListAPI::test_list_audio_chunks_status_filter PASSED [ 90%]
+tests/test_phase2_ingestion.py::TestQueueStatusAudio::test_queue_status_includes_audio PASSED [100%]
+
+============================== 10 passed in 5.01s ==============================

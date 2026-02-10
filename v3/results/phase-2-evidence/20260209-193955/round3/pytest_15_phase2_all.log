@@ -1,0 +1,177 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.11.14, pytest-9.0.2, pluggy-1.6.0 -- /opt/homebrew/Caskroom/miniforge/base/envs/v3/bin/python3
+cachedir: .pytest_cache
+rootdir: /Users/pyw/new/MyRecall
+configfile: pytest.ini
+plugins: anyio-4.12.1
+collecting ... collected 132 items
+
+tests/test_phase2_audio_manager.py::TestListAudioDevices::test_returns_input_devices PASSED [  0%]
+tests/test_phase2_audio_manager.py::TestListAudioDevices::test_returns_empty_on_error PASSED [  1%]
+tests/test_phase2_audio_manager.py::TestAudioManager::test_init_defaults PASSED [  2%]
+tests/test_phase2_audio_manager.py::TestAudioManager::test_is_alive_false_when_not_started PASSED [  3%]
+tests/test_phase2_audio_manager.py::TestAudioManager::test_resolve_device_by_index PASSED [  3%]
+tests/test_phase2_audio_manager.py::TestAudioManager::test_resolve_device_by_name PASSED [  4%]
+tests/test_phase2_audio_manager.py::TestAudioManager::test_resolve_device_not_found PASSED [  5%]
+tests/test_phase2_audio_manager.py::TestAudioManager::test_start_new_chunk_creates_wav PASSED [  6%]
+tests/test_phase2_audio_manager.py::TestAudioManager::test_close_chunk_fires_callback PASSED [  6%]
+tests/test_phase2_audio_manager.py::TestAudioManager::test_close_empty_chunk_removes_file PASSED [  7%]
+tests/test_phase2_audio_manager.py::TestAudioManager::test_audio_callback_writes_frames PASSED [  8%]
+tests/test_phase2_audio_manager.py::TestAudioManager::test_audio_callback_rotates_on_duration PASSED [  9%]
+tests/test_phase2_audio_manager.py::TestAudioManager::test_stop_flushes_chunk PASSED [  9%]
+tests/test_phase2_audio_recorder.py::TestAudioRecorder::test_init_defaults PASSED [ 10%]
+tests/test_phase2_audio_recorder.py::TestAudioRecorder::test_is_running_false_when_stopped PASSED [ 11%]
+tests/test_phase2_audio_recorder.py::TestAudioRecorder::test_stop_when_not_running PASSED [ 12%]
+tests/test_phase2_audio_recorder.py::TestAudioRecorder::test_on_chunk_complete_enqueues_with_metadata PASSED [ 12%]
+tests/test_phase2_audio_recorder.py::TestAudioRecorder::test_on_chunk_complete_correct_checksum PASSED [ 13%]
+tests/test_phase2_audio_recorder.py::TestAudioRecorder::test_on_chunk_complete_skips_empty_wav PASSED [ 14%]
+tests/test_phase2_audio_recorder.py::TestAudioRecorder::test_on_chunk_complete_nonexistent_file PASSED [ 15%]
+tests/test_phase2_gates.py::TestGate2F01AudioCapture::test_audio_manager_creates_wav PASSED [ 15%]
+tests/test_phase2_gates.py::TestGate2F01AudioCapture::test_audio_manager_device_name_sanitized PASSED [ 16%]
+tests/test_phase2_gates.py::TestGate2F02VADFiltering::test_vad_filters_silence PASSED [ 17%]
+tests/test_phase2_gates.py::TestGate2F02VADFiltering::test_vad_detects_speech_subset PASSED [ 18%]
+tests/test_phase2_gates.py::TestGate2F03WhisperTranscription::test_transcriber_produces_text PASSED [ 18%]
+tests/test_phase2_gates.py::TestGate2F03WhisperTranscription::test_transcriber_handles_empty_audio PASSED [ 19%]
+tests/test_phase2_gates.py::TestGate2F04AudioFTSIndexed::test_fts_insert_and_match PASSED [ 20%]
+tests/test_phase2_gates.py::TestGate2F04AudioFTSIndexed::test_fts_no_results_for_unrelated_query PASSED [ 21%]
+tests/test_phase2_gates.py::TestGate2F05UnifiedTimeline::test_timeline_returns_both_types PASSED [ 21%]
+tests/test_phase2_gates.py::TestGate2P01TranscriptionLatency::test_transcription_completes_within_budget PASSED [ 22%]
+tests/test_phase2_gates.py::TestGate2P02VADLatency::test_vad_completes_within_budget PASSED [ 23%]
+tests/test_phase2_gates.py::TestGate2P03Throughput::test_queue_depth_stable PASSED [ 24%]
+tests/test_phase2_gates.py::TestGate2P04AudioCaptureCPU::test_callback_based_design PASSED [ 25%]
+tests/test_phase2_gates.py::TestGate2Q01WERClean::test_wer_clean_under_threshold PASSED [ 25%]
+tests/test_phase2_gates.py::TestGate2Q01WERClean::test_wer_clean_with_one_error PASSED [ 26%]
+tests/test_phase2_gates.py::TestGate2Q02WERNoisy::test_wer_noisy_under_threshold PASSED [ 27%]
+tests/test_phase2_gates.py::TestGate2Q02WERNoisy::test_wer_noisy_boundary PASSED [ 28%]
+tests/test_phase2_gates.py::TestGate2S01Stability::test_24h_continuous_run SKIPPED [ 28%]
+tests/test_phase2_gates.py::TestGate2R01VRAM::test_vram_usage_structural SKIPPED [ 29%]
+tests/test_phase2_gates.py::TestGate2R02StorageRate::test_wav_file_size_reasonable PASSED [ 30%]
+tests/test_phase2_gates.py::TestGate2R02StorageRate::test_daily_storage_estimate PASSED [ 31%]
+tests/test_phase2_gates.py::TestGate2DG01Encryption::test_filevault_status_command PASSED [ 31%]
+tests/test_phase2_gates.py::TestGate2DG01Encryption::test_luks_check_structural SKIPPED [ 32%]
+tests/test_phase2_gates.py::TestGate2DG02Redaction::test_pii_redaction SKIPPED [ 33%]
+tests/test_phase2_gates.py::TestGate2DG03Retention::test_cascade_delete_removes_all PASSED [ 34%]
+tests/test_phase2_gates.py::TestGate2DG03Retention::test_expired_chunks_detected PASSED [ 34%]
+tests/test_phase2_ingestion.py::TestAudioUploadAPI::test_audio_upload_accepted PASSED [ 35%]
+tests/test_phase2_ingestion.py::TestAudioUploadAPI::test_audio_upload_creates_db_entry PASSED [ 36%]
+tests/test_phase2_ingestion.py::TestAudioUploadAPI::test_audio_upload_by_content_type PASSED [ 37%]
+tests/test_phase2_ingestion.py::TestAudioUploadAPI::test_audio_upload_by_filename PASSED [ 37%]
+tests/test_phase2_ingestion.py::TestAudioUploadAPI::test_upload_no_file_returns_400 PASSED [ 38%]
+tests/test_phase2_ingestion.py::TestAudioUploadAPI::test_upload_no_metadata_returns_400 PASSED [ 39%]
+tests/test_phase2_ingestion.py::TestAudioChunksListAPI::test_list_audio_chunks_empty PASSED [ 40%]
+tests/test_phase2_ingestion.py::TestAudioChunksListAPI::test_list_audio_chunks_after_upload PASSED [ 40%]
+tests/test_phase2_ingestion.py::TestAudioChunksListAPI::test_list_audio_chunks_status_filter PASSED [ 41%]
+tests/test_phase2_ingestion.py::TestQueueStatusAudio::test_queue_status_includes_audio PASSED [ 42%]
+tests/test_phase2_performance.py::TestGate2P01TranscriptionLatency::test_mock_transcription_latency PASSED [ 43%]
+tests/test_phase2_performance.py::TestGate2P01TranscriptionLatency::test_real_transcription_latency SKIPPED [ 43%]
+tests/test_phase2_performance.py::TestGate2P02VADProcessing::test_mock_vad_latency PASSED [ 44%]
+tests/test_phase2_performance.py::TestGate2P02VADProcessing::test_real_vad_latency SKIPPED [ 45%]
+tests/test_phase2_performance.py::TestGate2P03Throughput::test_no_backlog_growth_pattern PASSED [ 46%]
+tests/test_phase2_performance.py::TestGate2P03Throughput::test_mock_queue_depth_stable PASSED [ 46%]
+tests/test_phase2_performance.py::TestGate2P04AudioCaptureCPU::test_audio_manager_structural_attributes PASSED [ 47%]
+tests/test_phase2_performance.py::TestGate2P04AudioCaptureCPU::test_audio_manager_callback_writes_frames PASSED [ 48%]
+tests/test_phase2_performance.py::TestGate2P04AudioCaptureCPU::test_real_cpu_usage SKIPPED [ 49%]
+tests/test_phase2_quality.py::TestComputeWER::test_identical_strings PASSED [ 50%]
+tests/test_phase2_quality.py::TestComputeWER::test_one_substitution PASSED [ 50%]
+tests/test_phase2_quality.py::TestComputeWER::test_completely_wrong PASSED [ 51%]
+tests/test_phase2_quality.py::TestComputeWER::test_empty_both PASSED     [ 52%]
+tests/test_phase2_quality.py::TestComputeWER::test_empty_reference PASSED [ 53%]
+tests/test_phase2_quality.py::TestComputeWER::test_empty_hypothesis PASSED [ 53%]
+tests/test_phase2_quality.py::TestComputeWER::test_insertion PASSED      [ 54%]
+tests/test_phase2_quality.py::TestComputeWER::test_deletion PASSED       [ 55%]
+tests/test_phase2_quality.py::TestComputeWER::test_case_insensitive PASSED [ 56%]
+tests/test_phase2_quality.py::TestComputeWER::test_longer_sentence PASSED [ 56%]
+tests/test_phase2_quality.py::TestGate2Q01WERClean::test_wer_clean_with_mock_whisper PASSED [ 57%]
+tests/test_phase2_quality.py::TestGate2Q01WERClean::test_wer_clean_realistic_error PASSED [ 58%]
+tests/test_phase2_quality.py::TestGate2Q01WERClean::test_wer_clean_with_minor_errors PASSED [ 59%]
+tests/test_phase2_quality.py::TestGate2Q01WERClean::test_real_wer_clean_speech SKIPPED [ 59%]
+tests/test_phase2_quality.py::TestGate2Q02WERNoisy::test_wer_noisy_with_mock_whisper PASSED [ 60%]
+tests/test_phase2_quality.py::TestGate2Q02WERNoisy::test_wer_noisy_realistic_errors PASSED [ 61%]
+tests/test_phase2_quality.py::TestGate2Q02WERNoisy::test_wer_noisy_boundary_case PASSED [ 62%]
+tests/test_phase2_quality.py::TestGate2Q02WERNoisy::test_real_wer_noisy_speech SKIPPED [ 62%]
+tests/test_phase2_search.py::TestAudioFTSSearch::test_insert_and_search_transcription PASSED [ 63%]
+tests/test_phase2_search.py::TestAudioFTSSearch::test_search_no_results PASSED [ 64%]
+tests/test_phase2_search.py::TestAudioFTSSearch::test_search_audio_fts_pagination PASSED [ 65%]
+tests/test_phase2_search.py::TestAudioFTSSearch::test_get_audio_transcriptions_by_time_range PASSED [ 65%]
+tests/test_phase2_search.py::TestAudioFTSSearch::test_get_audio_transcriptions_outside_range PASSED [ 66%]
+tests/test_phase2_search.py::TestSearchAPIAudio::test_search_endpoint_exists PASSED [ 67%]
+tests/test_phase2_search.py::TestSearchAPIAudio::test_search_empty_query PASSED [ 68%]
+tests/test_phase2_smoke.py::TestPhase2SmokeEndToEnd::test_full_audio_pipeline PASSED [ 68%]
+tests/test_phase2_smoke.py::TestPhase2SmokeEndToEnd::test_audio_upload_then_chunks_status PASSED [ 69%]
+tests/test_phase2_timeline.py::TestTimelineAPI::test_timeline_endpoint_exists PASSED [ 70%]
+tests/test_phase2_timeline.py::TestTimelineAPI::test_timeline_empty_range PASSED [ 71%]
+tests/test_phase2_timeline.py::TestTimelineAPI::test_timeline_with_audio_transcriptions PASSED [ 71%]
+tests/test_phase2_timeline.py::TestTimelineAPI::test_timeline_source_filter_audio PASSED [ 72%]
+tests/test_phase2_timeline.py::TestTimelineAPI::test_timeline_source_filter_video PASSED [ 73%]
+tests/test_phase2_timeline.py::TestTimelineAPI::test_timeline_pagination PASSED [ 74%]
+tests/test_phase2_timeline.py::TestTimelineAPI::test_timeline_invalid_times PASSED [ 75%]
+tests/test_phase2_timeline.py::TestAudioTranscriptionsAPI::test_transcriptions_endpoint_exists PASSED [ 75%]
+tests/test_phase2_timeline.py::TestAudioTranscriptionsAPI::test_transcriptions_with_data PASSED [ 76%]
+tests/test_phase2_transcriber.py::TestTranscriptionSegment::test_fields PASSED [ 77%]
+tests/test_phase2_transcriber.py::TestWhisperTranscriber::test_init_defaults PASSED [ 78%]
+tests/test_phase2_transcriber.py::TestWhisperTranscriber::test_init_custom PASSED [ 78%]
+tests/test_phase2_transcriber.py::TestWhisperTranscriber::test_engine_name PASSED [ 79%]
+tests/test_phase2_transcriber.py::TestWhisperTranscriber::test_transcribe_no_model_returns_empty PASSED [ 80%]
+tests/test_phase2_transcriber.py::TestWhisperTranscriber::test_transcribe_returns_segments PASSED [ 81%]
+tests/test_phase2_transcriber.py::TestWhisperTranscriber::test_transcribe_filters_empty_text PASSED [ 81%]
+tests/test_phase2_transcriber.py::TestWhisperTranscriber::test_reinit_on_cpu PASSED [ 82%]
+tests/test_phase2_vad.py::TestSpeechSegment::test_fields PASSED          [ 83%]
+tests/test_phase2_vad.py::TestVoiceActivityDetector::test_init_defaults PASSED [ 84%]
+tests/test_phase2_vad.py::TestVoiceActivityDetector::test_init_custom PASSED [ 84%]
+tests/test_phase2_vad.py::TestVoiceActivityDetector::test_no_model_returns_empty PASSED [ 85%]
+tests/test_phase2_vad.py::TestVoiceActivityDetector::test_has_speech_delegates_to_get_segments PASSED [ 86%]
+tests/test_phase2_vad.py::TestVoiceActivityDetector::test_webrtcvad_segments_on_silence SKIPPED [ 87%]
+tests/test_phase2_vad.py::TestVoiceActivityDetector::test_webrtcvad_segments_on_noise SKIPPED [ 87%]
+tests/test_phase2_vad.py::TestVoiceActivityDetector::test_invalid_wav_returns_empty PASSED [ 88%]
+tests/test_phase2_worker.py::TestAudioProcessingResult::test_defaults PASSED [ 89%]
+tests/test_phase2_worker.py::TestAudioProcessingResult::test_with_error PASSED [ 90%]
+tests/test_phase2_worker.py::TestAudioChunkProcessor::test_init_lazy PASSED [ 90%]
+tests/test_phase2_worker.py::TestAudioChunkProcessor::test_process_missing_file PASSED [ 91%]
+tests/test_phase2_worker.py::TestAudioChunkProcessor::test_process_no_speech PASSED [ 92%]
+tests/test_phase2_worker.py::TestAudioChunkProcessor::test_process_with_speech PASSED [ 93%]
+tests/test_phase2_worker.py::TestAudioProcessingWorker::test_init PASSED [ 93%]
+tests/test_phase2_worker.py::TestAudioProcessingWorker::test_stop_event PASSED [ 94%]
+tests/test_phase2_worker.py::TestSQLStoreAudioLifecycle::test_insert_audio_chunk PASSED [ 95%]
+tests/test_phase2_worker.py::TestSQLStoreAudioLifecycle::test_get_audio_chunk_by_id PASSED [ 96%]
+tests/test_phase2_worker.py::TestSQLStoreAudioLifecycle::test_pending_processing_completed_lifecycle PASSED [ 96%]
+tests/test_phase2_worker.py::TestSQLStoreAudioLifecycle::test_pending_processing_failed_lifecycle PASSED [ 97%]
+tests/test_phase2_worker.py::TestSQLStoreAudioLifecycle::test_reset_stuck_audio_chunks PASSED [ 98%]
+tests/test_phase2_worker.py::TestSQLStoreAudioLifecycle::test_get_next_pending_audio_chunk PASSED [ 99%]
+tests/test_phase2_worker.py::TestSQLStoreAudioLifecycle::test_audio_chunk_status_counts PASSED [100%]
+
+=============================== warnings summary ===============================
+tests/test_phase2_performance.py:77
+  /Users/pyw/new/MyRecall/tests/test_phase2_performance.py:77: PytestUnknownMarkWarning: Unknown pytest.mark.slow - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.slow
+
+tests/test_phase2_performance.py:127
+  /Users/pyw/new/MyRecall/tests/test_phase2_performance.py:127: PytestUnknownMarkWarning: Unknown pytest.mark.slow - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.slow
+
+tests/test_phase2_performance.py:245
+  /Users/pyw/new/MyRecall/tests/test_phase2_performance.py:245: PytestUnknownMarkWarning: Unknown pytest.mark.slow - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.slow
+
+tests/test_phase2_quality.py:184
+  /Users/pyw/new/MyRecall/tests/test_phase2_quality.py:184: PytestUnknownMarkWarning: Unknown pytest.mark.slow - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.slow
+
+tests/test_phase2_quality.py:257
+  /Users/pyw/new/MyRecall/tests/test_phase2_quality.py:257: PytestUnknownMarkWarning: Unknown pytest.mark.slow - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.slow
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+SKIPPED [1] tests/test_phase2_gates.py:540: Requires 24 hours of continuous runtime observation
+SKIPPED [1] tests/test_phase2_gates.py:553: No GPU available -- VRAM measurement requires nvidia-smi
+SKIPPED [1] tests/test_phase2_gates.py:627: Linux-only: LUKS check
+SKIPPED [1] tests/test_phase2_gates.py:641: Optional gate -- PII redaction not implemented in Phase 2.0
+SKIPPED [1] tests/test_phase2_performance.py:77: Requires faster-whisper model download and CPU time
+SKIPPED [1] tests/test_phase2_performance.py:127: Requires torch + silero-vad model download
+SKIPPED [1] tests/test_phase2_performance.py:245: Requires real audio hardware and psutil
+SKIPPED [1] tests/test_phase2_quality.py:184: Requires faster-whisper model and LibriSpeech test-clean dataset
+SKIPPED [1] tests/test_phase2_quality.py:257: Requires faster-whisper model and real noisy meeting recordings
+SKIPPED [1] tests/test_phase2_vad.py:97: webrtcvad not installed
+SKIPPED [1] tests/test_phase2_vad.py:119: webrtcvad not installed
+================= 121 passed, 11 skipped, 5 warnings in 5.60s ==================
+

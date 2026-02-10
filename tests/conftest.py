@@ -1,6 +1,7 @@
 import sys
 import os
 import tempfile
+import types
 from pathlib import Path
 import importlib
 
@@ -36,6 +37,32 @@ def flask_app(tmp_path, monkeypatch):
 
     # Mock SearchEngine to avoid HuggingFace model download in test env
     import unittest.mock as mock
+    if "qwen_vl_utils" not in sys.modules:
+        qwen_stub = types.ModuleType("qwen_vl_utils")
+        qwen_stub.process_vision_info = lambda *_args, **_kwargs: ([], [])
+        sys.modules["qwen_vl_utils"] = qwen_stub
+    if "openrecall.server.ai.providers" not in sys.modules:
+        providers_stub = types.ModuleType("openrecall.server.ai.providers")
+
+        class _DummyProvider:
+            def __init__(self, *_args, **_kwargs):
+                pass
+
+        for name in (
+            "DashScopeEmbeddingProvider",
+            "DashScopeOCRProvider",
+            "DashScopeProvider",
+            "DoctrOCRProvider",
+            "LocalEmbeddingProvider",
+            "LocalOCRProvider",
+            "LocalProvider",
+            "OpenAIEmbeddingProvider",
+            "OpenAIOCRProvider",
+            "OpenAIProvider",
+            "RapidOCRProvider",
+        ):
+            setattr(providers_stub, name, _DummyProvider)
+        sys.modules["openrecall.server.ai.providers"] = providers_stub
     import openrecall.server.search.engine
     mock_se = mock.MagicMock()
     mock_se.search.return_value = []

@@ -1,0 +1,12 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.11.14, pytest-9.0.2, pluggy-1.6.0 -- /opt/homebrew/Caskroom/miniforge/base/envs/v3/bin/python3
+cachedir: .pytest_cache
+rootdir: /Users/pyw/new/MyRecall
+configfile: pytest.ini
+plugins: anyio-4.12.1
+collecting ... collected 2 items
+
+tests/test_phase2_smoke.py::TestPhase2SmokeEndToEnd::test_full_audio_pipeline PASSED [ 50%]
+tests/test_phase2_smoke.py::TestPhase2SmokeEndToEnd::test_audio_upload_then_chunks_status PASSED [100%]
+
+============================== 2 passed in 4.12s ===============================

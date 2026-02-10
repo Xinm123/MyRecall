@@ -1,0 +1,75 @@
+{
+  "run": {
+    "timestamp_utc": "2026-02-10T03:43:27.488144+00:00",
+    "dataset_mode": "hybrid",
+    "backends": [
+      "silero",
+      "webrtcvad"
+    ],
+    "min_speech_ratio": 0.05
+  },
+  "sample_overview": {
+    "synthetic": {
+      "count": 4,
+      "included": true
+    },
+    "real": {
+      "count": 0,
+      "included": false
+    },
+    "total": 4
+  },
+  "backend_metrics": {
+    "silero": {
+      "transcription_latency_seconds": {
+        "mean": 6.29136959374955,
+        "p50": 0.8969164374993852,
+        "p95": 20.055774843751163
+      },
+      "empty_transcription_ratio": 0.5,
+      "miss_detection_rate": 0.25,
+      "counts": {
+        "chunks": 4,
+        "vad_positive_chunks": 2,
+        "empty_transcriptions": 2,
+        "miss_detections": 1
+      }
+    },
+    "webrtcvad": {
+      "transcription_latency_seconds": {
+        "mean": 0.4109519272496982,
+        "p50": 0.2879910209994705,
+        "p95": 0.9932914276978406
+      },
+      "empty_transcription_ratio": 0.5,
+      "miss_detection_rate": 0.25,
+      "counts": {
+        "chunks": 4,
+        "vad_positive_chunks": 2,
+        "empty_transcriptions": 2,
+        "miss_detections": 1
+      }
+    }
+  },
+  "comparison_summary": {
+    "transcription_latency_seconds": {
+      "winner": "webrtcvad",
+      "delta": 5.880417666499852,
+      "metric": "transcription_latency_seconds"
+    },
+    "empty_transcription_ratio": {
+      "winner": "silero",
+      "delta": 0.0,
+      "metric": "empty_transcription_ratio"
+    },
+    "miss_detection_rate": {
+      "winner": "silero",
+      "delta": 0.0,
+      "metric": "miss_detection_rate"
+    }
+  },
+  "environment": {
+    "python_version": "3.11.14",
+    "platform": "macOS-26.2-arm64-arm-64bit"
+  }
+}

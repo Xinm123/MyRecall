@@ -1,14 +1,20 @@
 # MyRecall Phase 1.5 Video Pipeline Hardening Plan
 
-**Version**: 1.0  
-**Last Updated**: 2026-02-09  
+**Version**: 1.1  
+**Last Updated**: 2026-02-10  
 **Scope**: Phase 1/1.5 only (no Phase 2 audio changes)
 
 ---
 
-## 1. Objective
+## 1. Summary
 
-Fix monitor video pipeline stalls where chunk boundaries stop advancing after several chunks while process remains alive, and introduce a screenpipe-style chunk-process pipeline mode as a configurable option.
+This plan hardens the Phase 1/1.5 video recording pipeline with three goals:
+
+1. `chunk_process` uses strict wallclock-based 60s chunk rotation (not frame-count threshold).
+2. Stalled pipelines self-heal in both modes (`segment` and `chunk_process`) with mode-specific criteria.
+3. Client observability is corrected so status and chunk lifecycle logs consistently reflect real active chunks.
+
+Phase 2 audio design/implementation is explicitly out of scope.
 
 ---
 
@@ -18,92 +24,153 @@ Fix monitor video pipeline stalls where chunk boundaries stop advancing after se
 
 - `/Users/pyw/new/MyRecall/openrecall/client/ffmpeg_manager.py`
 - `/Users/pyw/new/MyRecall/openrecall/client/video_recorder.py`
+- `/Users/pyw/new/MyRecall/openrecall/client/__main__.py`
 - `/Users/pyw/new/MyRecall/openrecall/shared/config.py`
+- `/Users/pyw/new/MyRecall/myrecall_client.env`
+- `/Users/pyw/new/MyRecall/myrecall_client_low_latency.env`
 - `/Users/pyw/new/MyRecall/tests/test_phase1_video_recorder.py`
 - `/Users/pyw/new/MyRecall/tests/test_phase1_pipeline_profile_change.py`
 
 ### Out of Scope
 
-- Any Phase 2 audio implementation or docs
-- Server OCR/search behavior changes
+- Phase 2 audio chain and docs.
+- Server OCR/search protocol changes.
 
 ---
 
-## 3. Configuration Interface Changes
+## 3. Public Config / Interface Contract
 
-Add three config knobs:
+No new env keys are introduced in v1.1.
 
-- `OPENRECALL_VIDEO_PIPELINE_MODE` (`segment|chunk_process`, default `chunk_process`)
-- `OPENRECALL_VIDEO_PIPE_WRITE_TIMEOUT_MS` (single ffmpeg stdin write timeout, default `1500`)
-- `OPENRECALL_VIDEO_NO_CHUNK_PROGRESS_TIMEOUT_SECONDS` (no chunk-boundary progress timeout, default `180`)
+Existing keys and semantics:
 
-Backward compatibility:
+- `OPENRECALL_VIDEO_PIPELINE_MODE=segment|chunk_process`
+- `OPENRECALL_VIDEO_CHUNK_DURATION`:
+  - In `chunk_process`: strict monotonic wallclock target for chunk rotation.
+- `OPENRECALL_VIDEO_PIPE_WRITE_TIMEOUT_MS`:
+  - Single `stdin` write timeout; also contributes to chunk-process grace window.
+- `OPENRECALL_VIDEO_NO_CHUNK_PROGRESS_TIMEOUT_SECONDS`:
+  - **Segment mode only** no-progress timeout.
 
-- Existing `OPENRECALL_VIDEO_CHUNK_DURATION`, `OPENRECALL_VIDEO_FPS`, `OPENRECALL_VIDEO_PIPE_WRITE_WARN_MS`, `OPENRECALL_VIDEO_PIPELINE_RESTART_ON_PROFILE_CHANGE` remain valid.
+Read-only FFmpeg manager status fields exposed for recorder/watcher/status logging:
 
----
-
-## 4. Implementation Breakdown
-
-### A. Pipeline mode abstraction
-
-- Add mode branch in `FFmpegManager` for rawvideo pipeline path:
-  - `segment`: current segment muxer behavior
-  - `chunk_process`: single-output process per chunk
-- Unify chunk lifecycle events:
-  - chunk started
-  - chunk completed
-
-### B. chunk_process mode
-
-- Rotate by `frames_per_chunk = fps * chunk_duration`
-- On threshold hit:
-  1. close stdin
-  2. wait process exit
-  3. emit chunk completed callback
-  4. start next ffmpeg process with timestamp filename
-
-### C. segment mode hardening
-
-- Keep segment mode as fallback option
-- If chunk boundary has no progress over timeout, force monitor pipeline restart even when writes still happen
-
-### D. Single write timeout hardening
-
-- Add single-write timeout for ffmpeg stdin write
-- Timeout behavior:
-  - raise timeout error
-  - let upper controller trigger pipeline recovery
-  - keep slow-write warning and timeout error as separate signals
-
-### E. Observability
-
-- Keep periodic client status output
-- Keep started/ended logs around every chunk boundary
-- Ensure status `monitor_chunks` reflects active chunk path from lifecycle state
-
-### F. Verification
-
-- Add unit tests for:
-  - chunk_process command behavior and rotation
-  - write timeout propagation and controller recovery path
-  - segment no-progress restart
-  - chunk_process no false restart when writes remain healthy
-- Run phase1 video recorder and profile-change regression suites
+- `active_chunk_path`
+- `write_stuck_seconds`
+- `seconds_since_last_write`
+- `chunk_age_seconds`
+- `chunk_deadline_in_seconds`
 
 ---
 
-## 5. Acceptance Criteria
+## 4. Strict 60s Chunk Semantics
 
-- Default mode `chunk_process` rotates chunks continuously without freezing on a stale filename.
-- `segment` mode auto-recovers from no-progress chunk boundaries.
-- Client status aligns with chunk started/ended lifecycle logs.
-- No P0/P1 regressions in Phase 1/1.5 test surface.
+For `chunk_process`:
+
+1. On chunk start, initialize:
+   - `chunk_started_monotonic`
+   - `chunk_deadline_monotonic = started + chunk_duration`
+2. On each successful `write_frame`, compare current monotonic time with deadline.
+3. If `now >= deadline`, rotate with reason `deadline`:
+   - close current ffmpeg `stdin`
+   - wait process exit (or kill on timeout)
+   - emit chunk completed callback
+   - spawn next per-chunk ffmpeg process
+4. Rotation trigger is independent of actual input FPS (low FPS still rotates by wallclock).
 
 ---
 
-## 6. Rollback
+## 5. Chunk-Process No-Progress Policy
 
-- Runtime fallback: set `OPENRECALL_VIDEO_PIPELINE_MODE=segment`
-- No DB migration required for rollback
+`segment` mode remains chunk-name-progress based.
 
+`chunk_process` mode restart criteria:
+
+- `overdue = chunk_age_seconds > (video_chunk_duration + grace_seconds)`, where
+  - `grace_seconds = max(3, min(15, 4 * video_pipe_write_timeout_ms / 1000))`
+- OR `write_stuck_seconds >= write_stall_timeout`
+- OR `writer_alive == False`
+- OR `seconds_since_last_write >= write_stall_timeout`
+
+`OPENRECALL_VIDEO_NO_CHUNK_PROGRESS_TIMEOUT_SECONDS` is not used by `chunk_process`.
+
+---
+
+## 6. Observability Contract
+
+### Chunk Lifecycle Logs
+
+- Start: `Video chunk recording started | file=... | monitor_id=...`
+- End: `Video chunk recording ended | file=... | size_mb=... | duration=... | monitor_id=...`
+- Rotate reason: `chunk_rotate | reason=... | file=... | monitor_id=... | age=...`
+
+### Periodic Client Status (20s)
+
+`Client status | state=recording | monitor_chunks=... | monitor_health=... | duration=... | pending_uploads=...`
+
+`monitor_health` carries per-monitor fields:
+
+- `chunk_age_s`
+- `deadline_in_s`
+- `last_write_ago_s`
+- `writer_alive`
+
+Status and lifecycle events now share the same active chunk source.
+
+---
+
+## 7. Test Matrix
+
+### Automated (must pass)
+
+- `python3 -m pytest tests/test_phase1_video_recorder.py -v`
+- `python3 -m pytest tests/test_phase1_pipeline_profile_change.py -v`
+- `python3 -m pytest tests/test_phase1_video_recorder.py tests/test_phase1_pipeline_profile_change.py tests/test_video_recorder_fallback_policy.py tests/test_video_recorder_recovery_probe.py -v`
+
+### Manual Long-Run (acceptance evidence)
+
+- `chunk_process` 30-minute run:
+  - chunk boundary advances continuously.
+  - no long freeze on stale chunk name.
+- `segment` 15-minute run:
+  - no-progress triggers restart and recovers.
+- Ctrl-C shutdown:
+  - no duplicate shutdown completion logs.
+
+---
+
+## 8. Rollout & Rollback
+
+### Rollout
+
+1. Default mode remains `chunk_process`.
+2. Observe:
+   - chunk output continuity
+   - restart count
+   - write timeout count
+   - upload backlog trend
+
+### Rollback
+
+- Runtime fallback: `OPENRECALL_VIDEO_PIPELINE_MODE=segment`
+- No DB/schema migration dependency.
+
+---
+
+## 9. Completion Gates
+
+Engineering complete when:
+
+- Automated regression suite passes.
+- Status and lifecycle logs meet observability contract.
+
+Phase 1.5.1 fully closed when:
+
+- Manual long-run evidence is attached under:
+  - `/Users/pyw/new/MyRecall/v3/evidence/phase1_5_strict60/`
+
+---
+
+## 10. Phase Boundary
+
+This plan and implementation are bounded to Phase 1/1.5.  
+Phase 2 design, scope, and docs are intentionally unchanged.

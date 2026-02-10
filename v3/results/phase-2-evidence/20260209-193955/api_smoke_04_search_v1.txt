@@ -1,0 +1,83 @@
+HTTP/1.1 200 OK
+Server: Werkzeug/3.1.5 Python/3.11.14
+Date: Mon, 09 Feb 2026 11:42:49 GMT
+Content-Type: application/json
+Content-Length: 2016
+Connection: close
+
+{
+  "data": [
+    {
+      "app_name": "Unknown",
+      "browser_url": null,
+      "caption": "",
+      "focused": null,
+      "id": "f21c8612-b2e6-4e5c-98e9-d87df8297d22",
+      "image_path": "/Users/pyw/MRS/screenshots/1770633959.png",
+      "scene_tag": "",
+      "timestamp": 1770633959.0,
+      "window_title": "Unknown"
+    },
+    {
+      "app_name": "Unknown",
+      "browser_url": null,
+      "caption": "",
+      "focused": null,
+      "id": "30ce63f9-90fc-456f-a4b5-3b054e79e0a5",
+      "image_path": "/Users/pyw/MRS/screenshots/1770634019.png",
+      "scene_tag": "",
+      "timestamp": 1770634019.0,
+      "window_title": "Unknown"
+    },
+    {
+      "app_name": "Unknown",
+      "browser_url": null,
+      "caption": "",
+      "focused": null,
+      "id": "d8509dcf-d5d1-4722-ad61-9a19fd56e9c7",
+      "image_path": "/Users/pyw/MRS/screenshots/1770634259.png",
+      "scene_tag": "",
+      "timestamp": 1770634259.0,
+      "window_title": "Unknown"
+    },
+    {
+      "app_name": "Unknown",
+      "browser_url": null,
+      "caption": "",
+      "focused": null,
+      "id": "13b87fe6-e231-4bab-b18a-d9f8ca5677af",
+      "image_path": "/Users/pyw/MRS/screenshots/1770634139.png",
+      "scene_tag": "",
+      "timestamp": 1770634139.0,
+      "window_title": "Unknown"
+    },
+    {
+      "app_name": "Unknown",
+      "browser_url": null,
+      "caption": "",
+      "focused": null,
+      "id": "e0603de3-b481-4705-a9ef-410fc5a4333a",
+      "image_path": "/Users/pyw/MRS/screenshots/1770634199.png",
+      "scene_tag": "",
+      "timestamp": 1770634199.0,
+      "window_title": "Unknown"
+    },
+    {
+      "app_name": "Unknown",
+      "browser_url": null,
+      "caption": "",
+      "focused": null,
+      "id": "4463ce6c-cfca-4260-9cab-27407d4973b8",
+      "image_path": "/Users/pyw/MRS/screenshots/1770634079.png",
+      "scene_tag": "",
+      "timestamp": 1770634079.0,
+      "window_title": "Unknown"
+    }
+  ],
+  "meta": {
+    "has_more": false,
+    "limit": 20,
+    "offset": 0,
+    "total": 6
+  }
+}

@@ -27,6 +27,9 @@ install_requires = [
     "fastapi",
     "python-multipart",
     "rapidocr_onnxruntime",
+    "onnx>=1.16.0",
+    "onnxruntime>=1.17.0",
+    "webrtcvad-wheels>=2.0.14",
 ]
 
 # Define OS-specific dependencies

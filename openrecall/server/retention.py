@@ -39,6 +39,7 @@ class RetentionWorker(threading.Thread):
         while not self._stop_event.is_set():
             try:
                 self._cleanup_expired_video_chunks(sql_store)
+                self._cleanup_expired_audio_chunks(sql_store)
                 self._cleanup_expired_entries(sql_store)
             except Exception as e:
                 logger.error(f"Retention cleanup error: {e}")
@@ -90,6 +91,31 @@ class RetentionWorker(threading.Thread):
                 logger.error(f"Failed to delete video file {file_path}: {e}")
 
         logger.info(f"Retention cleanup: deleted {len(expired)} chunks, {total_frames} frames")
+
+    def _cleanup_expired_audio_chunks(self, sql_store: SQLStore) -> None:
+        """Delete expired audio chunks and associated transcriptions."""
+        expired = sql_store.get_expired_audio_chunks()
+        if not expired:
+            return
+
+        logger.info(f"Found {len(expired)} expired audio chunks for cleanup")
+
+        for chunk in expired:
+            chunk_id = chunk["id"]
+            file_path = chunk.get("file_path", "")
+
+            # Cascade delete from DB (FTS + transcriptions + chunk)
+            sql_store.delete_audio_chunk_cascade(chunk_id)
+
+            # Delete the audio file
+            try:
+                audio_file = Path(file_path)
+                if audio_file.exists():
+                    audio_file.unlink()
+            except Exception as e:
+                logger.error(f"Failed to delete audio file {file_path}: {e}")
+
+        logger.info(f"Retention cleanup: deleted {len(expired)} expired audio chunks")
 
     def _cleanup_expired_entries(self, sql_store: SQLStore) -> None:
         """Delete expired screenshot entries."""

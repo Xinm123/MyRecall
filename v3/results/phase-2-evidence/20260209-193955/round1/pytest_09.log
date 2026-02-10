@@ -1,0 +1,37 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.11.14, pytest-9.0.2, pluggy-1.6.0 -- /opt/homebrew/Caskroom/miniforge/base/envs/v3/bin/python3
+cachedir: .pytest_cache
+rootdir: /Users/pyw/new/MyRecall
+configfile: pytest.ini
+plugins: anyio-4.12.1
+collecting ... collected 9 items
+
+tests/test_phase2_performance.py::TestGate2P01TranscriptionLatency::test_mock_transcription_latency PASSED [ 11%]
+tests/test_phase2_performance.py::TestGate2P01TranscriptionLatency::test_real_transcription_latency SKIPPED [ 22%]
+tests/test_phase2_performance.py::TestGate2P02VADProcessing::test_mock_vad_latency PASSED [ 33%]
+tests/test_phase2_performance.py::TestGate2P02VADProcessing::test_real_vad_latency SKIPPED [ 44%]
+tests/test_phase2_performance.py::TestGate2P03Throughput::test_no_backlog_growth_pattern PASSED [ 55%]
+tests/test_phase2_performance.py::TestGate2P03Throughput::test_mock_queue_depth_stable PASSED [ 66%]
+tests/test_phase2_performance.py::TestGate2P04AudioCaptureCPU::test_audio_manager_structural_attributes PASSED [ 77%]
+tests/test_phase2_performance.py::TestGate2P04AudioCaptureCPU::test_audio_manager_callback_writes_frames PASSED [ 88%]
+tests/test_phase2_performance.py::TestGate2P04AudioCaptureCPU::test_real_cpu_usage SKIPPED [100%]
+
+=============================== warnings summary ===============================
+tests/test_phase2_performance.py:77
+  /Users/pyw/new/MyRecall/tests/test_phase2_performance.py:77: PytestUnknownMarkWarning: Unknown pytest.mark.slow - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.slow
+
+tests/test_phase2_performance.py:127
+  /Users/pyw/new/MyRecall/tests/test_phase2_performance.py:127: PytestUnknownMarkWarning: Unknown pytest.mark.slow - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.slow
+
+tests/test_phase2_performance.py:245
+  /Users/pyw/new/MyRecall/tests/test_phase2_performance.py:245: PytestUnknownMarkWarning: Unknown pytest.mark.slow - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.slow
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+SKIPPED [1] tests/test_phase2_performance.py:77: Requires faster-whisper model download and CPU time
+SKIPPED [1] tests/test_phase2_performance.py:127: Requires torch + silero-vad model download
+SKIPPED [1] tests/test_phase2_performance.py:245: Requires real audio hardware and psutil
+=================== 6 passed, 3 skipped, 3 warnings in 0.83s ===================

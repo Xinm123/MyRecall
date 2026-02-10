@@ -419,3 +419,48 @@ All gate criteria sourced from `/Users/pyw/new/MyRecall/v3/metrics/phase-gates.m
 **Date**: 2026-02-09T09:00:00Z
 **Updated By**: Phase 1 status closure update
 **Status**: COMPLETE -- Long-run gates remain `PENDING (LONGRUN)` and are tracked in the future non-blocking observation plan.
+
+---
+
+## Phase 1.5.1 Strict 60s + Stall Self-Heal Validation (2026-02-10)
+
+### Scope
+
+- Phase 1/1.5 client video pipeline only.
+- No Phase 2 audio logic included.
+
+### Implementation Coverage
+
+- `chunk_process` rotation trigger changed to strict monotonic wallclock deadline.
+- `chunk_process` watcher adds deadline-overdue self-heal policy.
+- Periodic status logging includes per-monitor health fields (`chunk_age_s`, `deadline_in_s`, `last_write_ago_s`, `writer_alive`).
+- Chunk lifecycle logs normalized:
+  - `Video chunk recording started ...`
+  - `Video chunk recording ended ...`
+- Client entrypoint shutdown path de-duplicated to avoid repeated shutdown completion logs.
+
+### Config Semantics (Locked)
+
+- `OPENRECALL_VIDEO_PIPELINE_MODE=chunk_process` remains default.
+- `OPENRECALL_VIDEO_CHUNK_DURATION=60` is strict wallclock target in chunk_process.
+- `OPENRECALL_VIDEO_NO_CHUNK_PROGRESS_TIMEOUT_SECONDS` applies to `segment` mode only.
+- `chunk_process` grace window formula:
+  - `grace_seconds = max(3, min(15, 4 * OPENRECALL_VIDEO_PIPE_WRITE_TIMEOUT_MS / 1000))`
+
+### Automated Verification
+
+| Command | Result |
+|---|---|
+| `python3 -m pytest tests/test_phase1_video_recorder.py -v` | 52 passed |
+| `python3 -m pytest tests/test_phase1_pipeline_profile_change.py -v` | 4 passed |
+| `python3 -m pytest tests/test_phase1_video_recorder.py tests/test_phase1_pipeline_profile_change.py tests/test_video_recorder_fallback_policy.py tests/test_video_recorder_recovery_probe.py -v` | 60 passed |
+
+### Evidence Path
+
+- Long-run evidence directory prepared: `/Users/pyw/new/MyRecall/v3/evidence/phase1_5_strict60/`
+- Automated test evidence comes from terminal command outputs in this implementation session.
+
+### Current Gate Status
+
+- `P15-R01` (regression) : ✅ PASS
+- `P15-I01/P15-I02/P15-I03/P15-I04` (manual/integration long-run) : ⏳ PENDING MANUAL RUN

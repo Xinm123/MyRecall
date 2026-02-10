@@ -309,7 +309,38 @@ class TestFFmpegRawVideoProfile:
         assert "-segment_list" not in cmd
         assert cmd[-1] == output_file
 
-    def test_chunk_process_rotates_and_emits_chunk_completion(self, tmp_path):
+    def test_chunk_process_does_not_rotate_before_deadline(self, tmp_path):
+        from openrecall.client.ffmpeg_manager import FFmpegManager
+        from openrecall.client.sck_stream import PixelFormatProfile
+
+        profile = PixelFormatProfile("nv12", 640, 480, 30, "tv")
+        mgr = FFmpegManager(
+            output_dir=tmp_path,
+            chunk_duration=60,
+            fps=30,
+            pipeline_mode="chunk_process",
+        )
+        mgr._input_profile = profile
+
+        process = MagicMock()
+        process.poll.return_value = None
+        process.stdin = MagicMock()
+        mgr._process = process
+        mgr._active_chunk_path = str(tmp_path / "monitor_1_2026-02-09_05-00-00.mp4")
+        mgr._chunk_started_monotonic = 100.0
+        mgr._chunk_deadline_monotonic = 160.0
+
+        with patch.object(mgr, "_write_with_timeout", return_value=None):
+            with patch(
+                "openrecall.client.ffmpeg_manager.time.monotonic",
+                side_effect=[110.0, 110.0, 110.0],
+            ):
+                with patch.object(mgr, "_rotate_chunk_process") as mock_rotate:
+                    mgr.write_frame(b"frame-a")
+
+        mock_rotate.assert_not_called()
+
+    def test_chunk_process_rotates_on_deadline_and_emits_chunk_completion(self, tmp_path):
         from openrecall.client.ffmpeg_manager import FFmpegManager
         from openrecall.client.sck_stream import PixelFormatProfile
 
@@ -317,7 +348,7 @@ class TestFFmpegRawVideoProfile:
         profile = PixelFormatProfile("nv12", 640, 480, 2, "tv")
         mgr = FFmpegManager(
             output_dir=tmp_path,
-            chunk_duration=1,
+            chunk_duration=60,
             fps=2,
             pipeline_mode="chunk_process",
             on_chunk_complete=completed.append,
@@ -335,11 +366,45 @@ class TestFFmpegRawVideoProfile:
 
         with patch.object(mgr, "_write_with_timeout", return_value=None):
             with patch.object(mgr, "_start_rawvideo_process") as mock_start_next:
-                mgr.write_frame(b"frame-a")
-                mgr.write_frame(b"frame-b")
+                with patch(
+                    "openrecall.client.ffmpeg_manager.time.monotonic",
+                    side_effect=[200.0, 200.0, 261.0],
+                ):
+                    mgr.write_frame(b"frame-a")
 
         assert completed == [str(chunk_path)]
         mock_start_next.assert_called_once_with(profile)
+
+    def test_chunk_process_low_fps_still_rotates_on_deadline(self, tmp_path):
+        from openrecall.client.ffmpeg_manager import FFmpegManager
+        from openrecall.client.sck_stream import PixelFormatProfile
+
+        profile = PixelFormatProfile("nv12", 640, 480, 2, "tv")
+        mgr = FFmpegManager(
+            output_dir=tmp_path,
+            chunk_duration=60,
+            fps=2,
+            pipeline_mode="chunk_process",
+        )
+        mgr._input_profile = profile
+
+        process = MagicMock()
+        process.poll.return_value = None
+        process.stdin = MagicMock()
+        mgr._process = process
+        mgr._active_chunk_path = str(tmp_path / "monitor_1_2026-02-09_05-10-00.mp4")
+        mgr._chunk_started_monotonic = 300.0
+        mgr._chunk_deadline_monotonic = 360.0
+
+        with patch.object(mgr, "_write_with_timeout", return_value=None):
+            with patch(
+                "openrecall.client.ffmpeg_manager.time.monotonic",
+                side_effect=[370.0, 370.0, 370.0],
+            ):
+                with patch.object(mgr, "_rotate_chunk_process") as mock_rotate:
+                    mgr.write_frame(b"frame-a")
+
+        mock_rotate.assert_called_once_with(reason="deadline")
 
     def test_write_frame_timeout_raises_timeout_error(self, tmp_path):
         from openrecall.client.ffmpeg_manager import FFmpegManager
@@ -361,6 +426,23 @@ class TestFFmpegRawVideoProfile:
         ):
             with pytest.raises(TimeoutError):
                 mgr.write_frame(b"frame")
+
+    def test_write_stuck_seconds_reports_inflight_write_time(self, tmp_path):
+        from openrecall.client.ffmpeg_manager import FFmpegManager
+
+        mgr = FFmpegManager(output_dir=tmp_path, pipeline_mode="chunk_process")
+        mgr._write_inflight_since_monotonic = 10.0
+        with patch("openrecall.client.ffmpeg_manager.time.monotonic", return_value=12.5):
+            assert mgr.write_stuck_seconds == pytest.approx(2.5, abs=1e-6)
+        mgr._write_inflight_since_monotonic = 0.0
+        assert mgr.write_stuck_seconds == 0.0
+
+    def test_active_chunk_path_property_exposes_current_path(self, tmp_path):
+        from openrecall.client.ffmpeg_manager import FFmpegManager
+
+        mgr = FFmpegManager(output_dir=tmp_path, pipeline_mode="chunk_process")
+        mgr._active_chunk_path = "/tmp/current_chunk.mp4"
+        assert mgr.active_chunk_path == "/tmp/current_chunk.mp4"
 
 
 class TestFFmpegSegmentPolling:
@@ -816,6 +898,46 @@ class TestVideoRecorder:
         messages = [r.message for r in caplog.records]
         assert any("active_chunk_0008.mp4" in m for m in messages)
 
+    def test_periodic_status_logs_chunk_health_fields(self, tmp_path, monkeypatch, caplog):
+        """Periodic status should include chunk age/deadline/write-health fields."""
+        monkeypatch.setenv("OPENRECALL_DATA_DIR", str(tmp_path))
+        monkeypatch.setenv("OPENRECALL_SERVER_DATA_DIR", str(tmp_path / "MRS"))
+        monkeypatch.setenv("OPENRECALL_CLIENT_DATA_DIR", str(tmp_path / "MRC"))
+        self._reload_modules()
+
+        from openrecall.client.video_recorder import CaptureModeState, VideoRecorder
+
+        mock_buffer = MagicMock()
+        mock_buffer.count.return_value = 3
+        mock_consumer = MagicMock()
+        mock_consumer.is_alive.return_value = False
+
+        recorder = VideoRecorder(buffer=mock_buffer, consumer=mock_consumer)
+        recorder._capture_state = CaptureModeState.SCK_ACTIVE
+
+        ffmpeg = MagicMock()
+        ffmpeg.active_chunk_path = "/tmp/active_chunk_0009.mp4"
+        ffmpeg.current_chunk_path = "/tmp/active_chunk_0009.mp4"
+        ffmpeg.chunk_age_seconds = 17.2
+        ffmpeg.chunk_deadline_in_seconds = 42.8
+        ffmpeg.seconds_since_last_write = 0.4
+        controller = MagicMock()
+        controller.ffmpeg_manager = ffmpeg
+        controller.writer_alive = True
+        recorder._pipelines = {"1": controller}
+
+        caplog.set_level("INFO", logger="openrecall.client.video_recorder")
+        recorder._log_periodic_status()
+
+        messages = [r.message for r in caplog.records]
+        assert any(
+            "chunk_age_s=" in m
+            and "deadline_in_s=" in m
+            and "last_write_ago_s=" in m
+            and "writer_alive=" in m
+            for m in messages
+        )
+
     def test_watcher_restarts_pipeline_when_chunk_stagnates(self, tmp_path, monkeypatch):
         """Watcher should force pipeline restart when chunk stays unchanged for too long."""
         monkeypatch.setenv("OPENRECALL_DATA_DIR", str(tmp_path))
@@ -912,6 +1034,8 @@ class TestVideoRecorder:
         ffmpeg.active_chunk_path = "/tmp/chunk_process_current.mp4"
         ffmpeg.current_chunk_path = "/tmp/chunk_process_current.mp4"
         ffmpeg.write_stuck_seconds = 0.0
+        ffmpeg.chunk_age_seconds = 30.0
+        ffmpeg.chunk_deadline_in_seconds = 30.0
         controller = MagicMock()
         controller.ffmpeg_manager = ffmpeg
         controller.seconds_since_last_write.return_value = 1.0
@@ -925,3 +1049,42 @@ class TestVideoRecorder:
             recorder._watcher_tick()
 
         mock_restart.assert_not_called()
+
+    def test_watcher_restarts_chunk_process_when_deadline_overdue(self, tmp_path, monkeypatch):
+        """Chunk-process mode should restart when chunk deadline is overdue."""
+        monkeypatch.setenv("OPENRECALL_DATA_DIR", str(tmp_path))
+        monkeypatch.setenv("OPENRECALL_SERVER_DATA_DIR", str(tmp_path / "MRS"))
+        monkeypatch.setenv("OPENRECALL_CLIENT_DATA_DIR", str(tmp_path / "MRC"))
+        self._reload_modules()
+
+        from openrecall.client.video_recorder import CaptureModeState, VideoRecorder
+
+        mock_buffer = MagicMock()
+        mock_consumer = MagicMock()
+        mock_consumer.is_alive.return_value = False
+        recorder = VideoRecorder(buffer=mock_buffer, consumer=mock_consumer)
+        recorder._capture_state = CaptureModeState.SCK_ACTIVE
+        recorder._pipeline_stall_timeout_seconds = 180.0
+        recorder._write_stall_timeout_seconds = 5.0
+        recorder._monitor_sync_interval = 9999
+
+        ffmpeg = MagicMock()
+        ffmpeg.pipeline_mode = "chunk_process"
+        ffmpeg.active_chunk_path = "/tmp/chunk_process_overdue.mp4"
+        ffmpeg.current_chunk_path = "/tmp/chunk_process_overdue.mp4"
+        ffmpeg.write_stuck_seconds = 0.0
+        ffmpeg.chunk_age_seconds = 70.0
+        ffmpeg.chunk_deadline_in_seconds = -4.0
+        controller = MagicMock()
+        controller.ffmpeg_manager = ffmpeg
+        controller.seconds_since_last_write.return_value = 1.0
+        controller.writer_alive = True
+        recorder._pipelines = {"1": controller}
+        recorder._chunk_progress_by_monitor = {
+            "1": ("chunk_process_overdue.mp4", time.time() - 12.0),
+        }
+
+        with patch.object(recorder, "_attempt_sck_start_once", return_value=True) as mock_restart:
+            recorder._watcher_tick()
+
+        mock_restart.assert_called_once_with(force=True)

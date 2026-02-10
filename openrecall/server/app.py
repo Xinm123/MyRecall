@@ -172,6 +172,17 @@ def init_video_worker(app_instance):
     logger.info("Video Processing Worker started successfully.")
 
 
+def init_audio_worker(app_instance):
+    """Initialize the audio processing worker."""
+    from openrecall.server.audio.worker import AudioProcessingWorker
+
+    audio_worker = AudioProcessingWorker()
+    audio_worker.start()
+
+    app_instance.audio_worker = audio_worker
+    logger.info("Audio Processing Worker started successfully.")
+
+
 def init_retention_worker(app_instance):
     """Initialize the retention cleanup worker."""
     from openrecall.server.retention import RetentionWorker

@@ -1,0 +1,17 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.11.14, pytest-9.0.2, pluggy-1.6.0 -- /opt/homebrew/Caskroom/miniforge/base/envs/v3/bin/python3
+cachedir: .pytest_cache
+rootdir: /Users/pyw/new/MyRecall
+configfile: pytest.ini
+plugins: anyio-4.12.1
+collecting ... collected 7 items
+
+tests/test_phase2_audio_recorder.py::TestAudioRecorder::test_init_defaults PASSED [ 14%]
+tests/test_phase2_audio_recorder.py::TestAudioRecorder::test_is_running_false_when_stopped PASSED [ 28%]
+tests/test_phase2_audio_recorder.py::TestAudioRecorder::test_stop_when_not_running PASSED [ 42%]
+tests/test_phase2_audio_recorder.py::TestAudioRecorder::test_on_chunk_complete_enqueues_with_metadata PASSED [ 57%]
+tests/test_phase2_audio_recorder.py::TestAudioRecorder::test_on_chunk_complete_correct_checksum PASSED [ 71%]
+tests/test_phase2_audio_recorder.py::TestAudioRecorder::test_on_chunk_complete_skips_empty_wav PASSED [ 85%]
+tests/test_phase2_audio_recorder.py::TestAudioRecorder::test_on_chunk_complete_nonexistent_file PASSED [100%]
+
+============================== 7 passed in 0.25s ===============================

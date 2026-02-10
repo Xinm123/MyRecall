@@ -1,0 +1,214 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.9.6, pytest-8.4.2, pluggy-1.6.0 -- /Applications/Xcode.app/Contents/Developer/usr/bin/python3
+cachedir: .pytest_cache
+rootdir: /Users/pyw/new/MyRecall
+configfile: pytest.ini
+collecting ... collected 7 items
+
+tests/test_phase2_search.py::TestAudioFTSSearch::test_insert_and_search_transcription ERROR [ 14%]
+tests/test_phase2_search.py::TestAudioFTSSearch::test_search_no_results ERROR [ 28%]
+tests/test_phase2_search.py::TestAudioFTSSearch::test_search_audio_fts_pagination ERROR [ 42%]
+tests/test_phase2_search.py::TestAudioFTSSearch::test_get_audio_transcriptions_by_time_range ERROR [ 57%]
+tests/test_phase2_search.py::TestAudioFTSSearch::test_get_audio_transcriptions_outside_range ERROR [ 71%]
+tests/test_phase2_search.py::TestSearchAPIAudio::test_search_endpoint_exists ERROR [ 85%]
+tests/test_phase2_search.py::TestSearchAPIAudio::test_search_empty_query ERROR [100%]
+
+==================================== ERRORS ====================================
+__ ERROR at setup of TestAudioFTSSearch.test_insert_and_search_transcription ___
+
+tmp_path = PosixPath('/private/var/folders/q2/gtfbxhrj7zv1xn9cn6f3pzj40000gn/T/pytest-of-pyw/pytest-114/test_insert_and_search_transcr0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x10acbd310>
+
+    @pytest.fixture
+    def flask_app(tmp_path, monkeypatch):
+        monkeypatch.setenv("OPENRECALL_DATA_DIR", str(tmp_path))
+        monkeypatch.setenv("OPENRECALL_SERVER_DATA_DIR", str(tmp_path / "MRS"))
+        monkeypatch.setenv("OPENRECALL_CLIENT_DATA_DIR", str(tmp_path / "MRC"))
+    
+>       import openrecall.shared.config
+
+tests/conftest.py:23: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    """Configuration management for OpenRecall using pydantic-settings."""
+    
+    import os
+    from typing import Optional, Union
+    from pathlib import Path
+    import tempfile
+    
+>   from pydantic import Field, model_validator, field_validator
+E   ModuleNotFoundError: No module named 'pydantic'
+
+openrecall/shared/config.py:8: ModuleNotFoundError
+_________ ERROR at setup of TestAudioFTSSearch.test_search_no_results __________
+
+tmp_path = PosixPath('/private/var/folders/q2/gtfbxhrj7zv1xn9cn6f3pzj40000gn/T/pytest-of-pyw/pytest-114/test_search_no_results0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x10acfed30>
+
+    @pytest.fixture
+    def flask_app(tmp_path, monkeypatch):
+        monkeypatch.setenv("OPENRECALL_DATA_DIR", str(tmp_path))
+        monkeypatch.setenv("OPENRECALL_SERVER_DATA_DIR", str(tmp_path / "MRS"))
+        monkeypatch.setenv("OPENRECALL_CLIENT_DATA_DIR", str(tmp_path / "MRC"))
+    
+>       import openrecall.shared.config
+
+tests/conftest.py:23: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    """Configuration management for OpenRecall using pydantic-settings."""
+    
+    import os
+    from typing import Optional, Union
+    from pathlib import Path
+    import tempfile
+    
+>   from pydantic import Field, model_validator, field_validator
+E   ModuleNotFoundError: No module named 'pydantic'
+
+openrecall/shared/config.py:8: ModuleNotFoundError
+____ ERROR at setup of TestAudioFTSSearch.test_search_audio_fts_pagination _____
+
+tmp_path = PosixPath('/private/var/folders/q2/gtfbxhrj7zv1xn9cn6f3pzj40000gn/T/pytest-of-pyw/pytest-114/test_search_audio_fts_paginati0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x10aa44c40>
+
+    @pytest.fixture
+    def flask_app(tmp_path, monkeypatch):
+        monkeypatch.setenv("OPENRECALL_DATA_DIR", str(tmp_path))
+        monkeypatch.setenv("OPENRECALL_SERVER_DATA_DIR", str(tmp_path / "MRS"))
+        monkeypatch.setenv("OPENRECALL_CLIENT_DATA_DIR", str(tmp_path / "MRC"))
+    
+>       import openrecall.shared.config
+
+tests/conftest.py:23: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    """Configuration management for OpenRecall using pydantic-settings."""
+    
+    import os
+    from typing import Optional, Union
+    from pathlib import Path
+    import tempfile
+    
+>   from pydantic import Field, model_validator, field_validator
+E   ModuleNotFoundError: No module named 'pydantic'
+
+openrecall/shared/config.py:8: ModuleNotFoundError
+_ ERROR at setup of TestAudioFTSSearch.test_get_audio_transcriptions_by_time_range _
+
+tmp_path = PosixPath('/private/var/folders/q2/gtfbxhrj7zv1xn9cn6f3pzj40000gn/T/pytest-of-pyw/pytest-114/test_get_audio_transcriptions_0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x10ad66220>
+
+    @pytest.fixture
+    def flask_app(tmp_path, monkeypatch):
+        monkeypatch.setenv("OPENRECALL_DATA_DIR", str(tmp_path))
+        monkeypatch.setenv("OPENRECALL_SERVER_DATA_DIR", str(tmp_path / "MRS"))
+        monkeypatch.setenv("OPENRECALL_CLIENT_DATA_DIR", str(tmp_path / "MRC"))
+    
+>       import openrecall.shared.config
+
+tests/conftest.py:23: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    """Configuration management for OpenRecall using pydantic-settings."""
+    
+    import os
+    from typing import Optional, Union
+    from pathlib import Path
+    import tempfile
+    
+>   from pydantic import Field, model_validator, field_validator
+E   ModuleNotFoundError: No module named 'pydantic'
+
+openrecall/shared/config.py:8: ModuleNotFoundError
+_ ERROR at setup of TestAudioFTSSearch.test_get_audio_transcriptions_outside_range _
+
+tmp_path = PosixPath('/private/var/folders/q2/gtfbxhrj7zv1xn9cn6f3pzj40000gn/T/pytest-of-pyw/pytest-114/test_get_audio_transcriptions_1')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x10ad34400>
+
+    @pytest.fixture
+    def flask_app(tmp_path, monkeypatch):
+        monkeypatch.setenv("OPENRECALL_DATA_DIR", str(tmp_path))
+        monkeypatch.setenv("OPENRECALL_SERVER_DATA_DIR", str(tmp_path / "MRS"))
+        monkeypatch.setenv("OPENRECALL_CLIENT_DATA_DIR", str(tmp_path / "MRC"))
+    
+>       import openrecall.shared.config
+
+tests/conftest.py:23: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    """Configuration management for OpenRecall using pydantic-settings."""
+    
+    import os
+    from typing import Optional, Union
+    from pathlib import Path
+    import tempfile
+    
+>   from pydantic import Field, model_validator, field_validator
+E   ModuleNotFoundError: No module named 'pydantic'
+
+openrecall/shared/config.py:8: ModuleNotFoundError
+_______ ERROR at setup of TestSearchAPIAudio.test_search_endpoint_exists _______
+
+tmp_path = PosixPath('/private/var/folders/q2/gtfbxhrj7zv1xn9cn6f3pzj40000gn/T/pytest-of-pyw/pytest-114/test_search_endpoint_exists0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x10ad66be0>
+
+    @pytest.fixture
+    def flask_app(tmp_path, monkeypatch):
+        monkeypatch.setenv("OPENRECALL_DATA_DIR", str(tmp_path))
+        monkeypatch.setenv("OPENRECALL_SERVER_DATA_DIR", str(tmp_path / "MRS"))
+        monkeypatch.setenv("OPENRECALL_CLIENT_DATA_DIR", str(tmp_path / "MRC"))
+    
+>       import openrecall.shared.config
+
+tests/conftest.py:23: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    """Configuration management for OpenRecall using pydantic-settings."""
+    
+    import os
+    from typing import Optional, Union
+    from pathlib import Path
+    import tempfile
+    
+>   from pydantic import Field, model_validator, field_validator
+E   ModuleNotFoundError: No module named 'pydantic'
+
+openrecall/shared/config.py:8: ModuleNotFoundError
+_________ ERROR at setup of TestSearchAPIAudio.test_search_empty_query _________
+
+tmp_path = PosixPath('/private/var/folders/q2/gtfbxhrj7zv1xn9cn6f3pzj40000gn/T/pytest-of-pyw/pytest-114/test_search_empty_query0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x10acd83d0>
+
+    @pytest.fixture
+    def flask_app(tmp_path, monkeypatch):
+        monkeypatch.setenv("OPENRECALL_DATA_DIR", str(tmp_path))
+        monkeypatch.setenv("OPENRECALL_SERVER_DATA_DIR", str(tmp_path / "MRS"))
+        monkeypatch.setenv("OPENRECALL_CLIENT_DATA_DIR", str(tmp_path / "MRC"))
+    
+>       import openrecall.shared.config
+
+tests/conftest.py:23: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    """Configuration management for OpenRecall using pydantic-settings."""
+    
+    import os
+    from typing import Optional, Union
+    from pathlib import Path
+    import tempfile
+    
+>   from pydantic import Field, model_validator, field_validator
+E   ModuleNotFoundError: No module named 'pydantic'
+
+openrecall/shared/config.py:8: ModuleNotFoundError
+=========================== short test summary info ============================
+ERROR tests/test_phase2_search.py::TestAudioFTSSearch::test_insert_and_search_transcription
+ERROR tests/test_phase2_search.py::TestAudioFTSSearch::test_search_no_results
+ERROR tests/test_phase2_search.py::TestAudioFTSSearch::test_search_audio_fts_pagination
+ERROR tests/test_phase2_search.py::TestAudioFTSSearch::test_get_audio_transcriptions_by_time_range
+ERROR tests/test_phase2_search.py::TestAudioFTSSearch::test_get_audio_transcriptions_outside_range
+ERROR tests/test_phase2_search.py::TestSearchAPIAudio::test_search_endpoint_exists
+ERROR tests/test_phase2_search.py::TestSearchAPIAudio::test_search_empty_query
+============================== 7 errors in 0.07s ===============================

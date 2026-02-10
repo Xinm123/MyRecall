@@ -1,0 +1,65 @@
+===== TEST 1 =====
+CMD: python3 -m pytest tests/test_phase2_audio_manager.py -v
+RESULT: PASS
+
+===== TEST 2 =====
+CMD: python3 -m pytest tests/test_phase2_audio_recorder.py -v
+RESULT: PASS
+
+===== TEST 3 =====
+CMD: python3 -m pytest tests/test_phase2_vad.py -v
+RESULT: PASS
+
+===== TEST 4 =====
+CMD: python3 -m pytest tests/test_phase2_transcriber.py -v
+RESULT: PASS
+
+===== TEST 5 =====
+CMD: python3 -m pytest tests/test_phase2_ingestion.py -v
+RESULT: PASS
+
+===== TEST 6 =====
+CMD: python3 -m pytest tests/test_phase2_worker.py -v
+RESULT: PASS
+
+===== TEST 7 =====
+CMD: python3 -m pytest tests/test_phase2_search.py -v
+RESULT: PASS
+
+===== TEST 8 =====
+CMD: python3 -m pytest tests/test_phase2_timeline.py -v
+RESULT: PASS
+
+===== TEST 9 =====
+CMD: python3 -m pytest tests/test_phase2_performance.py -v
+RESULT: PASS
+
+===== TEST 10 =====
+CMD: python3 -m pytest tests/test_phase2_quality.py -v
+RESULT: PASS
+
+===== TEST 11 =====
+CMD: python3 -m pytest tests/test_phase2_smoke.py -v
+RESULT: PASS
+
+===== TEST 12 =====
+CMD: python3 -m pytest tests/test_phase2_gates.py -v
+RESULT: PASS
+
+===== TEST 13 =====
+CMD: python3 -m pytest tests/test_phase0_*.py -v
+RESULT: PASS
+
+===== TEST 14 =====
+CMD: python3 -m pytest tests/test_phase1_*.py -v
+RESULT: PASS
+
+===== TEST 15 =====
+CMD: python3 -m pytest tests/test_phase2_*.py -v
+RESULT: PASS
+
+===== TEST 16 =====
+CMD: python3 -m pytest tests/ -v --tb=short
+RESULT: PASS
+
+FAIL_COUNT=0

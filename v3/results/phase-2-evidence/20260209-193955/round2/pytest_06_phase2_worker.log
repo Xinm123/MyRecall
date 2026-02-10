@@ -1,0 +1,412 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.9.6, pytest-8.4.2, pluggy-1.6.0 -- /Applications/Xcode.app/Contents/Developer/usr/bin/python3
+cachedir: .pytest_cache
+rootdir: /Users/pyw/new/MyRecall
+configfile: pytest.ini
+collecting ... collected 15 items
+
+tests/test_phase2_worker.py::TestAudioProcessingResult::test_defaults FAILED [  6%]
+tests/test_phase2_worker.py::TestAudioProcessingResult::test_with_error FAILED [ 13%]
+tests/test_phase2_worker.py::TestAudioChunkProcessor::test_init_lazy FAILED [ 20%]
+tests/test_phase2_worker.py::TestAudioChunkProcessor::test_process_missing_file FAILED [ 26%]
+tests/test_phase2_worker.py::TestAudioChunkProcessor::test_process_no_speech FAILED [ 33%]
+tests/test_phase2_worker.py::TestAudioChunkProcessor::test_process_with_speech FAILED [ 40%]
+tests/test_phase2_worker.py::TestAudioProcessingWorker::test_init FAILED [ 46%]
+tests/test_phase2_worker.py::TestAudioProcessingWorker::test_stop_event FAILED [ 53%]
+tests/test_phase2_worker.py::TestSQLStoreAudioLifecycle::test_insert_audio_chunk ERROR [ 60%]
+tests/test_phase2_worker.py::TestSQLStoreAudioLifecycle::test_get_audio_chunk_by_id ERROR [ 66%]
+tests/test_phase2_worker.py::TestSQLStoreAudioLifecycle::test_pending_processing_completed_lifecycle ERROR [ 73%]
+tests/test_phase2_worker.py::TestSQLStoreAudioLifecycle::test_pending_processing_failed_lifecycle ERROR [ 80%]
+tests/test_phase2_worker.py::TestSQLStoreAudioLifecycle::test_reset_stuck_audio_chunks ERROR [ 86%]
+tests/test_phase2_worker.py::TestSQLStoreAudioLifecycle::test_get_next_pending_audio_chunk ERROR [ 93%]
+tests/test_phase2_worker.py::TestSQLStoreAudioLifecycle::test_audio_chunk_status_counts ERROR [100%]
+
+==================================== ERRORS ====================================
+_____ ERROR at setup of TestSQLStoreAudioLifecycle.test_insert_audio_chunk _____
+
+tmp_path = PosixPath('/private/var/folders/q2/gtfbxhrj7zv1xn9cn6f3pzj40000gn/T/pytest-of-pyw/pytest-113/test_insert_audio_chunk0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x106199a60>
+
+    @pytest.fixture
+    def flask_app(tmp_path, monkeypatch):
+        monkeypatch.setenv("OPENRECALL_DATA_DIR", str(tmp_path))
+        monkeypatch.setenv("OPENRECALL_SERVER_DATA_DIR", str(tmp_path / "MRS"))
+        monkeypatch.setenv("OPENRECALL_CLIENT_DATA_DIR", str(tmp_path / "MRC"))
+    
+>       import openrecall.shared.config
+
+tests/conftest.py:23: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    """Configuration management for OpenRecall using pydantic-settings."""
+    
+    import os
+    from typing import Optional, Union
+    from pathlib import Path
+    import tempfile
+    
+>   from pydantic import Field, model_validator, field_validator
+E   ModuleNotFoundError: No module named 'pydantic'
+
+openrecall/shared/config.py:8: ModuleNotFoundError
+___ ERROR at setup of TestSQLStoreAudioLifecycle.test_get_audio_chunk_by_id ____
+
+tmp_path = PosixPath('/private/var/folders/q2/gtfbxhrj7zv1xn9cn6f3pzj40000gn/T/pytest-of-pyw/pytest-113/test_get_audio_chunk_by_id0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x1061717f0>
+
+    @pytest.fixture
+    def flask_app(tmp_path, monkeypatch):
+        monkeypatch.setenv("OPENRECALL_DATA_DIR", str(tmp_path))
+        monkeypatch.setenv("OPENRECALL_SERVER_DATA_DIR", str(tmp_path / "MRS"))
+        monkeypatch.setenv("OPENRECALL_CLIENT_DATA_DIR", str(tmp_path / "MRC"))
+    
+>       import openrecall.shared.config
+
+tests/conftest.py:23: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    """Configuration management for OpenRecall using pydantic-settings."""
+    
+    import os
+    from typing import Optional, Union
+    from pathlib import Path
+    import tempfile
+    
+>   from pydantic import Field, model_validator, field_validator
+E   ModuleNotFoundError: No module named 'pydantic'
+
+openrecall/shared/config.py:8: ModuleNotFoundError
+_ ERROR at setup of TestSQLStoreAudioLifecycle.test_pending_processing_completed_lifecycle _
+
+tmp_path = PosixPath('/private/var/folders/q2/gtfbxhrj7zv1xn9cn6f3pzj40000gn/T/pytest-of-pyw/pytest-113/test_pending_processing_comple0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x106183bb0>
+
+    @pytest.fixture
+    def flask_app(tmp_path, monkeypatch):
+        monkeypatch.setenv("OPENRECALL_DATA_DIR", str(tmp_path))
+        monkeypatch.setenv("OPENRECALL_SERVER_DATA_DIR", str(tmp_path / "MRS"))
+        monkeypatch.setenv("OPENRECALL_CLIENT_DATA_DIR", str(tmp_path / "MRC"))
+    
+>       import openrecall.shared.config
+
+tests/conftest.py:23: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    """Configuration management for OpenRecall using pydantic-settings."""
+    
+    import os
+    from typing import Optional, Union
+    from pathlib import Path
+    import tempfile
+    
+>   from pydantic import Field, model_validator, field_validator
+E   ModuleNotFoundError: No module named 'pydantic'
+
+openrecall/shared/config.py:8: ModuleNotFoundError
+_ ERROR at setup of TestSQLStoreAudioLifecycle.test_pending_processing_failed_lifecycle _
+
+tmp_path = PosixPath('/private/var/folders/q2/gtfbxhrj7zv1xn9cn6f3pzj40000gn/T/pytest-of-pyw/pytest-113/test_pending_processing_failed0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x1061a2640>
+
+    @pytest.fixture
+    def flask_app(tmp_path, monkeypatch):
+        monkeypatch.setenv("OPENRECALL_DATA_DIR", str(tmp_path))
+        monkeypatch.setenv("OPENRECALL_SERVER_DATA_DIR", str(tmp_path / "MRS"))
+        monkeypatch.setenv("OPENRECALL_CLIENT_DATA_DIR", str(tmp_path / "MRC"))
+    
+>       import openrecall.shared.config
+
+tests/conftest.py:23: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    """Configuration management for OpenRecall using pydantic-settings."""
+    
+    import os
+    from typing import Optional, Union
+    from pathlib import Path
+    import tempfile
+    
+>   from pydantic import Field, model_validator, field_validator
+E   ModuleNotFoundError: No module named 'pydantic'
+
+openrecall/shared/config.py:8: ModuleNotFoundError
+__ ERROR at setup of TestSQLStoreAudioLifecycle.test_reset_stuck_audio_chunks __
+
+tmp_path = PosixPath('/private/var/folders/q2/gtfbxhrj7zv1xn9cn6f3pzj40000gn/T/pytest-of-pyw/pytest-113/test_reset_stuck_audio_chunks0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x106158af0>
+
+    @pytest.fixture
+    def flask_app(tmp_path, monkeypatch):
+        monkeypatch.setenv("OPENRECALL_DATA_DIR", str(tmp_path))
+        monkeypatch.setenv("OPENRECALL_SERVER_DATA_DIR", str(tmp_path / "MRS"))
+        monkeypatch.setenv("OPENRECALL_CLIENT_DATA_DIR", str(tmp_path / "MRC"))
+    
+>       import openrecall.shared.config
+
+tests/conftest.py:23: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    """Configuration management for OpenRecall using pydantic-settings."""
+    
+    import os
+    from typing import Optional, Union
+    from pathlib import Path
+    import tempfile
+    
+>   from pydantic import Field, model_validator, field_validator
+E   ModuleNotFoundError: No module named 'pydantic'
+
+openrecall/shared/config.py:8: ModuleNotFoundError
+_ ERROR at setup of TestSQLStoreAudioLifecycle.test_get_next_pending_audio_chunk _
+
+tmp_path = PosixPath('/private/var/folders/q2/gtfbxhrj7zv1xn9cn6f3pzj40000gn/T/pytest-of-pyw/pytest-113/test_get_next_pending_audio_ch0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x106184100>
+
+    @pytest.fixture
+    def flask_app(tmp_path, monkeypatch):
+        monkeypatch.setenv("OPENRECALL_DATA_DIR", str(tmp_path))
+        monkeypatch.setenv("OPENRECALL_SERVER_DATA_DIR", str(tmp_path / "MRS"))
+        monkeypatch.setenv("OPENRECALL_CLIENT_DATA_DIR", str(tmp_path / "MRC"))
+    
+>       import openrecall.shared.config
+
+tests/conftest.py:23: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    """Configuration management for OpenRecall using pydantic-settings."""
+    
+    import os
+    from typing import Optional, Union
+    from pathlib import Path
+    import tempfile
+    
+>   from pydantic import Field, model_validator, field_validator
+E   ModuleNotFoundError: No module named 'pydantic'
+
+openrecall/shared/config.py:8: ModuleNotFoundError
+_ ERROR at setup of TestSQLStoreAudioLifecycle.test_audio_chunk_status_counts __
+
+tmp_path = PosixPath('/private/var/folders/q2/gtfbxhrj7zv1xn9cn6f3pzj40000gn/T/pytest-of-pyw/pytest-113/test_audio_chunk_status_counts0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x10619e520>
+
+    @pytest.fixture
+    def flask_app(tmp_path, monkeypatch):
+        monkeypatch.setenv("OPENRECALL_DATA_DIR", str(tmp_path))
+        monkeypatch.setenv("OPENRECALL_SERVER_DATA_DIR", str(tmp_path / "MRS"))
+        monkeypatch.setenv("OPENRECALL_CLIENT_DATA_DIR", str(tmp_path / "MRC"))
+    
+>       import openrecall.shared.config
+
+tests/conftest.py:23: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    """Configuration management for OpenRecall using pydantic-settings."""
+    
+    import os
+    from typing import Optional, Union
+    from pathlib import Path
+    import tempfile
+    
+>   from pydantic import Field, model_validator, field_validator
+E   ModuleNotFoundError: No module named 'pydantic'
+
+openrecall/shared/config.py:8: ModuleNotFoundError
+=================================== FAILURES ===================================
+___________________ TestAudioProcessingResult.test_defaults ____________________
+
+self = <test_phase2_worker.TestAudioProcessingResult object at 0x105da3ac0>
+
+    def test_defaults(self):
+>       from openrecall.server.audio.processor import AudioProcessingResult
+
+tests/test_phase2_worker.py:15: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+openrecall/server/audio/processor.py:9: in <module>
+    from openrecall.server.database import SQLStore
+openrecall/server/database/__init__.py:1: in <module>
+    from .vector_store import VectorStore
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    import logging
+    from typing import List, Tuple, Optional
+    
+>   import lancedb
+E   ModuleNotFoundError: No module named 'lancedb'
+
+openrecall/server/database/vector_store.py:4: ModuleNotFoundError
+__________________ TestAudioProcessingResult.test_with_error ___________________
+
+self = <test_phase2_worker.TestAudioProcessingResult object at 0x105f00d60>
+
+    def test_with_error(self):
+>       from openrecall.server.audio.processor import AudioProcessingResult
+
+tests/test_phase2_worker.py:24: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+openrecall/server/audio/processor.py:9: in <module>
+    from openrecall.server.database import SQLStore
+openrecall/server/database/__init__.py:1: in <module>
+    from .vector_store import VectorStore
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    import logging
+    from typing import List, Tuple, Optional
+    
+>   import lancedb
+E   ModuleNotFoundError: No module named 'lancedb'
+
+openrecall/server/database/vector_store.py:4: ModuleNotFoundError
+____________________ TestAudioChunkProcessor.test_init_lazy ____________________
+
+self = <test_phase2_worker.TestAudioChunkProcessor object at 0x10612b100>
+
+    def test_init_lazy(self):
+>       from openrecall.server.audio.processor import AudioChunkProcessor
+
+tests/test_phase2_worker.py:34: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+openrecall/server/audio/processor.py:9: in <module>
+    from openrecall.server.database import SQLStore
+openrecall/server/database/__init__.py:1: in <module>
+    from .vector_store import VectorStore
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    import logging
+    from typing import List, Tuple, Optional
+    
+>   import lancedb
+E   ModuleNotFoundError: No module named 'lancedb'
+
+openrecall/server/database/vector_store.py:4: ModuleNotFoundError
+______________ TestAudioChunkProcessor.test_process_missing_file _______________
+
+self = <test_phase2_worker.TestAudioChunkProcessor object at 0x10612b2b0>
+tmp_path = PosixPath('/private/var/folders/q2/gtfbxhrj7zv1xn9cn6f3pzj40000gn/T/pytest-of-pyw/pytest-113/test_process_missing_file0')
+
+    def test_process_missing_file(self, tmp_path):
+>       from openrecall.server.audio.processor import AudioChunkProcessor
+
+tests/test_phase2_worker.py:41: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+openrecall/server/audio/processor.py:9: in <module>
+    from openrecall.server.database import SQLStore
+openrecall/server/database/__init__.py:1: in <module>
+    from .vector_store import VectorStore
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    import logging
+    from typing import List, Tuple, Optional
+    
+>   import lancedb
+E   ModuleNotFoundError: No module named 'lancedb'
+
+openrecall/server/database/vector_store.py:4: ModuleNotFoundError
+________________ TestAudioChunkProcessor.test_process_no_speech ________________
+
+self = <test_phase2_worker.TestAudioChunkProcessor object at 0x10612b460>
+tmp_path = PosixPath('/private/var/folders/q2/gtfbxhrj7zv1xn9cn6f3pzj40000gn/T/pytest-of-pyw/pytest-113/test_process_no_speech0')
+
+    def test_process_no_speech(self, tmp_path):
+        """When VAD finds no speech, result should have 0 transcriptions."""
+>       from openrecall.server.audio.processor import AudioChunkProcessor
+
+tests/test_phase2_worker.py:52: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+openrecall/server/audio/processor.py:9: in <module>
+    from openrecall.server.database import SQLStore
+openrecall/server/database/__init__.py:1: in <module>
+    from .vector_store import VectorStore
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    import logging
+    from typing import List, Tuple, Optional
+    
+>   import lancedb
+E   ModuleNotFoundError: No module named 'lancedb'
+
+openrecall/server/database/vector_store.py:4: ModuleNotFoundError
+_______________ TestAudioChunkProcessor.test_process_with_speech _______________
+
+self = <test_phase2_worker.TestAudioChunkProcessor object at 0x10612b670>
+tmp_path = PosixPath('/private/var/folders/q2/gtfbxhrj7zv1xn9cn6f3pzj40000gn/T/pytest-of-pyw/pytest-113/test_process_with_speech0')
+
+    def test_process_with_speech(self, tmp_path):
+        """Full pipeline with mocked VAD and Whisper."""
+>       from openrecall.server.audio.processor import AudioChunkProcessor
+
+tests/test_phase2_worker.py:80: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+openrecall/server/audio/processor.py:9: in <module>
+    from openrecall.server.database import SQLStore
+openrecall/server/database/__init__.py:1: in <module>
+    from .vector_store import VectorStore
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    import logging
+    from typing import List, Tuple, Optional
+    
+>   import lancedb
+E   ModuleNotFoundError: No module named 'lancedb'
+
+openrecall/server/database/vector_store.py:4: ModuleNotFoundError
+_____________________ TestAudioProcessingWorker.test_init ______________________
+
+self = <test_phase2_worker.TestAudioProcessingWorker object at 0x10612b8e0>
+
+    def test_init(self):
+>       from openrecall.server.audio.worker import AudioProcessingWorker
+
+tests/test_phase2_worker.py:127: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+openrecall/server/audio/worker.py:8: in <module>
+    from openrecall.server.database import SQLStore
+openrecall/server/database/__init__.py:1: in <module>
+    from .vector_store import VectorStore
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    import logging
+    from typing import List, Tuple, Optional
+    
+>   import lancedb
+E   ModuleNotFoundError: No module named 'lancedb'
+
+openrecall/server/database/vector_store.py:4: ModuleNotFoundError
+__________________ TestAudioProcessingWorker.test_stop_event ___________________
+
+self = <test_phase2_worker.TestAudioProcessingWorker object at 0x10612ba60>
+
+    def test_stop_event(self):
+>       from openrecall.server.audio.worker import AudioProcessingWorker
+
+tests/test_phase2_worker.py:134: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+openrecall/server/audio/worker.py:8: in <module>
+    from openrecall.server.database import SQLStore
+openrecall/server/database/__init__.py:1: in <module>
+    from .vector_store import VectorStore
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    import logging
+    from typing import List, Tuple, Optional
+    
+>   import lancedb
+E   ModuleNotFoundError: No module named 'lancedb'
+
+openrecall/server/database/vector_store.py:4: ModuleNotFoundError
+=========================== short test summary info ============================
+ERROR tests/test_phase2_worker.py::TestSQLStoreAudioLifecycle::test_insert_audio_chunk
+ERROR tests/test_phase2_worker.py::TestSQLStoreAudioLifecycle::test_get_audio_chunk_by_id
+ERROR tests/test_phase2_worker.py::TestSQLStoreAudioLifecycle::test_pending_processing_completed_lifecycle
+ERROR tests/test_phase2_worker.py::TestSQLStoreAudioLifecycle::test_pending_processing_failed_lifecycle
+ERROR tests/test_phase2_worker.py::TestSQLStoreAudioLifecycle::test_reset_stuck_audio_chunks
+ERROR tests/test_phase2_worker.py::TestSQLStoreAudioLifecycle::test_get_next_pending_audio_chunk
+ERROR tests/test_phase2_worker.py::TestSQLStoreAudioLifecycle::test_audio_chunk_status_counts
+FAILED tests/test_phase2_worker.py::TestAudioProcessingResult::test_defaults
+FAILED tests/test_phase2_worker.py::TestAudioProcessingResult::test_with_error
+FAILED tests/test_phase2_worker.py::TestAudioChunkProcessor::test_init_lazy
+FAILED tests/test_phase2_worker.py::TestAudioChunkProcessor::test_process_missing_file
+FAILED tests/test_phase2_worker.py::TestAudioChunkProcessor::test_process_no_speech
+FAILED tests/test_phase2_worker.py::TestAudioChunkProcessor::test_process_with_speech
+FAILED tests/test_phase2_worker.py::TestAudioProcessingWorker::test_init - Mo...
+FAILED tests/test_phase2_worker.py::TestAudioProcessingWorker::test_stop_event
+========================= 8 failed, 7 errors in 0.12s ==========================

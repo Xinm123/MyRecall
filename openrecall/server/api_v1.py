@@ -174,8 +174,17 @@ def upload():
             or metadata.get("type") == "video_chunk"
         )
 
+        # Detect audio upload
+        is_audio = (
+            (file.content_type and file.content_type.startswith("audio/"))
+            or (file.filename and file.filename.endswith(".wav"))
+            or metadata.get("type") == "audio_chunk"
+        )
+
         if is_video:
             return _handle_video_upload(file, metadata, start_time)
+        elif is_audio:
+            return _handle_audio_upload(file, metadata, start_time)
         else:
             return _handle_screenshot_upload(file, metadata, start_time)
 
@@ -312,6 +321,63 @@ def _handle_video_upload(file, metadata, start_time):
         }), 500
 
 
+def _handle_audio_upload(file, metadata, start_time):
+    """Handle audio chunk upload."""
+    checksum_raw = str(metadata.get("checksum", "") or "")
+    checksum = checksum_raw.split(":", 1)[1] if checksum_raw.startswith("sha256:") else checksum_raw
+    device_name = metadata.get("device_name", "")
+    timestamp = float(metadata.get("timestamp", 0))
+
+    # Save to server_audio_path
+    settings.server_audio_path.mkdir(parents=True, exist_ok=True)
+    filename = f"{checksum}.wav" if checksum else file.filename
+    audio_path = settings.server_audio_path / filename
+
+    # Validate path stays within audio directory (prevent path traversal)
+    if not audio_path.resolve().is_relative_to(settings.server_audio_path.resolve()):
+        return jsonify({"status": "error", "message": "Invalid file path"}), 400
+
+    file.save(str(audio_path))
+
+    # Verify checksum if provided
+    if checksum:
+        h = hashlib.sha256()
+        with open(audio_path, "rb") as f:
+            for chunk in iter(lambda: f.read(8192), b""):
+                h.update(chunk)
+        actual_checksum = h.hexdigest()
+        if actual_checksum != checksum:
+            logger.warning(f"Audio checksum mismatch: expected {checksum}, got {actual_checksum}")
+
+    # Insert into database
+    chunk_id = sql_store.insert_audio_chunk(
+        file_path=str(audio_path),
+        timestamp=timestamp,
+        device_name=device_name,
+        checksum=checksum,
+    )
+
+    elapsed_ms = (time.perf_counter() - start_time) * 1000
+
+    if chunk_id:
+        return jsonify({
+            "status": "accepted",
+            "chunk_id": chunk_id,
+            "message": "Audio chunk queued for processing",
+            "elapsed_ms": round(elapsed_ms, 1),
+        }), 202
+    else:
+        logger.error(
+            "Audio upload DB insert failed | path=%s | checksum=%s",
+            settings.db_path,
+            checksum or "<none>",
+        )
+        return jsonify({
+            "status": "error",
+            "message": "Failed to insert audio chunk",
+        }), 500
+
+
 @api_v1_bp.route("/search", methods=["GET"])
 @require_auth
 def search_api():
@@ -330,7 +396,7 @@ def search_api():
         for item in results:
             flat = None
 
-            # Newer search engine result shape: dict with snapshot/video_data.
+            # Newer search engine result shape: dict with snapshot/video_data/audio_data.
             if isinstance(item, dict):
                 snap = item.get("snapshot")
                 if snap is not None:
@@ -343,6 +409,19 @@ def search_api():
                         "scene_tag": snap.content.scene_tag,
                         "image_path": snap.image_path,
                         # Phase 1.5 additive optional fields (None when unknown/unavailable)
+                        "focused": None,
+                        "browser_url": None,
+                    }
+                elif item.get("source") == "audio_transcription":
+                    audio_data = item.get("audio_data") or {}
+                    flat = {
+                        "id": f"atranscription:{audio_data.get('id')}",
+                        "timestamp": float(audio_data.get("timestamp") or 0.0),
+                        "app_name": audio_data.get("device_name") or "audio",
+                        "window_title": audio_data.get("transcription") or "",
+                        "caption": audio_data.get("snippet") or audio_data.get("transcription") or "",
+                        "scene_tag": "audio_transcription",
+                        "image_path": "",
                         "focused": None,
                         "browser_url": None,
                     }
@@ -443,6 +522,7 @@ def queue_status():
             cursor.execute("SELECT status, COUNT(*) FROM entries GROUP BY status")
             status_counts = dict(cursor.fetchall())
             video_status_counts = sql_store.get_video_chunk_status_counts(conn)
+            audio_status_counts = sql_store.get_audio_chunk_status_counts(conn)
 
         processing_mode = "LIFO" if pending > settings.processing_lifo_threshold else "FIFO"
 
@@ -458,6 +538,12 @@ def queue_status():
                 "processing": video_status_counts.get("PROCESSING", 0),
                 "completed": video_status_counts.get("COMPLETED", 0),
                 "failed": video_status_counts.get("FAILED", 0),
+            },
+            "audio_queue": {
+                "pending": audio_status_counts.get("PENDING", 0),
+                "processing": audio_status_counts.get("PROCESSING", 0),
+                "completed": audio_status_counts.get("COMPLETED", 0),
+                "failed": audio_status_counts.get("FAILED", 0),
             },
             "config": {
                 "lifo_threshold": settings.processing_lifo_threshold,
@@ -600,7 +686,7 @@ def heartbeat():
 @api_v1_bp.route("/timeline", methods=["GET"])
 @require_auth
 def timeline_api():
-    """Get video frames within a time range with pagination."""
+    """Get unified timeline entries (video frames + audio transcriptions) within a time range."""
     try:
         start_time = float(request.args.get("start_time", 0))
     except (ValueError, TypeError):
@@ -611,15 +697,49 @@ def timeline_api():
         return jsonify({"status": "error", "message": "end_time must be a number"}), 400
 
     limit, offset = _parse_pagination()
+    source_filter = request.args.get("source", "").strip().lower()
 
     try:
-        frames, total = sql_store.query_frames_by_time_range(
-            start_time=start_time,
-            end_time=end_time,
-            limit=limit,
-            offset=offset,
-        )
-        return jsonify(_paginate_response(frames, total, limit, offset)), 200
+        fetch_limit = limit + offset
+
+        frames = []
+        frames_total = 0
+        transcriptions = []
+        trans_total = 0
+
+        # Video frames (unless filtered to audio only)
+        if source_filter not in ("audio", "audio_transcription"):
+            frames, frames_total = sql_store.query_frames_by_time_range(
+                start_time=start_time,
+                end_time=end_time,
+                limit=fetch_limit,
+                offset=0,
+            )
+            for f in frames:
+                f["type"] = "video_frame"
+
+        # Audio transcriptions (unless filtered to video only)
+        if source_filter not in ("video", "video_frame"):
+            try:
+                transcriptions, trans_total = sql_store.get_audio_transcriptions_by_time_range(
+                    start_time=start_time,
+                    end_time=end_time,
+                    limit=fetch_limit,
+                    offset=0,
+                )
+                for t in transcriptions:
+                    t["type"] = "audio_transcription"
+            except Exception:
+                logger.debug("Audio transcriptions query failed (table may not exist yet)")
+
+        # Merge and sort by timestamp descending
+        merged = frames + transcriptions
+        merged.sort(key=lambda x: float(x.get("timestamp", 0)), reverse=True)
+
+        total = frames_total + trans_total
+        page = merged[offset: offset + limit]
+
+        return jsonify(_paginate_response(page, total, limit, offset)), 200
     except Exception as e:
         logger.exception("Error fetching timeline")
         return jsonify({"status": "error", "message": str(e)}), 500
@@ -686,3 +806,78 @@ def upload_status():
         return jsonify({"status": "partial", "bytes_received": partial_path.stat().st_size}), 200
     else:
         return jsonify({"status": "not_found", "bytes_received": 0}), 200
+
+
+# =========================================================================
+# Phase 2: Audio API endpoints
+# =========================================================================
+
+@api_v1_bp.route("/audio/chunks", methods=["GET"])
+@require_auth
+def audio_chunks():
+    """List audio chunks with optional status filter and pagination."""
+    limit, offset = _parse_pagination()
+    status_filter = request.args.get("status")
+
+    try:
+        import sqlite3
+        with sqlite3.connect(str(settings.db_path)) as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+
+            if status_filter:
+                cursor.execute(
+                    "SELECT COUNT(*) FROM audio_chunks WHERE status=?",
+                    (status_filter.upper(),),
+                )
+                total = cursor.fetchone()[0]
+                cursor.execute(
+                    "SELECT * FROM audio_chunks WHERE status=? ORDER BY timestamp DESC LIMIT ? OFFSET ?",
+                    (status_filter.upper(), limit, offset),
+                )
+            else:
+                cursor.execute("SELECT COUNT(*) FROM audio_chunks")
+                total = cursor.fetchone()[0]
+                cursor.execute(
+                    "SELECT * FROM audio_chunks ORDER BY timestamp DESC LIMIT ? OFFSET ?",
+                    (limit, offset),
+                )
+
+            chunks = [dict(row) for row in cursor.fetchall()]
+
+        return jsonify(_paginate_response(chunks, total, limit, offset)), 200
+    except Exception as e:
+        logger.exception("Error fetching audio chunks")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+@api_v1_bp.route("/audio/transcriptions", methods=["GET"])
+@require_auth
+def audio_transcriptions():
+    """List audio transcriptions with optional time range and device filter."""
+    limit, offset = _parse_pagination()
+
+    try:
+        start_time = float(request.args.get("start_time", 0))
+    except (ValueError, TypeError):
+        return jsonify({"status": "error", "message": "start_time must be a number"}), 400
+    try:
+        end_time = float(request.args.get("end_time", time.time()))
+    except (ValueError, TypeError):
+        return jsonify({"status": "error", "message": "end_time must be a number"}), 400
+
+    device = request.args.get("device")
+
+    try:
+        transcriptions, total = sql_store.get_audio_transcriptions_by_time_range(
+            start_time=start_time,
+            end_time=end_time,
+            limit=limit,
+            offset=offset,
+            device=device,
+        )
+
+        return jsonify(_paginate_response(transcriptions, total, limit, offset)), 200
+    except Exception as e:
+        logger.exception("Error fetching audio transcriptions")
+        return jsonify({"status": "error", "message": str(e)}), 500

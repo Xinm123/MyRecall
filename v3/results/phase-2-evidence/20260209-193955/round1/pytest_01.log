@@ -1,0 +1,23 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.11.14, pytest-9.0.2, pluggy-1.6.0 -- /opt/homebrew/Caskroom/miniforge/base/envs/v3/bin/python3
+cachedir: .pytest_cache
+rootdir: /Users/pyw/new/MyRecall
+configfile: pytest.ini
+plugins: anyio-4.12.1
+collecting ... collected 13 items
+
+tests/test_phase2_audio_manager.py::TestListAudioDevices::test_returns_input_devices PASSED [  7%]
+tests/test_phase2_audio_manager.py::TestListAudioDevices::test_returns_empty_on_error PASSED [ 15%]
+tests/test_phase2_audio_manager.py::TestAudioManager::test_init_defaults PASSED [ 23%]
+tests/test_phase2_audio_manager.py::TestAudioManager::test_is_alive_false_when_not_started PASSED [ 30%]
+tests/test_phase2_audio_manager.py::TestAudioManager::test_resolve_device_by_index PASSED [ 38%]
+tests/test_phase2_audio_manager.py::TestAudioManager::test_resolve_device_by_name PASSED [ 46%]
+tests/test_phase2_audio_manager.py::TestAudioManager::test_resolve_device_not_found PASSED [ 53%]
+tests/test_phase2_audio_manager.py::TestAudioManager::test_start_new_chunk_creates_wav PASSED [ 61%]
+tests/test_phase2_audio_manager.py::TestAudioManager::test_close_chunk_fires_callback PASSED [ 69%]
+tests/test_phase2_audio_manager.py::TestAudioManager::test_close_empty_chunk_removes_file PASSED [ 76%]
+tests/test_phase2_audio_manager.py::TestAudioManager::test_audio_callback_writes_frames PASSED [ 84%]
+tests/test_phase2_audio_manager.py::TestAudioManager::test_audio_callback_rotates_on_duration PASSED [ 92%]
+tests/test_phase2_audio_manager.py::TestAudioManager::test_stop_flushes_chunk PASSED [100%]
+
+============================== 13 passed in 0.25s ==============================

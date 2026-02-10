@@ -1,0 +1,42 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.11.14, pytest-9.0.2, pluggy-1.6.0 -- /opt/homebrew/Caskroom/miniforge/base/envs/v3/bin/python3
+cachedir: .pytest_cache
+rootdir: /Users/pyw/new/MyRecall
+configfile: pytest.ini
+plugins: anyio-4.12.1
+collecting ... collected 26 items
+
+tests/test_phase2_gates.py::TestGate2F01AudioCapture::test_audio_manager_creates_wav PASSED [  3%]
+tests/test_phase2_gates.py::TestGate2F01AudioCapture::test_audio_manager_device_name_sanitized PASSED [  7%]
+tests/test_phase2_gates.py::TestGate2F02VADFiltering::test_vad_filters_silence PASSED [ 11%]
+tests/test_phase2_gates.py::TestGate2F02VADFiltering::test_vad_detects_speech_subset PASSED [ 15%]
+tests/test_phase2_gates.py::TestGate2F03WhisperTranscription::test_transcriber_produces_text PASSED [ 19%]
+tests/test_phase2_gates.py::TestGate2F03WhisperTranscription::test_transcriber_handles_empty_audio PASSED [ 23%]
+tests/test_phase2_gates.py::TestGate2F04AudioFTSIndexed::test_fts_insert_and_match PASSED [ 26%]
+tests/test_phase2_gates.py::TestGate2F04AudioFTSIndexed::test_fts_no_results_for_unrelated_query PASSED [ 30%]
+tests/test_phase2_gates.py::TestGate2F05UnifiedTimeline::test_timeline_returns_both_types PASSED [ 34%]
+tests/test_phase2_gates.py::TestGate2P01TranscriptionLatency::test_transcription_completes_within_budget PASSED [ 38%]
+tests/test_phase2_gates.py::TestGate2P02VADLatency::test_vad_completes_within_budget PASSED [ 42%]
+tests/test_phase2_gates.py::TestGate2P03Throughput::test_queue_depth_stable PASSED [ 46%]
+tests/test_phase2_gates.py::TestGate2P04AudioCaptureCPU::test_callback_based_design PASSED [ 50%]
+tests/test_phase2_gates.py::TestGate2Q01WERClean::test_wer_clean_under_threshold PASSED [ 53%]
+tests/test_phase2_gates.py::TestGate2Q01WERClean::test_wer_clean_with_one_error PASSED [ 57%]
+tests/test_phase2_gates.py::TestGate2Q02WERNoisy::test_wer_noisy_under_threshold PASSED [ 61%]
+tests/test_phase2_gates.py::TestGate2Q02WERNoisy::test_wer_noisy_boundary PASSED [ 65%]
+tests/test_phase2_gates.py::TestGate2S01Stability::test_24h_continuous_run SKIPPED [ 69%]
+tests/test_phase2_gates.py::TestGate2R01VRAM::test_vram_usage_structural SKIPPED [ 73%]
+tests/test_phase2_gates.py::TestGate2R02StorageRate::test_wav_file_size_reasonable PASSED [ 76%]
+tests/test_phase2_gates.py::TestGate2R02StorageRate::test_daily_storage_estimate PASSED [ 80%]
+tests/test_phase2_gates.py::TestGate2DG01Encryption::test_filevault_status_command PASSED [ 84%]
+tests/test_phase2_gates.py::TestGate2DG01Encryption::test_luks_check_structural SKIPPED [ 88%]
+tests/test_phase2_gates.py::TestGate2DG02Redaction::test_pii_redaction SKIPPED [ 92%]
+tests/test_phase2_gates.py::TestGate2DG03Retention::test_cascade_delete_removes_all PASSED [ 96%]
+tests/test_phase2_gates.py::TestGate2DG03Retention::test_expired_chunks_detected PASSED [100%]
+
+=========================== short test summary info ============================
+SKIPPED [1] tests/test_phase2_gates.py:540: Requires 24 hours of continuous runtime observation
+SKIPPED [1] tests/test_phase2_gates.py:553: No GPU available -- VRAM measurement requires nvidia-smi
+SKIPPED [1] tests/test_phase2_gates.py:627: Linux-only: LUKS check
+SKIPPED [1] tests/test_phase2_gates.py:641: Optional gate -- PII redaction not implemented in Phase 2.0
+======================== 22 passed, 4 skipped in 0.88s =========================
+

@@ -66,6 +66,9 @@ class FFmpegManager:
         self._last_write_completed_monotonic: float = 0.0
         self._write_timeout_supported = os.name != "nt"
         self._current_chunk_started_at: float = 0.0
+        self._chunk_started_monotonic: float = 0.0
+        self._chunk_deadline_monotonic: float = 0.0
+        self._chunk_duration_seconds: float = max(1.0, float(self.chunk_duration))
         self._frames_written_in_chunk: int = 0
         self._frames_per_chunk: int = max(1, int(round(self.fps * self.chunk_duration)))
 
@@ -94,44 +97,58 @@ class FFmpegManager:
 
     @property
     def current_chunk_path(self) -> Optional[str]:
-        if self.pipeline_mode == "chunk_process":
-            active_path = self._active_chunk_path
-            if active_path and Path(active_path).exists():
-                return active_path
+        """Get the path of the currently recording chunk (or None if idle)."""
+        if self._active_chunk_path:
+            return self._active_chunk_path
 
-        if self._last_detected_chunk_path:
-            last_path = Path(self._last_detected_chunk_path)
-            if last_path.exists():
-                return str(last_path)
+        if self._last_detected_chunk_path and Path(self._last_detected_chunk_path).exists():
+            return self._last_detected_chunk_path
 
-        segments = self._read_segment_list()
-        for segment in reversed(segments):
-            segment_path = self.output_dir / segment
-            if segment_path.exists():
-                return str(segment_path)
+        if self.pipeline_mode == "segment":
+            for segment_name in reversed(self._read_segment_list()):
+                segment_path = self.output_dir / segment_name
+                if segment_path.exists():
+                    return str(segment_path)
+
         return None
 
     @property
     def active_chunk_path(self) -> Optional[str]:
-        active_path = self._active_chunk_path
-        if active_path:
-            path_obj = Path(active_path)
-            if path_obj.exists():
-                return str(path_obj)
-            if self.pipeline_mode == "chunk_process":
-                return active_path
-        return self.current_chunk_path
+        return self._active_chunk_path
 
     @property
     def write_stuck_seconds(self) -> float:
-        started_at = self._write_inflight_since_monotonic
-        if started_at <= 0:
+        if self._write_inflight_since_monotonic <= 0.0:
             return 0.0
-        return max(0.0, time.monotonic() - started_at)
+        return max(0.0, time.monotonic() - self._write_inflight_since_monotonic)
 
     @property
-    def last_write_completed_monotonic(self) -> float:
-        return self._last_write_completed_monotonic
+    def seconds_since_last_write(self) -> Optional[float]:
+        if self._last_write_completed_monotonic <= 0.0:
+            return None
+        return max(0.0, time.monotonic() - self._last_write_completed_monotonic)
+
+    @property
+    def chunk_age_seconds(self) -> float:
+        if self._chunk_started_monotonic <= 0.0:
+            return 0.0
+        return max(0.0, time.monotonic() - self._chunk_started_monotonic)
+
+    @property
+    def chunk_deadline_in_seconds(self) -> float:
+        if self._chunk_deadline_monotonic <= 0.0:
+            return 0.0
+        return self._chunk_deadline_monotonic - time.monotonic()
+
+    def get_current_chunk_duration(self) -> float:
+        """Get the duration of the current chunk being recorded in seconds."""
+        if self._current_chunk_started_at == 0.0:
+            return 0.0
+        return time.time() - self._current_chunk_started_at
+
+    def get_current_chunk_start_time(self) -> float:
+        """Get the start time of the current chunk in seconds since epoch."""
+        return self._current_chunk_started_at
 
     def is_alive(self) -> bool:
         return self._process is not None and self._process.poll() is None
@@ -141,7 +158,9 @@ class FFmpegManager:
         self._input_profile = None
         self._active_encoder = self._select_default_encoder()
         self._encoder_fallback_used = False
-        self._start_process(self._build_platform_capture_command(), use_pipe_input=False)
+        self._start_process(
+            self._build_platform_capture_command(), use_pipe_input=False
+        )
 
     def start_with_profile(self, profile: PixelFormatProfile) -> None:
         """Start stdin rawvideo mode with the given frame profile."""
@@ -175,10 +194,24 @@ class FFmpegManager:
             self._last_write_completed_monotonic = time.monotonic()
             if (
                 self.pipeline_mode == "chunk_process"
-                and self._input_profile is not None
-                and self._frames_written_in_chunk >= self._frames_per_chunk
+                and self._active_chunk_path
+                and self._chunk_deadline_monotonic <= 0.0
             ):
-                self._rotate_chunk_process()
+                base = (
+                    self._chunk_started_monotonic
+                    if self._chunk_started_monotonic > 0.0
+                    else self._last_write_completed_monotonic
+                )
+                self._chunk_started_monotonic = base
+                self._chunk_deadline_monotonic = base + self._chunk_duration_seconds
+                if self._current_chunk_started_at <= 0.0:
+                    self._current_chunk_started_at = time.time()
+            if (
+                self.pipeline_mode == "chunk_process"
+                and self._chunk_deadline_monotonic > 0.0
+                and time.monotonic() >= self._chunk_deadline_monotonic
+            ):
+                self._rotate_chunk_process(reason="deadline")
             return elapsed
         finally:
             self._write_inflight_since_monotonic = 0.0
@@ -223,6 +256,10 @@ class FFmpegManager:
         self._process = None
         self._active_chunk_path = None
         self._write_inflight_since_monotonic = 0.0
+        self._last_write_completed_monotonic = 0.0
+        self._chunk_started_monotonic = 0.0
+        self._chunk_deadline_monotonic = 0.0
+        self._current_chunk_started_at = 0.0
         self._frames_written_in_chunk = 0
         if self._watchdog_thread is not None:
             self._watchdog_thread.join(timeout=5)
@@ -251,6 +288,10 @@ class FFmpegManager:
                 pass
             self._process = None
             self._write_inflight_since_monotonic = 0.0
+            self._last_write_completed_monotonic = 0.0
+            self._chunk_started_monotonic = 0.0
+            self._chunk_deadline_monotonic = 0.0
+            self._current_chunk_started_at = 0.0
             self._frames_written_in_chunk = 0
 
         if (
@@ -264,7 +305,9 @@ class FFmpegManager:
             return
 
         if self._input_profile is None:
-            self._start_process(self._build_platform_capture_command(), use_pipe_input=False)
+            self._start_process(
+                self._build_platform_capture_command(), use_pipe_input=False
+            )
         else:
             self._start_rawvideo_process(self._input_profile)
 
@@ -300,7 +343,16 @@ class FFmpegManager:
         self._write_inflight_since_monotonic = 0.0
         self._last_write_completed_monotonic = 0.0
         self._frames_written_in_chunk = 0
-        self._current_chunk_started_at = time.time() if active_chunk_path else 0.0
+        if active_chunk_path:
+            now_wallclock = time.time()
+            now_monotonic = time.monotonic()
+            self._current_chunk_started_at = now_wallclock
+            self._chunk_started_monotonic = now_monotonic
+            self._chunk_deadline_monotonic = now_monotonic + self._chunk_duration_seconds
+        else:
+            self._current_chunk_started_at = 0.0
+            self._chunk_started_monotonic = 0.0
+            self._chunk_deadline_monotonic = 0.0
         self._stop_event.clear()
 
         if use_pipe_input and self._write_timeout_supported:
@@ -325,6 +377,7 @@ class FFmpegManager:
         return self._build_platform_capture_command()
 
     def _start_rawvideo_process(self, profile: PixelFormatProfile) -> None:
+        self._chunk_duration_seconds = max(1.0, float(self.chunk_duration))
         self._frames_per_chunk = max(1, int(round(profile.fps * self.chunk_duration)))
         if self.pipeline_mode == "chunk_process":
             output_file = self._next_chunk_file_path()
@@ -350,7 +403,9 @@ class FFmpegManager:
         candidate = self.output_dir / f"monitor_{monitor_id}_{timestamp}.mp4"
         suffix = 1
         while candidate.exists():
-            candidate = self.output_dir / f"monitor_{monitor_id}_{timestamp}_{suffix:02d}.mp4"
+            candidate = (
+                self.output_dir / f"monitor_{monitor_id}_{timestamp}_{suffix:02d}.mp4"
+            )
             suffix += 1
         return str(candidate)
 
@@ -503,7 +558,9 @@ class FFmpegManager:
 
         override = os.getenv("OPENRECALL_AVFOUNDATION_VIDEO_DEVICE", "").strip()
         if override:
-            self._darwin_input_spec = override if ":" in override else f"{override}:none"
+            self._darwin_input_spec = (
+                override if ":" in override else f"{override}:none"
+            )
             logger.warning(
                 "OPENRECALL_AVFOUNDATION_VIDEO_DEVICE is deprecated; "
                 "monitor-id rawvideo pipeline is preferred. Using override=%s",
@@ -555,7 +612,11 @@ class FFmpegManager:
                     self._emit_chunk_completed(segment_path)
 
             process = self._process
-            if process is not None and process.poll() is not None and not self._stop_event.is_set():
+            if (
+                process is not None
+                and process.poll() is not None
+                and not self._stop_event.is_set()
+            ):
                 exit_code = process.returncode
                 logger.error("FFmpeg exited unexpectedly (code=%s)", exit_code)
 
@@ -563,7 +624,10 @@ class FFmpegManager:
                     try:
                         stderr = process.stderr.read()
                         if stderr:
-                            logger.error("FFmpeg stderr: %s", stderr.decode("utf-8", errors="replace")[-500:])
+                            logger.error(
+                                "FFmpeg stderr: %s",
+                                stderr.decode("utf-8", errors="replace")[-500:],
+                            )
                     except Exception:
                         pass
 
@@ -638,6 +702,11 @@ class FFmpegManager:
     def _emit_chunk_started(self, chunk_path: str) -> None:
         self._started_chunk_paths_logged.add(chunk_path)
         self._active_chunk_path = chunk_path
+        self._current_chunk_started_at = time.time()
+        self._chunk_started_monotonic = time.monotonic()
+        self._chunk_deadline_monotonic = (
+            self._chunk_started_monotonic + self._chunk_duration_seconds
+        )
         logger.info(
             "Video chunk recording started | file=%s | monitor_id=%s",
             Path(chunk_path).name,
@@ -665,7 +734,9 @@ class FFmpegManager:
         except Exception:
             self._write_timeout_supported = False
 
-    def _write_with_timeout(self, process: subprocess.Popen, frame_bytes: bytes) -> None:
+    def _write_with_timeout(
+        self, process: subprocess.Popen, frame_bytes: bytes
+    ) -> None:
         stdin = process.stdin
         if stdin is None:
             raise BrokenPipeError("FFmpeg stdin unavailable")
@@ -704,12 +775,24 @@ class FFmpegManager:
                 raise BrokenPipeError("FFmpeg stdin closed during write")
             total += written
 
-    def _rotate_chunk_process(self) -> None:
+    def _rotate_chunk_process(self, reason: str = "unknown") -> None:
         process = self._process
         if process is None:
             return
 
         current_chunk = self._active_chunk_path
+        if self._current_chunk_started_at > 0.0:
+            chunk_age = max(0.0, time.time() - self._current_chunk_started_at)
+        else:
+            chunk_age = 0.0
+        logger.info(
+            "chunk_rotate | reason=%s | file=%s | monitor_id=%s | age=%.1fs",
+            reason,
+            Path(current_chunk).name if current_chunk else "unknown",
+            self.monitor_id,
+            chunk_age,
+        )
+
         try:
             if process.stdin:
                 process.stdin.close()
@@ -726,6 +809,10 @@ class FFmpegManager:
         self._process = None
         self._frames_written_in_chunk = 0
         self._write_inflight_since_monotonic = 0.0
+        self._last_write_completed_monotonic = 0.0
+        self._chunk_started_monotonic = 0.0
+        self._chunk_deadline_monotonic = 0.0
+        self._current_chunk_started_at = 0.0
 
         if current_chunk and Path(current_chunk).exists():
             self._emit_chunk_completed(current_chunk)
@@ -736,7 +823,9 @@ class FFmpegManager:
 
         profile = self._input_profile
         if profile is None:
-            self._start_process(self._build_platform_capture_command(), use_pipe_input=False)
+            self._start_process(
+                self._build_platform_capture_command(), use_pipe_input=False
+            )
             return
         self._start_rawvideo_process(profile)
 

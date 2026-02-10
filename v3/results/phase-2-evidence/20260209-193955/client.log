@@ -1,0 +1,54 @@
+19:42:39 | INFO    | openrecall.client | ==================================================
+19:42:39 | INFO    | openrecall.client | OpenRecall Client Starting
+19:42:39 | INFO    | openrecall.client | ==================================================
+19:42:39 | INFO    | openrecall.client | Debug mode: ON
+19:42:39 | INFO    | openrecall.client | Buffer path: /Users/pyw/MRC/buffer
+19:42:39 | INFO    | openrecall.client | Client screenshots: /Users/pyw/MRC/screenshots (enabled=False)
+19:42:39 | INFO    | openrecall.client | Cache folder: /Users/pyw/MRS/cache
+19:42:39 | INFO    | openrecall.client | Server API: http://localhost:18083/api
+19:42:39 | INFO    | openrecall.client | Capture interval: 20s
+19:42:39 | INFO    | openrecall.client | Upload timeout: 180s
+19:42:39 | INFO    | openrecall.client | Primary monitor only: True
+19:42:39 | INFO    | openrecall.client | Video monitor IDs: auto
+19:42:39 | INFO    | openrecall.client | Profile-change restart: True | Pool max bytes: 67108864
+19:42:39 | INFO    | openrecall.client | SCK retries: max=3 backoff=2s perm_backoff=30s auto_recover=True
+19:42:39 | INFO    | openrecall.client | ==================================================
+19:42:39 | INFO    | openrecall.client.recorder | Recording mode: auto -> video (FFmpeg available)
+19:42:42 | INFO    | openrecall.client.audio_manager | AudioManager started: device=1 (idx=1) rate=16000 channels=1 chunk_duration=60s
+19:42:42 | INFO    | openrecall.client.audio_recorder | Default microphone capture started: MacBook Pro麦克风
+19:42:42 | INFO    | openrecall.client.audio_recorder | AudioRecorder started with 1 device(s)
+19:42:42 | INFO    | openrecall.client | Audio recording started
+19:42:42 | INFO    | openrecall.client.video_recorder | Video recorder started (monitor-id pipeline)
+19:42:42 | INFO    | openrecall.client.consumer | 🚀 Consumer started | Pending uploads: 2
+19:42:42 | INFO    | openrecall.client.video_recorder |   Chunk duration: 60s
+19:42:42 | INFO    | openrecall.client.video_recorder |   FPS: 30, CRF: 23
+19:42:42 | INFO    | openrecall.client.video_recorder |   Pipeline mode: chunk_process | Pipe write timeout: 1500ms | No-progress timeout: 180s
+19:42:42 | INFO    | openrecall.client.video_recorder |   Output dir: /Users/pyw/MRC/video_chunks
+19:42:42 | INFO    | openrecall.client.consumer | Dispatch buffered item | id=20260209_185223_397728_2c797950 | item_type=audio_chunk | target=upload_audio_chunk
+19:42:42 | INFO    | openrecall.client.consumer | Uploading audio chunk | id=20260209_185223_397728_2c797950 | file=1_2026-02-09_18-51-59_343421.wav | size_kb=746.9 | device=default_mic
+19:42:42 | WARNING | openrecall.client.consumer | Audio chunk upload failed | file=1_2026-02-09_18-51-59_343421.wav | device=default_mic
+19:42:42 | WARNING | openrecall.client.consumer | Upload failed. Backing off for 60s (retry #1)
+19:42:42 | INFO    | openrecall.client.video_recorder | Selected monitors: 1
+19:42:42 | WARNING | openrecall.client.video_recorder | Heartbeat failed (network): HTTPConnectionPool(host='localhost', port=18083): Max retries exceeded with url: /api/heartbeat (Caused by NewConnectionError("HTTPConnection(host='localhost', port=18083): Failed to establish a new connection: [Errno 61] Connection refused"))
+19:42:42 | INFO    | openrecall.client.video_recorder | Client status | state=recording | monitor_chunks=1:monitor_1_2026-02-09_10-50-24.mp4 | pending_uploads=2
+19:42:42 | INFO    | openrecall.client.ffmpeg_manager | Starting FFmpeg: ffmpeg -f rawvideo -pixel_format nv12 -video_size 1512x982 -framerate 30 -use_wallclock_as_timestamps 1 -color_range tv -i - -c:v h264_videotoolbox -pix_fmt yuv420p -allow_sw 1 -y /Users/pyw/MRC/video_chunks/monitor_1/monitor_1_2026-02-09_11-42-42.mp4
+19:42:42 | INFO    | openrecall.client.ffmpeg_manager | FFmpeg watchdog started
+19:42:42 | INFO    | openrecall.client.ffmpeg_manager | FFmpeg started (PID=58092)
+19:42:42 | INFO    | openrecall.client.ffmpeg_manager | Video chunk recording started | file=monitor_1_2026-02-09_11-42-42.mp4 | monitor_id=1
+19:42:45 | WARNING | openrecall.client.video_recorder | Slow ffmpeg stdin write monitor=1 latency=80.29ms
+19:42:49 | INFO    | openrecall.client | 
+19:42:49 | INFO    | openrecall.client | Received shutdown signal, stopping client...
+19:42:49 | INFO    | openrecall.client.audio_recorder | Stopping AudioRecorder...
+19:42:49 | WARNING | openrecall.client.video_recorder | Slow ffmpeg stdin write monitor=1 latency=79.59ms
+19:42:49 | INFO    | openrecall.client.buffer | Buffered file (audio_chunk): 1_2026-02-09_19-42-39_720862.wav | Queue: 3 items
+19:42:49 | INFO    | openrecall.client.audio_recorder | Audio chunk buffered: device=default_mic file=1_2026-02-09_19-42-39_720862.wav size=224044 id=20260209_194249_2958...
+19:42:49 | INFO    | openrecall.client.audio_manager | AudioManager(1) stopped
+19:42:49 | INFO    | openrecall.client.audio_recorder | AudioRecorder stopped
+19:42:49 | INFO    | openrecall.client.ffmpeg_manager | FFmpeg watchdog stopped
+19:42:49 | INFO    | openrecall.client.video_recorder | Video chunk recording ended | file=monitor_1_2026-02-09_11-42-42.mp4 | size_mb=3.6 | monitor_id=1
+19:42:49 | INFO    | openrecall.client.buffer | Buffered file (video_chunk): monitor_1_2026-02-09_11-42-42.mp4 | Queue: 4 items
+19:42:49 | INFO    | openrecall.client.video_recorder | Video chunk enqueued: monitor_1_2026-02-09_11-42-42.mp4 (3.6MB monitor_id=1)
+19:42:49 | INFO    | openrecall.client.consumer | Stopping UploaderConsumer...
+19:42:49 | INFO    | openrecall.client.consumer | 🛑 Consumer stopped | Remaining in buffer: 4
+19:42:49 | INFO    | openrecall.client | Client shutdown complete
+Audio upload error: HTTPConnectionPool(host='localhost', port=18083): Max retries exceeded with url: /api/upload (Caused by NewConnectionError("HTTPConnection(host='localhost', port=18083): Failed to establish a new connection: [Errno 61] Connection refused"))

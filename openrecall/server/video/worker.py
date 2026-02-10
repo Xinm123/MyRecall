@@ -25,16 +25,16 @@ class VideoProcessingWorker(threading.Thread):
     def __init__(self):
         super().__init__(daemon=True, name="VideoProcessingWorker")
         self._stop_event = threading.Event()
-        logger.info("VideoProcessingWorker initialized")
+        logger.info("📹 [VIDEO-SERVER] VideoProcessingWorker initialized")
 
     def stop(self):
         """Signal the worker to stop."""
-        logger.info("VideoProcessingWorker stop signal received")
+        logger.info("📹 [VIDEO-SERVER] VideoProcessingWorker stop signal received")
         self._stop_event.set()
 
     def run(self):
         """Main processing loop."""
-        logger.info("VideoProcessingWorker started")
+        logger.info("📹 [VIDEO-SERVER] VideoProcessingWorker started")
 
         sql_store = SQLStore()
         processor = VideoChunkProcessor(sql_store=sql_store)
@@ -46,7 +46,9 @@ class VideoProcessingWorker(threading.Thread):
             # Reset stuck chunks from previous crash
             count = sql_store.reset_stuck_video_chunks(conn)
             if count > 0:
-                logger.warning(f"Recovered {count} stuck video chunks from previous session")
+                logger.warning(
+                    f"Recovered {count} stuck video chunks from previous session"
+                )
 
             while not self._stop_event.is_set():
                 try:
@@ -65,12 +67,17 @@ class VideoProcessingWorker(threading.Thread):
                         chunk_start_time = 0.0
                         try:
                             import datetime
+
                             dt = datetime.datetime.fromisoformat(chunk["created_at"])
                             chunk_start_time = dt.timestamp()
                         except Exception:
                             pass
 
-                    logger.info(f"Processing video chunk {chunk_id}: {chunk_path}")
+                    logger.info(
+                        "📹 [VIDEO-SERVER] Processing chunk | id=%d | path=%s",
+                        chunk_id,
+                        chunk_path,
+                    )
 
                     # Mark as PROCESSING
                     if not sql_store.mark_video_chunk_processing(conn, chunk_id):
@@ -78,12 +85,18 @@ class VideoProcessingWorker(threading.Thread):
                         continue
 
                     # Process the chunk
-                    result = processor.process_chunk(chunk_id, chunk_path, chunk_start_time)
+                    result = processor.process_chunk(
+                        chunk_id, chunk_path, chunk_start_time
+                    )
 
                     # Mark as COMPLETED or FAILED
                     if result.error:
                         sql_store.mark_video_chunk_failed(conn, chunk_id)
-                        logger.error(f"Video chunk {chunk_id} failed: {result.error}")
+                        logger.error(
+                            "📹 [VIDEO-SERVER] ❌ Chunk %d failed: %s",
+                            chunk_id,
+                            result.error,
+                        )
                     else:
                         sql_store.mark_video_chunk_completed(conn, chunk_id)
 
@@ -94,4 +107,6 @@ class VideoProcessingWorker(threading.Thread):
 
         finally:
             conn.close()
-            logger.info("VideoProcessingWorker stopped and connection closed")
+            logger.info(
+                "📹 [VIDEO-SERVER] VideoProcessingWorker stopped and connection closed"
+            )

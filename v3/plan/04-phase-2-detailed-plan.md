@@ -723,7 +723,7 @@ Every gate below is quoted exactly from `/Users/pyw/new/MyRecall/v3/metrics/phas
 | 2-F-01 | Audio Capture Working | Both system audio and microphone captured for 1 hour. Verify audio chunk files created, playable. | WB-02, WB-03 | `test_phase2_audio_recorder.py`, `test_phase2_gates.py` |
 | 2-F-02 | VAD Filtering | Only speech segments transcribed (silence skipped). Compare total audio vs transcribed duration (expect <50%). | WB-08, WB-10 | `test_phase2_vad.py`, `test_phase2_gates.py` |
 | 2-F-03 | Whisper Transcription | All speech segments transcribed and stored in DB. Query `SELECT COUNT(*) FROM audio_transcriptions` after 1 hour. | WB-09, WB-10 | `test_phase2_transcriber.py`, `test_phase2_gates.py` |
-| 2-F-04 | Audio FTS Indexed | Transcriptions searchable via FTS. Query `audio_fts` for known phrase, verify result returned. | WB-07, WB-10, WB-12 | `test_phase2_search.py`, `test_phase2_gates.py` |
+| 2-F-04 | Audio FTS Indexed | Transcriptions searchable via FTS. Query `audio_transcriptions_fts` for known phrase, verify result returned. | WB-07, WB-10, WB-12 | `test_phase2_search.py`, `test_phase2_gates.py` |
 | 2-F-05 | Unified Timeline | Timeline API returns both video frames AND audio transcriptions. `GET /api/v1/timeline`, verify both. | WB-13 | `test_phase2_timeline.py`, `test_phase2_gates.py` |
 
 ### Performance Gates
@@ -774,7 +774,7 @@ Every gate below is quoted exactly from `/Users/pyw/new/MyRecall/v3/metrics/phas
 | `test_phase2_audio_manager.py` | AudioManager lifecycle, device listing, WAV format | WAV 16kHz mono, chunk rotation callback, graceful device unavailable |
 | `test_phase2_audio_recorder.py` | AudioRecorder metadata, checksum, buffer enqueue | Metadata has required keys, checksum valid sha256, buffer.enqueue_file called |
 | `test_phase2_vad.py` | VoiceActivityDetector speech detection | Speech detected in speech file, silence returns empty, threshold configurable |
-| `test_phase2_transcriber.py` | WhisperTranscriber output format | Segments have text/start/end/confidence, engine_name correct, empty audio → empty |
+| `test_phase2_transcriber.py` | WhisperTranscriber output format | Segments have text/start_time/end_time/confidence, engine_name correct, empty audio → empty |
 | `test_phase2_search.py` | Audio FTS search integration | Known phrase found via FTS, results contain audio metadata |
 
 ### 7.2 Integration Tests

@@ -1,0 +1,396 @@
+19:42:39 | DEBUG   | asyncio | Using selector: KqueueSelector
+19:42:44 | DEBUG   | openrecall.server.database.migrations.runner | Migration v1 already applied, skipping
+19:42:44 | DEBUG   | openrecall.server.database.migrations.runner | Migration v2 already applied, skipping
+19:42:44 | DEBUG   | openrecall.server.database.migrations.runner | Migration v3 already applied, skipping
+19:42:44 | DEBUG   | openrecall.server.database.migrations.runner | Migration v4 already applied, skipping
+19:42:44 | DEBUG   | openrecall.server.database.migrations.runner | Migration v5 already applied, skipping
+19:42:44 | DEBUG   | openrecall.server.database.migrations.runner | Migration v6 already applied, skipping
+19:42:44 | DEBUG   | openrecall.server.database.migrations.runner | Migration v7 already applied, skipping
+19:42:44 | INFO    | openrecall.server.database.sql | Database migrations ensured (version=7, elapsed=0.002s)
+19:42:44 | INFO    | openrecall.server.database.vector_store | Creating LanceDB table 'semantic_snapshots'
+19:42:44 | DEBUG   | openrecall.server.database.migrations.runner | Migration v1 already applied, skipping
+19:42:44 | DEBUG   | openrecall.server.database.migrations.runner | Migration v2 already applied, skipping
+19:42:44 | DEBUG   | openrecall.server.database.migrations.runner | Migration v3 already applied, skipping
+19:42:44 | DEBUG   | openrecall.server.database.migrations.runner | Migration v4 already applied, skipping
+19:42:44 | DEBUG   | openrecall.server.database.migrations.runner | Migration v5 already applied, skipping
+19:42:44 | DEBUG   | openrecall.server.database.migrations.runner | Migration v6 already applied, skipping
+19:42:44 | DEBUG   | openrecall.server.database.migrations.runner | Migration v7 already applied, skipping
+19:42:44 | INFO    | openrecall.server.database.sql | Database migrations ensured (version=7, elapsed=0.001s)
+19:42:44 | INFO    | openrecall.server.ai.providers | OpenAIEmbeddingProvider configured: base=https://api.siliconflow.cn/v1 model=Qwen/Qwen3-Embedding-0.6B
+19:42:44 | INFO    | openrecall.server.services.reranker | Initialized APIReranker with URL: https://api.siliconflow.cn/v1/rerank
+19:42:44 | INFO    | openrecall.server.search.engine | SearchEngine initialized with Reranker: api (Qwen/Qwen3-Reranker-0.6B)
+19:42:44 | DEBUG   | openrecall.server.database.migrations.runner | Migration v1 already applied, skipping
+19:42:44 | DEBUG   | openrecall.server.database.migrations.runner | Migration v2 already applied, skipping
+19:42:44 | DEBUG   | openrecall.server.database.migrations.runner | Migration v3 already applied, skipping
+19:42:44 | DEBUG   | openrecall.server.database.migrations.runner | Migration v4 already applied, skipping
+19:42:44 | DEBUG   | openrecall.server.database.migrations.runner | Migration v5 already applied, skipping
+19:42:44 | DEBUG   | openrecall.server.database.migrations.runner | Migration v6 already applied, skipping
+19:42:44 | DEBUG   | openrecall.server.database.migrations.runner | Migration v7 already applied, skipping
+19:42:44 | INFO    | openrecall.server.database.sql | Database migrations ensured (version=7, elapsed=0.001s)
+19:42:44 | DEBUG   | openrecall.server.database.migrations.runner | Migration v1 already applied, skipping
+19:42:44 | DEBUG   | openrecall.server.database.migrations.runner | Migration v2 already applied, skipping
+19:42:44 | DEBUG   | openrecall.server.database.migrations.runner | Migration v3 already applied, skipping
+19:42:44 | DEBUG   | openrecall.server.database.migrations.runner | Migration v4 already applied, skipping
+19:42:44 | DEBUG   | openrecall.server.database.migrations.runner | Migration v5 already applied, skipping
+19:42:44 | DEBUG   | openrecall.server.database.migrations.runner | Migration v6 already applied, skipping
+19:42:44 | DEBUG   | openrecall.server.database.migrations.runner | Migration v7 already applied, skipping
+19:42:44 | INFO    | openrecall.server.database.sql | Database migrations ensured (version=7, elapsed=0.001s)
+19:42:44 | INFO    | openrecall.server | ==================================================
+19:42:44 | INFO    | openrecall.server | OpenRecall Server Starting
+19:42:44 | INFO    | openrecall.server | ==================================================
+19:42:44 | INFO    | openrecall.server | Debug mode: ON
+19:42:44 | INFO    | openrecall.server | Data folder: /Users/pyw/MRS
+19:42:44 | INFO    | openrecall.server | Cache folder: /Users/pyw/MRS/cache
+19:42:44 | INFO    | openrecall.server | Screenshots: /Users/pyw/MRS/screenshots
+19:42:44 | INFO    | openrecall.server | Database: /Users/pyw/MRS/db/recall.db
+19:42:44 | INFO    | openrecall.server | Bind: 127.0.0.1:18083
+19:42:44 | INFO    | openrecall.server | API URL: http://127.0.0.1:18083/api
+19:42:44 | INFO    | openrecall.server | Web UI: http://127.0.0.1:18083
+19:42:44 | INFO    | openrecall.server | Device: cpu
+19:42:44 | INFO    | openrecall.server | Processing: LIFO threshold = 10
+19:42:44 | INFO    | openrecall.server | OCR Provider: doctr
+19:42:44 | INFO    | openrecall.server | ==================================================
+19:42:44 | INFO    | openrecall.server | Model preloading disabled
+19:42:44 | INFO    | openrecall.server.worker | ProcessingWorker initialized
+19:42:44 | INFO    | openrecall.server.worker | 🚀 ProcessingWorker started
+19:42:44 | INFO    | openrecall.server.app | Background Processing Worker started successfully.
+19:42:44 | INFO    | openrecall.server.database.vector_store | Creating LanceDB table 'semantic_snapshots'
+19:42:44 | INFO    | openrecall.server.video.worker | VideoProcessingWorker initialized
+19:42:44 | INFO    | openrecall.server.video.worker | VideoProcessingWorker started
+19:42:44 | INFO    | openrecall.server.app | Video Processing Worker started successfully.
+19:42:44 | DEBUG   | openrecall.server.database.migrations.runner | Migration v1 already applied, skipping
+19:42:44 | DEBUG   | openrecall.server.database.migrations.runner | Migration v2 already applied, skipping
+19:42:44 | DEBUG   | openrecall.server.database.migrations.runner | Migration v3 already applied, skipping
+19:42:44 | DEBUG   | openrecall.server.database.migrations.runner | Migration v4 already applied, skipping
+19:42:44 | DEBUG   | openrecall.server.database.migrations.runner | Migration v5 already applied, skipping
+19:42:44 | DEBUG   | openrecall.server.database.migrations.runner | Migration v6 already applied, skipping
+19:42:44 | DEBUG   | openrecall.server.database.migrations.runner | Migration v7 already applied, skipping
+19:42:44 | INFO    | openrecall.server.database.sql | Database migrations ensured (version=7, elapsed=0.002s)
+19:42:44 | DEBUG   | openrecall.server.database.migrations.runner | Migration v1 already applied, skipping
+19:42:44 | DEBUG   | openrecall.server.database.migrations.runner | Migration v2 already applied, skipping
+19:42:44 | DEBUG   | openrecall.server.database.migrations.runner | Migration v3 already applied, skipping
+19:42:44 | DEBUG   | openrecall.server.database.migrations.runner | Migration v4 already applied, skipping
+19:42:44 | DEBUG   | openrecall.server.database.migrations.runner | Migration v5 already applied, skipping
+19:42:44 | DEBUG   | openrecall.server.database.migrations.runner | Migration v6 already applied, skipping
+19:42:44 | DEBUG   | openrecall.server.database.migrations.runner | Migration v7 already applied, skipping
+19:42:44 | INFO    | openrecall.server.ai.providers | OpenAIProvider configured: base=https://api.siliconflow.cn/v1 model=Qwen/Qwen3-VL-8B-Instruct
+19:42:44 | INFO    | openrecall.server.worker | 🤖 AI Engine initialized: vision=openai, ocr=doctr, embedding=openai, rerank=api(Qwen/Qwen3-Reranker-0.6B)
+19:42:44 | INFO    | openrecall.server.audio.worker | AudioProcessingWorker initialized
+19:42:44 | INFO    | openrecall.server.database.sql | Database migrations ensured (version=7, elapsed=0.002s)
+19:42:44 | INFO    | openrecall.server.audio.worker | AudioProcessingWorker started
+19:42:44 | INFO    | openrecall.server.app | Audio Processing Worker started successfully.
+ * Serving Flask app 'openrecall.server.app'
+ * Debug mode: on
+19:42:44 | INFO    | openrecall.server.database.sql | Reset 1 stuck video chunks from PROCESSING to PENDING
+19:42:44 | WARNING | openrecall.server.video.worker | Recovered 1 stuck video chunks from previous session
+19:42:44 | INFO    | openrecall.server.video.worker | Processing video chunk 2: /Users/pyw/MRS/video_chunks/3bb3d9e8edd26432103d4b4b56e039218d647e5fe3b60753d4ba00a96bc3844e.mp4
+19:42:44 | DEBUG   | openrecall.server.database.migrations.runner | Migration v1 already applied, skipping
+19:42:44 | DEBUG   | openrecall.server.database.migrations.runner | Migration v2 already applied, skipping
+19:42:44 | DEBUG   | openrecall.server.database.migrations.runner | Migration v3 already applied, skipping
+19:42:44 | DEBUG   | openrecall.server.database.migrations.runner | Migration v4 already applied, skipping
+19:42:44 | DEBUG   | openrecall.server.database.migrations.runner | Migration v5 already applied, skipping
+19:42:44 | DEBUG   | openrecall.server.database.migrations.runner | Migration v6 already applied, skipping
+19:42:44 | DEBUG   | openrecall.server.database.migrations.runner | Migration v7 already applied, skipping
+19:42:44 | INFO    | openrecall.server.database.sql | Database migrations ensured (version=7, elapsed=0.011s)
+19:42:44 | INFO    | werkzeug | [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on http://127.0.0.1:18083
+19:42:44 | INFO    | werkzeug | [33mPress CTRL+C to quit[0m
+19:42:45 | INFO    | werkzeug | 127.0.0.1 - - [09/Feb/2026 19:42:45] "GET /api/health HTTP/1.1" 200 -
+19:42:45 | INFO    | werkzeug | 127.0.0.1 - - [09/Feb/2026 19:42:45] "GET /api/v1/health HTTP/1.1" 200 -
+19:42:45 | INFO    | werkzeug | 127.0.0.1 - - [09/Feb/2026 19:42:45] "GET /api/health HTTP/1.1" 200 -
+19:42:45 | INFO    | werkzeug | 127.0.0.1 - - [09/Feb/2026 19:42:45] "GET /api/v1/health HTTP/1.1" 200 -
+19:42:45 | INFO    | openrecall.server.search.engine | Searching for: 'phase2_audio_smoke_keyword' (Time: None-None, Keywords: [])
+19:42:45 | DEBUG   | openrecall.server.search.engine | 🔎 Search Debug Input | q='phase2_audio_smoke_keyword' | parsed.text='phase2_audio_smoke_keyword' | mandatory_keywords=[] | time_utc=None..None | limit=5 | embedding_provider=OpenAIEmbeddingProvider
+19:42:46 | DEBUG   | openrecall.server.search.engine | 🧠 Vector Search | where=None | qvec_len=1024 | candidates=6 | embed_ms=918.8 | vec_ms=97.3
+19:42:46 | DEBUG   | openrecall.server.search.engine | 🧠 Vector Search Summary | where=None | merged=6
+19:42:46 | DEBUG   | openrecall.server.search.engine | 🔤 FTS Search | q='phase2_audio_smoke_keyword' | candidates=0 | fts_ms=0.9
+19:42:46 | DEBUG   | openrecall.server.search.engine | Video FTS | q='phase2_audio_smoke_keyword' | candidates=0
+19:42:46 | DEBUG   | openrecall.server.search.engine | Audio FTS | q='phase2_audio_smoke_keyword' | candidates=0
+19:42:46 | DEBUG   | openrecall.server.search.engine | 🧠 Reranker Input Stats | Candidates=6 | Total Context Length=768 chars | Avg Context Length=128 chars | Query Length=26 chars
+19:42:46 | DEBUG   | openrecall.server.search.engine | 🧠 Reranker Input (Full Context) logged to /Users/pyw/new/MyRecall/logs/rerank_debug.log
+19:42:46 | DEBUG   | openrecall.server.search.engine | 🧠 Reranker Input Preview (Doc 1/6):
+[Metadata]
+App: Unknown
+Title: Unknown
+Time: Monday, 2026-02-09 18:45
+
+[Visual Context]
+Scene: general
+Summary: 
+
+[OCR Content]
+...$$
+19:42:46 | DEBUG   | openrecall.server.search.engine | 🧠 Reranker Input Preview (Doc 2/6):
+[Metadata]
+App: Unknown
+Title: Unknown
+Time: Monday, 2026-02-09 18:46
+
+[Visual Context]
+Scene: general
+Summary: 
+
+[OCR Content]
+...$$
+19:42:47 | DEBUG   | openrecall.server.search.engine | 🧠 Reranked Top Results (Top 6):
+19:42:47 | DEBUG   | openrecall.server.search.engine | #1 Score: 0.0016 | OCR_len=0 Cap_len=0 Pair_len=154 |
+Doc:
+[Metadata]
+App: Unknown
+Title: Unknown
+Time: Monday, 2026-02-09 18:46
+
+[Visual Context]
+Scene: general
+Summary: 
+
+[OCR Content]
+...
+
+19:42:47 | DEBUG   | openrecall.server.search.engine | #2 Score: 0.0015 | OCR_len=0 Cap_len=0 Pair_len=154 |
+Doc:
+[Metadata]
+App: Unknown
+Title: Unknown
+Time: Monday, 2026-02-09 18:50
+
+[Visual Context]
+Scene: general
+Summary: 
+
+[OCR Content]
+...
+
+19:42:47 | DEBUG   | openrecall.server.search.engine | #3 Score: 0.0014 | OCR_len=0 Cap_len=0 Pair_len=154 |
+Doc:
+[Metadata]
+App: Unknown
+Title: Unknown
+Time: Monday, 2026-02-09 18:48
+
+[Visual Context]
+Scene: general
+Summary: 
+
+[OCR Content]
+...
+
+19:42:47 | DEBUG   | openrecall.server.search.engine | #4 Score: 0.0014 | OCR_len=0 Cap_len=0 Pair_len=154 |
+Doc:
+[Metadata]
+App: Unknown
+Title: Unknown
+Time: Monday, 2026-02-09 18:45
+
+[Visual Context]
+Scene: general
+Summary: 
+
+[OCR Content]
+...
+
+19:42:47 | DEBUG   | openrecall.server.search.engine | #5 Score: 0.0014 | OCR_len=0 Cap_len=0 Pair_len=154 |
+Doc:
+[Metadata]
+App: Unknown
+Title: Unknown
+Time: Monday, 2026-02-09 18:49
+
+[Visual Context]
+Scene: general
+Summary: 
+
+[OCR Content]
+...
+
+19:42:47 | DEBUG   | openrecall.server.search.engine | #6 Score: 0.0013 | OCR_len=0 Cap_len=0 Pair_len=154 |
+Doc:
+[Metadata]
+App: Unknown
+Title: Unknown
+Time: Monday, 2026-02-09 18:47
+
+[Visual Context]
+Scene: general
+Summary: 
+
+[OCR Content]
+...
+
+19:42:47 | DEBUG   | openrecall.server.search.engine | Search Summary | results=6 | vector_candidates=6 | fts_candidates=0 | fts_only_added=0 | fts_only_filtered=0 | total_ms=1951.4
+19:42:47 | DEBUG   | openrecall.server.search.engine | Search Filter Summary | where_clause=None | vector_unfiltered=0 | vector_pass=0 | vector_filtered_out=0
+19:42:47 | DEBUG   | openrecall.server.search.engine | FTS-only Missing IDs | count=0
+19:42:47 | DEBUG   | openrecall.server.search.engine | FTS-only Added IDs | count=0
+19:42:47 | DEBUG   | openrecall.server.search.engine | FTS-only Filtered IDs | count=0
+19:42:47 | DEBUG   | openrecall.server.search.engine | FTS Boost Details | count=0
+19:42:47 | DEBUG   | openrecall.server.search.engine | 🔍 Search Debug Report | q='phase2_audio_smoke_keyword' | showing_top=5
+19:42:47 | DEBUG   | openrecall.server.search.engine | #1 [Score: 0.0016] ID=30ce63f9... | Base=0.4902 | Vector=0.4902 (dist=0.5097655057907104, metric=cosine) | FTS_Match=NO (Rank=None, bm25=None, Boost=0.0000) | Rerank=0.0016 (Rank=0) | App='Unknown' Time=1770634019.0 Img=1770634019.png
+19:42:47 | DEBUG   | openrecall.server.search.engine | #2 [Score: 0.0015] ID=d8509dcf... | Base=0.4902 | Vector=0.4902 (dist=0.5097655057907104, metric=cosine) | FTS_Match=NO (Rank=None, bm25=None, Boost=0.0000) | Rerank=0.0015 (Rank=1) | App='Unknown' Time=1770634259.0 Img=1770634259.png
+19:42:47 | DEBUG   | openrecall.server.search.engine | #3 [Score: 0.0014] ID=13b87fe6... | Base=0.4902 | Vector=0.4902 (dist=0.5097655057907104, metric=cosine) | FTS_Match=NO (Rank=None, bm25=None, Boost=0.0000) | Rerank=0.0014 (Rank=2) | App='Unknown' Time=1770634139.0 Img=1770634139.png
+19:42:47 | DEBUG   | openrecall.server.search.engine | #4 [Score: 0.0014] ID=f21c8612... | Base=0.4902 | Vector=0.4902 (dist=0.5097655057907104, metric=cosine) | FTS_Match=NO (Rank=None, bm25=None, Boost=0.0000) | Rerank=0.0014 (Rank=3) | App='Unknown' Time=1770633959.0 Img=1770633959.png
+19:42:47 | DEBUG   | openrecall.server.search.engine | #5 [Score: 0.0014] ID=e0603de3... | Base=0.4898 | Vector=0.4898 (dist=0.5101871490478516, metric=cosine) | FTS_Match=NO (Rank=None, bm25=None, Boost=0.0000) | Rerank=0.0014 (Rank=4) | App='Unknown' Time=1770634199.0 Img=1770634199.png
+19:42:47 | INFO    | werkzeug | 127.0.0.1 - - [09/Feb/2026 19:42:47] "GET /api/search?q=phase2_audio_smoke_keyword&limit=5 HTTP/1.1" 200 -
+19:42:47 | INFO    | werkzeug | 127.0.0.1 - - [09/Feb/2026 19:42:47] "POST /api/heartbeat HTTP/1.1" 200 -
+19:42:47 | INFO    | openrecall.server.database.vector_store | Creating LanceDB table 'semantic_snapshots'
+19:42:47 | DEBUG   | openrecall.server.database.migrations.runner | Migration v1 already applied, skipping
+19:42:47 | DEBUG   | openrecall.server.database.migrations.runner | Migration v2 already applied, skipping
+19:42:47 | DEBUG   | openrecall.server.database.migrations.runner | Migration v3 already applied, skipping
+19:42:47 | DEBUG   | openrecall.server.database.migrations.runner | Migration v4 already applied, skipping
+19:42:47 | DEBUG   | openrecall.server.database.migrations.runner | Migration v5 already applied, skipping
+19:42:47 | DEBUG   | openrecall.server.database.migrations.runner | Migration v6 already applied, skipping
+19:42:47 | DEBUG   | openrecall.server.database.migrations.runner | Migration v7 already applied, skipping
+19:42:47 | INFO    | openrecall.server.database.sql | Database migrations ensured (version=7, elapsed=0.002s)
+19:42:47 | INFO    | openrecall.server.services.reranker | Initialized APIReranker with URL: https://api.siliconflow.cn/v1/rerank
+19:42:47 | INFO    | openrecall.server.search.engine | SearchEngine initialized with Reranker: api (Qwen/Qwen3-Reranker-0.6B)
+19:42:47 | INFO    | openrecall.server.search.engine | Searching for: 'phase2_audio_smoke_keyword' (Time: None-None, Keywords: [])
+19:42:47 | DEBUG   | openrecall.server.search.engine | 🔎 Search Debug Input | q='phase2_audio_smoke_keyword' | parsed.text='phase2_audio_smoke_keyword' | mandatory_keywords=[] | time_utc=None..None | limit=20 | embedding_provider=OpenAIEmbeddingProvider
+19:42:48 | DEBUG   | openrecall.server.search.engine | 🧠 Vector Search | where=None | qvec_len=1024 | candidates=6 | embed_ms=787.6 | vec_ms=9.1
+19:42:48 | DEBUG   | openrecall.server.search.engine | 🧠 Vector Search Summary | where=None | merged=6
+19:42:48 | DEBUG   | openrecall.server.search.engine | 🔤 FTS Search | q='phase2_audio_smoke_keyword' | candidates=0 | fts_ms=0.4
+19:42:48 | DEBUG   | openrecall.server.search.engine | Video FTS | q='phase2_audio_smoke_keyword' | candidates=0
+19:42:48 | DEBUG   | openrecall.server.search.engine | Audio FTS | q='phase2_audio_smoke_keyword' | candidates=0
+19:42:48 | DEBUG   | openrecall.server.search.engine | 🧠 Reranker Input Stats | Candidates=6 | Total Context Length=768 chars | Avg Context Length=128 chars | Query Length=26 chars
+19:42:48 | DEBUG   | openrecall.server.search.engine | 🧠 Reranker Input (Full Context) logged to /Users/pyw/new/MyRecall/logs/rerank_debug.log
+19:42:48 | DEBUG   | openrecall.server.search.engine | 🧠 Reranker Input Preview (Doc 1/6):
+[Metadata]
+App: Unknown
+Title: Unknown
+Time: Monday, 2026-02-09 18:45
+
+[Visual Context]
+Scene: general
+Summary: 
+
+[OCR Content]
+...$$
+19:42:48 | DEBUG   | openrecall.server.search.engine | 🧠 Reranker Input Preview (Doc 2/6):
+[Metadata]
+App: Unknown
+Title: Unknown
+Time: Monday, 2026-02-09 18:46
+
+[Visual Context]
+Scene: general
+Summary: 
+
+[OCR Content]
+...$$
+19:42:49 | DEBUG   | openrecall.server.search.engine | 🧠 Reranked Top Results (Top 6):
+19:42:49 | DEBUG   | openrecall.server.search.engine | #1 Score: 0.0016 | OCR_len=0 Cap_len=0 Pair_len=154 |
+Doc:
+[Metadata]
+App: Unknown
+Title: Unknown
+Time: Monday, 2026-02-09 18:45
+
+[Visual Context]
+Scene: general
+Summary: 
+
+[OCR Content]
+...
+
+19:42:49 | DEBUG   | openrecall.server.search.engine | #2 Score: 0.0015 | OCR_len=0 Cap_len=0 Pair_len=154 |
+Doc:
+[Metadata]
+App: Unknown
+Title: Unknown
+Time: Monday, 2026-02-09 18:46
+
+[Visual Context]
+Scene: general
+Summary: 
+
+[OCR Content]
+...
+
+19:42:49 | DEBUG   | openrecall.server.search.engine | #3 Score: 0.0015 | OCR_len=0 Cap_len=0 Pair_len=154 |
+Doc:
+[Metadata]
+App: Unknown
+Title: Unknown
+Time: Monday, 2026-02-09 18:50
+
+[Visual Context]
+Scene: general
+Summary: 
+
+[OCR Content]
+...
+
+19:42:49 | DEBUG   | openrecall.server.search.engine | #4 Score: 0.0014 | OCR_len=0 Cap_len=0 Pair_len=154 |
+Doc:
+[Metadata]
+App: Unknown
+Title: Unknown
+Time: Monday, 2026-02-09 18:48
+
+[Visual Context]
+Scene: general
+Summary: 
+
+[OCR Content]
+...
+
+19:42:49 | DEBUG   | openrecall.server.search.engine | #5 Score: 0.0014 | OCR_len=0 Cap_len=0 Pair_len=154 |
+Doc:
+[Metadata]
+App: Unknown
+Title: Unknown
+Time: Monday, 2026-02-09 18:49
+
+[Visual Context]
+Scene: general
+Summary: 
+
+[OCR Content]
+...
+
+19:42:49 | DEBUG   | openrecall.server.search.engine | #6 Score: 0.0013 | OCR_len=0 Cap_len=0 Pair_len=154 |
+Doc:
+[Metadata]
+App: Unknown
+Title: Unknown
+Time: Monday, 2026-02-09 18:47
+
+[Visual Context]
+Scene: general
+Summary: 
+
+[OCR Content]
+...
+
+19:42:49 | DEBUG   | openrecall.server.search.engine | Search Summary | results=6 | vector_candidates=6 | fts_candidates=0 | fts_only_added=0 | fts_only_filtered=0 | total_ms=1695.8
+19:42:49 | DEBUG   | openrecall.server.search.engine | Search Filter Summary | where_clause=None | vector_unfiltered=0 | vector_pass=0 | vector_filtered_out=0
+19:42:49 | DEBUG   | openrecall.server.search.engine | FTS-only Missing IDs | count=0
+19:42:49 | DEBUG   | openrecall.server.search.engine | FTS-only Added IDs | count=0
+19:42:49 | DEBUG   | openrecall.server.search.engine | FTS-only Filtered IDs | count=0
+19:42:49 | DEBUG   | openrecall.server.search.engine | FTS Boost Details | count=0
+19:42:49 | DEBUG   | openrecall.server.search.engine | 🔍 Search Debug Report | q='phase2_audio_smoke_keyword' | showing_top=6
+19:42:49 | DEBUG   | openrecall.server.search.engine | #1 [Score: 0.0016] ID=f21c8612... | Base=0.4902 | Vector=0.4902 (dist=0.5097655057907104, metric=cosine) | FTS_Match=NO (Rank=None, bm25=None, Boost=0.0000) | Rerank=0.0016 (Rank=0) | App='Unknown' Time=1770633959.0 Img=1770633959.png
+19:42:49 | DEBUG   | openrecall.server.search.engine | #2 [Score: 0.0015] ID=30ce63f9... | Base=0.4902 | Vector=0.4902 (dist=0.5097655057907104, metric=cosine) | FTS_Match=NO (Rank=None, bm25=None, Boost=0.0000) | Rerank=0.0015 (Rank=1) | App='Unknown' Time=1770634019.0 Img=1770634019.png
+19:42:49 | DEBUG   | openrecall.server.search.engine | #3 [Score: 0.0015] ID=d8509dcf... | Base=0.4902 | Vector=0.4902 (dist=0.5097655057907104, metric=cosine) | FTS_Match=NO (Rank=None, bm25=None, Boost=0.0000) | Rerank=0.0015 (Rank=2) | App='Unknown' Time=1770634259.0 Img=1770634259.png
+19:42:49 | DEBUG   | openrecall.server.search.engine | #4 [Score: 0.0014] ID=13b87fe6... | Base=0.4902 | Vector=0.4902 (dist=0.5097655057907104, metric=cosine) | FTS_Match=NO (Rank=None, bm25=None, Boost=0.0000) | Rerank=0.0014 (Rank=3) | App='Unknown' Time=1770634139.0 Img=1770634139.png
+19:42:49 | DEBUG   | openrecall.server.search.engine | #5 [Score: 0.0014] ID=e0603de3... | Base=0.4898 | Vector=0.4898 (dist=0.5101871490478516, metric=cosine) | FTS_Match=NO (Rank=None, bm25=None, Boost=0.0000) | Rerank=0.0014 (Rank=4) | App='Unknown' Time=1770634199.0 Img=1770634199.png
+19:42:49 | DEBUG   | openrecall.server.search.engine | #6 [Score: 0.0013] ID=4463ce6c... | Base=0.4898 | Vector=0.4898 (dist=0.5101871490478516, metric=cosine) | FTS_Match=NO (Rank=None, bm25=None, Boost=0.0000) | Rerank=0.0013 (Rank=5) | App='Unknown' Time=1770634079.0 Img=1770634079.png
+19:42:49 | INFO    | werkzeug | 127.0.0.1 - - [09/Feb/2026 19:42:49] "GET /api/v1/search?q=phase2_audio_smoke_keyword&page=1&page_size=20 HTTP/1.1" 200 -
+19:42:49 | INFO    | werkzeug | 127.0.0.1 - - [09/Feb/2026 19:42:49] "GET /api/v1/timeline?start_time=0&end_time=4102444800&page=1&page_size=20 HTTP/1.1" 200 -
+19:42:49 | INFO    | werkzeug | 127.0.0.1 - - [09/Feb/2026 19:42:49] "GET /api/v1/audio/chunks?page=1&page_size=20 HTTP/1.1" 200 -
+19:42:49 | INFO    | werkzeug | 127.0.0.1 - - [09/Feb/2026 19:42:49] "GET /api/v1/audio/transcriptions?start_time=0&end_time=4102444800&page=1&page_size=20 HTTP/1.1" 200 -
+19:42:49 | INFO    | openrecall.server | 
+19:42:49 | INFO    | openrecall.server | Received shutdown signal, stopping server...
+19:42:49 | INFO    | openrecall.server | Stopping background worker...
+19:42:49 | INFO    | openrecall.server.worker | Stop signal received
+19:42:49 | INFO    | openrecall.server.worker | ProcessingWorker stopped and connection closed
+19:42:49 | INFO    | openrecall.server | Background worker stopped
+19:42:49 | INFO    | openrecall.server | Stopping video worker...
+19:42:49 | INFO    | openrecall.server.video.worker | VideoProcessingWorker stop signal received
+19:42:54 | INFO    | openrecall.server | Video worker stopped
+19:42:54 | INFO    | openrecall.server | Stopping audio worker...
+19:42:54 | INFO    | openrecall.server.audio.worker | AudioProcessingWorker stop signal received
+19:42:54 | INFO    | openrecall.server.audio.worker | AudioProcessingWorker stopped and connection closed
+19:42:54 | INFO    | openrecall.server | Audio worker stopped
+19:42:54 | INFO    | openrecall.server | Server shutdown complete
+19:42:54 | INFO    | openrecall.server.worker | Stop signal received
+19:42:54 | INFO    | openrecall.server.video.worker | VideoProcessingWorker stop signal received
+19:42:54 | INFO    | openrecall.server.audio.worker | AudioProcessingWorker stop signal received

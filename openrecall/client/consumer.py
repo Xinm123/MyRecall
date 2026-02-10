@@ -77,6 +77,8 @@ class UploaderConsumer(threading.Thread):
                 item_type = item.metadata.get("type")
                 if item_type == "video_chunk":
                     target_uploader = "upload_video_chunk"
+                elif item_type == "audio_chunk":
+                    target_uploader = "upload_audio_chunk"
                 else:
                     target_uploader = "upload_screenshot"
                 logger.info(
@@ -112,6 +114,30 @@ class UploaderConsumer(threading.Thread):
                         file_path=str(item.image_path),
                         metadata=upload_meta,
                     )
+                elif item_type == "audio_chunk":
+                    chunk_path = Path(item.image_path)
+                    chunk_name = str(item.metadata.get("chunk_filename") or chunk_path.name)
+                    file_size_bytes = int(
+                        item.metadata.get("file_size_bytes")
+                        or (chunk_path.stat().st_size if chunk_path.exists() else 0)
+                    )
+                    device_name = str(item.metadata.get("device_name", "") or "unknown")
+                    logger.info(
+                        "Uploading audio chunk | id=%s | file=%s | size_kb=%.1f | device=%s",
+                        item.id,
+                        chunk_name,
+                        file_size_bytes / 1024,
+                        device_name,
+                    )
+                    upload_meta = {
+                        k: v
+                        for k, v in item.metadata.items()
+                        if not str(k).startswith("_")
+                    }
+                    success = self.uploader.upload_audio_chunk(
+                        file_path=str(item.image_path),
+                        metadata=upload_meta,
+                    )
                 else:
                     # Legacy/default path: screenshot image upload.
                     with Image.open(item.image_path) as pil_image:
@@ -139,6 +165,17 @@ class UploaderConsumer(threading.Thread):
                             elapsed_s,
                             remaining,
                         )
+                    elif item_type == "audio_chunk":
+                        self.buffer.commit([item.id])
+                        remaining = self.buffer.count()
+                        logger.info(
+                            "Uploaded audio chunk | file=%s | size_kb=%.1f | device=%s | elapsed=%.2fs | remaining=%s",
+                            chunk_name,
+                            file_size_bytes / 1024,
+                            device_name,
+                            elapsed_s,
+                            remaining,
+                        )
                     else:
                         app_name = item.metadata.get("active_app", "Unknown")
                         logger.info(f"📤 Uploaded: {app_name} | ts={item.metadata.get('timestamp', 0)}")
@@ -154,6 +191,12 @@ class UploaderConsumer(threading.Thread):
                                 chunk_name,
                                 file_size_bytes / (1024 * 1024),
                                 monitor_id,
+                            )
+                        elif item_type == "audio_chunk":
+                            logger.warning(
+                                "Audio chunk upload failed | file=%s | device=%s",
+                                chunk_name,
+                                device_name,
                             )
                         self._handle_failure()
                     

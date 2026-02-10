@@ -897,3 +897,372 @@ class SQLStore:
             logger.error(f"Failed to get expired entries: {e}")
         return results
 
+    # =========================================================================
+    # Phase 2: Audio Chunk Methods
+    # =========================================================================
+
+    def get_audio_chunk_status_counts(self, conn: Optional[sqlite3.Connection] = None) -> dict[str, int]:
+        """Get audio_chunks count grouped by status."""
+        counts: dict[str, int] = {}
+        try:
+            if conn is None:
+                with sqlite3.connect(str(self.db_path)) as local_conn:
+                    if not self._table_exists(local_conn, "audio_chunks"):
+                        return counts
+                    cursor = local_conn.cursor()
+                    cursor.execute("SELECT status, COUNT(*) FROM audio_chunks GROUP BY status")
+                    counts = {str(status): int(count) for status, count in cursor.fetchall()}
+            else:
+                if not self._table_exists(conn, "audio_chunks"):
+                    return counts
+                cursor = conn.cursor()
+                cursor.execute("SELECT status, COUNT(*) FROM audio_chunks GROUP BY status")
+                counts = {str(status): int(count) for status, count in cursor.fetchall()}
+        except sqlite3.Error as e:
+            logger.error(f"Failed to get audio chunk status counts: {e}")
+        return counts
+
+    def insert_audio_chunk(
+        self,
+        file_path: str,
+        timestamp: float,
+        device_name: str = "",
+        checksum: Optional[str] = None,
+        retention_days: Optional[int] = None,
+    ) -> Optional[int]:
+        """Insert a new audio chunk with PENDING status."""
+        days = retention_days if retention_days is not None else settings.retention_days
+        try:
+            with sqlite3.connect(str(self.db_path)) as conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    """INSERT INTO audio_chunks (file_path, timestamp, device_name, checksum, status, expires_at)
+                       VALUES (?, ?, ?, ?, 'PENDING', datetime('now', ?))""",
+                    (file_path, timestamp, device_name, checksum, f"+{days} days"),
+                )
+                conn.commit()
+                return cursor.lastrowid
+        except sqlite3.Error as e:
+            logger.error(f"Failed to insert audio chunk: {e}")
+            return None
+
+    def get_audio_chunk_by_id(self, chunk_id: int) -> Optional[dict]:
+        """Get an audio chunk by its ID."""
+        try:
+            with sqlite3.connect(str(self.db_path)) as conn:
+                conn.row_factory = sqlite3.Row
+                cursor = conn.cursor()
+                cursor.execute("SELECT * FROM audio_chunks WHERE id=?", (chunk_id,))
+                row = cursor.fetchone()
+                return dict(row) if row else None
+        except sqlite3.Error as e:
+            logger.error(f"Failed to get audio chunk {chunk_id}: {e}")
+            return None
+
+    def get_next_pending_audio_chunk(self, conn: sqlite3.Connection) -> Optional[dict]:
+        """Get the next pending audio chunk for processing (FIFO)."""
+        try:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT * FROM audio_chunks WHERE status='PENDING' ORDER BY created_at ASC LIMIT 1"
+            )
+            row = cursor.fetchone()
+            return dict(row) if row else None
+        except sqlite3.Error as e:
+            logger.error(f"Failed to get next pending audio chunk: {e}")
+            return None
+
+    def mark_audio_chunk_processing(self, conn: sqlite3.Connection, chunk_id: int) -> bool:
+        """Mark an audio chunk as PROCESSING."""
+        try:
+            cursor = conn.cursor()
+            cursor.execute(
+                "UPDATE audio_chunks SET status='PROCESSING' WHERE id=? AND status='PENDING'",
+                (chunk_id,),
+            )
+            conn.commit()
+            return cursor.rowcount > 0
+        except sqlite3.Error as e:
+            logger.error(f"Failed to mark audio chunk {chunk_id} as processing: {e}")
+            return False
+
+    def mark_audio_chunk_completed(self, conn: sqlite3.Connection, chunk_id: int) -> bool:
+        """Mark an audio chunk as COMPLETED."""
+        try:
+            cursor = conn.cursor()
+            cursor.execute(
+                "UPDATE audio_chunks SET status='COMPLETED' WHERE id=? AND status='PROCESSING'",
+                (chunk_id,),
+            )
+            conn.commit()
+            return cursor.rowcount > 0
+        except sqlite3.Error as e:
+            logger.error(f"Failed to mark audio chunk {chunk_id} as completed: {e}")
+            return False
+
+    def mark_audio_chunk_failed(self, conn: sqlite3.Connection, chunk_id: int) -> bool:
+        """Mark an audio chunk as FAILED and increment retry_count."""
+        try:
+            cursor = conn.cursor()
+            cursor.execute(
+                "UPDATE audio_chunks SET status='FAILED', retry_count=COALESCE(retry_count,0)+1 WHERE id=?",
+                (chunk_id,),
+            )
+            conn.commit()
+            return cursor.rowcount > 0
+        except sqlite3.Error as e:
+            logger.error(f"Failed to mark audio chunk {chunk_id} as failed: {e}")
+            return False
+
+    def reset_stuck_audio_chunks(self, conn: Optional[sqlite3.Connection] = None, max_retries: int = 3) -> int:
+        """Reset audio chunks stuck in PROCESSING back to PENDING.
+
+        Chunks that have exceeded max_retries stay as FAILED.
+        """
+        count = 0
+        sql = "UPDATE audio_chunks SET status='PENDING' WHERE status='PROCESSING' AND COALESCE(retry_count,0) < ?"
+        try:
+            if conn is None:
+                with sqlite3.connect(str(self.db_path)) as conn:
+                    cursor = conn.cursor()
+                    cursor.execute(sql, (max_retries,))
+                    count = cursor.rowcount
+                    conn.commit()
+            else:
+                cursor = conn.cursor()
+                cursor.execute(sql, (max_retries,))
+                count = cursor.rowcount
+                conn.commit()
+
+            if count > 0:
+                logger.info(f"Reset {count} stuck audio chunks from PROCESSING to PENDING")
+        except sqlite3.Error as e:
+            logger.error(f"Failed to reset stuck audio chunks: {e}")
+        return count
+
+    # =========================================================================
+    # Phase 2: Audio Transcription Methods
+    # =========================================================================
+
+    def insert_audio_transcription(
+        self,
+        audio_chunk_id: int,
+        offset_index: int,
+        timestamp: float,
+        transcription: str,
+        transcription_engine: str = "",
+        speaker_id: Optional[int] = None,
+        start_time: Optional[float] = None,
+        end_time: Optional[float] = None,
+    ) -> Optional[int]:
+        """Insert a transcription record for an audio chunk."""
+        text_length = len(transcription)
+        try:
+            with sqlite3.connect(str(self.db_path)) as conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    """INSERT INTO audio_transcriptions
+                       (audio_chunk_id, offset_index, timestamp, transcription,
+                        transcription_engine, speaker_id, start_time, end_time, text_length)
+                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    (audio_chunk_id, offset_index, timestamp, transcription,
+                     transcription_engine, speaker_id, start_time, end_time, text_length),
+                )
+                conn.commit()
+                return cursor.lastrowid
+        except sqlite3.Error as e:
+            logger.error(f"Failed to insert audio transcription for chunk {audio_chunk_id}: {e}")
+            return None
+
+    def insert_audio_transcription_fts(
+        self,
+        transcription: str,
+        device: str = "",
+        audio_chunk_id: Optional[int] = None,
+        speaker_id: Optional[int] = None,
+        transcription_id: Optional[int] = None,
+    ) -> None:
+        """Insert into the audio_transcriptions_fts FTS5 virtual table.
+
+        Args:
+            transcription_id: If provided, set as the FTS rowid to enable
+                              1:1 join with audio_transcriptions.id.
+        """
+        try:
+            with sqlite3.connect(str(self.db_path)) as conn:
+                if transcription_id is not None:
+                    conn.execute(
+                        "INSERT INTO audio_transcriptions_fts (rowid, transcription, device, audio_chunk_id, speaker_id) VALUES (?, ?, ?, ?, ?)",
+                        (transcription_id, transcription, device, audio_chunk_id, speaker_id),
+                    )
+                else:
+                    conn.execute(
+                        "INSERT INTO audio_transcriptions_fts (transcription, device, audio_chunk_id, speaker_id) VALUES (?, ?, ?, ?)",
+                        (transcription, device, audio_chunk_id, speaker_id),
+                    )
+        except sqlite3.Error as e:
+            logger.error(f"Failed to insert audio FTS for chunk {audio_chunk_id}: {e}")
+
+    def insert_audio_transcription_with_fts(
+        self,
+        audio_chunk_id: int,
+        offset_index: int,
+        timestamp: float,
+        transcription: str,
+        transcription_engine: str = "",
+        speaker_id: Optional[int] = None,
+        start_time: Optional[float] = None,
+        end_time: Optional[float] = None,
+        device: str = "",
+    ) -> Optional[int]:
+        """Insert transcription + FTS atomically in a single transaction."""
+        text_length = len(transcription)
+        try:
+            with sqlite3.connect(str(self.db_path)) as conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    """INSERT INTO audio_transcriptions
+                       (audio_chunk_id, offset_index, timestamp, transcription,
+                        transcription_engine, speaker_id, start_time, end_time, text_length)
+                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    (audio_chunk_id, offset_index, timestamp, transcription,
+                     transcription_engine, speaker_id, start_time, end_time, text_length),
+                )
+                trans_id = cursor.lastrowid
+                if trans_id:
+                    conn.execute(
+                        "INSERT INTO audio_transcriptions_fts "
+                        "(rowid, transcription, device, audio_chunk_id, speaker_id) "
+                        "VALUES (?, ?, ?, ?, ?)",
+                        (trans_id, transcription, device, audio_chunk_id, speaker_id),
+                    )
+                conn.commit()
+                return trans_id
+        except sqlite3.Error as e:
+            logger.error(f"Failed to insert audio transcription+FTS for chunk {audio_chunk_id}: {e}")
+            return None
+
+    # =========================================================================
+    # Phase 2: Audio FTS Search
+    # =========================================================================
+
+    def search_audio_fts(self, query: str, limit: int = 10) -> list:
+        """Search audio transcriptions via FTS5. Returns list of dicts.
+
+        Join uses fts.rowid = at.id for 1:1 mapping (requires insert_audio_transcription_fts
+        to be called with transcription_id). Column aliases match API expectations.
+        """
+        results: list = []
+        try:
+            with sqlite3.connect(str(self.db_path)) as conn:
+                conn.row_factory = sqlite3.Row
+                cursor = conn.cursor()
+                cursor.execute(
+                    """SELECT at.id, at.audio_chunk_id, at.timestamp,
+                              at.start_time, at.end_time, at.transcription,
+                              at.transcription_engine,
+                              fts.device AS device_name, fts.speaker_id,
+                              snippet(audio_transcriptions_fts, 0, '<b>', '</b>', '...', 32) AS snippet,
+                              bm25(audio_transcriptions_fts) AS score
+                       FROM audio_transcriptions_fts fts
+                       JOIN audio_transcriptions at ON fts.rowid = at.id
+                       WHERE audio_transcriptions_fts MATCH ?
+                       ORDER BY score ASC
+                       LIMIT ?""",
+                    (query, limit),
+                )
+                for row in cursor.fetchall():
+                    results.append(dict(row))
+        except sqlite3.Error as e:
+            logger.error(f"Audio FTS search failed: {e}")
+        return results
+
+    def get_audio_transcriptions_by_time_range(
+        self, start_time: float, end_time: float, limit: int = 50, offset: int = 0,
+        device: Optional[str] = None,
+    ) -> tuple[list, int]:
+        """Query audio transcriptions within a time range with pagination."""
+        transcriptions: list = []
+        total = 0
+        try:
+            with sqlite3.connect(str(self.db_path)) as conn:
+                conn.row_factory = sqlite3.Row
+                cursor = conn.cursor()
+
+                # Build WHERE clause with optional device filter
+                where = "at.timestamp >= ? AND at.timestamp <= ?"
+                params: list = [start_time, end_time]
+                if device:
+                    where += " AND ac.device_name = ?"
+                    params.append(device)
+
+                cursor.execute(
+                    f"""SELECT COUNT(*) FROM audio_transcriptions at
+                        JOIN audio_chunks ac ON at.audio_chunk_id = ac.id
+                        WHERE {where}""",
+                    params,
+                )
+                total = cursor.fetchone()[0]
+                cursor.execute(
+                    f"""SELECT at.id, at.audio_chunk_id, at.offset_index, at.timestamp,
+                              at.transcription, at.transcription_engine, at.speaker_id,
+                              at.start_time, at.end_time, at.text_length,
+                              ac.device_name, ac.file_path AS chunk_path
+                       FROM audio_transcriptions at
+                       JOIN audio_chunks ac ON at.audio_chunk_id = ac.id
+                       WHERE {where}
+                       ORDER BY at.timestamp ASC
+                       LIMIT ? OFFSET ?""",
+                    params + [limit, offset],
+                )
+                for row in cursor.fetchall():
+                    transcriptions.append(dict(row))
+        except sqlite3.Error as e:
+            logger.error(f"Failed to query audio transcriptions by time range: {e}")
+        return transcriptions, total
+
+    # =========================================================================
+    # Phase 2: Audio Retention Methods
+    # =========================================================================
+
+    def get_expired_audio_chunks(self) -> list:
+        """Get audio chunks that have expired and are completed."""
+        results: list = []
+        try:
+            with sqlite3.connect(str(self.db_path)) as conn:
+                conn.row_factory = sqlite3.Row
+                cursor = conn.cursor()
+                cursor.execute(
+                    "SELECT * FROM audio_chunks WHERE expires_at < datetime('now') AND status='COMPLETED'"
+                )
+                results = [dict(row) for row in cursor.fetchall()]
+        except sqlite3.Error as e:
+            logger.error(f"Failed to get expired audio chunks: {e}")
+        return results
+
+    def delete_audio_chunk_cascade(self, chunk_id: int) -> int:
+        """Delete an audio chunk and all associated data. Returns number of transcriptions deleted."""
+        transcriptions_deleted = 0
+        try:
+            with sqlite3.connect(str(self.db_path)) as conn:
+                conn.execute("PRAGMA foreign_keys=ON")
+                cursor = conn.cursor()
+                # Delete FTS entries (not covered by CASCADE)
+                cursor.execute(
+                    "DELETE FROM audio_transcriptions_fts WHERE audio_chunk_id = ?",
+                    (chunk_id,),
+                )
+                # Count transcriptions before cascade delete
+                cursor.execute(
+                    "SELECT COUNT(*) FROM audio_transcriptions WHERE audio_chunk_id=?",
+                    (chunk_id,),
+                )
+                transcriptions_deleted = cursor.fetchone()[0]
+                # CASCADE handles audio_transcriptions
+                cursor.execute("DELETE FROM audio_chunks WHERE id=?", (chunk_id,))
+                conn.commit()
+        except sqlite3.Error as e:
+            logger.error(f"Failed to cascade delete audio chunk {chunk_id}: {e}")
+        return transcriptions_deleted
+

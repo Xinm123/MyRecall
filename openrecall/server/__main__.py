@@ -119,9 +119,11 @@ def main():
     preload_ai_models()
     
     # Start workers AFTER preloading models
-    from openrecall.server.app import init_background_worker, init_video_worker
+    from openrecall.server.app import init_background_worker, init_video_worker, init_audio_worker
     init_background_worker(app)
     init_video_worker(app)
+    if settings.audio_enabled:
+        init_audio_worker(app)
 
     # Flag to prevent duplicate signal handling
     _shutting_down = False
@@ -140,6 +142,7 @@ def main():
             workers = [
                 ("background worker", "worker"),
                 ("video worker", "video_worker"),
+                ("audio worker", "audio_worker"),
             ]
             for label, attr in workers:
                 worker = getattr(app, attr, None)
@@ -158,7 +161,7 @@ def main():
     signal.signal(signal.SIGINT, shutdown_handler)
     signal.signal(signal.SIGTERM, shutdown_handler)
     def _shutdown_workers_on_exit():
-        for attr in ("worker", "video_worker"):
+        for attr in ("worker", "video_worker", "audio_worker"):
             worker = getattr(app, attr, None)
             if worker:
                 try:

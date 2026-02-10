@@ -45,7 +45,7 @@ class Settings(BaseSettings):
     - OPENRECALL_VIDEO_PIPE_WRITE_WARN_MS: Warn threshold for ffmpeg stdin write latency
     - OPENRECALL_VIDEO_PIPELINE_MODE: Video pipeline mode (segment|chunk_process)
     - OPENRECALL_VIDEO_PIPE_WRITE_TIMEOUT_MS: Timeout for single ffmpeg stdin write (ms)
-    - OPENRECALL_VIDEO_NO_CHUNK_PROGRESS_TIMEOUT_SECONDS: Restart when chunk boundary has no progress
+    - OPENRECALL_VIDEO_NO_CHUNK_PROGRESS_TIMEOUT_SECONDS: Segment-mode chunk boundary no-progress timeout
     - OPENRECALL_VIDEO_COLOR_RANGE: Raw input color range policy (auto|tv|pc)
     - OPENRECALL_SCK_START_RETRY_MAX: Max short-retry count before degrading to legacy mode
     - OPENRECALL_SCK_RETRY_BACKOFF_SECONDS: Backoff seconds between short SCK retries
@@ -309,7 +309,7 @@ class Settings(BaseSettings):
     video_chunk_duration: int = Field(
         default=60,
         alias="OPENRECALL_VIDEO_CHUNK_DURATION",
-        description="Video chunk duration in seconds (default: 60 = 1 minute)"
+        description="Video chunk duration target in seconds (chunk_process uses strict monotonic wallclock)."
     )
     video_fps: int = Field(
         default=30,
@@ -359,7 +359,7 @@ class Settings(BaseSettings):
     video_no_chunk_progress_timeout_seconds: int = Field(
         default=180,
         alias="OPENRECALL_VIDEO_NO_CHUNK_PROGRESS_TIMEOUT_SECONDS",
-        description="Restart pipeline when chunk boundary has no progress for this many seconds."
+        description="Segment-mode only: restart pipeline when chunk boundary has no progress for this many seconds."
     )
     video_color_range: str = Field(
         default="auto",
@@ -412,7 +412,94 @@ class Settings(BaseSettings):
         alias="OPENRECALL_RETENTION_CHECK_INTERVAL",
         description="Seconds between retention cleanup runs (default: 21600 = 6 hours)"
     )
-    
+
+    # Phase 2: Audio Recording Configuration
+    audio_enabled: bool = Field(
+        default=True,
+        alias="OPENRECALL_AUDIO_ENABLED",
+        description="Enable audio capture (system audio + microphone)"
+    )
+    audio_sample_rate: int = Field(
+        default=16000,
+        alias="OPENRECALL_AUDIO_SAMPLE_RATE",
+        description="Audio sample rate in Hz (16000 for Whisper compatibility)"
+    )
+    audio_channels: int = Field(
+        default=1,
+        alias="OPENRECALL_AUDIO_CHANNELS",
+        description="Audio channels (1=mono for Whisper)"
+    )
+    audio_chunk_duration: int = Field(
+        default=60,
+        alias="OPENRECALL_AUDIO_CHUNK_DURATION",
+        description="Audio chunk duration in seconds"
+    )
+    audio_format: str = Field(
+        default="wav",
+        alias="OPENRECALL_AUDIO_FORMAT",
+        description="Audio file format (wav)"
+    )
+    audio_device_system: str = Field(
+        default="",
+        alias="OPENRECALL_AUDIO_DEVICE_SYSTEM",
+        description="System audio device name or index (requires virtual device like BlackHole on macOS)"
+    )
+    audio_device_mic: str = Field(
+        default="",
+        alias="OPENRECALL_AUDIO_DEVICE_MIC",
+        description="Microphone device name or index (empty=default input)"
+    )
+    audio_vad_threshold: float = Field(
+        default=0.5,
+        alias="OPENRECALL_AUDIO_VAD_THRESHOLD",
+        description="VAD speech probability threshold (0.0-1.0)"
+    )
+    audio_vad_min_speech_ratio: float = Field(
+        default=0.05,
+        alias="OPENRECALL_AUDIO_VAD_MIN_SPEECH_RATIO",
+        description="Minimum speech ratio in chunk required before transcription"
+    )
+    audio_vad_smoothing_window_frames: int = Field(
+        default=10,
+        alias="OPENRECALL_AUDIO_VAD_SMOOTHING_WINDOW_FRAMES",
+        description="Rolling smoothing window size for frame-level VAD decisions"
+    )
+    audio_vad_hysteresis_on_frames: int = Field(
+        default=3,
+        alias="OPENRECALL_AUDIO_VAD_HYSTERESIS_ON_FRAMES",
+        description="Consecutive speech-like frames needed to enter speech state"
+    )
+    audio_vad_hysteresis_off_frames: int = Field(
+        default=5,
+        alias="OPENRECALL_AUDIO_VAD_HYSTERESIS_OFF_FRAMES",
+        description="Consecutive silence-like frames needed to exit speech state"
+    )
+    audio_vad_backend: str = Field(
+        default="silero",
+        alias="OPENRECALL_AUDIO_VAD_BACKEND",
+        description="VAD backend: silero (default) or webrtcvad"
+    )
+    audio_whisper_model: str = Field(
+        default="base",
+        alias="OPENRECALL_AUDIO_WHISPER_MODEL",
+        description="Whisper model size: tiny, base, small, medium, large-v3"
+    )
+    audio_whisper_compute_type: str = Field(
+        default="int8",
+        alias="OPENRECALL_AUDIO_WHISPER_COMPUTE_TYPE",
+        description="Whisper compute type: int8 (CPU), float16 (GPU), float32"
+    )
+    audio_whisper_language: str = Field(
+        default="en",
+        alias="OPENRECALL_AUDIO_WHISPER_LANGUAGE",
+        description="Whisper transcription language code"
+    )
+    audio_whisper_beam_size: int = Field(
+        default=5,
+        alias="OPENRECALL_AUDIO_WHISPER_BEAM_SIZE",
+        description="Whisper beam search size"
+    )
+
     @field_validator(
         "server_data_dir", 
         "client_data_dir", 
@@ -499,6 +586,16 @@ class Settings(BaseSettings):
         return self.client_data_dir / "video_chunks"
 
     @property
+    def client_audio_chunks_path(self) -> Path:
+        """Directory for client-side audio chunk output."""
+        return self.client_data_dir / "audio_chunks"
+
+    @property
+    def server_audio_path(self) -> Path:
+        """Directory for storing audio chunk files (Server side)."""
+        return self.server_data_dir / "audio"
+
+    @property
     def video_monitor_id_list(self) -> list[str]:
         """Parsed list for OPENRECALL_VIDEO_MONITOR_IDS."""
         return [item.strip() for item in self.video_monitor_ids.split(",") if item.strip()]
@@ -527,6 +624,8 @@ class Settings(BaseSettings):
             self.frames_path,
             self.video_chunks_path,
             self.client_video_chunks_path,
+            self.client_audio_chunks_path,
+            self.server_audio_path,
         ]
         
         for directory in directories:

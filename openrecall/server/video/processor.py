@@ -18,6 +18,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class ProcessingResult:
     """Result of processing a single video chunk."""
+
     video_chunk_id: int
     total_frames_extracted: int = 0
     frames_after_dedup: int = 0
@@ -27,8 +28,12 @@ class ProcessingResult:
 
 
 def _validate_frame_offset(
-    frame, video_chunk_id, chunk_path,
-    chunk_start_time, chunk_end_time, prev_offset,
+    frame,
+    video_chunk_id,
+    chunk_path,
+    chunk_start_time,
+    chunk_end_time,
+    prev_offset,
 ) -> Optional[str]:
     """Return rejection reason string, or None if valid.
 
@@ -83,6 +88,7 @@ class VideoChunkProcessor:
         if not self._ocr_initialized:
             try:
                 from openrecall.server.ai.factory import get_ocr_provider
+
                 self._ocr_provider = get_ocr_provider()
             except Exception as e:
                 logger.error(f"Failed to initialize OCR provider: {e}")
@@ -91,7 +97,10 @@ class VideoChunkProcessor:
         return self._ocr_provider
 
     def process_chunk(
-        self, video_chunk_id: int, chunk_path: str, chunk_start_time: float,
+        self,
+        video_chunk_id: int,
+        chunk_path: str,
+        chunk_start_time: float,
     ) -> ProcessingResult:
         """Process a single video chunk through the full pipeline.
 
@@ -109,7 +118,9 @@ class VideoChunkProcessor:
         try:
             # Step 1: Extract and deduplicate frames
             extracted = self.frame_extractor.extract_frames(
-                chunk_path, video_chunk_id, chunk_start_time,
+                chunk_path,
+                video_chunk_id,
+                chunk_start_time,
             )
             result.total_frames_extracted = len(extracted)
             result.frames_after_dedup = sum(1 for f in extracted if f.kept)
@@ -135,8 +146,12 @@ class VideoChunkProcessor:
                 try:
                     # Phase 1.5: Offset guard validation
                     reject_reason = _validate_frame_offset(
-                        frame, video_chunk_id, chunk_path,
-                        chunk_start_time, chunk_end_time, prev_offset,
+                        frame,
+                        video_chunk_id,
+                        chunk_path,
+                        chunk_start_time,
+                        chunk_end_time,
+                        prev_offset,
                     )
                     if reject_reason:
                         logger.warning(
@@ -152,7 +167,9 @@ class VideoChunkProcessor:
                             str(frame.path),
                             reject_reason,
                             chunk_start_time,
-                            f"{chunk_end_time:.3f}" if chunk_end_time is not None else "none",
+                            f"{chunk_end_time:.3f}"
+                            if chunk_end_time is not None
+                            else "none",
                             frame.timestamp,
                             prev_offset,
                             datetime.datetime.now(datetime.timezone.utc).strftime(
@@ -166,8 +183,10 @@ class VideoChunkProcessor:
                     resolved = resolve_frame_metadata(frame_meta, chunk_meta)
                     logger.debug(
                         "Frame %d metadata resolved: source=%s app=%s window=%s",
-                        frame.offset_index, resolved.source,
-                        resolved.app_name, resolved.window_name,
+                        frame.offset_index,
+                        resolved.source,
+                        resolved.app_name,
+                        resolved.window_name,
                     )
 
                     # Step 2: Insert frame record (Phase 1.5: with focused + browser_url)
@@ -181,7 +200,9 @@ class VideoChunkProcessor:
                         browser_url=resolved.browser_url,
                     )
                     if frame_id is None:
-                        logger.error(f"Failed to insert frame record for offset {frame.offset_index}")
+                        logger.error(
+                            f"Failed to insert frame record for offset {frame.offset_index}"
+                        )
                         continue
 
                     prev_offset = frame.offset_index
@@ -193,6 +214,7 @@ class VideoChunkProcessor:
                     except OSError:
                         # Cross-device: copy then delete
                         import shutil
+
                         shutil.copy2(str(frame.path), str(final_path))
                         frame.path.unlink(missing_ok=True)
 
@@ -206,7 +228,9 @@ class VideoChunkProcessor:
                     if text:
                         # Step 5: Insert OCR text (Phase 1.5: real engine name) + FTS
                         self.sql_store.insert_ocr_text(
-                            frame_id, text, ocr_engine=ocr_engine_name,
+                            frame_id,
+                            text,
+                            ocr_engine=ocr_engine_name,
                         )
                         self.sql_store.insert_ocr_text_fts(
                             frame_id,
@@ -217,24 +241,31 @@ class VideoChunkProcessor:
                         result.frames_with_ocr += 1
 
                 except Exception as e:
-                    logger.error(f"Failed processing frame offset {frame.offset_index}: {e}")
+                    logger.error(
+                        f"Failed processing frame offset {frame.offset_index}: {e}"
+                    )
                     continue
 
         except Exception as e:
             result.error = str(e)
-            logger.exception(f"Video chunk processing failed for chunk {video_chunk_id}")
+            logger.exception(
+                f"Video chunk processing failed for chunk {video_chunk_id}"
+            )
 
         result.elapsed_seconds = time.perf_counter() - t0
         logger.info(
-            f"Chunk {video_chunk_id} processed: "
-            f"{result.frames_after_dedup} frames kept, "
-            f"{result.frames_with_ocr} OCR'd in {result.elapsed_seconds:.1f}s"
+            "📹 [VIDEO-SERVER] ✅ Chunk processed | id=%d | frames_kept=%d | ocr_count=%d | elapsed=%.1fs",
+            video_chunk_id,
+            result.frames_after_dedup,
+            result.frames_with_ocr,
+            result.elapsed_seconds,
         )
         return result
 
 
 class _FallbackOCRProvider:
     """Fallback OCR that returns empty text."""
+
     engine_name = "fallback"
 
     def extract_text(self, image_path: str) -> str:
