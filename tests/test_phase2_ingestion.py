@@ -85,6 +85,45 @@ class TestAudioUploadAPI:
             assert row["status"] == "PENDING"
             assert row["device_name"] == "test_mic"
 
+    def test_audio_upload_persists_source_and_timing_metadata(self, flask_client):
+        """Upload stores is_input/source_kind/start_time/end_time metadata."""
+        wav_data = _make_wav_bytes(duration_s=0.5)
+        metadata = {
+            "type": "audio_chunk",
+            "timestamp": 1700000100,
+            "start_time": 1700000098.5,
+            "end_time": 1700000100.0,
+            "device_name": "test_mic",
+            "is_input": True,
+            "source_kind": "input",
+            "checksum": "sha256:meta_test",
+        }
+
+        response = flask_client.post(
+            "/api/v1/upload",
+            data={
+                "file": (io.BytesIO(wav_data), "meta_test.wav", "audio/wav"),
+                "metadata": json.dumps(metadata),
+            },
+            content_type="multipart/form-data",
+        )
+        assert response.status_code == 202
+        chunk_id = response.get_json()["chunk_id"]
+
+        from openrecall.shared.config import settings
+
+        with sqlite3.connect(str(settings.db_path)) as conn:
+            conn.row_factory = sqlite3.Row
+            row = conn.execute(
+                "SELECT * FROM audio_chunks WHERE id=?",
+                (chunk_id,),
+            ).fetchone()
+            assert row is not None
+            assert float(row["start_time"]) == pytest.approx(1700000098.5)
+            assert float(row["end_time"]) == pytest.approx(1700000100.0)
+            assert int(row["is_input"]) == 1
+            assert row["source_kind"] == "input"
+
     def test_audio_upload_by_content_type(self, flask_client):
         """Audio detection should work via content_type."""
         wav_data = _make_wav_bytes(duration_s=0.5)

@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import logging
+from collections import deque
 from dataclasses import dataclass
+from enum import Enum
 from pathlib import Path
-from typing import List, Optional, Union
+from typing import Deque, List, Optional, Union
 
 import numpy as np
 import requests
@@ -19,6 +21,24 @@ SILERO_MODEL_URLS = [
     "https://raw.githubusercontent.com/snakers4/silero-vad/master/src/silero_vad/data/silero_vad.onnx",
     "https://github.com/snakers4/silero-vad/raw/master/src/silero_vad/data/silero_vad.onnx",
 ]
+
+FRAME_HISTORY = 10
+SPEECH_THRESHOLD = 0.5
+SILENCE_THRESHOLD = 0.35
+SPEECH_FRAME_THRESHOLD = 3
+
+AUDIO_TYPE_CHUNK_SAMPLES = 1600
+SILERO_FRAME_SAMPLES = 512
+SILERO_CONTEXT_SAMPLES = 64
+WEBRTC_FRAME_SAMPLES = 320
+
+
+class VadStatus(str, Enum):
+    """Frame-level VAD status after history smoothing."""
+
+    SPEECH = "speech"
+    SILENCE = "silence"
+    UNKNOWN = "unknown"
 
 
 @dataclass
@@ -68,9 +88,22 @@ class VoiceActivityDetector:
         self._backend_used = "none"
         self._initialized = False
 
+        self._prob_history: Deque[float] = deque(maxlen=FRAME_HISTORY)
+        self._silero_stream_state: Optional[np.ndarray] = None
+        self._silero_stream_context = np.zeros(SILERO_CONTEXT_SAMPLES, dtype=np.float32)
+
     @property
     def backend_used(self) -> str:
         return self._backend_used
+
+    def reset_audio_type_state(self) -> None:
+        """Reset history/context/state used by frame-level audio_type decisions."""
+        self._prob_history.clear()
+        self._silero_stream_state = None
+        self._silero_stream_context = np.zeros(
+            SILERO_CONTEXT_SAMPLES,
+            dtype=np.float32,
+        )
 
     def _init_model(self) -> None:
         """Lazy initialize VAD backend."""
@@ -112,6 +145,7 @@ class VoiceActivityDetector:
             providers=["CPUExecutionProvider"],
         )
         self._backend_used = "silero"
+        self.reset_audio_type_state()
         logger.info(
             "🎧 [AUDIO-SERVER] Silero ONNX VAD initialized | model=%s",
             model_path,
@@ -163,6 +197,7 @@ class VoiceActivityDetector:
 
             self._model = webrtcvad.Vad(3)
             self._backend_used = "webrtcvad"
+            self.reset_audio_type_state()
             logger.info("🎧 [AUDIO-SERVER] WebRTC VAD initialized (aggressiveness=3)")
         except Exception as exc:
             self._model = None
@@ -172,6 +207,27 @@ class VoiceActivityDetector:
     def has_speech(self, wav_path: Union[str, Path]) -> bool:
         """Check if a WAV file contains any speech."""
         return len(self.get_speech_segments(wav_path)) > 0
+
+    def audio_type(self, audio_chunk: np.ndarray) -> VadStatus:
+        """Return frame-level speech/silence/unknown with screenpipe-like semantics."""
+        self._init_model()
+        if self._model is None:
+            return VadStatus.SILENCE
+
+        chunk = np.asarray(audio_chunk, dtype=np.float32).reshape(-1)
+        if self._backend_used == "silero":
+            prob = self._silero_audio_type_probability(chunk)
+        elif self._backend_used == "webrtcvad":
+            prob = self._webrtc_audio_type_probability(chunk)
+        else:
+            return VadStatus.SILENCE
+
+        status = self._update_status_with_probability(prob)
+        if status == VadStatus.SPEECH and prob > self.threshold:
+            return VadStatus.SPEECH
+        if status == VadStatus.UNKNOWN:
+            return VadStatus.UNKNOWN
+        return VadStatus.SILENCE
 
     def analyze_chunk(self, wav_path: Union[str, Path]) -> VadAnalysisResult:
         """Analyze a WAV chunk and return segments + chunk-level ratio metrics."""
@@ -203,7 +259,12 @@ class VoiceActivityDetector:
                 backend_used=self._backend_used,
             )
 
-        if audio.size == 0:
+        return self.analyze_audio(audio)
+
+    def analyze_audio(self, audio: np.ndarray) -> VadAnalysisResult:
+        """Analyze audio data and return segment + ratio metrics."""
+        self._init_model()
+        if self._model is None or audio.size == 0:
             return VadAnalysisResult(
                 segments=[],
                 speech_duration_seconds=0.0,
@@ -237,10 +298,61 @@ class VoiceActivityDetector:
         """Detect speech segments in a WAV file."""
         return self.analyze_chunk(wav_path).segments
 
+    def get_speech_segments_from_audio(self, audio: np.ndarray) -> List[SpeechSegment]:
+        """Detect speech segments from in-memory audio data."""
+        return self.analyze_audio(audio).segments
+
     def _frame_sample_count(self) -> int:
-        # WebRTC expects 10/20/30ms frames; we use 20ms (320 samples).
-        # Silero ONNX model is typically run on 32ms windows (512 samples).
-        return 512 if self._backend_used == "silero" else 320
+        return SILERO_FRAME_SAMPLES if self._backend_used == "silero" else WEBRTC_FRAME_SAMPLES
+
+    def _prepare_audio_type_frame(
+        self,
+        audio_chunk: np.ndarray,
+        frame_samples: int,
+    ) -> np.ndarray:
+        frame = np.asarray(audio_chunk, dtype=np.float32).reshape(-1)
+        if frame.size >= frame_samples:
+            return frame[:frame_samples]
+        return np.pad(frame, (0, frame_samples - frame.size))
+
+    def _silero_audio_type_probability(self, audio_chunk: np.ndarray) -> float:
+        frame = self._prepare_audio_type_frame(audio_chunk, SILERO_FRAME_SAMPLES)
+        model_input = np.concatenate((self._silero_stream_context, frame), axis=0)
+        prob, next_state = self._silero_probability(
+            model_input,
+            state=self._silero_stream_state,
+        )
+        self._silero_stream_state = next_state
+        self._silero_stream_context = model_input[-SILERO_CONTEXT_SAMPLES:]
+        return prob
+
+    def _webrtc_audio_type_probability(self, audio_chunk: np.ndarray) -> float:
+        if self._model is None:
+            return 0.0
+
+        frame = self._prepare_audio_type_frame(audio_chunk, WEBRTC_FRAME_SAMPLES)
+        audio_int16 = np.clip(frame, -1.0, 1.0)
+        audio_int16 = (audio_int16 * 32767.0).astype(np.int16)
+        frame_bytes = audio_int16.tobytes()
+        try:
+            is_speech = self._model.is_speech(frame_bytes, 16000)
+            return 1.0 if is_speech else 0.0
+        except Exception:
+            return 0.0
+
+    def _update_status_with_probability(self, prob: float) -> VadStatus:
+        self._prob_history.append(float(prob))
+        if not self._prob_history:
+            return VadStatus.UNKNOWN
+
+        speech_frames = sum(1 for p in self._prob_history if p > SPEECH_THRESHOLD)
+        silence_frames = sum(1 for p in self._prob_history if p < SILENCE_THRESHOLD)
+
+        if speech_frames >= SPEECH_FRAME_THRESHOLD:
+            return VadStatus.SPEECH
+        if silence_frames > len(self._prob_history) / 2:
+            return VadStatus.SILENCE
+        return VadStatus.UNKNOWN
 
     def _compute_frame_scores(self, audio: np.ndarray) -> List[float]:
         if self._backend_used == "silero":
@@ -275,23 +387,32 @@ class VoiceActivityDetector:
         if self._model is None:
             return []
 
-        frame_samples = self._frame_sample_count()
         scores: List[float] = []
+        state: Optional[np.ndarray] = None
+        context = np.zeros(SILERO_CONTEXT_SAMPLES, dtype=np.float32)
 
-        for start in range(0, len(audio), frame_samples):
-            frame = audio[start : start + frame_samples]
-            if len(frame) < frame_samples:
-                frame = np.pad(frame, (0, frame_samples - len(frame)))
+        for start in range(0, len(audio), SILERO_FRAME_SAMPLES):
+            frame = audio[start : start + SILERO_FRAME_SAMPLES]
+            if len(frame) < SILERO_FRAME_SAMPLES:
+                frame = np.pad(frame, (0, SILERO_FRAME_SAMPLES - len(frame)))
             frame = frame.astype(np.float32, copy=False)
-            scores.append(self._silero_probability(frame))
+            model_input = np.concatenate((context, frame), axis=0)
+            prob, state = self._silero_probability(model_input, state=state)
+            scores.append(prob)
+            context = model_input[-SILERO_CONTEXT_SAMPLES:]
 
         return scores
 
-    def _silero_probability(self, frame: np.ndarray) -> float:
+    def _silero_probability(
+        self,
+        frame: np.ndarray,
+        state: Optional[np.ndarray] = None,
+    ) -> tuple[float, Optional[np.ndarray]]:
         """Run one ONNX forward pass and return speech probability."""
         session = self._model
         try:
             feeds = {}
+            next_state = state
             for input_meta in session.get_inputs():
                 name = input_meta.name
                 normalized = name.lower()
@@ -304,20 +425,30 @@ class VoiceActivityDetector:
                         dim if isinstance(dim, int) and dim > 0 else 1
                         for dim in input_meta.shape
                     ]
-                    feeds[name] = np.zeros(shape, dtype=np.float32)
+                    if next_state is None:
+                        next_state = np.zeros(shape, dtype=np.float32)
+                    else:
+                        next_state = np.asarray(next_state, dtype=np.float32)
+                        if tuple(next_state.shape) != tuple(shape):
+                            next_state = np.zeros(shape, dtype=np.float32)
+                    feeds[name] = next_state
                 else:
                     # Best-effort default for optional scalar inputs.
                     feeds[name] = np.array(0, dtype=np.float32)
 
             outputs = session.run(None, feeds)
             if not outputs:
-                return 0.0
+                return 0.0, next_state
 
             value = float(np.array(outputs[0]).reshape(-1)[0])
-            return max(0.0, min(1.0, value))
+            if len(outputs) > 1:
+                candidate_state = np.array(outputs[1], dtype=np.float32)
+                if candidate_state.size > 0:
+                    next_state = candidate_state
+            return max(0.0, min(1.0, value)), next_state
         except Exception as exc:
             logger.debug("🎧 [AUDIO-SERVER] Silero frame inference failed: %s", exc)
-            return 0.0
+            return 0.0, state
 
     def _scores_to_segments(
         self,

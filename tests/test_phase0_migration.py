@@ -226,6 +226,82 @@ class TestGovernanceColumns:
         assert empty_count == 0, f"{empty_count} entries have empty created_at"
 
 
+class TestAudioChunkSourceTimingMigration:
+    """Tests for v3_008 audio source/timing schema enhancements."""
+
+    def test_audio_chunks_new_columns_exist(self, tmp_path):
+        """Audio chunks table includes source/timing columns after migration."""
+        from openrecall.server.database.migrations.runner import MigrationRunner
+
+        db_path = tmp_path / "test.db"
+        _create_test_db(db_path)
+
+        runner = MigrationRunner(db_path)
+        result = runner.run()
+        assert result.success
+
+        ac_cols = _get_columns(db_path, "audio_chunks")
+        assert "start_time" in ac_cols
+        assert "end_time" in ac_cols
+        assert "is_input" in ac_cols
+        assert "source_kind" in ac_cols
+
+    def test_audio_chunks_backfill_source_and_timing(self, tmp_path):
+        """Existing rows are backfilled for source_kind/is_input/start_time/end_time."""
+        from openrecall.server.database.migrations.runner import MigrationRunner
+
+        db_path = tmp_path / "test.db"
+        _create_test_db(db_path)
+
+        conn = sqlite3.connect(str(db_path))
+        conn.execute(
+            """CREATE TABLE IF NOT EXISTS audio_chunks (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                file_path TEXT NOT NULL,
+                timestamp REAL NOT NULL,
+                device_name TEXT DEFAULT '',
+                created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                expires_at TEXT,
+                encrypted INTEGER DEFAULT 0,
+                checksum TEXT,
+                status TEXT DEFAULT 'PENDING',
+                retry_count INTEGER DEFAULT 0
+            )"""
+        )
+        conn.execute(
+            """CREATE TABLE IF NOT EXISTS schema_version (
+                version INTEGER PRIMARY KEY,
+                applied_at TEXT NOT NULL DEFAULT (datetime('now')),
+                description TEXT
+            )"""
+        )
+        for version in range(1, 8):
+            conn.execute(
+                "INSERT OR IGNORE INTO schema_version (version, description) VALUES (?, ?)",
+                (version, f"v3_{version:03d}"),
+            )
+        conn.execute(
+            "INSERT INTO audio_chunks (file_path, timestamp, device_name, status) VALUES (?, ?, ?, ?)",
+            ("/tmp/old.wav", 1700000000.0, "microphone", "PENDING"),
+        )
+        conn.commit()
+        conn.close()
+
+        runner = MigrationRunner(db_path)
+        result = runner.run()
+        assert result.success
+
+        conn = sqlite3.connect(str(db_path))
+        conn.row_factory = sqlite3.Row
+        row = conn.execute("SELECT * FROM audio_chunks WHERE id=1").fetchone()
+        conn.close()
+        assert row is not None
+        assert float(row["start_time"]) == pytest.approx(1700000000.0)
+        assert float(row["end_time"]) == pytest.approx(1700000000.0)
+        assert int(row["is_input"]) == 1
+        assert row["source_kind"] == "input"
+
+
 class TestRollback:
     """Tests for migration rollback."""
 

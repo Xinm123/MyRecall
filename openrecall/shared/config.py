@@ -9,6 +9,13 @@ from pydantic import Field, model_validator, field_validator
 from pydantic_settings import BaseSettings
 
 
+_AUDIO_VAD_SENSITIVITY_DEFAULTS = {
+    "low": {"threshold": 0.7, "min_speech_ratio": 0.01},
+    "medium": {"threshold": 0.5, "min_speech_ratio": 0.05},
+    "high": {"threshold": 0.3, "min_speech_ratio": 0.2},
+}
+
+
 class Settings(BaseSettings):
     """Application settings with automatic directory creation.
     
@@ -449,6 +456,11 @@ class Settings(BaseSettings):
         alias="OPENRECALL_AUDIO_DEVICE_MIC",
         description="Microphone device name or index (empty=default input)"
     )
+    audio_vad_sensitivity: str = Field(
+        default="high",
+        alias="OPENRECALL_AUDIO_VAD_SENSITIVITY",
+        description="VAD sensitivity preset (low|medium|high)"
+    )
     audio_vad_threshold: float = Field(
         default=0.5,
         alias="OPENRECALL_AUDIO_VAD_THRESHOLD",
@@ -521,6 +533,50 @@ class Settings(BaseSettings):
         if normalized not in {"segment", "chunk_process"}:
             raise ValueError("OPENRECALL_VIDEO_PIPELINE_MODE must be one of: segment, chunk_process")
         return normalized
+
+    @field_validator("audio_vad_sensitivity")
+    @classmethod
+    def validate_audio_vad_sensitivity(cls, v: str) -> str:
+        normalized = (v or "").strip().lower()
+        if normalized not in _AUDIO_VAD_SENSITIVITY_DEFAULTS:
+            raise ValueError("OPENRECALL_AUDIO_VAD_SENSITIVITY must be one of: low, medium, high")
+        return normalized
+
+    @model_validator(mode="before")
+    @classmethod
+    def apply_audio_vad_sensitivity_defaults(cls, values):
+        if not isinstance(values, dict):
+            return values
+
+        resolved = dict(values)
+        sensitivity_raw = resolved.get(
+            "OPENRECALL_AUDIO_VAD_SENSITIVITY",
+            resolved.get("audio_vad_sensitivity", "high"),
+        )
+        sensitivity = str(sensitivity_raw or "high").strip().lower()
+        if not sensitivity:
+            sensitivity = "high"
+        resolved["OPENRECALL_AUDIO_VAD_SENSITIVITY"] = sensitivity
+
+        # Keep invalid values for field validation; do not silently coerce.
+        if sensitivity not in _AUDIO_VAD_SENSITIVITY_DEFAULTS:
+            return resolved
+
+        threshold_explicit = (
+            "OPENRECALL_AUDIO_VAD_THRESHOLD" in resolved
+            or "audio_vad_threshold" in resolved
+        )
+        min_ratio_explicit = (
+            "OPENRECALL_AUDIO_VAD_MIN_SPEECH_RATIO" in resolved
+            or "audio_vad_min_speech_ratio" in resolved
+        )
+
+        mapped = _AUDIO_VAD_SENSITIVITY_DEFAULTS[sensitivity]
+        if not threshold_explicit:
+            resolved["OPENRECALL_AUDIO_VAD_THRESHOLD"] = mapped["threshold"]
+        if not min_ratio_explicit:
+            resolved["OPENRECALL_AUDIO_VAD_MIN_SPEECH_RATIO"] = mapped["min_speech_ratio"]
+        return resolved
 
     model_config = {
         "env_prefix": "",

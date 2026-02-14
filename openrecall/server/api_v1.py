@@ -140,6 +140,40 @@ def _parse_pagination(default_limit: int = 50, max_limit: int = 1000) -> tuple:
     return limit, offset
 
 
+def _parse_optional_float(value):
+    """Parse optional float query/metadata values."""
+    if value is None:
+        return None
+    if isinstance(value, str) and value.strip() == "":
+        return None
+    return float(value)
+
+
+def _parse_bool_like(value):
+    """Parse bool-like values from metadata payloads."""
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        return bool(int(value))
+    if isinstance(value, str):
+        text = value.strip().lower()
+        if text in {"1", "true", "yes", "y", "on"}:
+            return True
+        if text in {"0", "false", "no", "n", "off"}:
+            return False
+    return None
+
+
+def _normalize_source_filter(value: str) -> str:
+    """Normalize source filter value to input/output/unknown."""
+    source = (value or "").strip().lower()
+    if not source:
+        return ""
+    if source in {"input", "output", "unknown"}:
+        return source
+    raise ValueError("source must be one of input, output, unknown")
+
+
 @api_v1_bp.route("/health", methods=["GET"])
 @require_auth
 def health():
@@ -327,6 +361,13 @@ def _handle_audio_upload(file, metadata, start_time):
     checksum = checksum_raw.split(":", 1)[1] if checksum_raw.startswith("sha256:") else checksum_raw
     device_name = metadata.get("device_name", "")
     timestamp = float(metadata.get("timestamp", 0))
+    try:
+        chunk_start_time = _parse_optional_float(metadata.get("start_time"))
+        chunk_end_time = _parse_optional_float(metadata.get("end_time"))
+    except (TypeError, ValueError):
+        return jsonify({"status": "error", "message": "start_time/end_time must be numbers"}), 400
+    source_kind = (metadata.get("source_kind") or "").strip().lower() or None
+    is_input = _parse_bool_like(metadata.get("is_input"))
 
     # Save to server_audio_path
     settings.server_audio_path.mkdir(parents=True, exist_ok=True)
@@ -355,6 +396,10 @@ def _handle_audio_upload(file, metadata, start_time):
         timestamp=timestamp,
         device_name=device_name,
         checksum=checksum,
+        start_time=chunk_start_time,
+        end_time=chunk_end_time,
+        is_input=is_input,
+        source_kind=source_kind,
     )
 
     elapsed_ms = (time.perf_counter() - start_time) * 1000
@@ -815,9 +860,22 @@ def upload_status():
 @api_v1_bp.route("/audio/chunks", methods=["GET"])
 @require_auth
 def audio_chunks():
-    """List audio chunks with optional status filter and pagination."""
+    """List audio chunks with optional filters and pagination."""
     limit, offset = _parse_pagination()
     status_filter = request.args.get("status")
+    device_filter = request.args.get("device")
+    sort_order = (request.args.get("sort", "desc") or "desc").strip().lower()
+    if sort_order not in {"asc", "desc"}:
+        return jsonify({"status": "error", "message": "sort must be asc or desc"}), 400
+    try:
+        source_filter = _normalize_source_filter(request.args.get("source", ""))
+    except ValueError as e:
+        return jsonify({"status": "error", "message": str(e)}), 400
+    try:
+        start_time = _parse_optional_float(request.args.get("start_time"))
+        end_time = _parse_optional_float(request.args.get("end_time"))
+    except (ValueError, TypeError):
+        return jsonify({"status": "error", "message": "start_time/end_time must be numbers"}), 400
 
     try:
         import sqlite3
@@ -825,24 +883,44 @@ def audio_chunks():
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
 
+            where_clauses = []
+            params = []
             if status_filter:
-                cursor.execute(
-                    "SELECT COUNT(*) FROM audio_chunks WHERE status=?",
-                    (status_filter.upper(),),
-                )
-                total = cursor.fetchone()[0]
-                cursor.execute(
-                    "SELECT * FROM audio_chunks WHERE status=? ORDER BY timestamp DESC LIMIT ? OFFSET ?",
-                    (status_filter.upper(), limit, offset),
-                )
-            else:
-                cursor.execute("SELECT COUNT(*) FROM audio_chunks")
-                total = cursor.fetchone()[0]
-                cursor.execute(
-                    "SELECT * FROM audio_chunks ORDER BY timestamp DESC LIMIT ? OFFSET ?",
-                    (limit, offset),
-                )
+                where_clauses.append("ac.status = ?")
+                params.append(status_filter.upper())
+            if device_filter:
+                where_clauses.append("ac.device_name = ?")
+                params.append(device_filter)
+            if source_filter:
+                where_clauses.append("COALESCE(ac.source_kind, 'unknown') = ?")
+                params.append(source_filter)
+            if start_time is not None:
+                where_clauses.append("ac.timestamp >= ?")
+                params.append(start_time)
+            if end_time is not None:
+                where_clauses.append("ac.timestamp <= ?")
+                params.append(end_time)
+            where_sql = (" WHERE " + " AND ".join(where_clauses)) if where_clauses else ""
 
+            cursor.execute(f"SELECT COUNT(*) FROM audio_chunks ac{where_sql}", params)
+            total = cursor.fetchone()[0]
+            cursor.execute(
+                f"""SELECT ac.*,
+                           COALESCE(t.transcriptions_count, 0) AS transcriptions_count,
+                           t.latest_transcription_at
+                    FROM audio_chunks ac
+                    LEFT JOIN (
+                        SELECT audio_chunk_id,
+                               COUNT(*) AS transcriptions_count,
+                               MAX(timestamp) AS latest_transcription_at
+                        FROM audio_transcriptions
+                        GROUP BY audio_chunk_id
+                    ) t ON t.audio_chunk_id = ac.id
+                    {where_sql}
+                    ORDER BY ac.timestamp {sort_order.upper()}
+                    LIMIT ? OFFSET ?""",
+                params + [limit, offset],
+            )
             chunks = [dict(row) for row in cursor.fetchall()]
 
         return jsonify(_paginate_response(chunks, total, limit, offset)), 200
@@ -854,7 +932,7 @@ def audio_chunks():
 @api_v1_bp.route("/audio/transcriptions", methods=["GET"])
 @require_auth
 def audio_transcriptions():
-    """List audio transcriptions with optional time range and device filter."""
+    """List audio transcriptions with optional filters and pagination."""
     limit, offset = _parse_pagination()
 
     try:
@@ -867,6 +945,13 @@ def audio_transcriptions():
         return jsonify({"status": "error", "message": "end_time must be a number"}), 400
 
     device = request.args.get("device")
+    sort_order = (request.args.get("sort", "asc") or "asc").strip().lower()
+    if sort_order not in {"asc", "desc"}:
+        return jsonify({"status": "error", "message": "sort must be asc or desc"}), 400
+    try:
+        source_filter = _normalize_source_filter(request.args.get("source", ""))
+    except ValueError as e:
+        return jsonify({"status": "error", "message": str(e)}), 400
 
     try:
         transcriptions, total = sql_store.get_audio_transcriptions_by_time_range(
@@ -875,9 +960,137 @@ def audio_transcriptions():
             limit=limit,
             offset=offset,
             device=device,
+            source_kind=source_filter or None,
+            sort=sort_order,
         )
+        for item in transcriptions:
+            chunk_id = item.get("audio_chunk_id")
+            item["audio_file_url"] = f"/api/v1/audio/chunks/{chunk_id}/file" if chunk_id else None
 
         return jsonify(_paginate_response(transcriptions, total, limit, offset)), 200
     except Exception as e:
         logger.exception("Error fetching audio transcriptions")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+# =========================================================================
+# Phase 2.5: Audio & Video Dashboard API endpoints
+# =========================================================================
+
+@api_v1_bp.route("/audio/chunks/<int:chunk_id>/file", methods=["GET"])
+@require_auth
+def audio_chunk_file(chunk_id):
+    """Serve an audio chunk WAV file by its database ID."""
+    try:
+        chunk = sql_store.get_audio_chunk_by_id(chunk_id)
+        if chunk is None:
+            return jsonify({"status": "error", "message": "Audio chunk not found"}), 404
+        file_path = Path(chunk["file_path"])
+        if not file_path.exists():
+            return jsonify({"status": "error", "message": "Audio file not found on disk"}), 404
+        # Path traversal prevention (gate 2.5-DG-01)
+        if not file_path.resolve().is_relative_to(settings.server_audio_path.resolve()):
+            return jsonify({"status": "error", "message": "Invalid file path"}), 403
+        return send_from_directory(
+            str(file_path.parent), file_path.name,
+            mimetype="audio/wav",
+        )
+    except Exception as e:
+        logger.exception("Error serving audio chunk file")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+@api_v1_bp.route("/audio/stats", methods=["GET"])
+@require_auth
+def audio_stats():
+    """Get aggregated audio statistics."""
+    try:
+        stats = sql_store.get_audio_stats()
+        return jsonify({"data": stats}), 200
+    except Exception as e:
+        logger.exception("Error fetching audio stats")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+@api_v1_bp.route("/video/chunks", methods=["GET"])
+@require_auth
+def video_chunks():
+    """List video chunks with optional status and monitor_id filter."""
+    limit, offset = _parse_pagination()
+    status_filter = request.args.get("status")
+    monitor_id = request.args.get("monitor_id")
+
+    try:
+        chunks, total = sql_store.get_video_chunks_paginated(
+            limit=limit, offset=offset,
+            status=status_filter, monitor_id=monitor_id,
+        )
+        return jsonify(_paginate_response(chunks, total, limit, offset)), 200
+    except Exception as e:
+        logger.exception("Error fetching video chunks")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+@api_v1_bp.route("/video/chunks/<int:chunk_id>/file", methods=["GET"])
+@require_auth
+def video_chunk_file(chunk_id):
+    """Serve a video chunk MP4 file by its database ID."""
+    try:
+        chunk = sql_store.get_video_chunk_by_id(chunk_id)
+        if chunk is None:
+            return jsonify({"status": "error", "message": "Video chunk not found"}), 404
+        file_path = Path(chunk["file_path"])
+        if not file_path.exists():
+            return jsonify({"status": "error", "message": "Video file not found on disk"}), 404
+        # Path traversal prevention (gate 2.5-DG-01)
+        if not file_path.resolve().is_relative_to(settings.video_chunks_path.resolve()):
+            return jsonify({"status": "error", "message": "Invalid file path"}), 403
+        return send_from_directory(
+            str(file_path.parent), file_path.name,
+            mimetype="video/mp4",
+        )
+    except Exception as e:
+        logger.exception("Error serving video chunk file")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+@api_v1_bp.route("/video/frames", methods=["GET"])
+@require_auth
+def video_frames():
+    """List video frames with pagination and multi-filter."""
+    limit, offset = _parse_pagination()
+    chunk_id = request.args.get("chunk_id", type=int)
+    app_name = request.args.get("app_name")
+    window_name = request.args.get("window_name")
+
+    try:
+        start_time = float(request.args["start_time"]) if "start_time" in request.args else None
+    except (ValueError, TypeError):
+        return jsonify({"status": "error", "message": "start_time must be a number"}), 400
+    try:
+        end_time = float(request.args["end_time"]) if "end_time" in request.args else None
+    except (ValueError, TypeError):
+        return jsonify({"status": "error", "message": "end_time must be a number"}), 400
+
+    try:
+        frames, total = sql_store.get_frames_paginated(
+            limit=limit, offset=offset,
+            chunk_id=chunk_id, app_name=app_name, window_name=window_name,
+            start_time=start_time, end_time=end_time,
+        )
+        return jsonify(_paginate_response(frames, total, limit, offset)), 200
+    except Exception as e:
+        logger.exception("Error fetching video frames")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+@api_v1_bp.route("/video/stats", methods=["GET"])
+@require_auth
+def video_stats():
+    """Get aggregated video statistics."""
+    try:
+        stats = sql_store.get_video_stats()
+        return jsonify({"data": stats}), 200
+    except Exception as e:
+        logger.exception("Error fetching video stats")
         return jsonify({"status": "error", "message": str(e)}), 500

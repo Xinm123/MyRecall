@@ -81,6 +81,10 @@ class AudioChunk(BaseModel):
     id: int | None = None
     file_path: str
     timestamp: float
+    start_time: float | None = None
+    end_time: float | None = None
+    is_input: bool | None = None
+    source_kind: str = "unknown"
     device_name: str = ""
     created_at: str = ""
     expires_at: str | None = None

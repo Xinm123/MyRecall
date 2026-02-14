@@ -922,6 +922,39 @@ class SQLStore:
             logger.error(f"Failed to get audio chunk status counts: {e}")
         return counts
 
+    @staticmethod
+    def _infer_audio_source_kind(device_name: str) -> str:
+        """Infer source kind (input/output/unknown) from device name."""
+        name = (device_name or "").strip().lower()
+        if not name:
+            return "unknown"
+        if any(token in name for token in ("mic", "microphone", "input")):
+            return "input"
+        if any(token in name for token in ("system", "speaker", "loopback", "output")):
+            return "output"
+        return "unknown"
+
+    @staticmethod
+    def _normalize_audio_source_kind(source_kind: Optional[str], device_name: str) -> str:
+        """Normalize source kind with fallback inference from device name."""
+        raw = (source_kind or "").strip().lower()
+        if raw in {"input", "output", "unknown"}:
+            return raw
+        return SQLStore._infer_audio_source_kind(device_name)
+
+    @staticmethod
+    def _normalize_is_input(is_input: Optional[bool], source_kind: str) -> Optional[int]:
+        """Normalize is_input to SQLite-friendly integer/null."""
+        if is_input is True:
+            return 1
+        if is_input is False:
+            return 0
+        if source_kind == "input":
+            return 1
+        if source_kind == "output":
+            return 0
+        return None
+
     def insert_audio_chunk(
         self,
         file_path: str,
@@ -929,16 +962,38 @@ class SQLStore:
         device_name: str = "",
         checksum: Optional[str] = None,
         retention_days: Optional[int] = None,
+        start_time: Optional[float] = None,
+        end_time: Optional[float] = None,
+        is_input: Optional[bool] = None,
+        source_kind: Optional[str] = None,
     ) -> Optional[int]:
         """Insert a new audio chunk with PENDING status."""
         days = retention_days if retention_days is not None else settings.retention_days
+        normalized_source = self._normalize_audio_source_kind(source_kind, device_name)
+        normalized_is_input = self._normalize_is_input(is_input, normalized_source)
+        chunk_start_time = float(start_time if start_time is not None else timestamp)
+        chunk_end_time = float(end_time if end_time is not None else timestamp)
         try:
             with sqlite3.connect(str(self.db_path)) as conn:
                 cursor = conn.cursor()
                 cursor.execute(
-                    """INSERT INTO audio_chunks (file_path, timestamp, device_name, checksum, status, expires_at)
-                       VALUES (?, ?, ?, ?, 'PENDING', datetime('now', ?))""",
-                    (file_path, timestamp, device_name, checksum, f"+{days} days"),
+                    """INSERT INTO audio_chunks (
+                           file_path, timestamp, start_time, end_time,
+                           device_name, is_input, source_kind,
+                           checksum, status, expires_at
+                       )
+                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'PENDING', datetime('now', ?))""",
+                    (
+                        file_path,
+                        timestamp,
+                        chunk_start_time,
+                        chunk_end_time,
+                        device_name,
+                        normalized_is_input,
+                        normalized_source,
+                        checksum,
+                        f"+{days} days",
+                    ),
                 )
                 conn.commit()
                 return cursor.lastrowid
@@ -1181,6 +1236,8 @@ class SQLStore:
     def get_audio_transcriptions_by_time_range(
         self, start_time: float, end_time: float, limit: int = 50, offset: int = 0,
         device: Optional[str] = None,
+        source_kind: Optional[str] = None,
+        sort: str = "asc",
     ) -> tuple[list, int]:
         """Query audio transcriptions within a time range with pagination."""
         transcriptions: list = []
@@ -1196,6 +1253,10 @@ class SQLStore:
                 if device:
                     where += " AND ac.device_name = ?"
                     params.append(device)
+                if source_kind:
+                    where += " AND COALESCE(ac.source_kind, 'unknown') = ?"
+                    params.append(source_kind)
+                sort_order = "DESC" if str(sort).lower() == "desc" else "ASC"
 
                 cursor.execute(
                     f"""SELECT COUNT(*) FROM audio_transcriptions at
@@ -1208,11 +1269,12 @@ class SQLStore:
                     f"""SELECT at.id, at.audio_chunk_id, at.offset_index, at.timestamp,
                               at.transcription, at.transcription_engine, at.speaker_id,
                               at.start_time, at.end_time, at.text_length,
-                              ac.device_name, ac.file_path AS chunk_path
+                              ac.device_name, ac.file_path AS chunk_path,
+                              ac.source_kind, ac.is_input, ac.created_at AS chunk_created_at
                        FROM audio_transcriptions at
                        JOIN audio_chunks ac ON at.audio_chunk_id = ac.id
                        WHERE {where}
-                       ORDER BY at.timestamp ASC
+                       ORDER BY at.timestamp {sort_order}
                        LIMIT ? OFFSET ?""",
                     params + [limit, offset],
                 )
@@ -1266,3 +1328,200 @@ class SQLStore:
             logger.error(f"Failed to cascade delete audio chunk {chunk_id}: {e}")
         return transcriptions_deleted
 
+    # =========================================================================
+    # Phase 2.5: Dashboard Pagination & Statistics Methods
+    # =========================================================================
+
+    def get_video_chunks_paginated(
+        self,
+        limit: int = 50,
+        offset: int = 0,
+        status: Optional[str] = None,
+        monitor_id: Optional[str] = None,
+    ) -> Tuple[list, int]:
+        """Get video chunks with pagination and optional filters. Returns (chunks, total)."""
+        chunks: list = []
+        total = 0
+        try:
+            with sqlite3.connect(str(self.db_path)) as conn:
+                conn.row_factory = sqlite3.Row
+                cursor = conn.cursor()
+                if not self._table_exists(conn, "video_chunks"):
+                    return chunks, total
+                where_clauses: list = []
+                params: list = []
+                if status:
+                    where_clauses.append("status = ?")
+                    params.append(status.upper())
+                if monitor_id:
+                    where_clauses.append("monitor_id = ?")
+                    params.append(monitor_id)
+                where_sql = (" WHERE " + " AND ".join(where_clauses)) if where_clauses else ""
+                cursor.execute(f"SELECT COUNT(*) FROM video_chunks{where_sql}", params)
+                total = cursor.fetchone()[0]
+                cursor.execute(
+                    f"SELECT * FROM video_chunks{where_sql} ORDER BY created_at DESC LIMIT ? OFFSET ?",
+                    params + [limit, offset],
+                )
+                chunks = [dict(row) for row in cursor.fetchall()]
+        except sqlite3.Error as e:
+            logger.error(f"Failed to get paginated video chunks: {e}")
+        return chunks, total
+
+    def get_frames_paginated(
+        self,
+        limit: int = 50,
+        offset: int = 0,
+        chunk_id: Optional[int] = None,
+        app_name: Optional[str] = None,
+        window_name: Optional[str] = None,
+        start_time: Optional[float] = None,
+        end_time: Optional[float] = None,
+    ) -> Tuple[list, int]:
+        """Get frames with pagination and optional filters. Returns (frames, total) with OCR snippet."""
+        frames: list = []
+        total = 0
+        try:
+            with sqlite3.connect(str(self.db_path)) as conn:
+                conn.row_factory = sqlite3.Row
+                cursor = conn.cursor()
+                if not self._table_exists(conn, "frames"):
+                    return frames, total
+                where_clauses: list = []
+                params: list = []
+                if chunk_id is not None:
+                    where_clauses.append("f.video_chunk_id = ?")
+                    params.append(chunk_id)
+                if app_name:
+                    where_clauses.append("f.app_name LIKE ?")
+                    params.append(f"%{app_name}%")
+                if window_name:
+                    where_clauses.append("f.window_name LIKE ?")
+                    params.append(f"%{window_name}%")
+                if start_time is not None:
+                    where_clauses.append("f.timestamp >= ?")
+                    params.append(start_time)
+                if end_time is not None:
+                    where_clauses.append("f.timestamp <= ?")
+                    params.append(end_time)
+                where_sql = (" WHERE " + " AND ".join(where_clauses)) if where_clauses else ""
+                cursor.execute(f"SELECT COUNT(*) FROM frames f{where_sql}", params)
+                total = cursor.fetchone()[0]
+                cursor.execute(
+                    f"""SELECT f.id AS frame_id, f.video_chunk_id, f.offset_index, f.timestamp,
+                              f.app_name, f.window_name, f.focused, f.browser_url,
+                              SUBSTR(COALESCE(ot.text, ''), 1, 200) AS ocr_snippet
+                       FROM frames f
+                       LEFT JOIN ocr_text ot ON f.id = ot.frame_id
+                       {where_sql}
+                       ORDER BY f.timestamp DESC
+                       LIMIT ? OFFSET ?""",
+                    params + [limit, offset],
+                )
+                for row in cursor.fetchall():
+                    d = dict(row)
+                    d["frame_url"] = f"/api/v1/frames/{d['frame_id']}"
+                    raw_focused = d.get("focused")
+                    d["focused"] = bool(raw_focused) if raw_focused is not None else None
+                    raw_url = d.get("browser_url")
+                    d["browser_url"] = raw_url if raw_url else None
+                    frames.append(d)
+        except sqlite3.Error as e:
+            logger.error(f"Failed to get paginated frames: {e}")
+        return frames, total
+
+    def get_video_stats(self) -> dict:
+        """Get aggregated video statistics."""
+        stats: dict = {
+            "total_chunks": 0,
+            "total_frames": 0,
+            "total_duration_seconds": 0.0,
+            "storage_bytes": 0,
+            "status_counts": {},
+        }
+        try:
+            with sqlite3.connect(str(self.db_path)) as conn:
+                cursor = conn.cursor()
+                if not self._table_exists(conn, "video_chunks"):
+                    return stats
+                cursor.execute("SELECT COUNT(*) FROM video_chunks")
+                stats["total_chunks"] = cursor.fetchone()[0]
+                if self._table_exists(conn, "frames"):
+                    cursor.execute("SELECT COUNT(*) FROM frames")
+                    stats["total_frames"] = cursor.fetchone()[0]
+                cursor.execute("SELECT status, COUNT(*) FROM video_chunks GROUP BY status")
+                stats["status_counts"] = {str(s): int(c) for s, c in cursor.fetchall()}
+                cursor.execute(
+                    "SELECT COALESCE(SUM(end_time - start_time), 0) "
+                    "FROM video_chunks WHERE start_time IS NOT NULL AND end_time IS NOT NULL"
+                )
+                stats["total_duration_seconds"] = round(cursor.fetchone()[0], 1)
+                cursor.execute("SELECT file_path FROM video_chunks")
+                total_bytes = 0
+                for (fp,) in cursor.fetchall():
+                    try:
+                        p = Path(fp)
+                        if p.exists():
+                            total_bytes += p.stat().st_size
+                    except (OSError, ValueError):
+                        pass
+                stats["storage_bytes"] = total_bytes
+        except sqlite3.Error as e:
+            logger.error(f"Failed to get video stats: {e}")
+        return stats
+
+    def get_audio_stats(self) -> dict:
+        """Get aggregated audio statistics."""
+        stats: dict = {
+            "total_chunks": 0,
+            "total_transcriptions": 0,
+            "total_duration_seconds": 0.0,
+            "storage_bytes": 0,
+            "status_counts": {},
+            "device_counts": {},
+            "source_counts": {},
+        }
+        try:
+            with sqlite3.connect(str(self.db_path)) as conn:
+                cursor = conn.cursor()
+                if not self._table_exists(conn, "audio_chunks"):
+                    return stats
+                cursor.execute("SELECT COUNT(*) FROM audio_chunks")
+                stats["total_chunks"] = cursor.fetchone()[0]
+                if self._table_exists(conn, "audio_transcriptions"):
+                    cursor.execute("SELECT COUNT(*) FROM audio_transcriptions")
+                    stats["total_transcriptions"] = cursor.fetchone()[0]
+                try:
+                    cursor.execute(
+                        "SELECT COALESCE(SUM(CASE WHEN end_time >= start_time THEN end_time - start_time ELSE 0 END), 0) "
+                        "FROM audio_chunks WHERE start_time IS NOT NULL AND end_time IS NOT NULL"
+                    )
+                    stats["total_duration_seconds"] = round(float(cursor.fetchone()[0] or 0.0), 1)
+                except sqlite3.Error:
+                    # Older schemas may not have timing columns yet.
+                    stats["total_duration_seconds"] = 0.0
+                cursor.execute("SELECT status, COUNT(*) FROM audio_chunks GROUP BY status")
+                stats["status_counts"] = {str(s): int(c) for s, c in cursor.fetchall()}
+                cursor.execute("SELECT device_name, COUNT(*) FROM audio_chunks GROUP BY device_name")
+                stats["device_counts"] = {str(d or "unknown"): int(c) for d, c in cursor.fetchall()}
+                try:
+                    cursor.execute(
+                        "SELECT COALESCE(source_kind, 'unknown'), COUNT(*) FROM audio_chunks GROUP BY source_kind"
+                    )
+                    stats["source_counts"] = {str(s or "unknown"): int(c) for s, c in cursor.fetchall()}
+                except sqlite3.Error:
+                    # Older schemas may not have source_kind yet.
+                    stats["source_counts"] = {}
+                cursor.execute("SELECT file_path FROM audio_chunks")
+                total_bytes = 0
+                for (fp,) in cursor.fetchall():
+                    try:
+                        p = Path(fp)
+                        if p.exists():
+                            total_bytes += p.stat().st_size
+                    except (OSError, ValueError):
+                        pass
+                stats["storage_bytes"] = total_bytes
+        except sqlite3.Error as e:
+            logger.error(f"Failed to get audio stats: {e}")
+        return stats

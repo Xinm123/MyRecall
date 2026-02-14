@@ -8,6 +8,8 @@
 | Timeline | `/timeline` | `openrecall/server/app.py:timeline()` | `openrecall/server/templates/timeline.html` | 时间滑杆浏览 |
 | Search | `/search` | `openrecall/server/app.py:search()` | `openrecall/server/templates/search.html` | 查询与结果调试展示 |
 | Control Center | 嵌入布局（无单独 URL） | `layout.html` 中前端脚本 | `openrecall/server/templates/layout.html` | 全局运行时开关 |
+| Audio Dashboard | `/audio` | `openrecall/server/app.py:audio()` | `openrecall/server/templates/audio.html` | Audio pipeline dashboard |
+| Video Dashboard | `/video` | `openrecall/server/app.py:video()` | `openrecall/server/templates/video.html` | Video pipeline dashboard |
 
 ## 2. 页面模板关系
 
@@ -16,9 +18,13 @@ flowchart LR
   L["layout.html"] --> I["index.html"]
   L --> T["timeline.html"]
   L --> S["search.html"]
+  L --> AU["audio.html (Phase 2.5)"]
+  L --> VI["video.html (Phase 2.5)"]
   I --> API1["/api/memories/latest\n/api/memories/recent"]
   T --> APIT["timeline_items(JSON) from server"]
   S --> APIS["/search query -> search_debug"]
+  AU --> APIAU["/api/v1/audio/chunks\n/api/v1/audio/stats\n/api/v1/audio/chunks/:id/file"]
+  VI --> APIVI["/api/v1/video/chunks\n/api/v1/video/stats\n/api/v1/video/frames\n/api/v1/video/chunks/:id/file"]
   L --> APIC["/api/config\nPOST /api/config"]
   L -.排障.-> APIV["/api/vision/status\n/api/v1/vision/status"]
 ```
@@ -79,6 +85,32 @@ Phase 1.5 在 timeline/search 返回中支持以下可选字段（向后兼容�
 
 NULL 语义：`null` = 未知（非 `false` / 非空字符串）。
 
+### 4.4 Phase 2.5 API — Audio/Video Dashboard
+
+Phase 2.5 新增以下 API endpoints 供 `/audio` 和 `/video` dashboard 页面使用：
+
+| API | 方法 | 关键参数 | 返回摘要 | 与 WebUI 的关系 |
+|---|---|---|---|---|
+| `GET /api/v1/video/chunks` | GET | `limit/offset`, `status`, `monitor_id` | 分页 video chunks 列表 | `/video` chunk table 数据源 |
+| `GET /api/v1/video/chunks/<id>/file` | GET | `chunk_id` (path) | `video/mp4` file (send_from_directory) | `/video` inline video playback |
+| `GET /api/v1/video/frames` | GET | `limit/offset`, `chunk_id`, `app`, `window`, `start_time/end_time` | 分页 frames 列表（含 OCR text snippet） | `/video` frame gallery 数据源 |
+| `GET /api/v1/video/stats` | GET | 无 | `{total_chunks, total_frames, total_duration_seconds, storage_bytes, status_counts}` | `/video` stats bar |
+| `GET /api/v1/audio/chunks/<id>/file` | GET | `chunk_id` (path) | `audio/wav` file (send_from_directory) | `/audio` inline audio playback |
+| `GET /api/v1/audio/stats` | GET | 无 | `{total_chunks, total_transcriptions, total_duration_seconds, storage_bytes, status_counts, device_counts}` | `/audio` stats bar |
+
+**扩展已有 endpoint**:
+
+| API | 新增参数 | 说明 | Breaking? |
+|---|---|---|---|
+| `GET /api/v1/audio/chunks` | `device` (optional) | 按 `device_name` 过滤（additive，无参数时行为不变） | No |
+
+**复用已有 endpoints（无变更）**:
+- `GET /api/v1/frames/:id` — frame gallery 图片源（Phase 1 已有）
+- `GET /api/v1/queue/status` — queue status badges 数据源（Phase 2.0 已有）
+- `GET /api/v1/audio/chunks` — audio chunk table 基础数据源（Phase 2.0 已有）
+- `GET /api/v1/audio/transcriptions` — transcription browser 数据源（Phase 2.0 已有）
+- `GET /api/config` — Control Center 配置（Phase 0 已有）
+
 ## 5. 上传链路与页面可见性映射
 
 ```mermaid
@@ -91,7 +123,7 @@ flowchart LR
   U --> S2["GET /api/v1/upload/status"]
   L1 --> DB["SQLite + Server FS"]
   L2 --> DB
-  DB --> UI["/, /timeline, /search 展示更新"]
+  DB --> UI["/, /timeline, /search,\n/audio, /video 展示更新"]
 ```
 
 说明：
@@ -100,12 +132,15 @@ flowchart LR
 
 ## 6. Route Consistency Checklist
 
-- [x] `app.py` 中页面路由仅有 `/`、`/timeline`、`/search`
+- [x] `app.py` 中页面路由：`/`、`/timeline`、`/search`、`/audio`、`/video`
+- [x] `app.py` `/audio`、`/video` 路由（Phase 2.5 Complete）
 - [x] Control Center 为布局内组件，无单独页面路由
 - [x] `api.py` 与 `api_v1.py` 均存在 `config/heartbeat/search`
 - [x] `api.py` 与 `api_v1.py` 均存在 `vision/status`
 - [x] `api_v1.py` 存在 `timeline` 与 `frames/:id`
 - [x] `api.py` 与 `api_v1.py` 均存在 `upload` 与 `upload/status`
+- [x] `api_v1.py` 新增 `video/chunks`, `video/chunks/<id>/file`, `video/frames`, `video/stats`, `audio/chunks/<id>/file`, `audio/stats`（Phase 2.5 Complete）
+- [x] `api_v1.py` 现有 `audio/chunks` 扩展 `device` 参数（Phase 2.5 Complete）
 
 ## 7. 代码来源
 

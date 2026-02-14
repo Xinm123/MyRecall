@@ -22,6 +22,7 @@ class TestAudioProcessingResult:
         assert r.segments_count == 0
         assert r.filtered_by_ratio is False
         assert r.vad_backend == "unknown"
+        assert r.no_transcription_reason is None
         assert r.error is None
 
     def test_with_error(self):
@@ -131,6 +132,50 @@ class TestAudioChunkProcessor:
         assert result.vad_backend == "webrtcvad"
         mock_transcriber.transcribe.assert_not_called()
 
+    def test_process_zero_transcriptions_logs_reason(self, tmp_path, caplog):
+        """When no transcriptions are produced, info logs should include the reason."""
+        import logging
+
+        from openrecall.server.audio.processor import AudioChunkProcessor
+        from openrecall.server.audio.vad import SpeechSegment, VadAnalysisResult
+
+        import numpy as np
+        import wave
+
+        wav_path = tmp_path / "zero_transcriptions.wav"
+        audio = np.zeros(16000, dtype=np.int16)
+        with wave.open(str(wav_path), "wb") as wf:
+            wf.setnchannels(1)
+            wf.setsampwidth(2)
+            wf.setframerate(16000)
+            wf.writeframes(audio.tobytes())
+
+        mock_vad = MagicMock()
+        mock_vad.analyze_chunk.return_value = VadAnalysisResult(
+            segments=[SpeechSegment(start_time=0.0, end_time=0.02)],
+            speech_duration_seconds=0.02,
+            total_duration_seconds=1.0,
+            speech_ratio=0.02,
+            backend_used="webrtcvad",
+        )
+
+        mock_store = MagicMock()
+        mock_store.get_audio_chunk_by_id.return_value = {"device_name": "mic"}
+
+        with patch("openrecall.server.audio.processor.settings") as mock_settings:
+            mock_settings.audio_vad_min_speech_ratio = 0.05
+            proc = AudioChunkProcessor(
+                vad=mock_vad,
+                transcriber=MagicMock(),
+                sql_store=mock_store,
+            )
+            with caplog.at_level(logging.INFO):
+                result = proc.process_chunk(1, str(wav_path), 1700000000.0)
+
+        assert result.transcriptions_count == 0
+        assert result.no_transcription_reason == "speech_ratio_below_threshold"
+        assert "no_transcription_reason=speech_ratio_below_threshold" in caplog.text
+
     def test_process_with_speech(self, tmp_path):
         """Full pipeline with mocked VAD and Whisper."""
         from openrecall.server.audio.processor import AudioChunkProcessor
@@ -182,6 +227,226 @@ class TestAudioChunkProcessor:
         assert result.speech_ratio == 0.5
         assert result.segments_count == 1
         assert result.vad_backend == "silero"
+        assert result.error is None
+        mock_store.insert_audio_transcription_with_fts.assert_called_once()
+
+    def test_gate_uses_speech_frame_ratio_for_filtering(self, tmp_path):
+        """Chunk gate should use speech_frame_count / total_frames, not segment duration ratio."""
+        from openrecall.server.audio.processor import AudioChunkProcessor
+        from openrecall.server.audio.vad import SpeechSegment, VadStatus
+
+        import numpy as np
+        import wave
+
+        wav_path = tmp_path / "gate_ratio.wav"
+        audio = np.zeros(16000, dtype=np.int16)  # 1s -> 10 frames @ 1600 samples
+        with wave.open(str(wav_path), "wb") as wf:
+            wf.setnchannels(1)
+            wf.setsampwidth(2)
+            wf.setframerate(16000)
+            wf.writeframes(audio.tobytes())
+
+        class _StubVad:
+            backend_used = "silero"
+
+            def __init__(self):
+                self._statuses = [VadStatus.SPEECH] + [VadStatus.SILENCE] * 9
+
+            def reset_audio_type_state(self):
+                return None
+
+            def audio_type(self, _chunk):
+                if self._statuses:
+                    return self._statuses.pop(0)
+                return VadStatus.SILENCE
+
+            def get_speech_segments(self, _wav_path):
+                return [SpeechSegment(start_time=0.0, end_time=1.0)]
+
+        mock_transcriber = MagicMock()
+        mock_store = MagicMock()
+        mock_store.get_audio_chunk_by_id.return_value = {"device_name": "mic"}
+
+        with patch("openrecall.server.audio.processor.settings") as mock_settings:
+            mock_settings.audio_vad_min_speech_ratio = 0.2
+            proc = AudioChunkProcessor(
+                vad=_StubVad(),
+                transcriber=mock_transcriber,
+                sql_store=mock_store,
+            )
+            result = proc.process_chunk(1, str(wav_path), 1700000000.0)
+
+        assert result.speech_ratio == pytest.approx(0.1, rel=1e-6)
+        assert result.filtered_by_ratio is True
+        assert result.no_transcription_reason == "speech_ratio_below_threshold"
+        mock_transcriber.transcribe.assert_not_called()
+
+    def test_gate_allows_ratio_equal_to_threshold(self, tmp_path):
+        """Gate should pass when speech_ratio equals configured minimum."""
+        from openrecall.server.audio.processor import AudioChunkProcessor
+        from openrecall.server.audio.vad import SpeechSegment, VadStatus
+
+        import numpy as np
+        import wave
+
+        wav_path = tmp_path / "gate_equal_threshold.wav"
+        audio = np.zeros(8000, dtype=np.int16)  # 0.5s -> 5 frames @ 1600 samples
+        with wave.open(str(wav_path), "wb") as wf:
+            wf.setnchannels(1)
+            wf.setsampwidth(2)
+            wf.setframerate(16000)
+            wf.writeframes(audio.tobytes())
+
+        class _StubVad:
+            backend_used = "silero"
+
+            def __init__(self):
+                self._statuses = [VadStatus.SPEECH] + [VadStatus.SILENCE] * 4
+
+            def reset_audio_type_state(self):
+                return None
+
+            def audio_type(self, _chunk):
+                if self._statuses:
+                    return self._statuses.pop(0)
+                return VadStatus.SILENCE
+
+            def get_speech_segments(self, _wav_path):
+                return [SpeechSegment(start_time=0.0, end_time=0.2)]
+
+        mock_transcriber = MagicMock()
+        mock_transcriber.transcribe.return_value = []
+        mock_store = MagicMock()
+        mock_store.get_audio_chunk_by_id.return_value = {"device_name": "mic"}
+
+        with patch("openrecall.server.audio.processor.settings") as mock_settings:
+            mock_settings.audio_vad_min_speech_ratio = 0.2
+            proc = AudioChunkProcessor(
+                vad=_StubVad(),
+                transcriber=mock_transcriber,
+                sql_store=mock_store,
+            )
+            result = proc.process_chunk(1, str(wav_path), 1700000000.0)
+
+        assert result.speech_ratio == pytest.approx(0.2, rel=1e-6)
+        assert result.filtered_by_ratio is False
+        mock_transcriber.transcribe.assert_called_once()
+
+    def test_gate_passes_with_high_frame_ratio_even_if_segments_are_short(self, tmp_path):
+        """Gate pass/fail should depend on frame ratio; segment-duration ratio must not suppress gate."""
+        from openrecall.server.audio.processor import AudioChunkProcessor
+        from openrecall.server.audio.vad import SpeechSegment, VadStatus
+
+        import numpy as np
+        import wave
+
+        wav_path = tmp_path / "gate_short_segments.wav"
+        audio = np.zeros(4800, dtype=np.int16)  # 0.3s -> 3 frames @ 1600 samples
+        with wave.open(str(wav_path), "wb") as wf:
+            wf.setnchannels(1)
+            wf.setsampwidth(2)
+            wf.setframerate(16000)
+            wf.writeframes(audio.tobytes())
+
+        class _StubVad:
+            backend_used = "silero"
+
+            def __init__(self):
+                self._statuses = [VadStatus.SPEECH, VadStatus.SPEECH, VadStatus.SILENCE]
+
+            def reset_audio_type_state(self):
+                return None
+
+            def audio_type(self, _chunk):
+                if self._statuses:
+                    return self._statuses.pop(0)
+                return VadStatus.SILENCE
+
+            def get_speech_segments(self, _wav_path):
+                return [SpeechSegment(start_time=0.0, end_time=0.02)]  # < 0.1s, will be skipped
+
+        mock_store = MagicMock()
+        mock_store.get_audio_chunk_by_id.return_value = {"device_name": "mic"}
+
+        with patch("openrecall.server.audio.processor.settings") as mock_settings:
+            mock_settings.audio_vad_min_speech_ratio = 0.2
+            proc = AudioChunkProcessor(
+                vad=_StubVad(),
+                transcriber=MagicMock(),
+                sql_store=mock_store,
+            )
+            result = proc.process_chunk(1, str(wav_path), 1700000000.0)
+
+        assert result.filtered_by_ratio is False
+        assert result.speech_ratio == pytest.approx(2.0 / 3.0, rel=1e-6)
+        assert result.no_transcription_reason == "all_segments_too_short"
+
+    def test_gate_passes_and_transcribes_in_audio_type_path(self, tmp_path):
+        """When frame-ratio gate passes, processor should still emit segment transcriptions."""
+        from openrecall.server.audio.processor import AudioChunkProcessor
+        from openrecall.server.audio.transcriber import TranscriptionSegment
+        from openrecall.server.audio.vad import SpeechSegment, VadStatus
+
+        import numpy as np
+        import wave
+
+        wav_path = tmp_path / "gate_pass_transcribe.wav"
+        audio = np.random.randint(-1000, 1000, 6400, dtype=np.int16)  # 0.4s -> 4 frames
+        with wave.open(str(wav_path), "wb") as wf:
+            wf.setnchannels(1)
+            wf.setsampwidth(2)
+            wf.setframerate(16000)
+            wf.writeframes(audio.tobytes())
+
+        class _StubVad:
+            backend_used = "silero"
+
+            def __init__(self):
+                self._statuses = [
+                    VadStatus.SPEECH,
+                    VadStatus.SPEECH,
+                    VadStatus.SPEECH,
+                    VadStatus.SILENCE,
+                ]
+
+            def reset_audio_type_state(self):
+                return None
+
+            def audio_type(self, _chunk):
+                if self._statuses:
+                    return self._statuses.pop(0)
+                return VadStatus.SILENCE
+
+            def get_speech_segments(self, _wav_path):
+                return [SpeechSegment(start_time=0.0, end_time=0.2)]
+
+        mock_transcriber = MagicMock()
+        mock_transcriber.transcribe.return_value = [
+            TranscriptionSegment(
+                text="hello",
+                start_time=0.0,
+                end_time=0.2,
+                confidence=0.9,
+            )
+        ]
+        mock_transcriber.engine_name = "faster-whisper:base"
+
+        mock_store = MagicMock()
+        mock_store.get_audio_chunk_by_id.return_value = {"device_name": "mic"}
+        mock_store.insert_audio_transcription_with_fts.return_value = 1
+
+        with patch("openrecall.server.audio.processor.settings") as mock_settings:
+            mock_settings.audio_vad_min_speech_ratio = 0.2
+            proc = AudioChunkProcessor(
+                vad=_StubVad(),
+                transcriber=mock_transcriber,
+                sql_store=mock_store,
+            )
+            result = proc.process_chunk(1, str(wav_path), 1700000000.0)
+
+        assert result.filtered_by_ratio is False
+        assert result.transcriptions_count == 1
+        assert result.segments_count == 1
         assert result.error is None
         mock_store.insert_audio_transcription_with_fts.assert_called_once()
 

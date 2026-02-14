@@ -1,0 +1,817 @@
+{% extends "layout.html" %}
+
+{% block title %}Video - MyRecall{% endblock %}
+
+{% block extra_head %}
+<style>
+  /* Stats Bar */
+  .stats-bar {
+    display: flex;
+    gap: 16px;
+    margin-bottom: 20px;
+    padding: 12px 20px;
+    background: var(--bg-card);
+    border-radius: 12px;
+    border: 1px solid var(--border-color);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+    flex-wrap: wrap;
+  }
+
+  .stat-card {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 100px;
+  }
+
+  .stat-card-label {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .stat-card-value {
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--text-primary);
+    letter-spacing: -0.5px;
+  }
+
+  .stat-card-sub {
+    font-size: 11px;
+    color: var(--text-secondary);
+  }
+
+  /* Queue Badges */
+  .queue-badges {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    margin-left: auto;
+  }
+
+  .queue-badge {
+    font-size: 11px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 999px;
+    line-height: 1.4;
+  }
+
+  .queue-badge.pending { background: #FFF3CD; color: #856404; }
+  .queue-badge.processing { background: #D1ECF1; color: #0C5460; }
+  .queue-badge.failed { background: #F8D7DA; color: #721C24; }
+
+  /* Section Title */
+  .section-title {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin: 24px 0 12px;
+    letter-spacing: -0.3px;
+  }
+
+  /* Data Table */
+  .data-table {
+    width: 100%;
+    background: var(--bg-card);
+    border-radius: 12px;
+    border: 1px solid var(--border-color);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+    overflow: hidden;
+    border-collapse: collapse;
+  }
+
+  .data-table th {
+    padding: 10px 16px;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    text-align: left;
+    border-bottom: 1px solid var(--border-color);
+    background: #FAFAFA;
+  }
+
+  .data-table td {
+    padding: 10px 16px;
+    font-size: 13px;
+    color: var(--text-primary);
+    border-bottom: 1px solid var(--border-color);
+  }
+
+  .data-table tr:last-child td {
+    border-bottom: none;
+  }
+
+  .data-table tr:hover td {
+    background: rgba(0, 0, 0, 0.02);
+  }
+
+  /* Status Badge */
+  .status-badge {
+    font-size: 11px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 6px;
+    display: inline-block;
+  }
+
+  .status-badge.completed { background: #D4EDDA; color: #155724; }
+  .status-badge.pending { background: #FFF3CD; color: #856404; }
+  .status-badge.processing { background: #D1ECF1; color: #0C5460; }
+  .status-badge.failed { background: #F8D7DA; color: #721C24; }
+
+  /* Play Button */
+  .play-btn {
+    background: transparent;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    padding: 4px 10px;
+    font-size: 12px;
+    cursor: pointer;
+    color: var(--accent-color);
+    font-weight: 500;
+    transition: all 0.15s;
+  }
+
+  .play-btn:hover {
+    background: var(--accent-color);
+    color: white;
+    border-color: var(--accent-color);
+  }
+
+  /* Frame Gallery Grid */
+  .frame-gallery {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 16px;
+  }
+
+  .frame-card {
+    background: var(--bg-card);
+    border-radius: 10px;
+    overflow: hidden;
+    border: 1px solid var(--border-color);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+    cursor: pointer;
+    transition: transform 0.2s, box-shadow 0.2s;
+  }
+
+  .frame-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+  }
+
+  .frame-card img {
+    width: 100%;
+    height: 160px;
+    object-fit: cover;
+    display: block;
+    background: #F0F0F0;
+  }
+
+  .frame-card-info {
+    padding: 8px 12px;
+  }
+
+  .frame-card-app {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .frame-card-time {
+    font-size: 11px;
+    color: var(--text-secondary);
+    font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
+  }
+
+  .frame-card-snippet {
+    font-size: 11px;
+    color: var(--text-secondary);
+    margin-top: 4px;
+    line-height: 1.4;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  /* Pagination */
+  .pagination-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 12px;
+    padding: 8px 0;
+  }
+
+  .pagination-info {
+    font-size: 12px;
+    color: var(--text-secondary);
+  }
+
+  .pagination-btns {
+    display: flex;
+    gap: 8px;
+  }
+
+  .pagination-btn {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    padding: 4px 12px;
+    font-size: 12px;
+    cursor: pointer;
+    color: var(--text-primary);
+    font-weight: 500;
+    transition: all 0.15s;
+  }
+
+  .pagination-btn:hover:not(:disabled) {
+    background: var(--accent-color);
+    color: white;
+    border-color: var(--accent-color);
+  }
+
+  .pagination-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+
+  /* Video Modal */
+  .video-modal {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(0, 0, 0, 0.9);
+    z-index: 1000;
+    padding: 16px;
+    box-sizing: border-box;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .video-modal.active {
+    display: flex;
+  }
+
+  .video-modal video {
+    max-width: 90vw;
+    max-height: 80vh;
+    border-radius: 8px;
+  }
+
+  .video-modal-close {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    color: white;
+    font-size: 32px;
+    cursor: pointer;
+    z-index: 1001;
+  }
+
+  /* Frame Detail Modal */
+  .frame-modal {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(0, 0, 0, 0.9);
+    z-index: 1000;
+    padding: 16px;
+    box-sizing: border-box;
+  }
+
+  .frame-modal.active {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .frame-modal-content {
+    display: flex;
+    gap: 24px;
+    max-width: 90vw;
+    max-height: 90vh;
+  }
+
+  .frame-modal-content img {
+    max-width: 60vw;
+    max-height: 80vh;
+    object-fit: contain;
+    border-radius: 8px;
+  }
+
+  .frame-modal-info {
+    min-width: 200px;
+    max-width: 300px;
+    color: white;
+  }
+
+  .frame-modal-info h3 {
+    margin: 0 0 12px;
+    font-size: 16px;
+  }
+
+  .frame-modal-info p {
+    font-size: 13px;
+    color: rgba(255, 255, 255, 0.75);
+    line-height: 1.5;
+    margin: 4px 0;
+  }
+
+  .frame-modal-ocr {
+    margin-top: 12px;
+    padding: 10px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.85);
+    line-height: 1.5;
+    max-height: 200px;
+    overflow-y: auto;
+  }
+
+  .frame-modal-close {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    color: white;
+    font-size: 32px;
+    cursor: pointer;
+    z-index: 1001;
+  }
+
+  /* Empty State */
+  .empty-state {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 40px;
+    text-align: center;
+    color: var(--text-secondary);
+  }
+
+  .empty-state-icon {
+    font-size: 40px;
+    margin-bottom: 12px;
+    opacity: 0.5;
+  }
+
+  .empty-state-title {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 6px;
+  }
+
+  .empty-state-text {
+    font-size: 13px;
+  }
+
+  /* Error Banner */
+  .error-banner {
+    background: #FEF2F2;
+    border: 1px solid #FECACA;
+    border-radius: 10px;
+    padding: 12px 16px;
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    color: #991B1B;
+  }
+
+  /* Chunk Frames Row */
+  .chunk-frames-row td {
+    background: rgba(0, 0, 0, 0.01);
+    padding: 0;
+    border-bottom: 1px solid var(--border-color) !important;
+  }
+
+  .chunk-frames-container {
+    padding: 12px 16px 16px;
+  }
+
+  .chunk-frames-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+  }
+
+  .chunk-frames-title {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .chunk-frames-count {
+    font-size: 11px;
+    color: var(--text-secondary);
+  }
+
+  .expand-btn {
+    background: transparent;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    padding: 4px 10px;
+    font-size: 12px;
+    cursor: pointer;
+    color: var(--text-primary);
+    font-weight: 500;
+    transition: all 0.15s;
+  }
+
+  .expand-btn:hover {
+    background: rgba(0, 0, 0, 0.05);
+  }
+
+  .expand-btn svg {
+    transition: transform 0.2s;
+  }
+
+  .expand-btn.expanded svg {
+    transform: rotate(180deg);
+  }
+
+  [x-cloak] {
+    display: none !important;
+  }
+</style>
+
+<script id="initialVideoStats" type="application/json">{{ stats | tojson | safe }}</script>
+<script>
+  (() => {
+    const el = document.getElementById("initialVideoStats");
+    try {
+      window.initialVideoStats = JSON.parse(el?.textContent || "{}");
+    } catch (_e) {
+      window.initialVideoStats = {};
+    }
+  })();
+</script>
+{% endblock %}
+
+{% block content %}
+<div x-data="videoDashboard()" x-init="init()" x-cloak>
+  <!-- Error Banner -->
+  <template x-if="error">
+    <div class="error-banner">
+      <span>Failed to load data: <span x-text="error"></span>. Retrying...</span>
+    </div>
+  </template>
+
+  <!-- Stats Bar -->
+  <div class="stats-bar">
+    <div class="stat-card">
+      <span class="stat-card-label">Chunks</span>
+      <span class="stat-card-value" x-text="stats.total_chunks ?? 0"></span>
+    </div>
+    <div class="stat-card">
+      <span class="stat-card-label">Frames</span>
+      <span class="stat-card-value" x-text="stats.total_frames ?? 0"></span>
+    </div>
+    <div class="stat-card">
+      <span class="stat-card-label">Duration</span>
+      <span class="stat-card-value" x-text="formatDuration(stats.total_duration_seconds ?? 0)"></span>
+    </div>
+    <div class="stat-card">
+      <span class="stat-card-label">Storage</span>
+      <span class="stat-card-value" x-text="formatBytes(stats.storage_bytes ?? 0)"></span>
+    </div>
+    <div class="queue-badges">
+      <template x-if="(stats.status_counts?.PENDING ?? 0) > 0">
+        <span class="queue-badge pending" x-text="`${stats.status_counts.PENDING} pending`"></span>
+      </template>
+      <template x-if="(stats.status_counts?.PROCESSING ?? 0) > 0">
+        <span class="queue-badge processing" x-text="`${stats.status_counts.PROCESSING} processing`"></span>
+      </template>
+      <template x-if="(stats.status_counts?.FAILED ?? 0) > 0">
+        <span class="queue-badge failed" x-text="`${stats.status_counts.FAILED} failed`"></span>
+      </template>
+    </div>
+  </div>
+
+  <!-- Empty State -->
+  <template x-if="(stats.total_chunks ?? 0) === 0 && !loading">
+    <div class="empty-state">
+      <div class="empty-state-icon">🎬</div>
+      <div class="empty-state-title">No video data yet</div>
+      <div class="empty-state-text">Video recordings will appear here once the client starts capturing.</div>
+    </div>
+  </template>
+
+  <!-- Chunks & Frames -->
+  <template x-if="(stats.total_chunks ?? 0) > 0">
+    <div>
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Monitor</th>
+            <th>Status</th>
+            <th>Start Time</th>
+            <th>End Time</th>
+            <th>Created</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <template x-for="chunk in chunks" :key="chunk.id">
+            <template x-if="true">
+              <tbody style="display: contents">
+                <tr>
+                  <td x-text="chunk.id"></td>
+                  <td x-text="chunk.monitor_id || '-'"></td>
+                  <td>
+                    <span class="status-badge"
+                      :class="badgeClass(chunk.status)"
+                      x-text="chunk.status"></span>
+                  </td>
+                  <td x-text="formatTimestamp(chunk.start_time)"></td>
+                  <td x-text="formatTimestamp(chunk.end_time)"></td>
+                  <td x-text="formatDateTime(chunk.created_at)"></td>
+                  <td style="display: flex; gap: 8px; align-items: center;">
+                    <button class="play-btn" @click="playVideo(chunk.id)">Play</button>
+                    <button class="expand-btn"
+                            :class="{ expanded: expandedChunks[chunk.id] }"
+                            @click="toggleChunk(chunk.id)"
+                            title="View Frames">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="6 9 12 15 18 9"></polyline>
+                      </svg>
+                    </button>
+                  </td>
+                </tr>
+                <tr x-show="expandedChunks[chunk.id]" x-transition.opacity.duration.300ms class="chunk-frames-row">
+                  <td colspan="7">
+                    <div class="chunk-frames-container">
+                      <div class="chunk-frames-header">
+                        <span class="chunk-frames-title">Frames for Chunk #<span x-text="chunk.id"></span></span>
+                        <template x-if="expandedChunks[chunk.id]?.loading">
+                          <span class="chunk-frames-count">Loading...</span>
+                        </template>
+                        <template x-if="!expandedChunks[chunk.id]?.loading">
+                          <span class="chunk-frames-count" x-text="`${expandedChunks[chunk.id]?.frames?.length || 0} frames`"></span>
+                        </template>
+                      </div>
+
+                      <div class="frame-gallery">
+                        <template x-for="frame in expandedChunks[chunk.id]?.frames || []" :key="frame.frame_id ?? frame.id">
+                          <div class="frame-card" @click="openFrame(frame)">
+                            <img :src="frame.frame_url || `/api/v1/frames/${frame.frame_id ?? frame.id}`"
+                                 :alt="`Frame ${frame.frame_id ?? frame.id}`"
+                                 loading="lazy" decoding="async">
+                            <div class="frame-card-info">
+                              <div class="frame-card-app" x-text="frame.app_name || 'Unknown'"></div>
+                              <div class="frame-card-time" x-text="formatTimestamp(frame.timestamp)"></div>
+                              <template x-if="frame.ocr_snippet">
+                                <div class="frame-card-snippet" x-text="frame.ocr_snippet"></div>
+                              </template>
+                            </div>
+                          </div>
+                        </template>
+                        <template x-if="!expandedChunks[chunk.id]?.loading && (expandedChunks[chunk.id]?.frames?.length || 0) === 0">
+                          <div style="grid-column: 1 / -1; padding: 20px; text-align: center; color: var(--text-secondary); font-size: 13px;">
+                            No frames found for this chunk.
+                          </div>
+                        </template>
+                      </div>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </template>
+          </template>
+        </tbody>
+      </table>
+
+      <div class="pagination-bar">
+        <span class="pagination-info" x-text="`Showing ${chunkOffset + 1}-${Math.min(chunkOffset + chunks.length, chunkTotal)} of ${chunkTotal}`"></span>
+        <div class="pagination-btns">
+          <button class="pagination-btn" :disabled="chunkOffset === 0" @click="prevChunks()">Previous</button>
+          <button class="pagination-btn" :disabled="chunkOffset + chunkLimit >= chunkTotal" @click="nextChunks()">Next</button>
+        </div>
+      </div>
+    </div>
+  </template>
+
+  <!-- Video Player Modal -->
+  <div class="video-modal" :class="{ active: activeVideoUrl }" @click.self="closeVideo()">
+    <span class="video-modal-close" @click="closeVideo()">&times;</span>
+    <video controls preload="metadata" :src="activeVideoUrl || ''" x-ref="videoPlayer"></video>
+  </div>
+
+  <!-- Frame Detail Modal -->
+  <div class="frame-modal" :class="{ active: selectedFrame }" @click.self="closeFrame()">
+    <span class="frame-modal-close" @click="closeFrame()">&times;</span>
+    <div class="frame-modal-content" x-show="selectedFrame">
+      <img :src="selectedFrame ? (selectedFrame.frame_url || `/api/v1/frames/${selectedFrame.frame_id ?? selectedFrame.id}`) : ''"
+           :alt="selectedFrame ? `Frame ${selectedFrame.frame_id ?? selectedFrame.id}` : ''">
+      <div class="frame-modal-info">
+        <h3 x-text="selectedFrame ? (selectedFrame.app_name || 'Unknown') : ''"></h3>
+        <p x-text="selectedFrame ? `Window: ${selectedFrame.window_name || '-'}` : ''"></p>
+        <p x-text="selectedFrame ? `Time: ${formatTimestamp(selectedFrame.timestamp)}` : ''"></p>
+        <p x-text="selectedFrame ? `Frame ID: ${selectedFrame.frame_id ?? selectedFrame.id}` : ''"></p>
+        <template x-if="selectedFrame && selectedFrame.ocr_snippet">
+          <div class="frame-modal-ocr" x-text="selectedFrame.ocr_snippet"></div>
+        </template>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_body %}
+<script>
+  function videoDashboard() {
+    return {
+      stats: window.initialVideoStats || {},
+      activeTab: 'chunks',
+      loading: false,
+      error: null,
+
+      // Chunks pagination
+      chunks: [],
+      chunkOffset: 0,
+      chunkLimit: 20,
+      chunkTotal: 0,
+
+      // Player state
+      activeVideoUrl: null,
+      selectedFrame: null,
+
+      _statsInterval: null,
+      expandedChunks: {}, // Track expanded state by chunk ID
+
+      init() {
+        this.fetchChunks();
+        this._statsInterval = setInterval(() => this.refreshStats(), 10000);
+
+        window.addEventListener('keydown', (e) => {
+          if (e.key === 'Escape') {
+            this.closeVideo();
+            this.closeFrame();
+          }
+        });
+      },
+
+      toggleChunk(chunkId) {
+        if (this.expandedChunks[chunkId]) {
+          delete this.expandedChunks[chunkId];
+        } else {
+          this.expandedChunks[chunkId] = { loading: false, frames: [] };
+          this.fetchChunkFrames(chunkId);
+        }
+      },
+
+      async fetchChunkFrames(chunkId) {
+        if (!this.expandedChunks[chunkId]) return;
+        this.expandedChunks[chunkId].loading = true;
+        try {
+          const res = await fetch(`/api/v1/video/frames?chunk_id=${chunkId}`);
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          const payload = await res.json();
+          if (!this.expandedChunks[chunkId]) return;
+          this.expandedChunks[chunkId].frames = payload.data || [];
+        } catch (e) {
+          console.error(e);
+          // Optional: handle error state in UI
+        } finally {
+          if (this.expandedChunks[chunkId]) {
+            this.expandedChunks[chunkId].loading = false;
+          }
+        }
+      },
+
+      destroy() {
+        if (this._statsInterval) {
+          clearInterval(this._statsInterval);
+          this._statsInterval = null;
+        }
+      },
+
+      async fetchChunks() {
+        this.loading = true;
+        try {
+          const res = await fetch(`/api/v1/video/chunks?limit=${this.chunkLimit}&offset=${this.chunkOffset}`);
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          const payload = await res.json();
+          this.chunks = payload.data || [];
+          this.chunkTotal = payload.meta?.total ?? 0;
+          this.error = null;
+        } catch (e) {
+          this.error = e.message;
+        }
+        this.loading = false;
+      },
+
+      async refreshStats() {
+        try {
+          const res = await fetch('/api/v1/video/stats');
+          if (!res.ok) return;
+          const payload = await res.json();
+          this.stats = payload.data || {};
+        } catch (_e) { /* silent */ }
+      },
+
+      playVideo(chunkId) {
+        this.activeVideoUrl = `/api/v1/video/chunks/${chunkId}/file`;
+      },
+
+      closeVideo() {
+        this.activeVideoUrl = null;
+        const vid = this.$refs.videoPlayer;
+        if (vid) { vid.pause(); vid.currentTime = 0; }
+      },
+
+      openFrame(frame) {
+        this.selectedFrame = frame;
+      },
+
+      closeFrame() {
+        this.selectedFrame = null;
+      },
+
+      prevChunks() {
+        this.chunkOffset = Math.max(0, this.chunkOffset - this.chunkLimit);
+        this.fetchChunks();
+      },
+
+      nextChunks() {
+        this.chunkOffset += this.chunkLimit;
+        this.fetchChunks();
+      },
+
+      formatBytes(bytes) {
+        if (!bytes || bytes === 0) return '0 B';
+        const k = 1024;
+        const sizes = ['B', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+      },
+
+      formatDuration(seconds) {
+        const s = Math.round(Number(seconds) || 0);
+        if (s < 60) return `${s}s`;
+        if (s < 3600) return `${Math.floor(s / 60)}m ${s % 60}s`;
+        const h = Math.floor(s / 3600);
+        const m = Math.floor((s % 3600) / 60);
+        return `${h}h ${m}m`;
+      },
+
+      formatTimestamp(ts) {
+        const n = Number(ts) || 0;
+        if (n === 0) return '-';
+        const d = new Date(n * 1000);
+        const pad = (v) => String(v).padStart(2, '0');
+        return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+      },
+
+      formatDateTime(value) {
+        if (value === null || value === undefined || value === '') return '-';
+        const text = String(value).trim();
+        if (/^\d+(\.\d+)?$/.test(text)) {
+          return this.formatTimestamp(text);
+        }
+        // Fix: SQLite datetime('now') returns UTC without timezone marker
+        // Add 'Z' suffix to parse as UTC, then browser converts to local time
+        const d = new Date(text.includes('Z') || text.includes('+') ? text : text + 'Z');
+        if (!Number.isNaN(d.getTime())) {
+          const pad = (v) => String(v).padStart(2, '0');
+          return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+        }
+        return text;
+      },
+
+      badgeClass(status) {
+        const s = (status || '').toLowerCase();
+        return {
+          completed: s === 'completed',
+          pending: s === 'pending',
+          processing: s === 'processing',
+          failed: s === 'failed',
+        };
+      },
+    };
+  }
+</script>
+{% endblock %}

@@ -195,6 +195,16 @@ class AudioRecorder:
             now = time.time()
             start_time = now - actual_duration
             end_time = now
+            device_text = (device_name or "").strip().lower()
+            if any(token in device_text for token in ("mic", "microphone", "input")):
+                source_kind = "input"
+                is_input = True
+            elif any(token in device_text for token in ("system", "speaker", "loopback", "output")):
+                source_kind = "output"
+                is_input = False
+            else:
+                source_kind = "unknown"
+                is_input = None
 
             metadata = {
                 "type": "audio_chunk",
@@ -202,6 +212,8 @@ class AudioRecorder:
                 "start_time": start_time,
                 "end_time": end_time,
                 "device_name": device_name,
+                "source_kind": source_kind,
+                "is_input": is_input,
                 "sample_rate": settings.audio_sample_rate,
                 "channels": settings.audio_channels,
                 "format": settings.audio_format,

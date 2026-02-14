@@ -124,6 +124,8 @@ class MigrationRollback:
             "idx_audio_transcriptions_chunk_ts",
             "idx_video_chunks_created_at",
             "idx_audio_chunks_created_at",
+            "idx_audio_chunks_start_time",
+            "idx_audio_chunks_source_kind",
         ]
         for idx in v3_indexes:
             conn.execute(f"DROP INDEX IF EXISTS {idx}")

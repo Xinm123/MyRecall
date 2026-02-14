@@ -1,8 +1,8 @@
 # MyRecall-v3 Roadmap Status Tracker
 
-**Last Updated**: 2026-02-10T22:55:00Z
-**Overall Status**: 🟩 Phase 0 Complete / 🟩 Phase 1 Complete / 🟩 Phase 2.0 Engineering Complete (Release NO-GO: Pending 2-S-01 LONGRUN evidence)
-**Target Completion**: Week 20 (2026-06-20) for MVP (P0-P4 deployed). Phase 5 deployment starts Week 16. Week 23+ for P7 Memory (不与Phase 6 Week 21-22重叠).
+**Last Updated**: 2026-02-14T09:30:00Z
+**Overall Status**: 🟩 Phase 0 Complete / 🟩 Phase 1 Complete / 🟩 Phase 2.0 Engineering Complete (Release NO-GO: Pending 2-S-01 LONGRUN evidence) / 🟩 Phase 2.5 Complete
+**Target Completion**: Week 22 (2026-07-04) for MVP (P0-P4 deployed). Phase 5 deployment starts Week 18. Week 25+ for P7 Memory (不与Phase 6 Week 23-24重叠).
 
 ---
 
@@ -14,12 +14,13 @@
 Phase 0: Foundation            [Week 1-2]   🟩🟩
 Phase 1: Video Recording       [Week 3-6]   🟩🟩🟩🟩 (COMPLETE; long-run observations tracked in future plan)
 Phase 2.0: Audio MVP           [Week 7-8]   🟩🟨 (ENGINEERING COMPLETE; release NO-GO pending 24h LONGRUN evidence)
-Phase 2.1: Speaker ID          [Week 9-10]  ⬜️⬜️ (OPTIONAL - decide after 2.0)
-Phase 3: Multi-Modal Search    [Week 11-12] ⬜️⬜️
-Phase 4: Chat                  [Week 13-15] ⬜️⬜️⬜️
-Phase 5: Deployment (SERIAL)   [Week 16-20] ⬜️⬜️⬜️⬜️⬜️ (CRITICAL PATH)
-Phase 6: Streaming Chat        [Week 21-22] ⬜️⬜️ (FUTURE)
-Phase 7: Memory (A+C)          [Week 23+]   ⬜️⬜️⬜️ (FUTURE, 延后实施)
+Phase 2.5: WebUI Audio/Video   [~5 days]    🟩 (COMPLETE; /audio + /video dashboards, 59 tests, 15/15 gates PASS)
+Phase 2.1: Audio Parity        [Week 9-12]  ⬜️⬜️⬜️⬜️ (screenpipe-aligned, required before Phase 3)
+Phase 3: Multi-Modal Search    [Week 13-14] ⬜️⬜️
+Phase 4: Chat                  [Week 15-17] ⬜️⬜️⬜️
+Phase 5: Deployment (SERIAL)   [Week 18-22] ⬜️⬜️⬜️⬜️⬜️ (CRITICAL PATH)
+Phase 6: Streaming Chat        [Week 23-24] ⬜️⬜️ (FUTURE)
+Phase 7: Memory (A+C)          [Week 25+]   ⬜️⬜️⬜️ (FUTURE, 延后实施)
 
 Legend: ⬜️ Not Started | 🟨 In Progress | 🟩 Complete | 🟥 Blocked
 
@@ -204,9 +205,9 @@ Legend: ⬜️ Not Started | 🟨 In Progress | 🟩 Complete | 🟥 Blocked
 **Status**: ⬜️ Proposed (Future Backlog)
 **Planned**: TBD (schedule after Phase 2.0 scope lock)
 **Actual**: N/A
-**Owner**: Tech Lead (architecture) + Solo Developer (implementation)
-**Purpose**: Upgrade from "resolver-ready but signal-sparse" to true frame-aligned metadata while keeping API contracts backward compatible.
-
+**Owner**: Tech Lead (om "resolver-ready but signal-sparse" to true frame-aligned metadata while keeping API contracts backward compatible.
+architecture) + Solo Developer (implementation)
+**Purpose**: Upgrade fr
 **Recommended Architecture (locked for future planning)**:
 - Keep **server-side frame extraction + OCR** as primary path (no architectural flip in this round).
 - Add **client-side metadata sidecar stream** (sample + event-driven), containing: `ts`, `app_name`, `window_title`, `focused`, `browser_url`, `monitor_id`.
@@ -285,30 +286,113 @@ Legend: ⬜️ Not Started | 🟨 In Progress | 🟩 Complete | 🟥 Blocked
 
 ---
 
-### Phase 2.1: Speaker Identification (OPTIONAL)
-**Status**: ⬜️ Not Started (OPTIONAL - User decides after Phase 2.0)
-**Planned**: Week 9-10 (2 weeks) - IF NEEDED
-**Actual**: TBD
-**Owner**: TBD
-**Decision**: ✅ CONFIRMED OPTIONAL (user can skip entirely)
-**Decision Trigger**: After Phase 2.0 validation (Week 8)
+### Phase 2.5: WebUI Audio & Video Dashboard Pages
+**Status**: 🟩 Complete
+**Planned**: ~5 working days
+**Actual**: 2026-02-12 (single session)
+**Owner**: Solo Developer (WebUI + minimal backend APIs)
+**Detailed Plan**: `/Users/pyw/new/MyRecall/v3/plan/05-phase-2.5-webui-audio-video-detailed-plan.md`
+**Validation Report**: `/Users/pyw/new/MyRecall/v3/results/phase-2.5-validation.md`
+
+**Dependencies**: Phase 2.0 Engineering Complete (all prerequisites met)
+
+**Scope**: `/audio` and `/video` WebUI Dashboard pages with chunk management, inline media playback, content browsing (transcriptions / frames), processing queue status, and aggregated statistics. 6 new API endpoints + 1 existing endpoint extension.
+
+**Test Results**: 59 Phase 2.5 tests passed (30 API + 8 audio page + 8 video page + 13 navigation). Full regression: 553 passed, 12 skipped, 0 failed.
 
 **Progress**:
-- [ ] Speaker diarization (pyannote-audio)
-- [ ] Speaker embedding & clustering
-- [ ] Cross-device audio deduplication
+- [x] SQLStore: `get_video_chunks_paginated()`, `get_frames_paginated()`, `get_video_stats()`, `get_audio_stats()`
+- [x] API: `GET /api/v1/video/chunks` (pagination + status/monitor_id filter)
+- [x] API: `GET /api/v1/video/chunks/<id>/file` (mp4 serving + path traversal prevention)
+- [x] API: `GET /api/v1/video/frames` (pagination + multi-filter + OCR snippet)
+- [x] API: `GET /api/v1/video/stats` (aggregated statistics)
+- [x] API: `GET /api/v1/audio/chunks/<id>/file` (WAV serving + path traversal prevention)
+- [x] API: `GET /api/v1/audio/stats` (aggregated statistics)
+- [x] API: Extend `GET /api/v1/audio/chunks` with `device` filter (additive)
+- [x] Flask route: `/audio` → `audio()`
+- [x] Template: `audio.html` (stats + chunks + transcriptions + playback + queue)
+- [x] Flask route: `/video` → `video()`
+- [x] Template: `video.html` (stats + chunks + frames + playback + queue)
+- [x] Navigation: `layout.html` audio/video icons + current-view highlighting
+- [x] Icons: `icons.html` `icon_audio()` + `icon_video()` macros
+- [x] Tests: 4 test files (59 tests total)
+
+**Gate Traceability** (authority: `v3/metrics/phase-gates.md`):
+
+| ID | Check | Type | Status |
+|----|-------|------|--------|
+| 2.5-F-01 | `/audio` page renderable | Non-Gating | PASS |
+| 2.5-F-02 | `/video` page renderable | Non-Gating | PASS |
+| 2.5-F-03 | Video chunks API pagination | Non-Gating | PASS |
+| 2.5-F-04 | Video frames API filtering | Non-Gating | PASS |
+| 2.5-F-05 | Video file serving mp4 | Non-Gating | PASS |
+| 2.5-F-06 | Audio file serving WAV | Non-Gating | PASS |
+| 2.5-F-07 | Audio inline playback | Non-Gating | PASS |
+| 2.5-F-08 | Video inline playback | Non-Gating | PASS |
+| 2.5-F-09 | Stats endpoints correct | Non-Gating | PASS |
+| 2.5-F-10 | Navigation icons + highlight | Non-Gating | PASS |
+| 2.5-F-11 | Audio device filter (additive) | Non-Gating | PASS |
+| 2.5-P-01 | Stats <500ms | Non-Gating | PASS (ref) |
+| **2.5-S-01** | **No test regression (>=477)** | **GATING** | **PASS** (553 passed) |
+| 2.5-R-01 | No full file load to memory | Non-Gating | PASS |
+| **2.5-DG-01** | **Path traversal prevention** | **GATING** | **PASS** (4 security tests) |
+
+**Go/No-Go Decision**: **GO** — All 15 gates PASS (2 GATING + 13 Non-Gating). 553 tests passed, 0 failed.
+
+**Blockers**: None.
+
+---
+
+### Phase 2.1: Audio Parity with screenpipe
+**Status**: ⬜️ Not Started
+**Planned**: Week 9-12 (4 weeks)
+**Actual**: TBD
+**Owner**: Solo Developer (audio alignment)
+**Alignment Target**: 尽可能对齐 screenpipe（架构/行为优先，保持 Python + ONNX）
+**Execution Policy**: Required precondition before Phase 3 (not optional)
+
+**Architecture Constraints (Decoupled Client/Server)**:
+- Client only handles capture and upload; it does not run speaker decisions, dedup logic, or speaker lifecycle operations.
+- Server owns speaker persistence, lifecycle operations, overlap cleanup, dedup metrics, and observability output.
+- All parity additions are additive and must not break existing upload protocol or current API behavior.
+
+**Scope (MUST)**:
+- [ ] Layered VAD decision chain aligned with chunk gate semantics (`speech_frame_count / total_frames`)
+- [ ] Pre-segmentation handling aligned (`speech/silence/unknown` flow + noise path behavior)
+- [ ] Recording stability aligned (overlap windows + disconnect recovery behavior)
+- [ ] Transcription result fields and timestamp behavior aligned with screenpipe semantics
+- [ ] Dedup baseline strategy aligned (time window + similarity threshold policy)
+- [ ] Speaker persistence layer: `speakers`, `speaker_embeddings` (additive schema)
+- [ ] Speaker lifecycle operations: identify/update centroid + merge + reassign + undo (server-side)
+- [ ] Text overlap cleanup + dedup metrics: `total`, `inserted`, `duplicate_blocked`, `overlap_trimmed`, `duplicate_rate`
+- [ ] Unified observability fields: `backend/speech_frames/total_frames/speech_ratio/min_speech_ratio/filtered/speaker_confidence/speaker_decision/dedup_action`
+- [ ] Speaker quality guardrail: low-confidence samples default to `unknown` (no auto-merge), with later manual merge/reassign support
+
+**Scope (SHOULD)**:
+- [ ] Multi-engine STT strategy parity while keeping Python runtime
+- [ ] Speaker/diarization compatibility path (Python stack)
+
+**Planned Additive Interfaces**:
+- [ ] DB: add `speakers` and `speaker_embeddings`; add `speaker_confidence` (or equivalent measurable field) on `audio_transcriptions`
+- [ ] API: add speaker lifecycle endpoints (merge/reassign/undo) as server capabilities, without changing current upload protocol
+- [ ] Observability contract: emit fixed unified fields for Phase 3/4 debugging and regression quality tracking
 
 **Go/No-Go Gates**:
-- [ ] Speaker DER ≤20%
-- [ ] Clustering stable over 24 hours
+- [ ] Key evaluation corpus parity pass rate ≥85% against screenpipe reference behavior
+- [ ] Silero `speech_ratio=0` anomaly chunk ratio reduced by ≥60% vs Phase 2.0 baseline
+- [ ] Gate-fail path skips transcription with correct reason field (`speech_ratio_below_threshold`) in 100% validation cases
+- [ ] Speaker persistence schema is present and writable (`speakers` + `speaker_embeddings`) with backward compatibility preserved
+- [ ] Speaker lifecycle acceptance passes (`merge/reassign/undo`) with auditable operation traces
+- [ ] Overlap dedup metrics are emitted and dedup effectiveness passes replay corpus checks (no regression on non-overlap set)
+- [ ] Unified observability field completeness is ≥99% across processed chunks, and low-confidence speaker samples default to `unknown`
 
-**Blockers**: Phase 2.0 completion + user decision on priority
+**Blockers**: Model asset readiness, representative parity corpus definition, lifecycle acceptance dataset, 24h long-run observation window
 
 ---
 
 ### Phase 3: Multi-Modal Search Integration
 **Status**: ⬜️ Not Started
-**Planned**: Week 11-12 (2 weeks)
+**Planned**: Week 13-14 (2 weeks)
 **Actual**: TBD
 **Owner**: Tech Lead (architecture + integration)
 
@@ -323,13 +407,13 @@ Legend: ⬜️ Not Started | 🟨 In Progress | 🟩 Complete | 🟥 Blocked
 - [ ] Precision@10 ≥0.7
 - [ ] Search latency <500ms p95
 
-**Blockers**: Phase 2.0 completion
+**Blockers**: Phase 2.1 completion
 
 ---
 
 ### Phase 4: Chat Capability
 **Status**: ⬜️ Not Started
-**Planned**: Week 13-15 (3 weeks)
+**Planned**: Week 15-17 (3 weeks)
 **Actual**: TBD
 **Owner**: Tech Lead (LLM integration)
 
@@ -355,10 +439,10 @@ Legend: ⬜️ Not Started | 🟨 In Progress | 🟩 Complete | 🟥 Blocked
 
 ### Phase 5: Deployment Migration (SERIAL, after Phase 3-4)
 **Status**: ⬜️ Not Started
-**Planned**: Week 16-20 (5 weeks)
+**Planned**: Week 18-22 (5 weeks)
 **Actual**: TBD
 **Owner**: Solo Developer + Product Owner (deployment & validation)
-**Priority**: 🔴 CRITICAL PATH (5-month hard deadline)
+**Priority**: 🔴 CRITICAL PATH (Week 22 hard deadline)
 
 **Architecture Decision**: Thin client model - all data stored on Debian server.
 
@@ -384,12 +468,12 @@ After Phase 5 (Thin Client):
 ```
 
 **Sub-Phases**:
-- [ ] Phase 5.0: Remote API Readiness Audit (Week 16) - validate Phase 0-4 APIs are remote-ready
-- [ ] Phase 5.1: Local-Remote Simulation (Week 17) - 50ms latency testing
-- [ ] Phase 5.2: Server Containerization (Week 18) - Dockerfile + docker-compose
-- [ ] Phase 5.3: Bulk Data Upload (Week 19) - migrate all existing local data
-- [ ] Phase 5.4: Client Refactor (Week 19-20) - remove local DB, switch to API-only, parallel with 5.3 second half
-- [ ] Phase 5.5: Gray Release & Cutover (Week 20)
+- [ ] Phase 5.0: Remote API Readiness Audit (Week 18) - validate Phase 0-4 APIs are remote-ready
+- [ ] Phase 5.1: Local-Remote Simulation (Week 19) - 50ms latency testing
+- [ ] Phase 5.2: Server Containerization (Week 20) - Dockerfile + docker-compose
+- [ ] Phase 5.3: Bulk Data Upload (Week 21) - migrate all existing local data
+- [ ] Phase 5.4: Client Refactor (Week 21-22) - remove local DB, switch to API-only, parallel with 5.3 second half
+- [ ] Phase 5.5: Gray Release & Cutover (Week 22)
 
 **Progress**:
 - [ ] Phase 5.0: API versioning and remote-first design
@@ -412,7 +496,7 @@ After Phase 5 (Thin Client):
 
 ### Phase 6: Streaming Chat
 **Status**: ⬜️ Not Started (FUTURE)
-**Planned**: Week 21-22 (2 weeks)
+**Planned**: Week 23-24 (2 weeks)
 **Actual**: TBD
 **Owner**: TBD
 
@@ -433,7 +517,7 @@ After Phase 5 (Thin Client):
 
 ### Phase 7: Memory Capabilities
 **Status**: ⬜️ Not Started (FUTURE)
-**Planned**: Week 23+ (TBD)
+**Planned**: Week 25+ (TBD)
 **Actual**: TBD
 **Owner**: TBD
 
@@ -467,7 +551,7 @@ After Phase 5 (Thin Client):
 | Client API latency high | Phase 5+ | Medium | Medium | ⬜️ | Pagination, metadata caching, async operations |
 | Debian box disk full | Phase 5+ | Low | High | ⬜️ | Disk quota alerts, auto-cleanup >90 days |
 | Deployment data loss | Phase 5 | Low | Critical | ⬜️ | Checksum verify, rollback drill, 7-day backup |
-| Phase 5 延期超 Week 20 | Phase 5 | Medium | Critical | ⚠️ | 串行执行,严控 scope,weekly check-ins |
+| Phase 5 延期超 Week 22 | Phase 5 | Medium | Critical | ⚠️ | 串行执行,严控 scope,weekly check-ins |
 
 ---
 
@@ -488,16 +572,16 @@ After Phase 5 (Thin Client):
 
 This section tracks questions that have been resolved through architectural decisions.
 
-### ✅ Resolution 1: Phase 2.1 Speaker ID Priority (2026-02-06)
+### ✅ Resolution 1: Phase 2.1 Audio Parity Priority (2026-02-06, updated 2026-02-14)
 
-**Original Question**: Is speaker identification required for MVP, or truly optional?
+**Original Question**: Should Phase 2.1 remain optional speaker ID work, or become required audio parity alignment before search/chat?
 
-**Decision**: OPTIONAL - User decides after Phase 2.0 validation (Week 8)
+**Decision**: Phase 2.1 is a required precondition before Phase 3, scoped as "Audio Parity with screenpipe" (Week 9-12).
 
 **Rationale**:
-- Speaker ID adds 2 weeks + complexity
-- Value depends on use case (meetings vs solo work)
-- Better to validate Phase 2.0 audio quality first
+- Audio parity reduces downstream data-quality risk for Phase 3 search relevance and Phase 4 chat grounding
+- Keep alignment at architecture/behavior level while preserving Python + ONNX runtime choices
+- Replace optional single-metric diarization scope with multi-dimensional parity gates for operational confidence
 
 **Reference**: ADR-0004
 
@@ -513,7 +597,7 @@ This section tracks questions that have been resolved through architectural deci
 - Summaries provide user value for reviewing past activity
 - Agent state enables smarter chat with context memory
 - Requires Phase 4 (Chat) foundation first
-- Not MVP-critical, deferred to Phase 7 (Week 23+)
+- Not MVP-critical, deferred to Phase 7 (Week 25+)
 
 **Reference**: ADR-0003
 
@@ -523,7 +607,7 @@ This section tracks questions that have been resolved through architectural deci
 
 **Original Question**: Should streaming be added to Phase 4, or deferred to Phase 6+?
 
-**Decision**: Phase 6+ (Week 21-22)
+**Decision**: Phase 6+ (Week 23-24)
 
 **Rationale**:
 - Phase 4 delivers simple request-response first
@@ -540,13 +624,13 @@ This section tracks questions that have been resolved through architectural deci
 **Rationale**:
 - Reduces complexity and coordination overhead
 - Prioritizes stability over speed
-- Timeline extends to 5 months (Week 20) - acceptable tradeoff
+- Timeline extends to 22 weeks (Week 22) - acceptable tradeoff
 
 ---
 
 ## Open Questions (Active)
 
-✅ **All Open Questions resolved as of 2026-02-06.** (See Changelog line 374-383 for all resolved decisions)
+✅ **All Open Questions resolved as of 2026-02-06.** (See Change Log for resolved decisions and superseded items.)
 
 **Review Trigger**: Add new questions here when discovered during Phase 0+ execution.
 
@@ -556,15 +640,16 @@ This section tracks questions that have been resolved through architectural deci
 
 | Date | Type | Description | Impact |
 |------|------|-------------|--------|
+| 2026-02-14 | Roadmap Rebaseline | Phase 2.1 redefined to `Audio Parity with screenpipe` (Week 9-12), no longer optional; downstream phases shifted by +2 weeks | MVP target moved to Week 22 (2026-07-04); parity gates become Phase 3 entry criteria |
 | 2026-02-06 | Priority Change | P0: Chat → Multi-modal capture | +2 weeks to first chat demo, better foundation |
 | 2026-02-06 | User Decision | Chat mode: Streaming → Simple request-response | -3 days to Phase 4 completion |
 | 2026-02-06 | User Decision | Audio scope: Align with screenpipe (full stack) | +1 week to Phase 2, better capability |
-| 2026-02-06 | User Decision | Deployment timeline: 20周硬约束(约5个月) | Phase 5 (Week 16-20) becomes critical path |
+| 2026-02-06 | User Decision | Deployment timeline: 20周硬约束(约5个月) *(superseded by 2026-02-14 rebaseline)* | Superseded by Week 22 critical path |
 | 2026-02-06 | Architecture Decision | Thin client architecture for Phase 5 | All data on Debian server, Phase 0 must be remote-first |
-| 2026-02-06 | User Decision | Phase 2.1 Speaker ID: Confirmed OPTIONAL | Can save 2 weeks if not needed |
-| 2026-02-06 | User Decision | P3 Memory scope: A+C (Summaries + Agent State) | Deferred to Phase 7 (Week 23+) |
-| 2026-02-06 | Roadmap Addition | Phase 6: Streaming Chat (Week 21-22) | +2 weeks for streaming capability |
-| 2026-02-06 | Roadmap Addition | Phase 7: Memory Capabilities (Week 23+, 延后实施) | Future feature, gates defined post-Phase 4 |
+| 2026-02-06 | User Decision | Phase 2.1 Speaker ID: Confirmed OPTIONAL *(superseded by 2026-02-14 parity decision)* | Replaced by required Phase 2.1 parity work |
+| 2026-02-06 | User Decision | P3 Memory scope: A+C (Summaries + Agent State) | Deferred to Phase 7 (Week 25+) |
+| 2026-02-06 | Roadmap Addition | Phase 6: Streaming Chat (Week 23-24) | +2 weeks for streaming capability |
+| 2026-02-06 | Roadmap Addition | Phase 7: Memory Capabilities (Week 25+, 延后实施) | Future feature, gates defined post-Phase 4 |
 | 2026-02-06 | Documentation Fix | Roadmap consistency pass: unified timeline (20周), fixed Search priority, clarified execution strategy | Resolved 12 documentation conflicts |
 | 2026-02-06 | Phase 0 Planning | Phase 0 detailed plan produced (`02-phase-0-detailed-plan.md`), roadmap Phase 0 section expanded with 21 progress items and 19 gate IDs, validation template created | Phase 0 ready to execute |
 | 2026-02-06 | Phase 0 Complete | All 19 Phase 0 gates passed (155 tests, 0 failures). 20 new files, 5 modified files, 2 governance docs. Go decision confirmed. | Phase 1 unblocked |
@@ -576,6 +661,8 @@ This section tracks questions that have been resolved through architectural deci
 | 2026-02-08 | Roadmap Addition | Added future Phase 1.x plan for frame-accurate metadata signal pipeline (server-side extraction/OCR + client sidecar + frame_ts alignment) | Establishes recommended evolution path without adopting multi-window-per-frame architecture in current scope |
 | 2026-02-09 | Status Update | Phase 1 marked complete; 7 long-run observations moved to future non-blocking plan (Week 9-12 tracking) | Unblocks Phase 2 execution while preserving long-run evidence collection |
 | 2026-02-09 | Phase 2.0 Planning | Phase 2.0 detailed plan produced (`04-phase-2-detailed-plan.md`), roadmap Phase 2.0 section expanded with 10-day progress breakdown, 17 gate IDs, validation template created | Phase 2.0 ready to execute on 2026-02-09 |
+| 2026-02-12 | Phase 2.5 Planning | Phase 2.5 detailed plan produced (`05-phase-2.5-webui-audio-video-detailed-plan.md`): 2 new dashboard pages (`/audio`, `/video`), 6 new API endpoints, navigation update, 12 WBs, 15 gate checks, 4 test files (~35 tests), validation template created | Phase 2.5 ready to execute; can run in parallel with 2-S-01 observation |
+| 2026-02-12 | Phase 2.5 Complete | All 15 Phase 2.5 gates PASS (2 GATING + 13 Non-Gating). 59 new tests (30 API + 8 audio page + 8 video page + 13 nav). Full regression: 553 passed, 0 failed. `/audio` + `/video` dashboards with Alpine.js SSR pattern, 6 new API endpoints, path traversal prevention. | Phase 2.5 engineering closed; Phase 2.1 or Phase 3 unblocked |
 
 ---
 
@@ -589,18 +676,18 @@ This section tracks questions that have been resolved through architectural deci
 1. **Complexity Reduction**: Eliminates resource conflicts, coordination overhead, and parallel debugging challenges
 2. **Quality Focus**: Each phase can be fully validated before the next begins
 3. **Single-Person Team**: Serial execution aligns better with solo development workflow
-4. **Acceptable Tradeoff**: 5-month timeline (Week 20) is acceptable vs. risk of parallel execution failures
+4. **Acceptable Tradeoff**: 22-week timeline (Week 22) is acceptable vs. risk of parallel execution failures
 
 **Timeline Impact**:
 - Original plan (parallel): 15 weeks
-- Adjusted plan (serial): 20 weeks
-- Tradeoff: +5 weeks for stability and reduced risk
+- Adjusted plan (serial + Phase 2.1 parity extension): 22 weeks
+- Tradeoff: +7 weeks for stability, reduced risk, and audio parity quality
 
 **Sequence**:
 ```
-Week 11-12: Phase 3 (Multi-Modal Search)
-Week 13-15: Phase 4 (Chat Capability)
-Week 16-20: Phase 5 (Deployment Migration)
+Week 13-14: Phase 3 (Multi-Modal Search)
+Week 15-17: Phase 4 (Chat Capability)
+Week 18-22: Phase 5 (Deployment Migration)
 ```
 
 **Cross-Phase Dependencies**:
@@ -627,17 +714,21 @@ Week 16-20: Phase 5 (Deployment Migration)
    - **Completed with decision update (2026-02-09)**: Phase 1 marked complete; 13 passed, 7 long-run observations moved to future non-blocking plan
    - Remaining evidence tracked under `Phase 1 Long-Run Observation Plan (Future, Non-Blocking)`
 
-4. **Week 8 (Phase 2.1 User Decision)**
-   - Review Phase 2.0 validation results (Whisper WER, VAD effectiveness, audio sync)
-   - User decides: Proceed with Phase 2.1 Speaker ID (Week 9-10) or skip to Phase 3
-   - Reference: ADR-0004 decision criteria
+4. **Week 10 (Phase 2.1 Mid-Review)**
+   - Review MUST scope progress (VAD gate parity, transcription semantics, observability fields)
+   - Confirm blockers and mitigation status (model assets, parity corpus, long-run schedule)
+   - Decide whether SHOULD scope can start in parallel without impacting MUST delivery
 
-5. **Week 15 End (Pre-Phase 5 Kickoff Checkpoint)**
+5. **Week 12 End (Phase 2.1 Go/No-Go)**
+   - Validate all Phase 2.1 parity gates and produce evidence package
+   - Confirm Phase 3 can start on Week 13 without carry-over technical debt
+
+6. **Week 17 End (Pre-Phase 5 Kickoff Checkpoint)**
    - Confirm all P0-P4 gates passed
    - Verify Phase 5 deployment readiness
-   - Final go/no-go decision for Week 16 Phase 5 kickoff
+   - Final go/no-go decision for Week 18 Phase 5 kickoff
 
-6. **Week 20 End (MVP Validation After Phase 5 Completion)**
+7. **Week 22 End (MVP Validation After Phase 5 Completion)**
    - Confirm Phase 5 cutover and rollback drill completed
    - Verify remote deployment quality targets are met
 

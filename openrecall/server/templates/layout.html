@@ -148,6 +148,16 @@
       background-color: rgba(0, 0, 0, 0.12);
       color: #1D1D1F;
     }
+
+    html[data-current-view="audio"] a[href="/audio"] {
+      background-color: rgba(0, 0, 0, 0.12);
+      color: #1D1D1F;
+    }
+
+    html[data-current-view="video"] a[href="/video"] {
+      background-color: rgba(0, 0, 0, 0.12);
+      color: #1D1D1F;
+    }
     
     /* Right Group: Icons */
     .toolbar-right-group {
@@ -361,6 +371,12 @@
         <a href="/timeline" class="toolbar-icon-link" title="Timeline View">
           {{ icons.icon_timeline() }}
         </a>
+        <a href="/audio" class="toolbar-icon-link" title="Audio">
+          {{ icons.icon_audio() }}
+        </a>
+        <a href="/video" class="toolbar-icon-link" title="Video">
+          {{ icons.icon_video() }}
+        </a>
       </div>
       <a href="/search" class="toolbar-icon-link" title="Search">
         {{ icons.icon_search() }}
@@ -546,6 +562,10 @@
       currentView = 'timeline';
     } else if (currentPath === '/search') {
       currentView = 'search';
+    } else if (currentPath === '/audio') {
+      currentView = 'audio';
+    } else if (currentPath === '/video') {
+      currentView = 'video';
     }
     document.documentElement.setAttribute('data-current-view', currentView);
   </script>

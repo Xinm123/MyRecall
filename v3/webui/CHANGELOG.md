@@ -137,6 +137,60 @@
 
 ---
 
+## Phase 2.5 (Complete — WebUI Audio & Video Dashboard Pages)
+
+### 新增
+- 新增 `/audio` 页面：Audio pipeline 综合 dashboard（chunk 列表 + 分页过滤 + inline 播放 + transcription 浏览 + queue 状态 + 统计概览）。
+- 新增 `/video` 页面：Video pipeline 综合 dashboard（chunk 列表 + 分页过滤 + inline 播放 + frame gallery + queue 状态 + 统计概览）。
+- 新增 `icon_audio()` 和 `icon_video()` SVG macro 于 `icons.html`。
+- 新增 6 个 API endpoints：
+  - `GET /api/v1/video/chunks` — video chunks 分页列表（status/monitor_id filter）
+  - `GET /api/v1/video/chunks/<id>/file` — mp4 文件 serving（path traversal prevention）
+  - `GET /api/v1/video/frames` — frames 分页列表（chunk_id/app/window/time filter + OCR snippet）
+  - `GET /api/v1/video/stats` — video 聚合统计
+  - `GET /api/v1/audio/chunks/<id>/file` — WAV 文件 serving（path traversal prevention）
+  - `GET /api/v1/audio/stats` — audio 聚合统计
+
+### 修改
+- `layout.html` 导航条新增 Audio/Video icon 链接，`data-current-view` 高亮逻辑扩展到 5 个页面。
+- `GET /api/v1/audio/chunks` 新增 `device` 可选过滤参数（additive，不破坏已有行为）。
+- Navigation 从 3 page icons 扩展到 5 page icons（+Audio/Video）。
+
+### 废弃
+- 无。
+
+### 影响面
+- 用户可通过独立 dashboard 查看和管理 audio/video pipeline 数据，减少对命令行检查的依赖。
+- 新增页面不影响已有页面（`/`、`/timeline`、`/search`）的行为。
+- 新增媒体 file serving endpoints 为 Phase 3+ 提供基础。
+- Navigation 变更影响所有页面（layout.html 全局变化）。
+
+### 验证
+- `tests/test_phase25_api.py` — 30 passed, 0 failed
+- `tests/test_phase25_audio_page.py` — 8 passed, 0 failed
+- `tests/test_phase25_video_page.py` — 8 passed, 0 failed
+- `tests/test_phase25_navigation.py` — 13 passed, 0 failed
+- Full regression: 553 passed, 12 skipped, 0 failed
+
+### 证据
+- `/Users/pyw/new/MyRecall/v3/plan/05-phase-2.5-webui-audio-video-detailed-plan.md`
+- `/Users/pyw/new/MyRecall/v3/results/phase-2.5-validation.md`
+- `/Users/pyw/new/MyRecall/v3/webui/pages/audio.md`
+- `/Users/pyw/new/MyRecall/v3/webui/pages/video.md`
+
+### 证据矩阵
+
+| Change | Code Path | Test Command | Result | UTC Timestamp |
+|---|---|---|---|---|
+| Audio/Video dashboard pages + API endpoints | `openrecall/server/app.py`, `openrecall/server/api_v1.py`, `openrecall/server/database/sql.py` | `python3 -m pytest tests/test_phase25_api.py -v` | 30 passed | 2026-02-12 |
+| Audio dashboard page (SSR + Alpine.js) | `openrecall/server/templates/audio.html` | `python3 -m pytest tests/test_phase25_audio_page.py -v` | 8 passed | 2026-02-12 |
+| Video dashboard page (SSR + Alpine.js) | `openrecall/server/templates/video.html` | `python3 -m pytest tests/test_phase25_video_page.py -v` | 8 passed | 2026-02-12 |
+| Navigation icons + highlighting (5-page toolbar) | `openrecall/server/templates/layout.html`, `openrecall/server/templates/icons.html` | `python3 -m pytest tests/test_phase25_navigation.py -v` | 13 passed | 2026-02-12 |
+| Path traversal prevention (GATING 2.5-DG-01) | `openrecall/server/api_v1.py` | `python3 -m pytest tests/test_phase25_api.py -k "PathSecurity or path_traversal" -v` | 4 passed | 2026-02-12 |
+| Full regression closure | All Phase 0/1/2/2.5 code | `python3 -m pytest tests/ -v --tb=short` | 553 passed, 12 skipped | 2026-02-12 |
+
+---
+
 ## 未来维护规则（强约束）
 
 每次新增 `phase-*-validation.md` 时：

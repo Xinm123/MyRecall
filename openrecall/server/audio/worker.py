@@ -94,6 +94,12 @@ class AudioProcessingWorker(threading.Thread):
                         )
                     else:
                         sql_store.mark_audio_chunk_completed(conn, chunk_id)
+                        if result.transcriptions_count == 0:
+                            logger.info(
+                                "🎧 [AUDIO-SERVER] Chunk completed with no transcriptions | id=%d | no_transcription_reason=%s",
+                                chunk_id,
+                                result.no_transcription_reason or "unknown",
+                            )
 
                 except Exception as e:
                     logger.error(f"Error in audio worker loop: {e}")

@@ -23,6 +23,7 @@ class AudioProcessingResult:
     segments_count: int = 0
     filtered_by_ratio: bool = False
     vad_backend: str = "unknown"
+    no_transcription_reason: Optional[str] = None
     error: Optional[str] = None
 
 
@@ -108,37 +109,95 @@ class AudioChunkProcessor:
                 result.error = "VAD not available"
                 return result
 
-            if hasattr(vad, "analyze_chunk"):
+            from openrecall.server.audio.vad import VadStatus
+            from openrecall.server.audio.wav_utils import load_wav_16k, extract_segment
+
+            audio_data = load_wav_16k(chunk_path)
+            frame_size = 1600
+            total_frames = 0
+            speech_frames = 0
+            analysis = None
+
+            audio_type_fn = getattr(vad, "audio_type", None)
+            has_audio_type = callable(audio_type_fn) and callable(
+                getattr(type(vad), "audio_type", None)
+            )
+            has_reset_audio_type_state = callable(
+                getattr(type(vad), "reset_audio_type_state", None)
+            )
+            if has_audio_type and has_reset_audio_type_state:
+                vad.reset_audio_type_state()
+
+            if has_audio_type:
+                for start in range(0, len(audio_data), frame_size):
+                    frame = audio_data[start : start + frame_size]
+                    if len(frame) == 0:
+                        continue
+                    total_frames += 1
+                    status = audio_type_fn(frame)
+                    if status == VadStatus.SPEECH:
+                        speech_frames += 1
+                result.speech_ratio = (
+                    speech_frames / total_frames if total_frames > 0 else 0.0
+                )
+                result.vad_backend = getattr(vad, "backend_used", "") or "unknown"
+            elif callable(getattr(vad, "analyze_chunk", None)):
                 analysis = vad.analyze_chunk(chunk_path)
-                speech_segments = analysis.segments
                 result.speech_ratio = float(analysis.speech_ratio)
-                result.segments_count = len(speech_segments)
                 result.vad_backend = analysis.backend_used or "unknown"
             else:
-                speech_segments = vad.get_speech_segments(chunk_path)
-                result.speech_ratio = 0.0 if not speech_segments else 1.0
-                result.segments_count = len(speech_segments)
+                result.speech_ratio = 0.0
                 result.vad_backend = "unknown"
 
             result.filtered_by_ratio = (
                 result.speech_ratio < settings.audio_vad_min_speech_ratio
             )
             logger.info(
-                "🎧 [AUDIO-SERVER] VAD analysis | chunk_id=%d | backend=%s | speech_ratio=%.4f | filtered=%s | segments=%d",
+                "🎧 [AUDIO-SERVER] VAD gate | chunk_id=%d | backend=%s | speech_frames=%d | total_frames=%d | speech_ratio=%.4f | min_speech_ratio=%.4f | filtered=%s",
                 chunk_id,
                 result.vad_backend,
+                speech_frames,
+                total_frames,
                 result.speech_ratio,
+                settings.audio_vad_min_speech_ratio,
                 result.filtered_by_ratio,
-                result.segments_count,
             )
 
             if result.filtered_by_ratio:
+                result.no_transcription_reason = "speech_ratio_below_threshold"
+                logger.info(
+                    "🎧 [AUDIO-SERVER] No transcription | chunk_id=%d | no_transcription_reason=%s | speech_ratio=%.4f | threshold=%.4f",
+                    chunk_id,
+                    result.no_transcription_reason,
+                    result.speech_ratio,
+                    settings.audio_vad_min_speech_ratio,
+                )
                 result.elapsed_seconds = time.perf_counter() - t0
                 return result
 
+            # Step 2: gate passed -> find speech segments for transcription.
+            has_get_segments_from_audio = callable(
+                getattr(type(vad), "get_speech_segments_from_audio", None)
+            )
+            has_get_segments = callable(
+                getattr(type(vad), "get_speech_segments", None)
+            )
+            if has_get_segments_from_audio:
+                speech_segments = vad.get_speech_segments_from_audio(audio_data)
+            elif has_get_segments:
+                speech_segments = vad.get_speech_segments(chunk_path)
+            elif analysis is not None:
+                speech_segments = analysis.segments
+            else:
+                speech_segments = []
+
+            result.segments_count = len(speech_segments)
             if not speech_segments:
+                result.no_transcription_reason = "no_speech_segments"
                 logger.info(
-                    "🎧 [AUDIO-SERVER] No speech detected | chunk_id=%d", chunk_id
+                    "🎧 [AUDIO-SERVER] No speech detected | chunk_id=%d | no_transcription_reason=%s",
+                    chunk_id,
+                    result.no_transcription_reason,
                 )
                 result.elapsed_seconds = time.perf_counter() - t0
                 return result
@@ -155,11 +214,10 @@ class AudioChunkProcessor:
                 result.error = "Whisper transcriber not available"
                 return result
 
-            from openrecall.server.audio.wav_utils import load_wav_16k, extract_segment
-
-            audio_data = load_wav_16k(chunk_path)
-
             offset_index = 0
+            short_segments_skipped = 0
+            empty_transcriptions_skipped = 0
+            failed_segments = 0
             for seg in speech_segments:
                 try:
                     # Extract the speech segment audio
@@ -167,6 +225,7 @@ class AudioChunkProcessor:
                         audio_data, seg.start_time, seg.end_time
                     )
                     if len(segment_audio) < 1600:  # Less than 0.1s at 16kHz
+                        short_segments_skipped += 1
                         continue
 
                     # Transcribe the segment
@@ -174,6 +233,7 @@ class AudioChunkProcessor:
 
                     for ts in transcription_segments:
                         if not ts.text.strip():
+                            empty_transcriptions_skipped += 1
                             continue
 
                         # Calculate absolute timestamps
@@ -198,6 +258,7 @@ class AudioChunkProcessor:
                             offset_index += 1
 
                 except Exception as e:
+                    failed_segments += 1
                     logger.error(
                         f"Failed to process speech segment "
                         f"[{seg.start_time:.1f}-{seg.end_time:.1f}] "
@@ -205,16 +266,42 @@ class AudioChunkProcessor:
                     )
                     continue
 
+            if result.transcriptions_count == 0:
+                if short_segments_skipped == len(speech_segments):
+                    result.no_transcription_reason = "all_segments_too_short"
+                elif failed_segments == len(speech_segments):
+                    result.no_transcription_reason = "all_segments_failed"
+                elif empty_transcriptions_skipped > 0:
+                    result.no_transcription_reason = "empty_transcription_text"
+                else:
+                    result.no_transcription_reason = "no_transcription_output"
+
+                logger.info(
+                    "🎧 [AUDIO-SERVER] No transcription | chunk_id=%d | no_transcription_reason=%s",
+                    chunk_id,
+                    result.no_transcription_reason,
+                )
+
         except Exception as e:
             result.error = str(e)
             logger.exception(f"Audio chunk processing failed for chunk {chunk_id}")
 
         result.elapsed_seconds = time.perf_counter() - t0
-        logger.info(
-            "🎧 [AUDIO-SERVER] ✅ Chunk processed | id=%d | transcriptions=%d | elapsed=%.1fs | device=%s",
-            chunk_id,
-            result.transcriptions_count,
-            result.elapsed_seconds,
-            device_name,
-        )
+        if result.transcriptions_count == 0 and result.error is None:
+            logger.info(
+                "🎧 [AUDIO-SERVER] ✅ Chunk processed | id=%d | transcriptions=%d | elapsed=%.1fs | device=%s | no_transcription_reason=%s",
+                chunk_id,
+                result.transcriptions_count,
+                result.elapsed_seconds,
+                device_name,
+                result.no_transcription_reason or "unknown",
+            )
+        else:
+            logger.info(
+                "🎧 [AUDIO-SERVER] ✅ Chunk processed | id=%d | transcriptions=%d | elapsed=%.1fs | device=%s",
+                chunk_id,
+                result.transcriptions_count,
+                result.elapsed_seconds,
+                device_name,
+            )
         return result

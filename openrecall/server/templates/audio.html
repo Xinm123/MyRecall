@@ -1,0 +1,1178 @@
+{% extends "layout.html" %}
+
+{% block title %}Audio - MyRecall{% endblock %}
+
+{% block extra_head %}
+<style>
+  /* Stats Bar */
+  .stats-bar {
+    display: flex;
+    gap: 16px;
+    margin-bottom: 20px;
+    padding: 12px 20px;
+    background: var(--bg-card);
+    border-radius: 12px;
+    border: 1px solid var(--border-color);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+    flex-wrap: wrap;
+  }
+
+  .stat-card {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 100px;
+  }
+
+  .stat-card-label {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .stat-card-value {
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--text-primary);
+    letter-spacing: -0.5px;
+  }
+
+  .stat-card-sub {
+    font-size: 11px;
+    color: var(--text-secondary);
+  }
+
+  /* Queue Badges */
+  .queue-badges {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    margin-left: auto;
+  }
+
+  .queue-badge {
+    font-size: 11px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 999px;
+    line-height: 1.4;
+  }
+
+  .queue-badge.pending { background: #FFF3CD; color: #856404; }
+  .queue-badge.processing { background: #D1ECF1; color: #0C5460; }
+  .queue-badge.failed { background: #F8D7DA; color: #721C24; }
+
+  /* Section Title */
+  .section-title {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin: 24px 0 12px;
+    letter-spacing: -0.3px;
+  }
+
+  /* Data Table */
+  .data-table {
+    width: 100%;
+    background: var(--bg-card);
+    border-radius: 12px;
+    border: 1px solid var(--border-color);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+    overflow: hidden;
+    border-collapse: collapse;
+  }
+
+  .data-table th {
+    padding: 10px 16px;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    text-align: left;
+    border-bottom: 1px solid var(--border-color);
+    background: #FAFAFA;
+  }
+
+  .data-table td {
+    padding: 10px 16px;
+    font-size: 13px;
+    color: var(--text-primary);
+    border-bottom: 1px solid var(--border-color);
+  }
+
+  .data-table tr:last-child td {
+    border-bottom: none;
+  }
+
+  .data-table tr:hover td {
+    background: rgba(0, 0, 0, 0.02);
+  }
+
+  /* Status Badge */
+  .status-badge {
+    font-size: 11px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 6px;
+    display: inline-block;
+  }
+
+  .status-badge.completed { background: #D4EDDA; color: #155724; }
+  .status-badge.pending { background: #FFF3CD; color: #856404; }
+  .status-badge.processing { background: #D1ECF1; color: #0C5460; }
+  .status-badge.failed { background: #F8D7DA; color: #721C24; }
+
+  /* Inline Audio Player */
+  .inline-player {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 320px;
+  }
+
+  .player-btn {
+    background: transparent;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    color: var(--accent-color);
+    transition: all 0.15s;
+    flex-shrink: 0;
+  }
+
+  .player-btn:hover {
+    background: var(--accent-color);
+    color: white;
+    border-color: var(--accent-color);
+  }
+
+  .player-progress-container {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 80px;
+  }
+
+  .player-progress-bar {
+    width: 100%;
+    height: 6px;
+    background: var(--border-color);
+    border-radius: 3px;
+    cursor: pointer;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .player-progress-fill {
+    height: 100%;
+    background: var(--accent-color);
+    border-radius: 3px;
+    transition: width 0.1s linear;
+  }
+
+  .player-time {
+    font-size: 10px;
+    color: var(--text-secondary);
+    font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
+  }
+
+  .player-volume-container {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    position: relative;
+  }
+
+  .player-volume-slider {
+    width: 0;
+    height: 4px;
+    opacity: 0;
+    transition: all 0.2s;
+    cursor: pointer;
+  }
+
+  .player-volume-container:hover .player-volume-slider {
+    width: 60px;
+    opacity: 1;
+  }
+
+  .player-select {
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    padding: 2px 4px;
+    font-size: 11px;
+    background: #fff;
+    color: var(--text-primary);
+    cursor: pointer;
+    width: 50px;
+  }
+
+  .player-menu-btn {
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    padding: 4px;
+    color: var(--text-secondary);
+    border-radius: 4px;
+    position: relative;
+  }
+
+  .player-menu-btn:hover {
+    background: rgba(0,0,0,0.05);
+    color: var(--text-primary);
+  }
+
+  .player-dropdown {
+    position: absolute;
+    right: 0;
+    top: 100%;
+    margin-top: 4px;
+    background: white;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    min-width: 120px;
+    z-index: 100;
+    display: none;
+  }
+
+  .player-dropdown.show {
+    display: block;
+  }
+
+  .player-dropdown-item {
+    padding: 8px 12px;
+    font-size: 12px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .player-dropdown-item:hover {
+    background: rgba(0,0,0,0.05);
+  }
+
+  .player-dropdown-item:first-child {
+    border-radius: 6px 6px 0 0;
+  }
+
+  .player-dropdown-item:last-child {
+    border-radius: 0 0 6px 6px;
+  }
+
+  /* Play Button (legacy for transcription items) */
+  .play-btn {
+    background: transparent;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    padding: 4px 10px;
+    font-size: 12px;
+    cursor: pointer;
+    color: var(--accent-color);
+    font-weight: 500;
+    transition: all 0.15s;
+  }
+
+  .play-btn:hover {
+    background: var(--accent-color);
+    color: white;
+    border-color: var(--accent-color);
+  }
+
+  /* Transcription List */
+  .transcription-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .transcription-item {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    padding: 12px 16px;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  }
+
+  .transcription-meta {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 6px;
+  }
+
+  .transcription-device {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+  }
+
+  .transcription-time {
+    font-size: 11px;
+    color: var(--text-secondary);
+    font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
+  }
+
+  .transcription-text {
+    font-size: 13px;
+    color: var(--text-primary);
+    line-height: 1.5;
+  }
+
+  /* Pagination */
+  .pagination-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 12px;
+    padding: 8px 0;
+  }
+
+  .pagination-info {
+    font-size: 12px;
+    color: var(--text-secondary);
+  }
+
+  .pagination-btns {
+    display: flex;
+    gap: 8px;
+  }
+
+  .pagination-btn {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    padding: 4px 12px;
+    font-size: 12px;
+    cursor: pointer;
+    color: var(--text-primary);
+    font-weight: 500;
+    transition: all 0.15s;
+  }
+
+  .pagination-btn:hover:not(:disabled) {
+    background: var(--accent-color);
+    color: white;
+    border-color: var(--accent-color);
+  }
+
+  .pagination-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+
+  /* Empty State */
+  .empty-state {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 40px;
+    text-align: center;
+    color: var(--text-secondary);
+  }
+
+  .empty-state-icon {
+    font-size: 40px;
+    margin-bottom: 12px;
+    opacity: 0.5;
+  }
+
+  .empty-state-title {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 6px;
+  }
+
+  .empty-state-text {
+    font-size: 13px;
+  }
+
+  /* Error Banner */
+  .error-banner {
+    background: #FEF2F2;
+    border: 1px solid #FECACA;
+    border-radius: 10px;
+    padding: 12px 16px;
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    color: #991B1B;
+  }
+
+  /* Filters */
+  .audio-filters {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 10px;
+    margin-bottom: 14px;
+    padding: 10px;
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+  }
+
+  .audio-filters select {
+    width: 100%;
+    height: 34px;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 0 8px;
+    background: #fff;
+    color: var(--text-primary);
+    font-size: 12px;
+  }
+
+  /* Marker Rail */
+  .audio-marker-rail {
+    position: relative;
+    height: 34px;
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    margin-bottom: 14px;
+    overflow: hidden;
+  }
+
+  .audio-marker-track {
+    position: relative;
+    width: 100%;
+    height: 100%;
+  }
+
+  .audio-marker {
+    position: absolute;
+    top: 6px;
+    width: 8px;
+    height: 20px;
+    border-radius: 999px;
+    border: none;
+    cursor: pointer;
+    transform: translateX(-50%);
+  }
+
+  .chunk-marker {
+    background: #60A5FA;
+  }
+
+  .transcription-marker {
+    background: #34D399;
+  }
+
+  /* Thread View */
+  .thread-view {
+    margin-bottom: 12px;
+  }
+
+  .transcription-thread-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .thread-group {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    padding: 10px 12px;
+  }
+
+  .thread-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+  }
+
+  .thread-title {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-primary);
+  }
+
+  .thread-count {
+    font-size: 11px;
+    color: var(--text-secondary);
+  }
+
+  .chunk-transcriptions-row td {
+    background: rgba(0, 0, 0, 0.01);
+    padding-top: 8px;
+    padding-bottom: 12px;
+  }
+
+  .chunk-transcriptions {
+    width: 100%;
+  }
+
+  .chunk-transcription-item {
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 8px 10px;
+    margin-bottom: 8px;
+    background: #fff;
+  }
+
+  [x-cloak] {
+    display: none !important;
+  }
+</style>
+
+<script id="initialAudioStats" type="application/json">{{ stats | tojson | safe }}</script>
+<script>
+  (() => {
+    const el = document.getElementById("initialAudioStats");
+    try {
+      window.initialAudioStats = JSON.parse(el?.textContent || "{}");
+    } catch (_e) {
+      window.initialAudioStats = {};
+    }
+  })();
+</script>
+{% endblock %}
+
+{% block content %}
+<div x-data="audioDashboard()" x-init="init()" x-cloak>
+  <!-- Error Banner -->
+  <template x-if="error">
+    <div class="error-banner">
+      <span>Failed to load data: <span x-text="error"></span>. Retrying...</span>
+    </div>
+  </template>
+
+  <!-- Stats Bar -->
+  <div class="stats-bar">
+    <div class="stat-card">
+      <span class="stat-card-label">Chunks</span>
+      <span class="stat-card-value" x-text="stats.total_chunks ?? 0"></span>
+    </div>
+    <div class="stat-card">
+      <span class="stat-card-label">Transcriptions</span>
+      <span class="stat-card-value" x-text="stats.total_transcriptions ?? 0"></span>
+    </div>
+    <div class="stat-card">
+      <span class="stat-card-label">Storage</span>
+      <span class="stat-card-value" x-text="formatBytes(stats.storage_bytes ?? 0)"></span>
+    </div>
+    <div class="stat-card">
+      <span class="stat-card-label">Devices</span>
+      <span class="stat-card-value" x-text="Object.keys(stats.device_counts ?? {}).length"></span>
+    </div>
+    <div class="queue-badges">
+      <template x-if="(stats.status_counts?.PENDING ?? 0) > 0">
+        <span class="queue-badge pending" x-text="`${stats.status_counts.PENDING} pending`"></span>
+      </template>
+      <template x-if="(stats.status_counts?.PROCESSING ?? 0) > 0">
+        <span class="queue-badge processing" x-text="`${stats.status_counts.PROCESSING} processing`"></span>
+      </template>
+      <template x-if="(stats.status_counts?.FAILED ?? 0) > 0">
+        <span class="queue-badge failed" x-text="`${stats.status_counts.FAILED} failed`"></span>
+      </template>
+    </div>
+  </div>
+
+  <!-- Filters -->
+  <div class="audio-filters">
+    <select class="source-filter" x-model="sourceFilter" @change="applyFilters()">
+      <option value="">All Sources</option>
+      <option value="input">Input (Mic)</option>
+      <option value="output">Output (System)</option>
+      <option value="unknown">Unknown</option>
+    </select>
+    <select class="time-range" x-model="timeRange" @change="applyFilters()">
+      <option value="1h">Last 1 hour</option>
+      <option value="6h">Last 6 hours</option>
+      <option value="24h">Last 24 hours</option>
+      <option value="7d">Last 7 days</option>
+      <option value="all">All</option>
+    </select>
+    <select x-model="sortOrder" @change="applyFilters()">
+      <option value="desc">Newest First</option>
+      <option value="asc">Oldest First</option>
+    </select>
+  </div>
+
+  <!-- Marker Rail -->
+  <div class="audio-marker-rail">
+    <div class="audio-marker-track">
+      <template x-for="marker in markerItems()" :key="marker.key">
+        <button class="audio-marker"
+                :class="marker.type === 'transcription' ? 'transcription-marker' : 'chunk-marker'"
+                :style="`left: ${marker.position}%`"
+                @click="jumpToMarker(marker)"
+                :title="marker.label"></button>
+      </template>
+    </div>
+  </div>
+
+  <!-- Empty State -->
+  <template x-if="(stats.total_chunks ?? 0) === 0 && !loading">
+    <div class="empty-state">
+      <div class="empty-state-icon">🎙</div>
+      <div class="empty-state-title">No audio data yet</div>
+      <div class="empty-state-text">Audio recordings will appear here once the client starts capturing.</div>
+    </div>
+  </template>
+
+  <template x-if="(stats.total_chunks ?? 0) > 0">
+    <div>
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Device</th>
+            <th>Status</th>
+            <th>Timestamp</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <template x-for="chunk in chunks" :key="chunk.id">
+          <tbody>
+            <tr>
+              <td x-text="chunk.id"></td>
+              <td x-text="chunk.device_name || '-'"></td>
+              <td>
+                <span class="status-badge"
+                  :class="badgeClass(chunk.status)"
+                  x-text="chunk.status"></span>
+              </td>
+              <td x-text="formatTimestamp(chunk.timestamp)"></td>
+              <td>
+                <!-- Inline Audio Player -->
+                <div class="inline-player" @click.outside="closePlayerMenu(chunk.id)">
+                  <!-- Play/Pause Button -->
+                  <button class="player-btn" @click="togglePlay(chunk.id)">
+                    <svg x-show="!isPlaying(chunk.id)" width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M8 5v14l11-7z"/>
+                    </svg>
+                    <svg x-show="isPlaying(chunk.id)" width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>
+                    </svg>
+                  </button>
+
+                  <!-- Progress Bar -->
+                  <div class="player-progress-container">
+                    <div class="player-progress-bar" @click="seekTo(chunk.id, $event)">
+                      <div class="player-progress-fill" :style="`width: ${getProgress(chunk.id)}%`"></div>
+                    </div>
+                    <div class="player-time">
+                      <span x-text="formatTime(getCurrentTime(chunk.id))"></span> / <span x-text="formatTime(getDuration(chunk.id))"></span>
+                    </div>
+                  </div>
+
+                  <!-- Volume Control -->
+                  <div class="player-volume-container">
+                    <button class="player-btn" style="width: 28px; height: 28px;" @click="toggleMute(chunk.id)">
+                      <svg x-show="!isMuted(chunk.id)" width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/>
+                      </svg>
+                      <svg x-show="isMuted(chunk.id)" width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73 4.27 3zM12 4L9.91 6.09 12 8.18V4z"/>
+                      </svg>
+                    </button>
+                    <input type="range" class="player-volume-slider" min="0" max="100" 
+                           :value="getVolume(chunk.id)" @input="setVolume(chunk.id, $event.target.value)">
+                  </div>
+
+                  <!-- Playback Speed -->
+                  <select class="player-select" @change="setPlaybackRate(chunk.id, $event.target.value)">
+                    <option value="0.5" :selected="getPlaybackRate(chunk.id) == 0.5">0.5x</option>
+                    <option value="0.75" :selected="getPlaybackRate(chunk.id) == 0.75">0.75x</option>
+                    <option value="1" :selected="getPlaybackRate(chunk.id) == 1">1x</option>
+                    <option value="1.25" :selected="getPlaybackRate(chunk.id) == 1.25">1.25x</option>
+                    <option value="1.5" :selected="getPlaybackRate(chunk.id) == 1.5">1.5x</option>
+                    <option value="2" :selected="getPlaybackRate(chunk.id) == 2">2x</option>
+                  </select>
+
+                  <!-- More Options (Download) -->
+                  <div style="position: relative;">
+                    <button class="player-menu-btn" @click="togglePlayerMenu(chunk.id)">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/>
+                      </svg>
+                    </button>
+                    <div class="player-dropdown" :class="{ 'show': isPlayerMenuOpen(chunk.id) }">
+                      <div class="player-dropdown-item" @click="downloadAudio(chunk.id)">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                          <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/>
+                        </svg>
+                        Download
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Hidden Audio Element -->
+                  <audio :id="'audio-' + chunk.id" preload="metadata" :src="`/api/v1/audio/chunks/${chunk.id}/file`"
+                         @timeupdate="updateTime(chunk.id)" @loadedmetadata="loadMetadata(chunk.id)" @ended="onEnded(chunk.id)"></audio>
+                </div>
+              </td>
+            </tr>
+            <tr class="chunk-transcriptions-row">
+              <td colspan="5">
+                <div class="thread-view">
+                  <div class="transcription-thread-list chunk-transcriptions">
+                    <template x-if="chunkTranscriptions(chunk.id).length === 0">
+                      <div class="chunk-transcription-item">No transcription yet.</div>
+                    </template>
+                    <template x-for="t in chunkTranscriptions(chunk.id)" :key="t.id">
+                      <div class="chunk-transcription-item">
+                        <div class="transcription-meta">
+                          <span class="transcription-device"
+                                x-text="(t.source_kind || 'unknown') + ' · ' + (t.device_name || 'Unknown')"></span>
+                          <span class="transcription-time" x-text="formatTimestamp(t.timestamp)"></span>
+                        </div>
+                        <div class="transcription-text" x-text="t.transcription || t.text || '-'"></div>
+                        <div style="margin-top: 8px;">
+                          <button class="play-btn" @click="playAudio(t.audio_chunk_id)">Play Segment</button>
+                        </div>
+                      </div>
+                    </template>
+                  </div>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </template>
+      </table>
+
+      <div class="pagination-bar">
+        <span class="pagination-info" x-text="`Showing ${chunkOffset + 1}-${Math.min(chunkOffset + chunks.length, chunkTotal)} of ${chunkTotal}`"></span>
+        <div class="pagination-btns">
+          <button class="pagination-btn" :disabled="chunkOffset === 0" @click="prevChunks()">Previous</button>
+          <button class="pagination-btn" :disabled="chunkOffset + chunkLimit >= chunkTotal" @click="nextChunks()">Next</button>
+        </div>
+      </div>
+    </div>
+  </template>
+
+</div>
+{% endblock %}
+
+{% block extra_body %}
+<script>
+  function audioDashboard() {
+    return {
+      stats: window.initialAudioStats || {},
+      loading: false,
+      error: null,
+      sourceFilter: '',
+      timeRange: '24h',
+      sortOrder: 'desc',
+
+      // Chunks pagination
+      chunks: [],
+      chunkOffset: 0,
+      chunkLimit: 20,
+      chunkTotal: 0,
+
+      // Transcriptions buffer (loaded for current filter window)
+      transcriptions: [],
+      transPageSize: 200,
+
+      // Player state - per-chunk audio players
+      players: {},  // Map of chunkId -> player state
+      openMenuChunkId: null,  // Currently open menu
+
+      _statsInterval: null,
+      _progressInterval: null,
+
+      init() {
+        this.restoreFiltersFromQuery();
+        this.fetchChunks();
+        this.fetchTranscriptions();
+        this._statsInterval = setInterval(() => this.refreshStats(), 10000);
+      },
+
+      destroy() {
+        if (this._statsInterval) {
+          clearInterval(this._statsInterval);
+          this._statsInterval = null;
+        }
+      },
+
+      restoreFiltersFromQuery() {
+        const p = new URLSearchParams(window.location.search);
+        this.sourceFilter = p.get('source') || '';
+        this.timeRange = p.get('range') || '24h';
+        this.sortOrder = p.get('sort') || 'desc';
+      },
+
+      syncQuery() {
+        const p = new URLSearchParams();
+        if (this.sourceFilter) p.set('source', this.sourceFilter);
+        if (this.timeRange) p.set('range', this.timeRange);
+        if (this.sortOrder) p.set('sort', this.sortOrder);
+        const next = p.toString();
+        const url = next ? `${window.location.pathname}?${next}` : window.location.pathname;
+        window.history.replaceState({}, '', url);
+      },
+
+      applyFilters() {
+        this.syncQuery();
+        this.chunkOffset = 0;
+        this.fetchChunks();
+        this.fetchTranscriptions();
+      },
+
+      rangeParams() {
+        if (this.timeRange === 'all') return '';
+        const now = Math.floor(Date.now() / 1000);
+        const map = {
+          '1h': 3600,
+          '6h': 21600,
+          '24h': 86400,
+          '7d': 604800,
+        };
+        const delta = map[this.timeRange] || 86400;
+        const start = now - delta;
+        return `&start_time=${start}&end_time=${now}`;
+      },
+
+      async fetchChunks() {
+        this.loading = true;
+        try {
+          const source = this.sourceFilter ? `&source=${encodeURIComponent(this.sourceFilter)}` : '';
+          const sort = `&sort=${encodeURIComponent(this.sortOrder)}`;
+          const url = `/api/v1/audio/chunks?limit=${this.chunkLimit}&offset=${this.chunkOffset}${source}${sort}${this.rangeParams()}`;
+          const res = await fetch(url);
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          const payload = await res.json();
+          this.chunks = payload.data || [];
+          this.chunkTotal = payload.meta?.total ?? 0;
+          this.error = null;
+        } catch (e) {
+          this.error = e.message;
+        }
+        this.loading = false;
+      },
+
+      async fetchTranscriptions() {
+        this.loading = true;
+        try {
+          const source = this.sourceFilter ? `&source=${encodeURIComponent(this.sourceFilter)}` : '';
+          const sort = `&sort=${encodeURIComponent(this.sortOrder)}`;
+          const baseUrl = `/api/v1/audio/transcriptions?limit=${this.transPageSize}${source}${sort}${this.rangeParams()}`;
+          const items = [];
+          let offset = 0;
+          let pageCount = 0;
+          const maxPages = 200;
+
+          while (pageCount < maxPages) {
+            const res = await fetch(`${baseUrl}&offset=${offset}`);
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const payload = await res.json();
+            const pageItems = payload.data || [];
+            items.push(...pageItems);
+
+            const hasMore = Boolean(payload.meta?.has_more);
+            if (!hasMore || pageItems.length === 0) break;
+
+            offset += this.transPageSize;
+            pageCount += 1;
+          }
+
+          this.transcriptions = items;
+          this.error = null;
+        } catch (e) {
+          this.error = e.message;
+        }
+        this.loading = false;
+      },
+
+      async refreshStats() {
+        try {
+          const res = await fetch('/api/v1/audio/stats');
+          if (!res.ok) return;
+          const payload = await res.json();
+          this.stats = payload.data || {};
+        } catch (_e) { /* silent */ }
+      },
+
+      markerItems() {
+        const points = [];
+        const addPoints = (items, type) => {
+          for (const it of items || []) {
+            const ts = Number(it.timestamp) || 0;
+            const chunkId = type === 'transcription' ? it.audio_chunk_id : it.id;
+            points.push({
+              key: `${type}-${it.id || it.audio_chunk_id}-${ts}`,
+              type,
+              ts,
+              chunkId,
+              label: `${type} @ ${this.formatTimestamp(ts)}`,
+            });
+          }
+        };
+        addPoints(this.chunks, 'chunk');
+        addPoints(this.transcriptions, 'transcription');
+        if (points.length === 0) return [];
+        const minTs = Math.min(...points.map((p) => p.ts));
+        const maxTs = Math.max(...points.map((p) => p.ts));
+        const span = Math.max(1, maxTs - minTs);
+        return points.map((p) => ({
+          ...p,
+          position: Math.max(0, Math.min(100, ((p.ts - minTs) / span) * 100)),
+        }));
+      },
+
+      jumpToMarker(marker) {
+        if (!marker) return;
+        this.playAudio(marker.chunkId);
+        if (marker.type === 'transcription' && this.transcriptions.length === 0) {
+          this.fetchTranscriptions();
+        }
+      },
+
+      chunkTranscriptions(chunkId) {
+        const id = Number(chunkId);
+        return (this.transcriptions || [])
+          .filter((t) => Number(t.audio_chunk_id) === id)
+          .sort((a, b) => (Number(a.timestamp) || 0) - (Number(b.timestamp) || 0));
+      },
+
+      // Player management methods
+      getPlayer(chunkId) {
+        if (!this.players[chunkId]) {
+          this.players[chunkId] = {
+            isPlaying: false,
+            currentTime: 0,
+            duration: 0,
+            volume: 100,
+            isMuted: false,
+            playbackRate: 1,
+          };
+        }
+        return this.players[chunkId];
+      },
+
+      togglePlay(chunkId) {
+        const audio = document.getElementById(`audio-${chunkId}`);
+        if (!audio) return;
+
+        // Pause all other players
+        Object.keys(this.players).forEach(id => {
+          if (id !== String(chunkId) && this.players[id].isPlaying) {
+            const otherAudio = document.getElementById(`audio-${id}`);
+            if (otherAudio) {
+              otherAudio.pause();
+              this.players[id].isPlaying = false;
+            }
+          }
+        });
+
+        const player = this.getPlayer(chunkId);
+        if (player.isPlaying) {
+          audio.pause();
+          player.isPlaying = false;
+        } else {
+          audio.play().then(() => {
+            player.isPlaying = true;
+          }).catch(e => {
+            console.error('Play failed:', e);
+          });
+        }
+      },
+
+      isPlaying(chunkId) {
+        return this.getPlayer(chunkId).isPlaying;
+      },
+
+      updateTime(chunkId) {
+        const audio = document.getElementById(`audio-${chunkId}`);
+        if (!audio) return;
+        const player = this.getPlayer(chunkId);
+        player.currentTime = audio.currentTime;
+      },
+
+      loadMetadata(chunkId) {
+        const audio = document.getElementById(`audio-${chunkId}`);
+        if (!audio) return;
+        const player = this.getPlayer(chunkId);
+        player.duration = audio.duration || 0;
+      },
+
+      onEnded(chunkId) {
+        const player = this.getPlayer(chunkId);
+        player.isPlaying = false;
+        player.currentTime = 0;
+      },
+
+      getProgress(chunkId) {
+        const player = this.getPlayer(chunkId);
+        if (!player.duration) return 0;
+        return (player.currentTime / player.duration) * 100;
+      },
+
+      getCurrentTime(chunkId) {
+        return this.getPlayer(chunkId).currentTime;
+      },
+
+      getDuration(chunkId) {
+        return this.getPlayer(chunkId).duration;
+      },
+
+      seekTo(chunkId, event) {
+        const audio = document.getElementById(`audio-${chunkId}`);
+        if (!audio || !audio.duration) return;
+
+        const rect = event.currentTarget.getBoundingClientRect();
+        const percent = (event.clientX - rect.left) / rect.width;
+        const newTime = percent * audio.duration;
+
+        audio.currentTime = newTime;
+        this.getPlayer(chunkId).currentTime = newTime;
+      },
+
+      formatTime(seconds) {
+        if (!seconds || isNaN(seconds)) return '0:00';
+        const mins = Math.floor(seconds / 60);
+        const secs = Math.floor(seconds % 60);
+        return `${mins}:${secs.toString().padStart(2, '0')}`;
+      },
+
+      toggleMute(chunkId) {
+        const audio = document.getElementById(`audio-${chunkId}`);
+        if (!audio) return;
+
+        const player = this.getPlayer(chunkId);
+        player.isMuted = !player.isMuted;
+        audio.muted = player.isMuted;
+      },
+
+      isMuted(chunkId) {
+        return this.getPlayer(chunkId).isMuted;
+      },
+
+      getVolume(chunkId) {
+        return this.getPlayer(chunkId).volume;
+      },
+
+      setVolume(chunkId, value) {
+        const audio = document.getElementById(`audio-${chunkId}`);
+        if (!audio) return;
+
+        const volume = parseInt(value, 10);
+        const player = this.getPlayer(chunkId);
+        player.volume = volume;
+        audio.volume = volume / 100;
+
+        if (volume > 0 && player.isMuted) {
+          player.isMuted = false;
+          audio.muted = false;
+        }
+      },
+
+      getPlaybackRate(chunkId) {
+        return this.getPlayer(chunkId).playbackRate;
+      },
+
+      setPlaybackRate(chunkId, rate) {
+        const audio = document.getElementById(`audio-${chunkId}`);
+        if (!audio) return;
+
+        const rateNum = parseFloat(rate);
+        this.getPlayer(chunkId).playbackRate = rateNum;
+        audio.playbackRate = rateNum;
+      },
+
+      togglePlayerMenu(chunkId) {
+        if (this.openMenuChunkId === chunkId) {
+          this.openMenuChunkId = null;
+        } else {
+          this.openMenuChunkId = chunkId;
+        }
+      },
+
+      closePlayerMenu(chunkId) {
+        if (this.openMenuChunkId === chunkId) {
+          this.openMenuChunkId = null;
+        }
+      },
+
+      isPlayerMenuOpen(chunkId) {
+        return this.openMenuChunkId === chunkId;
+      },
+
+      downloadAudio(chunkId) {
+        this.closePlayerMenu(chunkId);
+        const url = `/api/v1/audio/chunks/${chunkId}/file`;
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `audio_chunk_${chunkId}.wav`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      },
+
+      // Legacy method - redirect to new inline player
+      playAudio(chunkId) {
+        this.togglePlay(chunkId);
+      },
+
+      prevChunks() {
+        this.chunkOffset = Math.max(0, this.chunkOffset - this.chunkLimit);
+        this.fetchChunks();
+      },
+
+      nextChunks() {
+        this.chunkOffset += this.chunkLimit;
+        this.fetchChunks();
+      },
+
+      formatBytes(bytes) {
+        if (!bytes || bytes === 0) return '0 B';
+        const k = 1024;
+        const sizes = ['B', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+      },
+
+      formatTimestamp(ts) {
+        const n = Number(ts) || 0;
+        if (n === 0) return '-';
+        const d = new Date(n * 1000);
+        const pad = (v) => String(v).padStart(2, '0');
+        return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+      },
+
+      formatDateTime(value) {
+        if (value === null || value === undefined || value === '') return '-';
+        const text = String(value).trim();
+        if (/^\d+(\.\d+)?$/.test(text)) {
+          return this.formatTimestamp(text);
+        }
+        const d = new Date(text);
+        if (!Number.isNaN(d.getTime())) {
+          const pad = (v) => String(v).padStart(2, '0');
+          return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+        }
+        return text;
+      },
+
+      badgeClass(status) {
+        const s = (status || '').toLowerCase();
+        return {
+          completed: s === 'completed',
+          pending: s === 'pending',
+          processing: s === 'processing',
+          failed: s === 'failed',
+        };
+      },
+    };
+  }
+</script>
+{% endblock %}

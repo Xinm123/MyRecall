@@ -115,6 +115,20 @@ def search():
         return render_template("search.html", entries=[], error=str(e))
 
 
+@app.route("/audio")
+def audio():
+    """Audio dashboard page."""
+    stats = sql_store.get_audio_stats()
+    return render_template("audio.html", stats=stats)
+
+
+@app.route("/video")
+def video():
+    """Video dashboard page."""
+    stats = sql_store.get_video_stats()
+    return render_template("video.html", stats=stats)
+
+
 @app.route("/static/<filename>")
 def serve_image(filename):
     return send_from_directory(str(settings.screenshots_path), filename)
