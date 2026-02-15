@@ -163,3 +163,11 @@ class TestAudioPage:
         html = resp.data.decode()
         assert 'x-for="chunk in chunks"' in html
         assert '<template x-for="chunk in chunks" :key="chunk.id">\n            <template>' not in html
+
+    def test_audio_page_play_segment_uses_transcription_window(self, audio_client):
+        resp = audio_client.get("/audio")
+        html = resp.data.decode()
+        assert '@click="playTranscription(t)"' in html
+        assert "playTranscription(transcription)" in html
+        assert "transcription.start_time" in html
+        assert "transcription.end_time" in html

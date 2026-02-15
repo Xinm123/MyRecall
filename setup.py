@@ -30,6 +30,8 @@ install_requires = [
     "onnx>=1.16.0",
     "onnxruntime>=1.17.0",
     "webrtcvad-wheels>=2.0.14",
+    "sounddevice>=0.5.0",
+    "faster-whisper>=1.1.0",
 ]
 
 # Define OS-specific dependencies

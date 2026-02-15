@@ -737,7 +737,7 @@
                         </div>
                         <div class="transcription-text" x-text="t.transcription || t.text || '-'"></div>
                         <div style="margin-top: 8px;">
-                          <button class="play-btn" @click="playAudio(t.audio_chunk_id)">Play Segment</button>
+                          <button class="play-btn" @click="playTranscription(t)">Play Segment</button>
                         </div>
                       </div>
                     </template>
@@ -954,6 +954,8 @@
             volume: 100,
             isMuted: false,
             playbackRate: 1,
+            segmentStart: null,
+            segmentEnd: null,
           };
         }
         return this.players[chunkId];
@@ -975,6 +977,8 @@
         });
 
         const player = this.getPlayer(chunkId);
+        player.segmentStart = null;
+        player.segmentEnd = null;
         if (player.isPlaying) {
           audio.pause();
           player.isPlaying = false;
@@ -996,6 +1000,15 @@
         if (!audio) return;
         const player = this.getPlayer(chunkId);
         player.currentTime = audio.currentTime;
+        if (Number.isFinite(player.segmentEnd) && audio.currentTime >= player.segmentEnd) {
+          audio.pause();
+          const clampedEnd = Math.max(0, player.segmentEnd);
+          audio.currentTime = clampedEnd;
+          player.currentTime = clampedEnd;
+          player.isPlaying = false;
+          player.segmentStart = null;
+          player.segmentEnd = null;
+        }
       },
 
       loadMetadata(chunkId) {
@@ -1009,6 +1022,8 @@
         const player = this.getPlayer(chunkId);
         player.isPlaying = false;
         player.currentTime = 0;
+        player.segmentStart = null;
+        player.segmentEnd = null;
       },
 
       getProgress(chunkId) {
@@ -1034,7 +1049,10 @@
         const newTime = percent * audio.duration;
 
         audio.currentTime = newTime;
-        this.getPlayer(chunkId).currentTime = newTime;
+        const player = this.getPlayer(chunkId);
+        player.currentTime = newTime;
+        player.segmentStart = null;
+        player.segmentEnd = null;
       },
 
       formatTime(seconds) {
@@ -1121,6 +1139,64 @@
       // Legacy method - redirect to new inline player
       playAudio(chunkId) {
         this.togglePlay(chunkId);
+      },
+
+      playTranscription(transcription) {
+        if (!transcription) return;
+        const chunkId = Number(transcription.audio_chunk_id);
+        if (!chunkId) return;
+        const audio = document.getElementById(`audio-${chunkId}`);
+        if (!audio) return;
+
+        Object.keys(this.players).forEach(id => {
+          if (id !== String(chunkId) && this.players[id].isPlaying) {
+            const otherAudio = document.getElementById(`audio-${id}`);
+            if (otherAudio) {
+              otherAudio.pause();
+              this.players[id].isPlaying = false;
+              this.players[id].segmentStart = null;
+              this.players[id].segmentEnd = null;
+            }
+          }
+        });
+
+        const player = this.getPlayer(chunkId);
+        const chunk = (this.chunks || []).find((c) => Number(c.id) === chunkId);
+        const chunkStart = Number(chunk?.start_time ?? chunk?.timestamp ?? 0);
+
+        let segmentStart = Number(transcription.start_time);
+        if (!Number.isFinite(segmentStart)) {
+          segmentStart = Number(transcription.timestamp ?? 0);
+        }
+        let segmentEnd = Number(transcription.end_time);
+        if (!Number.isFinite(segmentEnd) || segmentEnd <= segmentStart) {
+          segmentEnd = segmentStart + 0.5;
+        }
+
+        let relativeStart = chunkStart > 0 ? (segmentStart - chunkStart) : segmentStart;
+        let relativeEnd = chunkStart > 0 ? (segmentEnd - chunkStart) : segmentEnd;
+
+        if (!Number.isFinite(relativeStart) || relativeStart < 0) relativeStart = 0;
+        if (!Number.isFinite(relativeEnd) || relativeEnd <= relativeStart) {
+          relativeEnd = relativeStart + 0.5;
+        }
+
+        if (Number.isFinite(audio.duration) && audio.duration > 0) {
+          const maxTime = Math.max(0, audio.duration);
+          relativeStart = Math.min(relativeStart, Math.max(0, maxTime - 0.05));
+          relativeEnd = Math.min(Math.max(relativeStart + 0.05, relativeEnd), maxTime);
+        }
+
+        player.segmentStart = relativeStart;
+        player.segmentEnd = relativeEnd;
+        audio.currentTime = relativeStart;
+        player.currentTime = relativeStart;
+
+        audio.play().then(() => {
+          player.isPlaying = true;
+        }).catch(e => {
+          console.error('Segment play failed:', e);
+        });
       },
 
       prevChunks() {
