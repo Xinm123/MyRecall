@@ -3,102 +3,69 @@
 ## 1. 页面定位
 
 - 目标：按时间顺序回看历史画面。
-- 目标用户：回顾特定时间段行为的用户。
-- 场景：快速拖动查看“某个时间点屏幕内容”。
+- 用户：回顾特定时间段行为的用户与调试人员。
+- 文档模式：`Current (verified)` 与 `Target positioning` 双轨。
 
 ## 2. 入口与路由
 
 - URL：`/timeline`
-- 后端路由：`/Users/pyw/newpart/MyRecall/openrecall/server/app.py` 中 `timeline()`
-- 模板文件：`/Users/pyw/newpart/MyRecall/openrecall/server/templates/timeline.html`
-- 布局依赖：`/Users/pyw/newpart/MyRecall/openrecall/server/templates/layout.html`
+- 后端路由：`openrecall/server/app.py` 中 `timeline()`
+- 模板：`openrecall/server/templates/timeline.html`
+- 布局：`openrecall/server/templates/layout.html`
 
-## 3. 功能清单
+## 3. Current (Verified)
 
-1. 时间滑杆（离散索引）切换画面。
-2. 显示对应时间戳（24h 格式）。
-3. 展示对应图片（截图或帧 URL）。
-4. 无数据时显示空提示。
+1. `/timeline` 页面当前由 `get_recent_memories(limit=1000)` 预聚合注入 `timeline_items`。
+2. 页面主视图展示 `timestamp + image_url`，偏向视觉回看。
+3. `/api/v1/timeline` 当前默认返回 mixed 数据（video frames + audio transcriptions）。
+4. `/api/v1/timeline` 支持 `source` 过滤（如 `source=audio` / `source=video`）。
 
-限制与降级：
-- 时间线数据当前由 server 预聚合后一次性注入页面（非流式）。
-- 图片不可用时浏览器显示加载失败；帧路径可依赖后端 on-demand 抽帧 fallback。
-- 上传暂停或重试时，最新时间段数据可能暂时缺失，待上传完成后补齐。
-- Audio Freeze（2026-02-23 起）：Timeline 页面以 **vision-only** 为准，不规划音频事件并入与展示。
+关键证据路径：
 
-## 4. 如何使用
+- `openrecall/server/app.py:timeline()`
+- `openrecall/server/api_v1.py:timeline_api()`
+- `tests/test_phase2_timeline.py`
 
-### 最小路径
-1. 打开 `/timeline`。
-2. 拖动滑杆。
-3. 查看时间与图片变化。
+## 4. Target Positioning
 
-### 常见路径
-1. 先在 `/search` 定位大致时间。
-2. 再到 `/timeline` 做精细回看。
+1. Timeline 保持运维/回放视角，可继续 mixed 展示。
+2. Search/Chat grounding 维持 vision-only 主线（不依赖 timeline mixed 默认）。
+3. 文档语义避免把 “Search/Chat 的 vision-only” 错写为 “Timeline API 已 vision-only”。
 
-## 5. 数据流与Pipeline
+## 5. 数据流（Current）
 
 ```mermaid
 flowchart LR
   U["浏览器 /timeline"] --> R["app.py:timeline()"]
-  R --> Q["SQLStore.get_recent_memories(limit=1000)"]
-  Q --> M["timeline_items: timestamp + image_url"]
-  M --> TPL["render timeline.html"]
-  TPL --> UI["slider + image"]
-  UI --> F["image_url -> /screenshots/* 或 /api/v1/frames/:id"]
-  F --> S["Server FS / frames API"]
+  R --> Q["sql_store.get_recent_memories(limit=1000)"]
+  Q --> T["render timeline.html"]
+  T --> I["timeline_items: timestamp + image_url"]
+  U --> V1["/api/v1/timeline?start_time&end_time&source(optional)"]
+  V1 --> M["api_v1 timeline: merge frames + transcriptions"]
 ```
 
-关键数据对象：
-- `timeline_items[]`：`{timestamp, image_url}`。
-- 前端使用反向索引实现“最新在右侧”的拖动体验。
-- `frame_id`（通过 `image_url` 间接承载）：对应 `/api/v1/frames/:id` 的检索键。
+## 6. 接口映射
 
-## 6. 依赖接口
-
-| 接口 | 方法 | 关键参数 | 返回摘要 |
+| 接口 | 方法 | Current | Target |
 |---|---|---|---|
-| `/timeline` | GET | 无 | SSR 页面 + timeline_items JSON |
-| `/api/v1/frames/:id` | GET | `frame_id` | 帧图片（可按需抽帧） |
-| `/api/v1/timeline` | GET | `start_time/end_time/page/page_size` | 标准时间线分页 JSON（用于 API 客户端） |
-| `/api/v1/upload` | POST | multipart(file+metadata) | 视频进入时间线数据的上游入口（间接依赖） |
+| `/timeline` | GET | SSR 页面，视觉回看主入口 | 保持 |
+| `/api/v1/timeline` | GET | 默认 mixed；可按 `source` 过滤 | 保持 mixed 作为 ops 视角 |
+| `/api/v1/frames/:id` | GET | 帧图片服务（含 fallback） | 证据 drill-down 基础能力 |
 
-## 7. 前后变化（相比之前）
+## 7. 风险与盲点
 
-| 维度 | 之前 | 当前 |
-|---|---|---|
-| 页面形态 | 滑杆 + 单图浏览 | 维持不变 |
-| 数据语义 | 以截图为主 | 支持视频帧 URL（`/api/v1/frames/:id`） |
-| API 基座 | 非 v1 主路径 | 已具备 `/api/v1/timeline` 与帧接口能力 |
-| 音频规划状态 | 无明确说明 | Audio Freeze：Timeline 以 vision-only 为准；音频并入不在当前主线范围内 |
+1. 把 timeline 文档写成“vision-only”会与 API 现实冲突。
+2. 若忽略 mixed 默认行为，Chat/Search 评估时会错误推断数据语义。
+3. Audio Freeze 的主线约束应放在 Search/Chat，而非错误外溢到 timeline API 现实描述。
 
-变化原因与影响：
-- 原因：Phase 1 主要强化视频管道与可检索帧，不做大规模 UI 重构。
-- 影响：UI 外观稳定，但底层数据可表达连续视频信息。
+## 8. 验收清单（文档层）
 
-## 8. 故障与排查
+- [x] 明确 timeline 页面与 timeline API 的语义差异。
+- [x] 明确 `/api/v1/timeline` 当前 mixed 默认行为。
+- [x] 明确 Search/Chat vision-only 与 timeline mixed 并存关系。
 
-1. 症状：滑杆可动但图片不变。
-- 检查：`timeline_items` 内容是否都指向同一 URL。
-- 定位：`app.py:timeline()` 组装逻辑与数据源质量。
+## 9. 相关文档
 
-2. 症状：帧图片 404。
-- 检查：`/api/v1/frames/:id` 是否可访问。
-- 定位：`api_v1.py:serve_frame()` 的文件存在/按需抽帧逻辑。
-
-3. 症状：时间显示异常。
-- 检查：timestamp 是否为秒级数字。
-- 定位：`timeline.html` 中 `formatDate24Hour()` 与 `Number(item.timestamp)`。
-
-## 9. 测试与验收点
-
-- [ ] `/timeline` 可正常渲染。
-- [ ] 滑杆移动时图片与时间同步变化。
-- [ ] 无数据时显示空提示。
-- [ ] `image_url` 为 `/api/v1/frames/:id` 时可正常显示。
-- [ ] `/api/v1/timeline` 支持分页参数且返回正确 meta。
-
-相关验证来源：
-- `/Users/pyw/newpart/MyRecall/tests/test_phase1_timeline_api.py`
-- `/Users/pyw/newpart/MyRecall/v3/results/phase-1-validation.md`
+- `v3/milestones/roadmap-status.md`
+- `v3/webui/ROUTE_MAP.md`
+- `v3/webui/DATAFLOW.md`

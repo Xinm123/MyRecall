@@ -1,38 +1,33 @@
 # WebUI 文档中台
 
-本目录用于系统化描述 MyRecall WebUI 的页面能力、行为变化、数据链路与维护方式。
+本目录用于描述 MyRecall WebUI 的页面能力、数据链路、接口映射与维护规则。
 
-## 范围
+## 覆盖范围
 
-当前仅覆盖已实现页面与组件：
+当前覆盖页面与组件：
+
 - `/`（Home Grid）
 - `/timeline`
 - `/search`
+- `/audio`
+- `/video`
 - Control Center（布局内全局控制面板）
 
-不在本目录单独展开未来规划页面（如 `/chat`），仅在变更日志中引用 roadmap。
+## Source of Truth
 
-## 事实来源（Source of Truth）
-
-- 页面路由：`/Users/pyw/new/MyRecall/openrecall/server/app.py`
-- UI 模板：`/Users/pyw/new/MyRecall/openrecall/server/templates/layout.html`
+- 页面路由：`openrecall/server/app.py`
+- UI 模板：`openrecall/server/templates/layout.html`
 - 页面模板：
-  - `/Users/pyw/new/MyRecall/openrecall/server/templates/index.html`
-  - `/Users/pyw/new/MyRecall/openrecall/server/templates/timeline.html`
-  - `/Users/pyw/new/MyRecall/openrecall/server/templates/search.html`
+  - `openrecall/server/templates/index.html`
+  - `openrecall/server/templates/timeline.html`
+  - `openrecall/server/templates/search.html`
+  - `openrecall/server/templates/audio.html`
+  - `openrecall/server/templates/video.html`
 - API：
-  - `/Users/pyw/new/MyRecall/openrecall/server/api.py`
-  - `/Users/pyw/new/MyRecall/openrecall/server/api_v1.py`
+  - `openrecall/server/api.py`
+  - `openrecall/server/api_v1.py`
 
-## 对比基线
-
-“相比之前”的默认基线固定为：
-- `/Users/pyw/new/MyRecall/v3/references/myrecall-v2-analysis.md`
-- `/Users/pyw/new/MyRecall/v3/results/phase-0-validation.md`
-- `/Users/pyw/new/MyRecall/v3/results/phase-1-validation.md`
-- `/Users/pyw/new/MyRecall/v3/results/phase-1-post-baseline-changelog.md`
-
-## 建议阅读顺序
+## 阅读顺序
 
 1. `OVERVIEW.md`
 2. `ROUTE_MAP.md`
@@ -41,19 +36,21 @@
 5. `pages/*.md`
 6. `CHANGELOG.md`
 
+## 文档契约
+
+1. 所有关键行为使用双轨叙事：`Current (verified)` 与 `Target (contract)`。
+2. 历史阶段内容必须标记 `historical`，不与 current 混写。
+3. 对 screenpipe 的引用必须声明对齐层级：`semantic` / `discipline` / `divergence`。
+4. 使用相对路径作为默认引用，避免机器绑定绝对路径。
+
 ## 维护规则（按 Phase）
 
 每次新增/更新 `phase-*-validation.md` 时，必须同步更新：
+
 1. `CHANGELOG.md`
 2. 受影响页面文档（`pages/*.md`）
-3. 如链路变化，更新 `DATAFLOW.md`（含 request/processing/storage/retrieval 与 fallback）
-4. 如路由/API 变化，更新 `ROUTE_MAP.md`（含 upload/upload status 这类间接影响页面数据的新鲜度接口）
-
-## 文档质量门槛
-
-- 可读：读者无需打开代码也能理解页面行为。
-- 可追溯：关键结论有代码路径或结果文档来源。
-- 可维护：新 Phase 可按模板增量维护，不重写历史。
+3. 若链路变化，更新 `DATAFLOW.md`
+4. 若路由/API 变化，更新 `ROUTE_MAP.md`
 
 ## 文件导航
 

@@ -1,6 +1,6 @@
 # MyRecall-v3 Phase Gates & Acceptance Criteria
 
-**Version**: 2.3
+**Version**: 2.4
 **Last Updated**: 2026-02-24
 
 ⚠️ **Authority Notice**: 此文件为所有Phase (0-8) 的权威Go/No-Go验收标准。Roadmap文档仅引用此处定义,不重复定义Phase gates。任何关于Phase验收标准的变更必须首先更新本文件。
@@ -10,6 +10,23 @@
 ## Purpose
 
 This document defines quantifiable acceptance criteria for each phase. A phase should proceed only after Go/No-Go criteria are satisfied, or after an explicit documented deferral decision (e.g., LONGRUN observation plan with traceable follow-up) is approved and recorded.
+
+## Gate Scope Metadata
+
+Use the following gate-scope labels when interpreting any phase gate:
+
+- `current`: gate applies to current active execution.
+- `target`: gate defines a future contract not yet executed.
+- `historical`: gate retained for audit trail.
+- `frozen`: gate belongs to a paused/frozen branch and is not on MVP critical path.
+
+High-priority examples:
+
+| Phase | Gate Scope | Gate Owner Phase |
+|------|------------|------------------|
+| Phase 2.1 | historical/frozen | N/A (not on MVP critical path) |
+| Phase 2.6 | target (governance-only) | Phase 2.6 |
+| Phase 2.7 | target (quality hardening) | Phase 2.7 |
 
 ---
 
@@ -272,7 +289,9 @@ These checks do not change the original 21 gate counts. They capture high-priori
 
 ---
 
-## Phase 2.1: Speaker Identification (OPTIONAL)
+## Phase 2.1: Speaker Identification (OPTIONAL, Historical/Frozen)
+
+This phase is retained for audit completeness. It is currently outside MVP critical path under Audio Freeze.
 
 ### 1. Functional Gates
 
@@ -299,8 +318,8 @@ This phase is a governance gate. It does not introduce runtime API behavior by i
 | Gate | Criteria | Validation Method | Status |
 |------|----------|-------------------|--------|
 | **2.6-G-01 Stability Evidence** | 24h continuous stability evidence archived; no unresolved P0/P1 incidents in freeze scope | Review stability report + incident register | ⬜️ |
-| **2.6-G-02 Performance Budget** | CPU growth ≤+12%, storage growth ≤+10%, query p95 no regression (target +10%-20% improvement) | Compare benchmark package vs Phase 1.5 baseline | ⬜️ |
-| **2.6-G-03 Quality Baseline** | Label mismatch ≤2%-5%, Precision@10 uplift ≥20% vs Phase 1.5 baseline | Run fixed evaluation suite and verify report | ⬜️ |
+| **2.6-G-02 Performance Budget** | Freeze-scope governed modules show no unacceptable regression | Compare freeze-scope benchmark package against approved baseline | ⬜️ |
+| **2.6-G-03 Exception Closure** | All approved exception requests are closed with evidence and TTL compliance | Audit exception register and closure artifacts | ⬜️ |
 | **2.6-G-04 Rollback Readiness** | Rollback drill succeeds and recovery objective met (<2 minutes) | Run rollback drill and verify integrity checks | ⬜️ |
 | **2.6-G-05 Config Drift Audit** | No unauthorized changes in freeze scope files/keys during freeze window | Review drift audit log + approval mapping | ⬜️ |
 

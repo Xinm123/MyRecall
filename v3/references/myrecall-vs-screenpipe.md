@@ -1,5 +1,9 @@
 # MyRecall vs screenpipe：项目对比分析报告
 
+> **Historical Baseline**: This document is retained as a historical comparison snapshot (2026-02-04).  
+> It is not the authoritative source for current vision-only roadmap decisions.  
+> For current alignment decisions, see `v3/references/myrecall-vs-screenpipe-alignment-current.md`.
+
 > 生成日期：2026-02-04  
 > 目标读者：希望在“本地数字记忆（capture → index → search → timeline/chat）”方向做取舍、集成或二次开发的维护者/开发者  
 > 结论先行：两者都走 **local-first**，但 MyRecall 更偏“**截图 + Web UI + 强混合检索（含 rerank）**”，screenpipe 更偏“**桌面端产品化 + 视觉/音频/事件全量采集 + 时间轴流式体验 + Agent/插件生态**”。

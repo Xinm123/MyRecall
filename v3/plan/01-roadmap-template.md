@@ -260,4 +260,4 @@
 - **Planned By**: [Name] on [Date]
 - **Reviewed By**: [Name] on [Date]
 - **Approved By**: [Name] on [Date]
-- **Status**: [Draft | Under Review | Approved | Rejected | Paused | Frozen | Superseded]
+- **Status**: [Draft | Under Review | Accepted | Rejected | Paused | Frozen | Superseded]

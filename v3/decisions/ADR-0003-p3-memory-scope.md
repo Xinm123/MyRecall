@@ -1,6 +1,6 @@
 # ADR-0003: P3 Memory Scope Definition
 
-**Status**: Approved (deferred to Phase 7)
+**Status**: Accepted (deferred to Phase 7)
 
 **Date**: 2026-02-06
 
@@ -48,7 +48,7 @@ The question arose: What does "memory capability" actually mean, and when should
 1. **Foundation dependency**: Requires Phase 4 (Chat) to be complete first
 2. **Not MVP-critical**: Core value is multi-modal search + basic chat
 3. **Learning opportunity**: Phase 4 will reveal what memory features users actually need
-4. **Timeline pressure**: 20周硬约束(约5个月)对应Phase 5部署迁移 - must focus on P0-P4
+4. **Timeline pressure**: MVP 以 Week 22 作为外边界（历史上曾讨论 20 周口径），需优先聚焦 P0-P4
 
 ### Why NOT Option B Separately?
 

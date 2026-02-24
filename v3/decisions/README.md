@@ -29,3 +29,4 @@ Use this folder for concise decision records.
 - `Accepted`: current and active decision.
 - `Superseded`: historical decision retained for audit trail.
 - `Draft`: proposal not yet locked.
+- `Approved`: **deprecated label**; migrate to `Accepted`.

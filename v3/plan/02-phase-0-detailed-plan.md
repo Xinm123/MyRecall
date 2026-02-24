@@ -3,6 +3,7 @@
 **Version**: 1.1
 **Last Updated**: 2026-02-06
 **Status**: Complete (Baseline Frozen: `v3-phase0-go`)
+**Scope Type**: historical
 **Timeline**: Week 1-2 (Day 1-10, 2026-02-06 to 2026-02-19)
 **Owner**: Solo Developer
 
@@ -59,11 +60,11 @@
 
 | Input | Source | Status |
 |-------|--------|--------|
-| Existing v2 codebase | `/Users/pyw/newpart/MyRecall/openrecall/` | Available |
+| Existing v2 codebase | `openrecall/` | Available |
 | Existing recall.db schema (`entries` table) | `~/MRS/db/recall.db` | Available |
 | Existing FTS schema (`ocr_fts` in fts.db) | `~/MRS/fts.db` | Available |
 | Existing LanceDB store | `~/MRS/lancedb/` | Available |
-| screenpipe reference schema | `/Users/pyw/newpart/screenpipe/crates/screenpipe-db/` | Read-only reference |
+| screenpipe reference schema | `../screenpipe/crates/screenpipe-db/` | Read-only reference |
 | ADR-0001 (Python-first) | `v3/decisions/ADR-0001-python-first.md` | Approved |
 | ADR-0002 (Thin client) | `v3/decisions/ADR-0002-thin-client-architecture.md` | Approved |
 | Phase gates (authority) | `v3/metrics/phase-gates.md` | Approved |
@@ -707,7 +708,7 @@ pytest tests/test_phase0_gates.py -v
 
 ## 7. Gate Traceability Matrix
 
-All gate criteria sourced exclusively from `/Users/pyw/newpart/MyRecall/v3/metrics/phase-gates.md` (authority).
+All gate criteria sourced exclusively from `v3/metrics/phase-gates.md` (authority).
 
 ### Data Governance Gates (DG)
 

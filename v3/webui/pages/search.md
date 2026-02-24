@@ -2,109 +2,85 @@
 
 ## 1. 页面定位
 
-- 目标：提供可解释的检索结果视图（含 debug 评分维度）。
-- 目标用户：需要按关键词定位历史内容的用户与调试人员。
-- 场景：搜索文本线索、分析检索排序质量。
+- 目标：提供可解释检索结果视图（调试优先）。
+- 用户：需要按关键词定位历史内容的用户与调试人员。
+- 语义定位：Search 页面文档采用 `Current (verified)` 与 `Target (Phase 3 contract)` 双轨。
 
 ## 2. 入口与路由
 
 - URL：`/search`
-- 后端路由：`/Users/pyw/newpart/MyRecall/openrecall/server/app.py` 中 `search()`
-- 模板文件：`/Users/pyw/newpart/MyRecall/openrecall/server/templates/search.html`
-- 布局依赖：`/Users/pyw/newpart/MyRecall/openrecall/server/templates/layout.html`
+- 后端路由：`openrecall/server/app.py` 中 `search()`
+- 模板：`openrecall/server/templates/search.html`
+- 布局依赖：`openrecall/server/templates/layout.html`
 
-## 3. 功能清单
+## 3. Current (Verified)
 
-1. 搜索表单（`start_time/end_time/q`：`start_time` 必填；`q` 可选；`q` 为空表示 browse/feed，对齐 screenpipe）。
-2. 结果卡片展示（应用、时间、图片、评分）。
-3. 多评分维度展示：Final/Rerank/Vector/FTS/Combined。
-4. 图片模态预览（左右切换 + 键盘导航）。
-5. 无结果空态展示。
+### 3.1 当前行为（已验证）
 
-限制与降级：
-- 页面主路径使用 `search_debug()` 结果结构，强调可解释性而非精简 API。
-- Phase 3+：时间范围成为强约束（`start_time` 必填）以避免 unbounded scan；`q` 为空进入 browse/feed 模式（按时间倒序）。
-- 上传重试期间，最新 OCR 候选可能尚未入检索库，结果会出现短时滞后。
-- Audio Freeze（2026-02-23 起）：Search 页面与 API 当前以 **vision-only** 为准，不规划音频检索集成与展示。
+1. 表单包含 `q/start_time/end_time` 字段。
+2. `/search` 路由当前只读取 `q`，未使用 `start_time/end_time` 进行过滤。
+3. 当 `q` 为空：返回 recent memories（最多 50 条），不是有界 browse feed 合同实现。
+4. 当 `q` 非空：调用 `search_engine.search_debug(q, limit=50)`。
+5. `search_debug` 结果当前仍可能包含 audio transcription 候选（来自 SearchEngine）。
 
-## 4. 如何使用
+### 3.2 关键证据路径
 
-### 最小路径
-1. 打开 `/search`。
-2. 先选择时间范围（建议默认最近 1-2 小时），再输入关键词（可选）并提交。
-3. 观察卡片与评分，点击图片看大图。
+- `openrecall/server/app.py:search()`
+- `openrecall/server/templates/search.html`（表单字段）
+- `openrecall/server/search/engine.py`（audio FTS 合并路径）
+- `openrecall/server/api_v1.py:search_api()`（空 `q` 返回空分页 payload）
 
-### 常见路径
-1. 先用短关键词粗搜。
-2. 根据 app/time 缩小候选。
-3. 回到 `/timeline` 做时间回放。
+## 4. Target (Phase 3 Contract)
 
-## 5. 数据流与Pipeline
+### 4.1 目标契约
+
+1. `GET /api/v1/search` 支持 browse/feed：空 `q` 返回按时间倒序结果。
+2. `start_time` 作为有界检索硬约束（MyRecall policy）。
+3. Search/Chat grounding 收敛为 vision-only（OCR 证据路径）。
+4. 过滤能力统一：`app_name/window_name/focused/browser_url`。
+
+### 4.2 与 Screenpipe 对齐层级
+
+- `semantic`：空 query browse 语义、过滤器心智模型、排序规则。
+- `discipline`：默认短时间窗与有界查询实践（防止超大范围扫描）。
+- `divergence`：MyRecall 目标阶段的 vision-only 收敛与参数策略。
+
+## 5. 数据流（Current）
 
 ```mermaid
 flowchart LR
-  U["浏览器 /search?start_time=...&end_time=...&q=..."] --> A["app.py:search()"]
-  A --> Q["search_engine.search_debug(q?, start_time, end_time, filters...)"]
-  Q --> TPL["render search.html"]
-  TPL --> UI["结果卡片 + 评分字段"]
-  UI --> IMG["image_url 或 /screenshots/*"]
+  U["浏览器 /search"] --> A["app.py:search()"]
+  A -->|"q 为空"| R["sql_store.get_recent_memories(limit=50)"]
+  A -->|"q 非空"| Q["search_engine.search_debug(q, limit=50)"]
+  Q --> H["Hybrid result: snapshot + video frame (+audio candidate possible)"]
+  R --> T["render search.html"]
+  H --> T
 ```
 
-关键数据对象：
-- `entries[]`：包含 `final_rank/final_score/vector_score/fts_bm25/...` 调试字段。
-- 图片来源可来自 `entry.image_url`（含帧 URL）或 screenshot 回退路径。
+## 6. 接口映射
 
-## 6. 依赖接口
-
-| 接口 | 方法 | 关键参数 | 返回摘要 |
+| 接口 | 方法 | Current | Target |
 |---|---|---|---|
-| `/search` | GET | `start_time/end_time/q` | SSR 页面（debug 结果；对齐 screenpipe 的 bounded search 纪律） |
-| `/api/search` | GET | `q, limit` | legacy JSON 搜索接口 |
-| `/api/v1/search` | GET | `start_time(end_time 可选), q(可选), limit/offset 或 page/page_size, app/window/focused/browser_url` | v1 分页 JSON 搜索接口（screenpipe-aligned browse + keyword） |
-| `/api/v1/frames/:id` | GET | `frame_id` | 帧图片服务（若 image_url 指向帧） |
-| `/api/v1/upload` | POST | multipart(file+metadata) | 检索数据进入管道的上游入口（间接依赖） |
+| `/search` | GET | SSR 调试页；仅 `q` 生效 | 保持为调试/观察入口 |
+| `/api/search` | GET | legacy JSON 搜索 | 兼容保留 |
+| `/api/v1/search` | GET | 空 `q` 返回空分页；`start_time` 未强制 | browse/feed + bounded 合同 |
+| `/api/v1/frames/:id` | GET | 帧图片服务 | 作为 evidence drill-down 核心 |
 
-## 7. 前后变化（相比之前）
+## 7. 风险与盲点
 
-| 维度 | 之前 | 当前 |
-|---|---|---|
-| 页面入口 | `/search` | `/search`（不变） |
-| 搜索稳定性 | video-only 候选可能触发渲染崩溃 | Phase 1 已修复，video-only 可稳定显示 |
-| 数据覆盖 | 以 screenshot 检索语义为主 | 扩展到视频 OCR 候选进入检索 |
-| API 标准化 | legacy `/api/search` | 新增 `/api/v1/search` 标准分页接口 |
-| 音频规划状态 | 无明确说明 | Audio Freeze：音频检索不在当前主线范围内；Search 以 vision-only 为准 |
+1. 将 target 契约写成 current 事实会误导测试与排障。
+2. 若不显式标注 audio 候选仍在 SearchEngine 中，容易与 vision-only MVP 口径冲突。
+3. 若不区分 API 层行为与 agent 操作纪律，容易错误声称“已与 screenpipe 完全同构”。
 
-变化原因与影响：
-- 原因：Phase 1 强化视频可检索能力并修复搜索渲染稳定性。
-- 影响：搜索结果更完整，且异常路径可控。
+## 8. 验收清单（文档层）
 
-## 8. 故障与排查
+- [x] 明确 `Current (verified)` 与 `Target`。
+- [x] 明确 `/search` 与 `/api/v1/search` 当前差异。
+- [x] 明确 screenpipe 对齐层级（semantic/discipline/divergence）。
+- [x] 明确 vision-only 是 Search/Chat 目标约束，而非当前全部链路现实。
 
-1. 症状：搜索结果为空。
-- 检查：时间范围是否过窄、数据是否已完成 OCR/索引；`q` 为空是 browse/feed（不是错误）。
-- 定位：`app.py:search()` 分支与 `search_engine.search_debug()`。
-- 补充：若近期采集刚发生且网络不稳，检查 upload status 以确认是否仍在 buffer 重试。
+## 9. 相关文档
 
-2. 症状：页面报错/卡片无法渲染。
-- 检查：是否出现 video-only 特殊候选。
-- 定位：Phase 1 已修复该类崩溃，参考 post-baseline changelog。
-
-3. 症状：评分字段全为空。
-- 检查：是否处于 browse/feed 模式（`q` 为空）；此时部分评分字段可能为空或被占位。
-- 定位：`app.py:search()` browse 分支与排序逻辑。
-
-## 9. 测试与验收点
-
-- [ ] 输入关键词后返回结果列表。
-- [ ] `q` 为空时进入 browse/feed（按 timestamp DESC）。
-- [ ] `start_time` 缺失时被拒绝（避免 unbounded scan）。
-- [ ] 评分字段按预期显示（有值或占位）。
-- [ ] video-only 结果不崩溃。
-- [ ] 图片模态支持 ESC / 左右键。
-- [ ] `/api/v1/search` 分页参数兼容（`page/page_size` 与 `limit/offset`）。
-
-相关验证来源：
-- `/Users/pyw/newpart/MyRecall/tests/test_phase1_search_integration.py`
-- `/Users/pyw/newpart/MyRecall/tests/test_phase1_search_debug_render.py`
-- `/Users/pyw/newpart/MyRecall/tests/test_phase1_timeline_api.py`
-- `/Users/pyw/newpart/MyRecall/v3/results/phase-1-validation.md`
+- `v3/milestones/roadmap-status.md`
+- `v3/decisions/ADR-0006-screenpipe-search-contract.md`
+- `v3/plan/06-vision-chat-mvp-spec.md`

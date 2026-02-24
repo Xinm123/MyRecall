@@ -1,8 +1,9 @@
 # MyRecall-v3 Master Prompt (Version Control)
 
-**Version**: 1.3
-**Last Updated**: 2026-02-23
+**Version**: 1.4
+**Last Updated**: 2026-02-24
 **Status**: Active (Vision-only pivot; evidence-first Chat MVP planning)
+**Scope Type**: target
 **Original Request**: Retained below for reference
 
 ---
@@ -20,8 +21,8 @@ MyRecall-v3 (Third major version)
 
 ### Reference Projects
 1. **screenpipe** (重点参考)
-   - Location: `/Users/pyw/newpart/screenpipe/`
-   - Key modules: chat、多模态采集 (vision + audio)、search、timeline indexing
+   - Location: `screenpipe/`
+   - Key modules: search semantics、time-range discipline、evidence-grounded chat workflow
 
 2. **openclaw memory** (参考概念)
    - Documentation: https://docs.openclaw.ai/concepts/memory
@@ -85,8 +86,14 @@ MyRecall-v3 (Third major version)
 - **Filters**: `app_name/window_name/focused/browser_url`
 - **Content scope**: 仅 OCR（vision-only）；音频不纳入 Search/Chat 主线
 
+### 5.1 Alignment Level (Required in Search/Chat Docs)
+
+- `semantic`: 对齐查询/过滤/排序心智模型
+- `discipline`: 对齐操作纪律（例如始终有界时间范围）
+- `divergence`: 有意差异（例如 MyRecall 的 vision-only 收敛）
+
 ### 6. Deployment Evolution
-- **Timeline**: Week 22 是 MVP 部署外边界。Phase 3→4→5 采用串行相对序列（R1-R9）执行，日历周由执行启动时分配。
+- **Timeline**: Week 22 是 MVP 部署外边界。Phase 3→4→5 采用串行相对序列（R1-R11）执行，日历周由执行启动时分配。
 - **Design Requirement**: 从 Phase 0 就设计 remote-first API（versioning, pagination, stateless）
 - **Approach**: 串行执行 Phase 3 → 4 → 5 (vs 原并行方案15周),降低复杂度优先稳定性
 
@@ -177,13 +184,13 @@ MyRecall-v3 (Third major version)
 
 | Category | Location | Purpose |
 |----------|----------|---------|
-| **Master Prompt** | `/Users/pyw/newpart/MyRecall/v3/plan/00-master-prompt.md` | 当前文件,版本控制 |
-| **Roadmap Status** | `/Users/pyw/newpart/MyRecall/v3/milestones/roadmap-status.md` | 正式版 roadmap,进度追踪 |
-| **Roadmap Template** | `/Users/pyw/newpart/MyRecall/v3/plan/01-roadmap-template.md` | 阶段模板参考 |
-| **Phase Gates** | `/Users/pyw/newpart/MyRecall/v3/metrics/phase-gates.md` | 验收门槛与指标 |
-| **ADRs** | `/Users/pyw/newpart/MyRecall/v3/decisions/ADR-NNNN-*.md` | 架构决策记录 (递增编号) |
-| **Phase Validation** | `/Users/pyw/newpart/MyRecall/v3/results/phase-<n>-validation.md` | 每阶段验证结果 |
-| **References** | `/Users/pyw/newpart/MyRecall/v3/references/` | 参考材料目录 |
+| **Master Prompt** | `v3/plan/00-master-prompt.md` | 当前文件,版本控制 |
+| **Roadmap Status** | `v3/milestones/roadmap-status.md` | 正式版 roadmap,进度追踪 |
+| **Roadmap Template** | `v3/plan/01-roadmap-template.md` | 阶段模板参考 |
+| **Phase Gates** | `v3/metrics/phase-gates.md` | 验收门槛与指标 |
+| **ADRs** | `v3/decisions/ADR-NNNN-*.md` | 架构决策记录 (递增编号) |
+| **Phase Validation** | `v3/results/phase-<n>-validation.md` | 每阶段验证结果 |
+| **References** | `v3/references/` | 参考材料目录 |
 
 ---
 
@@ -224,6 +231,7 @@ MyRecall-v3 (Third major version)
 | 1.1 | 2026-02-06 | Phase 0 completion reflected (baseline freeze + trigger update for Phase 1 planning) |
 | 1.2 | 2026-02-06 | Phase state updated to Phase 1 post-execution validation mode; constraints aligned to acceptance workflow. |
 | 1.3 | 2026-02-23 | Vision-only pivot lock: screenpipe-aligned time semantics + Search contract; Phase 4 grounding clarified as single retrieval + single summary (no tool-calling). |
+| 1.4 | 2026-02-24 | Documentation contract hardening: added Scope Type, unified alignment levels (`semantic/discipline/divergence`), synchronized sequence wording with roadmap (`R1-R11`), and switched core path references to repo-relative style. |
 
 ---
 

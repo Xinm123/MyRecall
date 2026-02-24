@@ -1,6 +1,7 @@
 # Vision Chat MVP (Evidence-First, Screenpipe-Aligned) — Spec + Paste-Ready Prompt
 
 **Date**: 2026-02-23  
+**Scope Type**: target  
 **Scope Lock**: Vision-only (frames + OCR + metadata) / Audio Freeze / Evidence-first / Screenpipe-aligned Search contract / Browser-local timezone authority
 
 ---

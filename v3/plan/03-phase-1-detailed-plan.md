@@ -3,6 +3,7 @@
 **Version**: 1.1
 **Last Updated**: 2026-02-07
 **Status**: Executed (Engineering Complete; long-run evidence pending)
+**Scope Type**: historical
 **Timeline**: Week 3-6 (Day 1-20, 20 working days)
 **Owner**: Solo Developer
 
@@ -14,8 +15,8 @@ This document remains the execution baseline plan. The implementation has been c
 
 Post-baseline bugfixes and hardening changes are tracked in:
 
-- `/Users/pyw/newpart/MyRecall/v3/results/phase-1-validation.md`
-- `/Users/pyw/newpart/MyRecall/v3/results/phase-1-post-baseline-changelog.md`
+- `v3/results/phase-1-validation.md`
+- `v3/results/phase-1-post-baseline-changelog.md`
 
 Audio Freeze relationship:
 - This is a historical execution document for vision pipeline hardening.
@@ -928,7 +929,7 @@ test_gate_1DG03_ocr_pii_detection_optional
 
 ## 6. Gate Traceability Matrix
 
-All gate criteria sourced exclusively from `/Users/pyw/newpart/MyRecall/v3/metrics/phase-gates.md`.
+All gate criteria sourced exclusively from `v3/metrics/phase-gates.md`.
 
 ### Phase 1 Functional Gates
 

@@ -1,6 +1,6 @@
 # ADR-0002: Thin Client Architecture
 
-**Status**: Approved
+**Status**: Accepted
 
 **Date**: 2026-02-06
 

@@ -3,8 +3,9 @@
 **Version**: 1.1  
 **Last Updated**: 2026-02-10  
 **Status**: Executed (Historical Hardening Plan)
+**Scope Type**: historical
 **Scope**: Phase 1/1.5 only (no Phase 2 audio changes)
-**Evidence Index**: `/Users/pyw/newpart/MyRecall/v3/evidence/phase1_5_strict60/`
+**Evidence Index**: `v3/evidence/phase1_5_strict60/`
 
 ---
 
@@ -24,14 +25,14 @@ Phase 2 audio design/implementation is explicitly out of scope.
 
 ### In Scope
 
-- `/Users/pyw/newpart/MyRecall/openrecall/client/ffmpeg_manager.py`
-- `/Users/pyw/newpart/MyRecall/openrecall/client/video_recorder.py`
-- `/Users/pyw/newpart/MyRecall/openrecall/client/__main__.py`
-- `/Users/pyw/newpart/MyRecall/openrecall/shared/config.py`
-- `/Users/pyw/newpart/MyRecall/myrecall_client.env`
-- `/Users/pyw/newpart/MyRecall/myrecall_client_low_latency.env`
-- `/Users/pyw/newpart/MyRecall/tests/test_phase1_video_recorder.py`
-- `/Users/pyw/newpart/MyRecall/tests/test_phase1_pipeline_profile_change.py`
+- `openrecall/client/ffmpeg_manager.py`
+- `openrecall/client/video_recorder.py`
+- `openrecall/client/__main__.py`
+- `openrecall/shared/config.py`
+- `myrecall_client.env`
+- `myrecall_client_low_latency.env`
+- `tests/test_phase1_video_recorder.py`
+- `tests/test_phase1_pipeline_profile_change.py`
 
 ### Out of Scope
 
@@ -168,7 +169,7 @@ Engineering complete when:
 Phase 1.5.1 fully closed when:
 
 - Manual long-run evidence is attached under:
-  - `/Users/pyw/newpart/MyRecall/v3/evidence/phase1_5_strict60/`
+  - `v3/evidence/phase1_5_strict60/`
 
 ---
 

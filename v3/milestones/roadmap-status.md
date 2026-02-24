@@ -89,7 +89,7 @@ This section must be updated whenever code reality changes or when convergence w
 **Planned**: Week 1-2 (2026-02-06 to 2026-02-19, 10 working days)
 **Actual**: Completed 2026-02-06
 **Owner**: Solo Developer (infrastructure setup)
-**Detailed Plan**: `/Users/pyw/newpart/MyRecall/v3/plan/02-phase-0-detailed-plan.md`
+**Detailed Plan**: `v3/plan/02-phase-0-detailed-plan.md`
 
 **Execution Tracks**:
 - Track A (Day 1-4): Schema, migration, rollback, Pydantic models
@@ -151,7 +151,7 @@ This section must be updated whenever code reality changes or when convergence w
 **Planned**: Week 3-6 (4 weeks, 20 working days)
 **Actual**: Engineering completed 2026-02-06 (single session)
 **Owner**: Solo Developer (core pipeline implementation)
-**Detailed Plan**: `/Users/pyw/newpart/MyRecall/v3/plan/03-phase-1-detailed-plan.md`
+**Detailed Plan**: `v3/plan/03-phase-1-detailed-plan.md`
 
 **Execution Tracks**:
 - Track A (Day 1-5): FFmpeg recording, chunk management, frame extraction, E2E wire-up
@@ -223,17 +223,17 @@ This section must be updated whenever code reality changes or when convergence w
 
 **Blockers**: 无工程阻塞（Phase 1 已完成）。7 个长时 gate 已转入未来观测计划跟踪。
 
-**Evidence**: `/Users/pyw/newpart/MyRecall/v3/evidence/phase1-audit/commands.log`, `/Users/pyw/newpart/MyRecall/v3/evidence/phase1-audit/api_smoke_status_lines_round1.txt`, `/Users/pyw/newpart/MyRecall/v3/evidence/phase1-audit/test_phase1_all_after_fix2.txt`, `/Users/pyw/newpart/MyRecall/v3/evidence/phase1_5_strict60/`
+**Evidence**: `v3/evidence/phase1-audit/commands.log`, `v3/evidence/phase1-audit/api_smoke_status_lines_round1.txt`, `v3/evidence/phase1-audit/test_phase1_all_after_fix2.txt`, `v3/evidence/phase1_5_strict60/`
 
 **Phase 1.5 Evidence Matrix**
 
 | Change | Code Path | Test Command | Result | UTC Timestamp |
 |---|---|---|---|---|
-| Resolver `frame > chunk > null` for `app/window/focused/browser_url` | `/Users/pyw/newpart/MyRecall/openrecall/server/video/metadata_resolver.py` | `python3 -m pytest tests/test_phase1_5_metadata_resolver.py -v` | 12 passed | 2026-02-08T07:50:52Z |
-| focused/browser_url explicit pipeline and query/read compatibility | `/Users/pyw/newpart/MyRecall/openrecall/server/video/processor.py`, `/Users/pyw/newpart/MyRecall/openrecall/server/database/sql.py`, `/Users/pyw/newpart/MyRecall/openrecall/server/api_v1.py` | `python3 -m pytest tests/test_phase1_5_focused_browser_url.py -v` | 10 passed | 2026-02-08T07:50:52Z |
-| OCR engine true-value persistence | `/Users/pyw/newpart/MyRecall/openrecall/server/ai/base.py`, `/Users/pyw/newpart/MyRecall/openrecall/server/ai/providers.py`, `/Users/pyw/newpart/MyRecall/openrecall/server/video/processor.py` | `python3 -m pytest tests/test_phase1_5_ocr_engine.py -v` | 3 passed | 2026-02-08T07:50:52Z |
-| Offset guard reject-write protection and structured logging | `/Users/pyw/newpart/MyRecall/openrecall/server/video/processor.py` | `python3 -m pytest tests/test_phase1_5_offset_guard.py -v` | 8 passed | 2026-02-08T07:50:52Z |
-| Phase 1 + 1.5 full closure regression | `/Users/pyw/newpart/MyRecall/openrecall/server/video/metadata_resolver.py`, `/Users/pyw/newpart/MyRecall/openrecall/server/video/processor.py`, `/Users/pyw/newpart/MyRecall/openrecall/server/api_v1.py`, `/Users/pyw/newpart/MyRecall/openrecall/server/database/sql.py` | `python3 -m pytest tests/test_phase1_* -v` | 170 passed, 8 skipped | 2026-02-08T07:50:08Z |
+| Resolver `frame > chunk > null` for `app/window/focused/browser_url` | `openrecall/server/video/metadata_resolver.py` | `python3 -m pytest tests/test_phase1_5_metadata_resolver.py -v` | 12 passed | 2026-02-08T07:50:52Z |
+| focused/browser_url explicit pipeline and query/read compatibility | `openrecall/server/video/processor.py`, `openrecall/server/database/sql.py`, `openrecall/server/api_v1.py` | `python3 -m pytest tests/test_phase1_5_focused_browser_url.py -v` | 10 passed | 2026-02-08T07:50:52Z |
+| OCR engine true-value persistence | `openrecall/server/ai/base.py`, `openrecall/server/ai/providers.py`, `openrecall/server/video/processor.py` | `python3 -m pytest tests/test_phase1_5_ocr_engine.py -v` | 3 passed | 2026-02-08T07:50:52Z |
+| Offset guard reject-write protection and structured logging | `openrecall/server/video/processor.py` | `python3 -m pytest tests/test_phase1_5_offset_guard.py -v` | 8 passed | 2026-02-08T07:50:52Z |
+| Phase 1 + 1.5 full closure regression | `openrecall/server/video/metadata_resolver.py`, `openrecall/server/video/processor.py`, `openrecall/server/api_v1.py`, `openrecall/server/database/sql.py` | `python3 -m pytest tests/test_phase1_* -v` | 170 passed, 8 skipped | 2026-02-08T07:50:08Z |
 
 ### Phase 1 Long-Run Observation Plan (Future, Non-Blocking)
 **Status**: ⬜️ Planned
@@ -250,7 +250,7 @@ This section must be updated whenever code reality changes or when convergence w
 | 1-R-01 | Storage `<50GB/day` | 24h 存储增长报告 |
 | 1-R-02 | Memory `<500MB` | 运行期 RSS 采样（avg/p95/max） |
 
-**Output Location**: `/Users/pyw/newpart/MyRecall/v3/results/phase-1-validation.md`（追加 LONGRUN 证据附录）
+**Output Location**: `v3/results/phase-1-validation.md`（追加 LONGRUN 证据附录）
 
 ---
 
@@ -259,8 +259,8 @@ This section must be updated whenever code reality changes or when convergence w
 **Planned**: Week 7-8 (10 working days, 2026-02-09 to 2026-02-20)
 **Actual**: 2026-02-09 (implementation completed in single session)
 **Owner**: Solo Developer (audio capture & transcription)
-**Detailed Plan**: `/Users/pyw/newpart/MyRecall/v3/plan/04-phase-2-detailed-plan.md`
-**Validation Report**: `/Users/pyw/newpart/MyRecall/v3/results/phase-2-validation.md`
+**Detailed Plan**: `v3/plan/04-phase-2-detailed-plan.md`
+**Validation Report**: `v3/results/phase-2-validation.md`
 
 **Test Results**: 477 passed, 19 skipped, 0 failed (full suite including Phase 0+1 regression)
 
@@ -313,8 +313,8 @@ This section must be updated whenever code reality changes or when convergence w
 **Planned**: ~5 working days
 **Actual**: 2026-02-12 (single session)
 **Owner**: Solo Developer (WebUI + minimal backend APIs)
-**Detailed Plan**: `/Users/pyw/newpart/MyRecall/v3/plan/05-phase-2.5-webui-audio-video-detailed-plan.md`
-**Validation Report**: `/Users/pyw/newpart/MyRecall/v3/results/phase-2.5-validation.md`
+**Detailed Plan**: `v3/plan/05-phase-2.5-webui-audio-video-detailed-plan.md`
+**Validation Report**: `v3/results/phase-2.5-validation.md`
 
 **Dependencies**: Phase 2.0 Engineering Complete (all prerequisites met)
 
@@ -417,8 +417,8 @@ This section must be updated whenever code reality changes or when convergence w
 **Planned**: Relative R1 (must pass before Phase 2.7 starts)
 **Actual**: TBD
 **Owner**: Product Owner + Chief Architect
-**Detailed Plan**: `/Users/pyw/newpart/MyRecall/v3/plan/phase-2.6-audio-freeze-governance.md`
-**Decision Record**: `/Users/pyw/newpart/MyRecall/v3/decisions/ADR-0007-phase-2.6-audio-freeze-governance.md`
+**Detailed Plan**: `v3/plan/phase-2.6-audio-freeze-governance.md`
+**Decision Record**: `v3/decisions/ADR-0007-phase-2.6-audio-freeze-governance.md`
 
 **Purpose**:
 - Turn Audio Freeze into an auditable control phase.
@@ -432,11 +432,11 @@ This section must be updated whenever code reality changes or when convergence w
 - `GateEvidenceManifest`
 
 **Go/No-Go Gates** (authority: `v3/metrics/phase-gates.md`):
-- [ ] 2.6-G-01: 24h stability evidence archived with no unresolved P0/P1 incidents.
-- [ ] 2.6-G-02: Performance budget validated (CPU <= +12%, storage <= +10%, query p95 no regression; target +10%-20% improvement).
-- [ ] 2.6-G-03: Quality baseline validated (label mismatch <=2%-5%, Precision@10 uplift >=20%).
+- [ ] 2.6-G-01: 24h stability evidence archived with no unresolved P0/P1 incidents in freeze scope.
+- [ ] 2.6-G-02: Freeze-scope performance budget validated (no unacceptable regression in governed modules).
+- [ ] 2.6-G-03: Exception workflow closure validated (all approved exceptions closed with evidence and TTL compliance).
 - [ ] 2.6-G-04: Rollback drill evidence passes and recovery objective met (<2 minutes).
-- [ ] 2.6-G-05: Config drift audit closed (no unauthorized freeze-scope changes).
+- [ ] 2.6-G-05: Config/code drift audit closed (no unauthorized freeze-scope changes).
 
 **Blockers**: Blocks Phase 2.7 until all `2.6-G-*` gates PASS.
 
@@ -447,7 +447,7 @@ This section must be updated whenever code reality changes or when convergence w
 **Planned**: Relative R2 (hard gate milestone; must complete before Phase 3 kickoff)
 **Actual**: TBD
 **Owner**: Solo Developer (video metadata + indexing contracts)
-**Detailed Plan**: `/Users/pyw/newpart/MyRecall/docs/plans/2026-02-24-phase-2.7-frame-label-alignment.md`
+**Detailed Plan**: `docs/plans/2026-02-24-phase-2.7-frame-label-alignment.md`
 
 **Purpose**:
 - Resolve chunk-level label drift where multiple frames inherit identical `app_name/window_name/focused/browser_url`.
@@ -670,12 +670,12 @@ After Phase 5 (Thin Client):
 
 | Metric | Phase 1 Target | Phase 2 Target | Phase 2.6 Target | Phase 2.7 Target | Phase 3 Target | Phase 4 Target | Phase 5 Target |
 |--------|----------------|----------------|------------------|------------------|----------------|----------------|----------------|
-| **Performance** | Frame <2s | N/A (paused) | CPU <=+12%, storage <=+10%, query p95 no regression | Query p95 no regression; target +10%-20% | Search <500ms | Chat <5s | Upload <5min |
-| **Accuracy** | OCR ≥95% | N/A (paused) | Label mismatch <=2%-5%; P@10 uplift >=20% | Label mismatch <=2%-5%; P@10 uplift >=20% vs baseline | P@10 ≥0.7 | Hallucination <10% | Checksum 100% |
+| **Performance** | Frame <2s | N/A (paused) | Freeze-scope modules show no unacceptable regression | Query p95 no regression; target +10%-20% | Search <500ms | Chat <5s | Upload <5min |
+| **Accuracy** | OCR ≥95% | N/A (paused) | N/A (governance-only phase) | Label mismatch <=2%-5%; P@10 uplift >=20% vs baseline | P@10 ≥0.7 | Hallucination <10% | Checksum 100% |
 | **Stability** | 7-day 0-crash | N/A (paused) | 24h stability evidence + rollback drill pass | No API compatibility or migration regression | N/A | N/A | >99.5% uptime |
-| **Resource** | <5% CPU | N/A (paused) | Config drift audit = 0 unauthorized changes | CPU <=+12%, storage <=+10% | N/A | <$0.05/query | Queue <10 p95 |
+| **Resource** | <5% CPU | N/A (paused) | Config/code drift audit = 0 unauthorized changes | CPU <=+12%, storage <=+10% | N/A | <$0.05/query | Queue <10 p95 |
 
-**Current Baseline**: Phase 0 measured on 2026-02-06: migration <1s (10K entries), query overhead <10ms, rollback <1s, schema overhead <1MB, migration memory <1MB. Source: `/Users/pyw/newpart/MyRecall/v3/results/phase-0-validation.md`.
+**Current Baseline**: Phase 0 measured on 2026-02-06: migration <1s (10K entries), query overhead <10ms, rollback <1s, schema overhead <1MB, migration memory <1MB. Source: `v3/results/phase-0-validation.md`.
 
 ---
 
@@ -815,9 +815,13 @@ This section tracks questions that have been resolved through architectural deci
 
 ## Open Questions (Active)
 
-✅ **All Open Questions resolved as of 2026-02-06.** (See Change Log for resolved decisions and superseded items.)
+The following open questions are currently active and must be resolved before corresponding execution gates:
 
-**Review Trigger**: Add new questions here when discovered during Phase 0+ execution.
+1. **Phase 2.6 evidence granularity**: What exact artifact schema is required for exception-closure evidence so that review is deterministic?
+2. **Phase 2.7 baseline lock**: Which concrete dataset snapshot ID is frozen as the Phase 1.5 comparison baseline for mismatch/P@10 checks?
+3. **Phase 3 browse semantics transition**: During migration from empty-q=empty-payload to empty-q=browse-feed, what compatibility notice window is required for existing callers?
+
+**Review Trigger**: Update this section whenever a question is resolved, superseded, or newly discovered.
 
 ---
 

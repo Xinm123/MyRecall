@@ -1,4 +1,4 @@
-# ADR-0006: Screenpipe-Aligned Search Contract (Vision-Only)
+# ADR-0006: Search Contract Alignment with Screenpipe (Vision-Only)
 
 **Status**: Accepted
 **SupersededBy**: N/A
@@ -12,163 +12,142 @@
 
 ## Context and Problem Statement
 
-MyRecall-v3 Phase 4 Chat MVP requires a **bounded, stable, and screenpipe-like** retrieval primitive to ground answers in real screen evidence.
+MyRecall-v3 needs one stable retrieval primitive for Phase 3/4, but current docs previously mixed three different claims:
 
-Current MyRecall `/api/v1/search` behavior is not aligned with screenpipe in two critical ways:
+1. screenpipe API behavior
+2. screenpipe operator discipline
+3. MyRecall target policy choices
 
-1. `q`-first semantics (browse/feed mode not first-class) make it hard to implement “time-range summary” without extra endpoints.
-2. Time bounds are not enforced as a hard constraint, risking unbounded scans and flaky latency.
-
-We need a clear, locked Search API contract that:
-
-- Can be used directly by Chat grounding in Phase 4 (single retrieval)
-- Mirrors screenpipe’s `/search` mental model as closely as possible
-- Stays within the vision-only pivot (Audio Freeze)
+This ADR separates them explicitly to avoid false equivalence.
 
 ---
 
 ## Decision Drivers
 
-1. **Chat MVP stability**: least moving parts (single retrieval + single summary).
-2. **Screenpipe alignment**: reduce semantic drift; copy interaction expectations.
-3. **Evidence-first**: chat claims must be traceable to real frame IDs and timestamps.
-4. **Performance safety**: avoid unbounded scans; stable ordering + pagination.
-5. **Vision-only pivot**: OCR-only contract; audio excluded from Search/Chat scope.
+1. Chat MVP stability: one canonical retrieval endpoint.
+2. Evidence-first correctness: bounded retrieval and traceable frame evidence.
+3. Semantic alignment with screenpipe search model.
+4. Explicit divergence control under vision-only pivot.
 
 ---
 
-## Considered Options
+## Alignment Levels (Required)
 
-### Option A: Keep current `/api/v1/search` (q required) + add separate browse endpoint
+- `semantic`: align query/filter/order mental model.
+- `discipline`: align usage discipline (bounded time ranges, small limits).
+- `divergence`: intentional product differences.
 
-- **Pros**: minimal change to existing behavior
-- **Cons**: two retrieval primitives; increases Phase 4 bug surface; diverges from screenpipe
+---
 
-### Option B: Make `/api/v1/search` screenpipe-like (Chosen)
+## Screenpipe Reference (Facts)
 
-- **Pros**: one canonical retrieval primitive; matches screenpipe’s `/search` mental model; easiest Phase 4 grounding
-- **Cons**: requires tightening contract (q optional, time bounds required); may require compatibility handling
+From screenpipe server route and DB behavior:
 
-### Option C: Build Phase 4 Chat on timeline/frames APIs directly (no search)
+- `q` is optional (`Option<String>`).
+- `start_time` and `end_time` are optional at API layer.
+- Empty query supports browse-like retrieval behavior.
 
-- **Pros**: could avoid touching search
-- **Cons**: loses screenpipe alignment; reinvents browse semantics; higher engineering complexity for Phase 4 sampling
+References:
+
+- `screenpipe/crates/screenpipe-server/src/routes/search.rs`
+- `screenpipe/crates/screenpipe-db/src/db.rs`
+
+From screenpipe skills/system prompts:
+
+- operational rule is to **always include `start_time`** to avoid broad expensive queries.
+
+References:
+
+- `screenpipe/apps/screenpipe-app-tauri/src-tauri/assets/skills/screenpipe-search/SKILL.md`
+- `screenpipe/apps/screenpipe-app-tauri/src-tauri/src/pi.rs`
+
+---
+
+## Current Reality (Verified, 2026-02-24)
+
+Current MyRecall `GET /api/v1/search` behavior:
+
+- `q` empty/missing returns empty paginated payload.
+- `start_time` is not enforced at route level.
+- search engine can still merge audio FTS candidates.
+
+References:
+
+- `openrecall/server/api_v1.py` (`search_api`)
+- `openrecall/server/search/engine.py`
 
 ---
 
 ## Decision Outcome
 
-**Chosen Option: Option B**
+MyRecall keeps `GET /api/v1/search` as canonical endpoint, aligned to screenpipe at **semantic** level, with explicit MyRecall policy choices documented as **discipline/divergence**.
 
-MyRecall will treat `GET /api/v1/search` as the canonical, screenpipe-aligned vision retrieval endpoint.
+### Contract (Target for Phase 3+)
 
-Phase 4 Chat grounding will use **search browse/feed mode** (`q=""`) over a bounded time range, then sample/truncate before calling the LLM once.
-
----
-
-## Contract (Phase 3+)
-
-### Endpoint
-
-- `GET /api/v1/search`
-
-### Parameters (screenpipe-aligned semantics)
-
-| Parameter | Type | Required | Semantics |
-|---|---:|---:|---|
-| `start_time` | float (epoch seconds) | Yes | Start of time window (browser-local authority; server filters absolute) |
-| `end_time` | float (epoch seconds) | No | End of time window; default = now |
-| `q` | string | No | Keywords; empty/missing means browse/feed mode |
-| `content_type` | string | No | Vision-only: only `ocr` is allowed. Any non-`ocr` value MUST return `400 Bad Request`. |
-| `limit` | int | No | Page size (bounded; prefer 5-20) |
-| `offset` | int | No | Pagination offset |
-| `app_name` | string | No | Filter by app substring |
-| `window_name` | string | No | Filter by window title substring |
-| `focused` | bool | No | Filter by focused windows |
-| `browser_url` | string | No | Filter by browser URL substring |
+| Parameter | Required | Alignment Level | Notes |
+|---|---:|---|---|
+| `q` | No | semantic | Empty/missing means browse/feed mode |
+| `start_time` (epoch float) | Yes | discipline | MyRecall policy for bounded retrieval stability |
+| `end_time` (epoch float) | No | discipline | Defaults to now |
+| `app_name`/`window_name`/`focused`/`browser_url` | No | semantic | Filter semantics aligned |
+| `content_type` | No | divergence | Vision-only path permits `ocr` only |
 
 ### Ordering Rules
 
-- If `q` is missing or empty:
-  - browse/feed mode
-  - order by `timestamp DESC`
-- If `q` is non-empty:
-  - rank results by search score
-  - tie-break by `timestamp DESC` for stability
+- Browse mode (`q` empty): `timestamp DESC`.
+- Keyword mode (`q` non-empty): score-first, tie-break `timestamp DESC`.
+- Pagination must remain stable under fixed query params.
 
-Pagination MUST be stable under both modes (no duplicates/gaps across pages with identical query parameters).
+### Intentional Divergences
 
-### Compatibility Window (Current -> Target)
-
-- Transition period: Phase 3 implementation window.
-- During transition, if `content_type` is omitted, server defaults to `ocr`.
-- During transition, non-`ocr` `content_type` values MUST be rejected with `400` and a clear error payload.
-- No silent ignore mode is allowed, to prevent ambiguous caller behavior.
-
-### Response Expectations (minimum fields for Phase 4)
-
-Each OCR result MUST include enough fields to render evidence and enable drill-down:
-
-- `frame_id`
-- `timestamp` (epoch seconds)
-- `app_name`, `window_name`, `focused`, `browser_url`
-- `ocr_snippet` (short, safe to display)
-- `frame_url` (e.g. `/api/v1/frames/:id`)
+1. **Vision-only MVP scope**: Search/Chat grounding excludes audio.
+2. **`content_type` enforcement**: non-`ocr` may be rejected in the vision-only contract path.
+3. **Time format**: MyRecall uses epoch seconds (browser-local authority -> absolute filtering), while screenpipe uses ISO timestamps.
 
 ---
 
-## Screenpipe Reference (How it Does It)
+## Compatibility Window (Current -> Target)
 
-Screenpipe’s `/search` endpoint:
+During Phase 3 migration:
 
-- accepts `q` as optional (`q: Option<String>`)
-- supports time bounds and filters (app/window/focused/browser_url)
-- supports browse behavior when query is empty (returns OCR ordered by timestamp)
-
-Repo references (for semantics, not code reuse):
-
-- `screenpipe/crates/screenpipe-server/src/routes/search.rs`
-- `screenpipe/apps/screenpipe-app-tauri/src-tauri/assets/skills/screenpipe-search/SKILL.md` (explicit rule: ALWAYS include `start_time`)
-
-Key intentional differences:
-
-- Screenpipe uses ISO-8601 UTC strings; MyRecall uses epoch seconds for browser-local authority.
-- Screenpipe supports multi-modal `content_type`; MyRecall Phase 3/4 is vision-only (`ocr`).
+1. Document current behavior as `Current (verified)`.
+2. Implement target behavior behind phased convergence.
+3. Keep response payload explicit for caller adaptation errors (no silent semantic fallback for invalid target-path params).
 
 ---
 
 ## Consequences
 
-### Positive ✅
+### Positive
 
-- One canonical retrieval primitive for Phase 3 Search and Phase 4 Chat
-- Strong semantic alignment with screenpipe’s bounded search discipline
-- Enables Phase 4 “single retrieval + single summary” grounding with minimal orchestration
+- One retrieval contract for both Search and Chat grounding.
+- Avoids doc-level ambiguity between parity and policy.
+- Supports evidence-first phase gates.
 
-### Negative ❌
+### Negative
 
-- Requires tightening `/api/v1/search` behavior (q optional + time bounds required)
-- May need compatibility handling for any callers that assumed `q` is required
+- Caller migration needed once empty-`q` behavior changes.
+- Additional validation and mode handling complexity at route layer.
 
-### Neutral 🔄
+### Neutral
 
-- Multi-modal search can be revisited later only if Audio Freeze is lifted by a new ADR
+- Multi-modal search can be reconsidered only via future ADR that changes Audio Freeze scope.
 
 ---
 
 ## Rollback Conditions
 
-Rollback to Option A (separate browse endpoint) only if:
+Rollback to split endpoints only if:
 
-- Enforcing time bounds breaks an important legacy caller and cannot be adapted quickly, or
-- Search performance/regressions cannot be stabilized within Phase 3 gates
+1. Unified search contract cannot satisfy Phase 3 latency/reliability gates.
+2. Compatibility burden on existing callers becomes unacceptable within planned migration window.
 
-Rollback must preserve evidence-first guarantees (never fabricate frame references).
+Any rollback must preserve evidence-first guarantees and non-fabrication policy.
 
 ---
 
 ## Related Docs
 
-- `v3/milestones/roadmap-status.md` (Phase 3/4 tracker)
-- `v3/metrics/phase-gates.md` (authority for Phase 3/4 gates)
-- `v3/plan/06-vision-chat-mvp-spec.md` (Phase 4 grounding + sampling)
+- `v3/milestones/roadmap-status.md`
+- `v3/metrics/phase-gates.md`
+- `v3/plan/06-vision-chat-mvp-spec.md`
