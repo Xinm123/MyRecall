@@ -2,13 +2,18 @@
 
 **Phase**: 2.5 (WebUI Dashboard Pages: `/audio` and `/video`)
 **Version**: 1.0
-**Timeline**: 5 working days (Planned)
+**Status**: Executed (Historical Plan)
+**Scope Type**: historical
+**Timeline**: 5 working days (Executed 2026-02-12)
 **Owner**: Solo Developer
-**Authority**: `/Users/pyw/new/MyRecall/v3/metrics/phase-gates.md`（gate 阈值唯一权威来源）
+**Authority**: `/Users/pyw/newpart/MyRecall/v3/metrics/phase-gates.md`（gate 阈值唯一权威来源）
 **ADR References**: ADR-0001 (Python-first), ADR-0002 (Thin client, remote-first API)
 **Prerequisites**: Phase 2.0 Engineering Complete（15/17 gates PASS, 477 tests pass）
+**Validation Report**: `/Users/pyw/newpart/MyRecall/v3/results/phase-2.5-validation.md`
 
 ---
+
+> Historical note: `/audio` dashboards and APIs are preserved for operations/inspection, but audio expansion remains frozen under ADR-0005.
 
 ## 1. Goal / Non-Goals
 
@@ -121,9 +126,9 @@
 | Unit tests | `tests/test_phase25_api.py`: ~20 test cases for all new endpoints |
 
 **Target Files**:
-- Modified: `/Users/pyw/new/MyRecall/openrecall/server/database/sql.py`
-- Modified: `/Users/pyw/new/MyRecall/openrecall/server/api_v1.py`
-- New: `/Users/pyw/new/MyRecall/tests/test_phase25_api.py`
+- Modified: `/Users/pyw/newpart/MyRecall/openrecall/server/database/sql.py`
+- Modified: `/Users/pyw/newpart/MyRecall/openrecall/server/api_v1.py`
+- New: `/Users/pyw/newpart/MyRecall/tests/test_phase25_api.py`
 
 ---
 
@@ -140,9 +145,9 @@
 | Integration test | `tests/test_phase25_audio_page.py`: GET /audio returns 200, template renders |
 
 **Target Files**:
-- Modified: `/Users/pyw/new/MyRecall/openrecall/server/app.py`
-- New: `/Users/pyw/new/MyRecall/openrecall/server/templates/audio.html`
-- New: `/Users/pyw/new/MyRecall/tests/test_phase25_audio_page.py`
+- Modified: `/Users/pyw/newpart/MyRecall/openrecall/server/app.py`
+- New: `/Users/pyw/newpart/MyRecall/openrecall/server/templates/audio.html`
+- New: `/Users/pyw/newpart/MyRecall/tests/test_phase25_audio_page.py`
 
 **SSR vs Client-side 数据分工**:
 
@@ -169,9 +174,9 @@
 | Integration test | `tests/test_phase25_video_page.py`: GET /video returns 200 |
 
 **Target Files**:
-- Modified: `/Users/pyw/new/MyRecall/openrecall/server/app.py`
-- New: `/Users/pyw/new/MyRecall/openrecall/server/templates/video.html`
-- New: `/Users/pyw/new/MyRecall/tests/test_phase25_video_page.py`
+- Modified: `/Users/pyw/newpart/MyRecall/openrecall/server/app.py`
+- New: `/Users/pyw/newpart/MyRecall/openrecall/server/templates/video.html`
+- New: `/Users/pyw/newpart/MyRecall/tests/test_phase25_video_page.py`
 
 ---
 
@@ -192,9 +197,9 @@
 | Navigation integration test | `tests/test_phase25_navigation.py`: 所有 5 page routes return 200 |
 
 **Target Files**:
-- Modified: `/Users/pyw/new/MyRecall/openrecall/server/templates/layout.html`
-- Modified: `/Users/pyw/new/MyRecall/openrecall/server/templates/icons.html`
-- New: `/Users/pyw/new/MyRecall/tests/test_phase25_navigation.py`
+- Modified: `/Users/pyw/newpart/MyRecall/openrecall/server/templates/layout.html`
+- Modified: `/Users/pyw/newpart/MyRecall/openrecall/server/templates/icons.html`
+- New: `/Users/pyw/newpart/MyRecall/tests/test_phase25_navigation.py`
 
 ---
 
@@ -224,7 +229,7 @@
 
 **Dependencies**: 无（使用已有 table schema）。
 
-**Target File**: `/Users/pyw/new/MyRecall/openrecall/server/database/sql.py`
+**Target File**: `/Users/pyw/newpart/MyRecall/openrecall/server/database/sql.py`
 
 **Interface**:
 
@@ -256,7 +261,7 @@ python -m pytest tests/test_phase25_api.py::test_video_chunks_paginated -v
 
 **Dependencies**: 无。
 
-**Target File**: `/Users/pyw/new/MyRecall/openrecall/server/database/sql.py`
+**Target File**: `/Users/pyw/newpart/MyRecall/openrecall/server/database/sql.py`
 
 **Interface**:
 
@@ -291,7 +296,7 @@ python -m pytest tests/test_phase25_api.py::test_frames_paginated -v
 
 **Dependencies**: 无。
 
-**Target File**: `/Users/pyw/new/MyRecall/openrecall/server/database/sql.py`
+**Target File**: `/Users/pyw/newpart/MyRecall/openrecall/server/database/sql.py`
 
 **Interface**:
 
@@ -335,7 +340,7 @@ python -m pytest tests/test_phase25_api.py -k "stats" -v
 
 **Dependencies**: WB-01, WB-02, WB-03 (SQLStore methods)。
 
-**Target File**: `/Users/pyw/new/MyRecall/openrecall/server/api_v1.py`
+**Target File**: `/Users/pyw/newpart/MyRecall/openrecall/server/api_v1.py`
 
 **API/Data Contract Changes**:
 
@@ -388,7 +393,7 @@ python -m pytest tests/test_phase25_api.py -k "video" -v
 
 **Dependencies**: WB-03 (SQLStore methods)。
 
-**Target File**: `/Users/pyw/new/MyRecall/openrecall/server/api_v1.py`
+**Target File**: `/Users/pyw/newpart/MyRecall/openrecall/server/api_v1.py`
 
 **API/Data Contract Changes**:
 
@@ -419,8 +424,8 @@ python -m pytest tests/test_phase25_api.py -k "audio" -v
 **Dependencies**: WB-04, WB-05 (API endpoints 可用)。
 
 **Target Files**:
-- Modified: `/Users/pyw/new/MyRecall/openrecall/server/app.py`
-- New: `/Users/pyw/new/MyRecall/openrecall/server/templates/audio.html`
+- Modified: `/Users/pyw/newpart/MyRecall/openrecall/server/app.py`
+- New: `/Users/pyw/newpart/MyRecall/openrecall/server/templates/audio.html`
 
 **Flask Route**:
 ```python
@@ -457,8 +462,8 @@ python -m pytest tests/test_phase25_audio_page.py -v
 **Dependencies**: WB-04, WB-05 (API endpoints 可用)。
 
 **Target Files**:
-- Modified: `/Users/pyw/new/MyRecall/openrecall/server/app.py`
-- New: `/Users/pyw/new/MyRecall/openrecall/server/templates/video.html`
+- Modified: `/Users/pyw/newpart/MyRecall/openrecall/server/app.py`
+- New: `/Users/pyw/newpart/MyRecall/openrecall/server/templates/video.html`
 
 **Flask Route**:
 ```python
@@ -495,8 +500,8 @@ python -m pytest tests/test_phase25_video_page.py -v
 **Dependencies**: WB-06, WB-07 (pages exist)。
 
 **Target Files**:
-- Modified: `/Users/pyw/new/MyRecall/openrecall/server/templates/layout.html`
-- Modified: `/Users/pyw/new/MyRecall/openrecall/server/templates/icons.html`
+- Modified: `/Users/pyw/newpart/MyRecall/openrecall/server/templates/layout.html`
+- Modified: `/Users/pyw/newpart/MyRecall/openrecall/server/templates/icons.html`
 
 **icons.html 新增**:
 - `icon_audio()` macro: 16x16px speaker + sound wave SVG
@@ -592,11 +597,11 @@ python -m pytest tests/ -v --tb=short
 **Dependencies**: WB-01 through WB-10。
 
 **Target Files**:
-- New: `/Users/pyw/new/MyRecall/v3/webui/pages/audio.md`
-- New: `/Users/pyw/new/MyRecall/v3/webui/pages/video.md`
-- Modified: `/Users/pyw/new/MyRecall/v3/webui/ROUTE_MAP.md`
-- Modified: `/Users/pyw/new/MyRecall/v3/webui/DATAFLOW.md`
-- Modified: `/Users/pyw/new/MyRecall/v3/webui/CHANGELOG.md`
+- New: `/Users/pyw/newpart/MyRecall/v3/webui/pages/audio.md`
+- New: `/Users/pyw/newpart/MyRecall/v3/webui/pages/video.md`
+- Modified: `/Users/pyw/newpart/MyRecall/v3/webui/ROUTE_MAP.md`
+- Modified: `/Users/pyw/newpart/MyRecall/v3/webui/DATAFLOW.md`
+- Modified: `/Users/pyw/newpart/MyRecall/v3/webui/CHANGELOG.md`
 
 ---
 
@@ -620,7 +625,7 @@ python -m pytest tests/test_phase0_api_v1.py tests/test_phase1_timeline_api.py t
 
 ## 6. Gate Traceability Matrix
 
-Phase 2.5 在 `/Users/pyw/new/MyRecall/v3/metrics/phase-gates.md` 中**没有专属 gates**。以下所有项映射到已有 Phase gates 或标注为 **Non-Gating**。
+Phase 2.5 在 `/Users/pyw/newpart/MyRecall/v3/metrics/phase-gates.md` 中**没有专属 gates**。以下所有项映射到已有 Phase gates 或标注为 **Non-Gating**。
 
 | ID | Gate / Check | Maps to | Status | Validation |
 |----|-------------|---------|--------|------------|
@@ -771,7 +776,7 @@ Phase 2.5 在 `/Users/pyw/new/MyRecall/v3/metrics/phase-gates.md` 中**没有专
 
 ## 11. Documentation Sync Matrix
 
-按 `/Users/pyw/new/MyRecall/v3/webui/templates/phase-update-checklist.md` 执行：
+按 `/Users/pyw/newpart/MyRecall/v3/webui/templates/phase-update-checklist.md` 执行：
 
 | Checklist Item | Answer | Action | When |
 |----------------|--------|--------|------|
@@ -792,5 +797,5 @@ Phase 2.5 在 `/Users/pyw/new/MyRecall/v3/metrics/phase-gates.md` 中**没有专
 
 **Date**: 2026-02-12
 **Author**: Solo Developer (Phase 2.5 planning)
-**Status**: PLANNED — Pending execution
-**Next Action**: Execution Readiness Checklist 验证后开始 Day 1
+**Status**: EXECUTED — Engineering complete, validation closed
+**Next Action**: No execution action under current roadmap; maintain as historical documentation.

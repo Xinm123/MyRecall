@@ -59,11 +59,11 @@
 
 | Input | Source | Status |
 |-------|--------|--------|
-| Existing v2 codebase | `/Users/pyw/new/MyRecall/openrecall/` | Available |
+| Existing v2 codebase | `/Users/pyw/newpart/MyRecall/openrecall/` | Available |
 | Existing recall.db schema (`entries` table) | `~/MRS/db/recall.db` | Available |
 | Existing FTS schema (`ocr_fts` in fts.db) | `~/MRS/fts.db` | Available |
 | Existing LanceDB store | `~/MRS/lancedb/` | Available |
-| screenpipe reference schema | `/Users/pyw/new/screenpipe/crates/screenpipe-db/` | Read-only reference |
+| screenpipe reference schema | `/Users/pyw/newpart/screenpipe/crates/screenpipe-db/` | Read-only reference |
 | ADR-0001 (Python-first) | `v3/decisions/ADR-0001-python-first.md` | Approved |
 | ADR-0002 (Thin client) | `v3/decisions/ADR-0002-thin-client-architecture.md` | Approved |
 | Phase gates (authority) | `v3/metrics/phase-gates.md` | Approved |
@@ -707,7 +707,7 @@ pytest tests/test_phase0_gates.py -v
 
 ## 7. Gate Traceability Matrix
 
-All gate criteria sourced exclusively from `/Users/pyw/new/MyRecall/v3/metrics/phase-gates.md` (authority).
+All gate criteria sourced exclusively from `/Users/pyw/newpart/MyRecall/v3/metrics/phase-gates.md` (authority).
 
 ### Data Governance Gates (DG)
 
@@ -883,18 +883,18 @@ All gate criteria sourced exclusively from `/Users/pyw/new/MyRecall/v3/metrics/p
 
 ---
 
-## 11. Execution Readiness Checklist
+## 11. Historical Execution Readiness Snapshot (Completed)
 
-1. [ ] All 8 required documents read and understood (master prompt, roadmap, phase-gates, ADR-0001 through ADR-0004, references)
-2. [ ] v2 codebase architecture understood (producer-consumer, 3-tier storage, API routes, models, config)
-3. [ ] screenpipe reference schema reviewed (table structures, FTS patterns, index strategies)
-4. [ ] No unresolved open questions (all ADRs approved, all gates defined in phase-gates.md)
-5. [ ] Development environment ready (Python, pytest, psutil available)
-6. [ ] Copy of production `recall.db` available for migration testing
-7. [ ] This plan reviewed and approved by Product Owner
-8. [ ] No conflicting changes in progress on the v2 codebase
-9. [ ] Git branch `phase-0/foundation` created from current `master`
-10. [ ] Day 1 tasks have no external dependencies -- can start immediately
+1. [x] All 8 required documents read and understood (master prompt, roadmap, phase-gates, ADR-0001 through ADR-0004, references)
+2. [x] v2 codebase architecture understood (producer-consumer, 3-tier storage, API routes, models, config)
+3. [x] screenpipe reference schema reviewed (table structures, FTS patterns, index strategies)
+4. [x] No unresolved open questions (all ADRs approved, all gates defined in phase-gates.md)
+5. [x] Development environment ready (Python, pytest, psutil available)
+6. [x] Copy of production `recall.db` available for migration testing
+7. [x] This plan reviewed and approved by Product Owner
+8. [x] No conflicting changes in progress on the v2 codebase
+9. [x] Git branch `phase-0/foundation` created from current `master`
+10. [x] Day 1 tasks had no external dependencies and started immediately
 
 ---
 

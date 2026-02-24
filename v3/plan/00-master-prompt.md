@@ -1,8 +1,8 @@
 # MyRecall-v3 Master Prompt (Version Control)
 
-**Version**: 1.2
-**Last Updated**: 2026-02-06
-**Status**: Active (Phase 1 complete; Phase 2 detailed planning in progress)
+**Version**: 1.3
+**Last Updated**: 2026-02-23
+**Status**: Active (Vision-only pivot; evidence-first Chat MVP planning)
 **Original Request**: Retained below for reference
 
 ---
@@ -20,7 +20,7 @@ MyRecall-v3 (Third major version)
 
 ### Reference Projects
 1. **screenpipe** (重点参考)
-   - Location: `/Users/pyw/new/screenpipe/`
+   - Location: `/Users/pyw/newpart/screenpipe/`
    - Key modules: chat、多模态采集 (vision + audio)、search、timeline indexing
 
 2. **openclaw memory** (参考概念)
@@ -29,7 +29,7 @@ MyRecall-v3 (Third major version)
 
 ### Current Deployment
 - **Phase 0-4**: Client + Server 都运行在本机 PC (localhost)
-- **Phase 5 Target**: Client 运行在本机 PC，Server 运行在 Debian 盒子 (WAN)
+- **Phase 5 Target**: Client 运行在本机 PC，Server 运行在 Debian 盒子 (LAN / Type-C)
 
 ---
 
@@ -39,17 +39,17 @@ MyRecall-v3 (Third major version)
 
 | Priority | Feature | Timeline | Hard Constraints |
 |----------|---------|----------|------------------|
-| **P0** | 多模态采集 (screenshot → video + audio) | Week 1-10 | 数据基础,必须优先 |
-| **P1** | Chat 对话能力 (simple request-response) | Week 13-15 | 依赖 P0 数据 |
-| **P2** | Search 优化 (Multi-Modal Search) | Week 11-12 | **MVP 核心** (Phase 3,Chat 依赖) |
-| **P3** | Memory 能力 (A: Summaries + C: Agent State) | Week 23+ | 已明确为 Phase 7 实施(推迟) |
-| **P4** | 部署迁移 (local → Debian) | Week 16-20 | **20周硬约束（约5个月,关键路径）** |
+| **P0** | Vision 数据基础 (video → frames → OCR → timeline/search) | Phase 0-1 已完成 | Chat 只能用 vision 证据 |
+| **P1** | Chat 对话能力 (vision-only, evidence-first, non-streaming) | Phase 4 | **对用户活动断言需 evidence[]；禁止编造** |
+| **P2** | Search 功能完善 (vision-only, screenpipe-aligned UX + filtering) | Phase 3 | **必须支持 time-range 过滤** |
+| **P3** | 部署迁移 (local → Debian) | Phase 5 | **关键路径**；API 必须 remote-first |
+| **P4** | Memory 能力 (Summaries + Agent State) | Phase 7+ | 推迟实施，不阻塞 MVP |
 
-**注**: Phase 2.1 Speaker ID (Week 9-10) 为可选特性,不在 P0-P4 优先级表中。用户在 Phase 2.0 验证后决定是否实施。详见 ADR-0004。
+**注**: Audio 相关能力（含 Phase 2.0/2.1）在本轮与可预见未来 **冻结/暂停**（见本提示词下方 “Audio Freeze” 约束）。已有实现不强制移除，但不继续扩展与对齐。
 
 **Key Decision Rationale**:
-- Chat 需要丰富数据源才有价值 → P0 必须先打好数据基础
-- 与 screenpipe 对齐 → 需要完整的 vision + audio + timeline
+- Chat 的价值来自“可回溯的证据链” → evidence-first 作为第一原则
+- 本轮 Chat/Search 仅以 vision 为依据 → “昨天讨论 X”严格指屏幕可见文本（OCR）
 - 部署迁移是硬约束 → 从 Phase 0 开始就必须设计 client-server 边界
 
 ---
@@ -65,18 +65,40 @@ MyRecall-v3 (Third major version)
   3. 独立 sidecar 进程形式引入 Rust (仅在有量化证据且前两步无效时)
 
 ### 2. Chat Mode
-- **Phase 4 (Initial)**: Simple request-response (NO streaming)
-- **Phase 6+ (Future)**: Add streaming if needed
+- **Phase 4 (Initial)**: Simple request-response (NO streaming) + evidence-first（引用具体时刻/活动必须带可跳转证据；纯说明可不带）+ **single retrieval + single summary**（不做 tool-calling）
+- **Phase 6+ (Future)**: Streaming + tool-calling orchestration (defer)
 
-### 3. Audio Scope
-- **Alignment**: 与 screenpipe 对齐
-- **Components**: System audio + Microphone + VAD + Whisper + Speaker identification
-- **User Control**: Configurable (enable/disable each component)
+### 3. Audio Freeze (Paused)
+- **Decision**: 本阶段及可预见未来，暂停所有音频相关开发（采集/存储/检索/Chat 集成/对齐 screenpipe）。
+- **Rationale**: 聚焦 Chat 核心闭环，避免 multi-modal 复杂度与隐私面扩张。
+- **Implication**: Chat/Search 的所有用例必须可在 “vision-only 数据” 上成立；无法成立的用例必须改写或延期。
 
-### 4. Deployment Evolution
-- **Timeline**: 20 周 (5 个月,硬约束,Phase 5 Week 16-20 关键路径) - Phase 0-4 在前 15 周完成,Phase 5 deployment 在 Week 16-20 执行
+### 4. Time Semantics (Screenpipe-Aligned)
+- **Authority**: 以 **用户侧（浏览器）本地时区** 定义时间范围。
+- **Implementation**: 前端将本地时间段解析为 **epoch seconds**（float）传给 server；server 只按绝对时间过滤，不做时区推断。
+- **LLM Prompting**: system prompt 必须注入 `Current time / timezone / local time`，避免“今天/下午”歧义。
+
+### 5. Search Contract (Screenpipe-Aligned, Vision-Only)
+- **Endpoint**: `GET /api/v1/search`
+- **Query**: `q` 可选；`q=""` 表示 browse/feed（按 `timestamp DESC`）
+- **Time bounds**: `start_time` 必填（epoch seconds）；`end_time` 可选（默认 now）；禁止 unbounded scan
+- **Filters**: `app_name/window_name/focused/browser_url`
+- **Content scope**: 仅 OCR（vision-only）；音频不纳入 Search/Chat 主线
+
+### 6. Deployment Evolution
+- **Timeline**: Week 22 是 MVP 部署外边界。Phase 3→4→5 采用串行相对序列（R1-R9）执行，日历周由执行启动时分配。
 - **Design Requirement**: 从 Phase 0 就设计 remote-first API（versioning, pagination, stateless）
 - **Approach**: 串行执行 Phase 3 → 4 → 5 (vs 原并行方案15周),降低复杂度优先稳定性
+
+### 6.1 Now vs Target API (Current Deviation Snapshot)
+
+| Surface | Target (authoritative) | Current (code reality) | Required Convergence |
+|---|---|---|---|
+| `GET /api/v1/search` browse mode | `q` 可选；`q=""` 返回 browse/feed (`timestamp DESC`) | 空/缺失 `q` 当前返回空结果 | Phase 3 实现 browse/feed |
+| `GET /api/v1/search` time bounds | `start_time` 必填，`end_time` 可选 | 路由层未强制 `start_time` | Phase 3 增加硬校验 |
+| Search modality | Search/Chat 为 vision-only | 搜索引擎仍会合并 audio FTS 候选 | Phase 3 收敛为 vision-only contract |
+| `POST /api/v1/chat` | Phase 4 返回 `answer + evidence[]` | 当前未实现该 endpoint | Phase 4 实现 API + evidence 校验 |
+| `GET /api/v1/timeline` | Chat/Search grounding 使用 vision evidence | timeline 默认混合 video+audio | 保留 timeline 运维视图混合；但 Search/Chat 严格走 vision-only |
 
 ---
 
@@ -96,12 +118,12 @@ MyRecall-v3 (Third major version)
 
 ### 4. Degradation Strategies
 - 录屏失败 → Fallback to screenshot mode
-- 音频中断 → Continue video-only
+- 音频中断 → N/A（Audio Freeze）
 - OCR 质量差 → Adjust FPS / model
 - 索引延迟过高 → Batch processing / queue management
 
 ### 5. Data Governance
-- **Capture Scope**: 明确采集边界 (屏幕、音频、元数据)
+- **Capture Scope**: 明确采集边界 (屏幕/vision、元数据；音频冻结)
 - **PII Handling**: 检测策略、处理方式、用户控制
 - **Encryption**: At-rest (用户管理) + In-transit (HTTPS)
 - **Retention**: Auto-delete >30 days, 用户可配置
@@ -155,23 +177,24 @@ MyRecall-v3 (Third major version)
 
 | Category | Location | Purpose |
 |----------|----------|---------|
-| **Master Prompt** | `/Users/pyw/new/MyRecall/v3/plan/00-master-prompt.md` | 当前文件,版本控制 |
-| **Roadmap Status** | `/Users/pyw/new/MyRecall/v3/milestones/roadmap-status.md` | 正式版 roadmap,进度追踪 |
-| **Roadmap Template** | `/Users/pyw/new/MyRecall/v3/plan/01-roadmap-template.md` | 阶段模板参考 |
-| **Phase Gates** | `/Users/pyw/new/MyRecall/v3/metrics/phase-gates.md` | 验收门槛与指标 |
-| **ADRs** | `/Users/pyw/new/MyRecall/v3/decisions/ADR-NNNN-*.md` | 架构决策记录 (递增编号) |
-| **Phase Validation** | `/Users/pyw/new/MyRecall/v3/results/phase-<n>-validation.md` | 每阶段验证结果 |
-| **References** | `/Users/pyw/new/MyRecall/v3/references/` | 参考材料目录 |
+| **Master Prompt** | `/Users/pyw/newpart/MyRecall/v3/plan/00-master-prompt.md` | 当前文件,版本控制 |
+| **Roadmap Status** | `/Users/pyw/newpart/MyRecall/v3/milestones/roadmap-status.md` | 正式版 roadmap,进度追踪 |
+| **Roadmap Template** | `/Users/pyw/newpart/MyRecall/v3/plan/01-roadmap-template.md` | 阶段模板参考 |
+| **Phase Gates** | `/Users/pyw/newpart/MyRecall/v3/metrics/phase-gates.md` | 验收门槛与指标 |
+| **ADRs** | `/Users/pyw/newpart/MyRecall/v3/decisions/ADR-NNNN-*.md` | 架构决策记录 (递增编号) |
+| **Phase Validation** | `/Users/pyw/newpart/MyRecall/v3/results/phase-<n>-validation.md` | 每阶段验证结果 |
+| **References** | `/Users/pyw/newpart/MyRecall/v3/references/` | 参考材料目录 |
 
 ---
 
 ## Current Phase (Validation)
 
-**Stage**: Post-Execution Validation Mode (Phase 1)
+**Stage**: Roadmap Revision Mode (Vision-only pivot; Phase 3/4 planning)
 **Constraints**:
-- ✅ 允许: 验收审计、证据采集、更新验证文档与里程碑状态
-- ✅ 允许: 为通过 Gate 做最小必要修复（需可追踪）
-- ❌ 禁止: 超范围新功能开发与与当前 Phase 无关改动
+- ✅ 允许: 明确核心需求、重排优先级、修订 roadmap/milestones/ADRs，并落盘到 `MyRecall/v3/*`
+- ✅ 允许: 为 Chat MVP 打通闭环所需的最小必要基础改动（必须可追踪、可回滚）
+- ❌ 禁止: 音频相关新功能与对齐工作（Audio Freeze）
+- ❌ 禁止: 与 Chat/Search 主线无关的大范围重构
 
 ---
 
@@ -200,11 +223,12 @@ MyRecall-v3 (Third major version)
 | 1.0 | 2026-02-06 | Initial master prompt (Phase 0 planning baseline) |
 | 1.1 | 2026-02-06 | Phase 0 completion reflected (baseline freeze + trigger update for Phase 1 planning) |
 | 1.2 | 2026-02-06 | Phase state updated to Phase 1 post-execution validation mode; constraints aligned to acceptance workflow. |
+| 1.3 | 2026-02-23 | Vision-only pivot lock: screenpipe-aligned time semantics + Search contract; Phase 4 grounding clarified as single retrieval + single summary (no tool-calling). |
 
 ---
 
 **Next Update Trigger**:
-- Phase 1 长周期证据补齐并完成 Go/No-Go 结论后
-- Phase 2 详细计划定稿后 (sync Phase 1 learnings into next execution phase)
+- Vision-only Chat MVP 计划定稿并进入执行前
+- Roadmap/milestones 与本提示词出现冲突时（必须同步修订）
 - 遇到与此 prompt 冲突的新需求
 - 技术栈重大调整

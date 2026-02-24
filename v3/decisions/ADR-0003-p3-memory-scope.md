@@ -5,6 +5,9 @@
 **Date**: 2026-02-06
 
 **Deciders**: User + AI Architect
+**SupersededBy**: N/A
+**Supersedes**: N/A
+**Scope**: target
 
 ---
 
@@ -27,7 +30,9 @@ The question arose: What does "memory capability" actually mean, and when should
 
 **Option B** (user preferences, projects, people) is considered a subset of C and will be included in agent state.
 
-**Implementation**: Deferred to **Phase 7** (Week 23+ 推迟实施,待Phase 4完成后启动)
+**Implementation**: Deferred to **Phase 7** (Week 25+ 推迟实施,待Phase 4完成后启动)
+
+**Gate finalization policy**: Phase 7 Go/No-Go gates are finalized only after Phase 4 production learnings are reviewed.
 
 ## Rationale
 
@@ -144,6 +149,6 @@ Based on:
 
 ## References
 
-- Phase 7 detailed plan: `/Users/pyw/new/MyRecall/v3/milestones/roadmap-status.md` (lines 243-264)
-- Open questions resolution: `/Users/pyw/new/MyRecall/v3/milestones/roadmap-status.md` (lines 302-314)
+- Phase 7 roadmap status: `v3/milestones/roadmap-status.md#phase-7-memory-capabilities`
+- Decision log (memory): `v3/milestones/roadmap-status.md#-resolution-3-p3-memory-capability-definition-2026-02-06`
 - OpenClaw memory concepts: https://docs.openclaw.ai/concepts/memory

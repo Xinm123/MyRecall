@@ -1,12 +1,18 @@
 # ADR-0004: Speaker Identification as Optional Feature
 
-**Status**: Approved (optional)
+**Status**: Superseded
+**SupersededBy**: ADR-0005 (2026-02-23)
+**Supersedes**: N/A
+**Scope**: historical
 
 **Date**: 2026-02-06
 
 **Deciders**: User + AI Architect
 
 ---
+
+> Historical record: this ADR captured pre-pivot audio scope decisions.
+> For MVP critical path, audio work is frozen by ADR-0005.
 
 ## Context
 
@@ -150,7 +156,7 @@ User should skip if:
 ### Option 3: Speaker ID in Phase 7 (with Memory)
 - **Pros**: Defer entirely to post-MVP
 - **Cons**: Misses opportunity to collect speaker data from day 1
-- **Rejected**: If user wants it, better to decide after Phase 2.0 (Week 8) than wait until Phase 7 (Week 23+)
+- **Rejected**: If user wants it, better to decide after Phase 2.0 (Week 8) than wait until Phase 7 (Week 25+)
 
 ## Success Criteria (If Phase 2.1 Implemented)
 
@@ -166,6 +172,6 @@ User should skip if:
 
 ## References
 
-- Phase 2.1 detailed plan: `/Users/pyw/new/MyRecall/v3/milestones/roadmap-status.md` (lines 97-114)
-- Open questions resolution: `/Users/pyw/new/MyRecall/v3/milestones/roadmap-status.md` (lines 294-301)
-- Screenpipe audio implementation: `/Users/pyw/new/screenpipe/` (reference for VAD + transcription patterns)
+- Historical Phase 2.1 section: `v3/milestones/roadmap-status.md#phase-21-audio-parity-with-screenpipe-paused--frozen`
+- Superseding decision: `v3/decisions/ADR-0005-vision-only-chat-pivot.md`
+- Screenpipe audio implementation (reference): `screenpipe/`

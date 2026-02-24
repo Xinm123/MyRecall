@@ -5,6 +5,28 @@
 
 ---
 
+## 🧭 v3 治理补充：Phase 2.6（音频硬冻结治理）
+
+> 本节是对 v3 现行里程碑治理的补充说明。它不改变本归档文档的历史演进叙事，只解释为何在 Phase 2.5 与 Phase 2.7 之间新增独立治理阶段。
+
+### 为什么 Phase 2.6 必须独立存在
+
+* **职责解耦**：将“冻结治理动作”与“标签对齐实现动作”分离，避免 Phase 2.7 失败时无法归因（治理失败 vs 实现失败）。
+* **审计闭环**：冻结状态必须具备证据包（稳定性、性能预算、回滚演练、配置漂移审计），不能只停留在文字声明。
+* **例外可控**：给 P0/P1 修复提供明确审批通道，防止“为了修 bug 破坏冻结边界”。
+* **与 screenpipe 原则对齐**：对齐其质量门禁、回滚与 soak 验证哲学，但保留 MyRecall 的 phase-gate 管理结构，不强行同构。
+
+### v3 执行顺序图（治理后）
+
+```mermaid
+flowchart LR
+    P25["Phase 2.5: WebUI Dashboards"] --> P26["Phase 2.6: Audio Freeze Governance"]
+    P26 -->|"all 2.6-G-* PASS"| P27["Phase 2.7: Frame Label Alignment Gate"]
+    P27 -->|"GO"| P3["Phase 3: Vision Search Parity"]
+    P3 --> P4["Phase 4: Vision Chat MVP"]
+    P4 --> P5["Phase 5: Deployment Migration"]
+```
+
 ## 🟢 第一部分：基础夯实与架构解耦 (Foundation & Decoupling)
 **目标**：修复原版工程缺陷，建立强类型契约，并将单体架构拆分为可通过 HTTP 通信的 CS 架构。
 

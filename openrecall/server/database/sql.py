@@ -9,6 +9,39 @@ from openrecall.shared.models import RecallEntry
 
 logger = logging.getLogger(__name__)
 
+
+def _contains_han(text: str) -> bool:
+    """Return True when text contains CJK Unified Ideographs (Han)."""
+    if not text:
+        return False
+    for char in text:
+        codepoint = ord(char)
+        if 0x3400 <= codepoint <= 0x4DBF:
+            return True  # CJK Unified Ideographs Extension A
+        if 0x4E00 <= codepoint <= 0x9FFF:
+            return True  # CJK Unified Ideographs
+        if 0xF900 <= codepoint <= 0xFAFF:
+            return True  # CJK Compatibility Ideographs
+    return False
+
+
+def _make_snippet(text: str, needle: str, radius: int = 80) -> str:
+    """Build a short snippet around the first match, optionally with <b> highlights."""
+    if not text:
+        return ""
+    if not needle:
+        return (text[: 2 * radius] + "...") if len(text) > 2 * radius else text
+
+    idx = text.find(needle)
+    if idx < 0:
+        return (text[: 2 * radius] + "...") if len(text) > 2 * radius else text
+
+    start = max(0, idx - radius)
+    end = min(len(text), idx + len(needle) + radius)
+    prefix = "..." if start > 0 else ""
+    suffix = "..." if end < len(text) else ""
+    return f"{prefix}{text[start:idx]}<b>{needle}</b>{text[idx + len(needle):end]}{suffix}"
+
 class SQLStore:
     """
     Unified SQL Store for OpenRecall.
@@ -839,6 +872,52 @@ class SQLStore:
                     results.append(d)
         except sqlite3.Error as e:
             logger.error(f"Video FTS search failed: {e}")
+
+        if results:
+            return results
+
+        # FTS5(unicode61) does not tokenize Chinese into words; e.g. "GO场景" becomes a single token
+        # and MATCH "场景" returns no rows even though the substring exists. For CJK queries, fall back
+        # to a substring scan so WebUI search behaves as users expect.
+        plain_query = (query or "").strip()
+        if not plain_query or not _contains_han(plain_query):
+            return results
+        if any(token in plain_query for token in ('"', "*", ":", " OR ", " AND ", " NOT ", "NEAR")):
+            return results
+
+        try:
+            with sqlite3.connect(str(self.db_path)) as conn:
+                conn.row_factory = sqlite3.Row
+                cursor = conn.cursor()
+                cursor.execute(
+                    """SELECT f.id AS frame_id, f.app_name, f.window_name,
+                              ot.text AS full_text,
+                              0.0 AS score,
+                              f.timestamp, f.video_chunk_id, f.offset_index,
+                              f.focused, f.browser_url
+                       FROM ocr_text ot
+                       JOIN frames f ON ot.frame_id = f.id
+                       WHERE ot.text LIKE '%' || ? || '%'
+                       ORDER BY f.timestamp DESC
+                       LIMIT ?""",
+                    (plain_query, limit),
+                )
+                for row in cursor.fetchall():
+                    text = row["full_text"] or ""
+                    d = dict(row)
+                    d["text_snippet"] = _make_snippet(text, plain_query)
+                    # Drop raw text payload; callers only expect text_snippet.
+                    d.pop("full_text", None)
+                    # Normalize focused: NULL -> None, 0 -> False, 1 -> True
+                    raw_focused = d.get("focused")
+                    d["focused"] = bool(raw_focused) if raw_focused is not None else None
+                    # Normalize browser_url: empty string -> None
+                    raw_url = d.get("browser_url")
+                    d["browser_url"] = raw_url if raw_url else None
+                    results.append(d)
+        except sqlite3.Error as e:
+            logger.error(f"Video substring search failed: {e}")
+
         return results
 
     # =========================================================================

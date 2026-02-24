@@ -9,9 +9,9 @@
 ## 2. 入口与路由
 
 - URL：`/timeline`
-- 后端路由：`/Users/pyw/new/MyRecall/openrecall/server/app.py` 中 `timeline()`
-- 模板文件：`/Users/pyw/new/MyRecall/openrecall/server/templates/timeline.html`
-- 布局依赖：`/Users/pyw/new/MyRecall/openrecall/server/templates/layout.html`
+- 后端路由：`/Users/pyw/newpart/MyRecall/openrecall/server/app.py` 中 `timeline()`
+- 模板文件：`/Users/pyw/newpart/MyRecall/openrecall/server/templates/timeline.html`
+- 布局依赖：`/Users/pyw/newpart/MyRecall/openrecall/server/templates/layout.html`
 
 ## 3. 功能清单
 
@@ -24,7 +24,7 @@
 - 时间线数据当前由 server 预聚合后一次性注入页面（非流式）。
 - 图片不可用时浏览器显示加载失败；帧路径可依赖后端 on-demand 抽帧 fallback。
 - 上传暂停或重试时，最新时间段数据可能暂时缺失，待上传完成后补齐。
-- Phase 2.0 处于执行前基线阶段：音频转写事件并入 timeline 已规划但尚未在当前页面生效。
+- Audio Freeze（2026-02-23 起）：Timeline 页面以 **vision-only** 为准，不规划音频事件并入与展示。
 
 ## 4. 如何使用
 
@@ -71,7 +71,7 @@ flowchart LR
 | 页面形态 | 滑杆 + 单图浏览 | 维持不变 |
 | 数据语义 | 以截图为主 | 支持视频帧 URL（`/api/v1/frames/:id`） |
 | API 基座 | 非 v1 主路径 | 已具备 `/api/v1/timeline` 与帧接口能力 |
-| Phase 2.0 规划状态 | 无音频时间线说明 | 已在规划文档中定义“video + audio 统一 timeline”目标，待实现后回填验证 |
+| 音频规划状态 | 无明确说明 | Audio Freeze：Timeline 以 vision-only 为准；音频并入不在当前主线范围内 |
 
 变化原因与影响：
 - 原因：Phase 1 主要强化视频管道与可检索帧，不做大规模 UI 重构。
@@ -100,5 +100,5 @@ flowchart LR
 - [ ] `/api/v1/timeline` 支持分页参数且返回正确 meta。
 
 相关验证来源：
-- `/Users/pyw/new/MyRecall/tests/test_phase1_timeline_api.py`
-- `/Users/pyw/new/MyRecall/v3/results/phase-1-validation.md`
+- `/Users/pyw/newpart/MyRecall/tests/test_phase1_timeline_api.py`
+- `/Users/pyw/newpart/MyRecall/v3/results/phase-1-validation.md`

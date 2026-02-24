@@ -2,12 +2,18 @@
 
 **Phase**: 2.0 (Audio Recording + Transcription + Search)
 **Version**: 1.0
+**Status**: Frozen Historical Plan (superseded for MVP critical path by ADR-0005)
+**Scope Type**: historical
+**Superseded By**: ADR-0005 (Vision-only Chat Pivot + Audio Freeze)
+**Governed By**: `/Users/pyw/newpart/MyRecall/v3/plan/phase-2.6-audio-freeze-governance.md`
 **Timeline**: Week 7-8 (10 working days, 2026-02-09 to 2026-02-20)
 **Owner**: Solo Developer
-**Authority**: `/Users/pyw/new/MyRecall/v3/metrics/phase-gates.md` (gate thresholds are canonical and immutable)
-**ADR References**: ADR-0001 (Python-first), ADR-0002 (Thin client, remote-first API), ADR-0004 (Speaker ID optional)
+**Authority**: `/Users/pyw/newpart/MyRecall/v3/metrics/phase-gates.md` (gate thresholds are canonical and immutable)
+**ADR References**: ADR-0001 (Python-first), ADR-0002 (Thin client, remote-first API), ADR-0004 (Speaker ID optional), ADR-0007 (Phase 2.6 audio freeze governance)
 
 ---
+
+> Historical note: this plan records completed audio engineering work. Under current MVP strategy, audio is frozen and not on the critical path for Phase 3/4/5. Any re-entry, exception, or unfreeze decision must follow Phase 2.6 governance artifacts and gates.
 
 ## 1. Goal / Non-Goals
 
@@ -304,7 +310,7 @@ Deliver a working audio capture, transcription, and search pipeline that runs al
 
 **Dependencies**: None (builds on existing `Settings` class).
 
-**Target file**: `/Users/pyw/new/MyRecall/openrecall/shared/config.py`
+**Target file**: `/Users/pyw/newpart/MyRecall/openrecall/shared/config.py`
 
 **Interface changes**: Add to `Settings` class:
 
@@ -347,7 +353,7 @@ OPENRECALL_AUDIO_WHISPER_MODEL=small python -c "from openrecall.shared.config im
 
 **Dependencies**: WB-01 (config)
 
-**Target file**: `/Users/pyw/new/MyRecall/openrecall/client/audio_manager.py`
+**Target file**: `/Users/pyw/newpart/MyRecall/openrecall/client/audio_manager.py`
 
 **Interface**:
 
@@ -381,7 +387,7 @@ python -c "from openrecall.client.audio_manager import list_audio_devices; print
 
 **Dependencies**: WB-02 (AudioManager), WB-01 (config), existing `LocalBuffer`
 
-**Target file**: `/Users/pyw/new/MyRecall/openrecall/client/audio_recorder.py`
+**Target file**: `/Users/pyw/newpart/MyRecall/openrecall/client/audio_recorder.py`
 
 **Interface**:
 
@@ -424,8 +430,8 @@ class AudioRecorder:
 **Dependencies**: WB-03
 
 **Target files**:
-- `/Users/pyw/new/MyRecall/openrecall/client/consumer.py` (add `elif item_type == "audio_chunk"` branch)
-- `/Users/pyw/new/MyRecall/openrecall/client/uploader.py` (add `upload_audio_chunk()` method)
+- `/Users/pyw/newpart/MyRecall/openrecall/client/consumer.py` (add `elif item_type == "audio_chunk"` branch)
+- `/Users/pyw/newpart/MyRecall/openrecall/client/uploader.py` (add `upload_audio_chunk()` method)
 
 **Interface change in consumer.py** (after existing video dispatch):
 ```python
@@ -450,7 +456,7 @@ def upload_audio_chunk(self, file_path: str, metadata: dict) -> bool:
 
 **Dependencies**: None (schema-only)
 
-**Target file**: `/Users/pyw/new/MyRecall/openrecall/server/database/migrations/v3_006_add_audio_chunk_status.sql`
+**Target file**: `/Users/pyw/newpart/MyRecall/openrecall/server/database/migrations/v3_006_add_audio_chunk_status.sql`
 
 **SQL**:
 ```sql
@@ -469,7 +475,7 @@ ALTER TABLE audio_chunks ADD COLUMN status TEXT DEFAULT 'PENDING';
 
 **Dependencies**: WB-05 (migration), WB-07 (SQLStore methods)
 
-**Target file**: `/Users/pyw/new/MyRecall/openrecall/server/api_v1.py`
+**Target file**: `/Users/pyw/newpart/MyRecall/openrecall/server/api_v1.py`
 
 **Logic**: Detect `audio/*` MIME types → save WAV to `settings.server_audio_path` → parse metadata → compute `expires_at` → call `sql_store.insert_audio_chunk()` → return 202 Accepted.
 
@@ -489,7 +495,7 @@ curl -X POST http://localhost:8082/api/v1/upload \
 
 **Dependencies**: WB-05
 
-**Target file**: `/Users/pyw/new/MyRecall/openrecall/server/database/sql.py`
+**Target file**: `/Users/pyw/newpart/MyRecall/openrecall/server/database/sql.py`
 
 **New methods**:
 
@@ -518,8 +524,8 @@ def reset_stuck_audio_tasks(self) -> int
 **Dependencies**: None (standalone module)
 
 **Target files**:
-- `/Users/pyw/new/MyRecall/openrecall/server/audio/vad.py`
-- `/Users/pyw/new/MyRecall/openrecall/server/audio/wav_utils.py`
+- `/Users/pyw/newpart/MyRecall/openrecall/server/audio/vad.py`
+- `/Users/pyw/newpart/MyRecall/openrecall/server/audio/wav_utils.py`
 
 **Interface**:
 
@@ -547,7 +553,7 @@ class VoiceActivityDetector:
 
 **Dependencies**: WB-01 (config for model selection)
 
-**Target file**: `/Users/pyw/new/MyRecall/openrecall/server/audio/transcriber.py`
+**Target file**: `/Users/pyw/newpart/MyRecall/openrecall/server/audio/transcriber.py`
 
 **Interface**:
 
@@ -577,7 +583,7 @@ class WhisperTranscriber:
 
 **Dependencies**: WB-08 (VAD), WB-09 (Whisper), WB-07 (SQLStore)
 
-**Target file**: `/Users/pyw/new/MyRecall/openrecall/server/audio/processor.py`
+**Target file**: `/Users/pyw/newpart/MyRecall/openrecall/server/audio/processor.py`
 
 **Interface**:
 
@@ -610,7 +616,7 @@ class AudioChunkProcessor:
 
 **Dependencies**: WB-10 (AudioChunkProcessor), WB-07 (SQLStore)
 
-**Target file**: `/Users/pyw/new/MyRecall/openrecall/server/audio/worker.py`
+**Target file**: `/Users/pyw/newpart/MyRecall/openrecall/server/audio/worker.py`
 
 **Interface**:
 
@@ -635,7 +641,7 @@ class AudioProcessingWorker(threading.Thread):
 
 **Dependencies**: WB-07 (SQLStore.search_audio_fts)
 
-**Target file**: `/Users/pyw/new/MyRecall/openrecall/server/search/engine.py`
+**Target file**: `/Users/pyw/newpart/MyRecall/openrecall/server/search/engine.py`
 
 **Logic**: After video FTS block, add audio FTS search block. Merge results into `results_map` with key `"atranscription:{id}"`, base score 0.15, `type: "audio_transcription"`.
 
@@ -649,7 +655,7 @@ class AudioProcessingWorker(threading.Thread):
 
 **Dependencies**: WB-07 (SQLStore.get_audio_transcriptions_by_time_range)
 
-**Target file**: `/Users/pyw/new/MyRecall/openrecall/server/api_v1.py`
+**Target file**: `/Users/pyw/newpart/MyRecall/openrecall/server/api_v1.py`
 
 **Logic**: Fetch video frames + audio transcriptions for time range → merge by timestamp → add `type` discriminator (`"video_frame"` / `"audio_transcription"`) → paginate → return.
 
@@ -681,7 +687,7 @@ class AudioProcessingWorker(threading.Thread):
 
 **Dependencies**: WB-07 (SQLStore.get_expired_audio_chunks, delete_audio_chunk_cascade)
 
-**Target file**: `/Users/pyw/new/MyRecall/openrecall/server/retention.py`
+**Target file**: `/Users/pyw/newpart/MyRecall/openrecall/server/retention.py`
 
 **Logic**: Add `_cleanup_expired_audio_chunks()` → query expired → cascade delete DB rows → delete WAV files → log.
 
@@ -714,7 +720,7 @@ class AudioProcessingWorker(threading.Thread):
 
 ## 6. Gate Traceability Matrix
 
-Every gate below is quoted exactly from `/Users/pyw/new/MyRecall/v3/metrics/phase-gates.md`.
+Every gate below is quoted exactly from `/Users/pyw/newpart/MyRecall/v3/metrics/phase-gates.md`.
 
 ### Functional Gates
 
@@ -1064,5 +1070,5 @@ flowchart TB
 
 **Date**: 2026-02-09
 **Author**: Solo Developer (Phase 2.0 planning)
-**Status**: APPROVED — Ready for execution
-**Next Action**: Execute readiness checklist verification on 2026-02-09 (Day 1 morning)
+**Status**: FROZEN HISTORICAL PLAN — Not on MVP critical path
+**Next Action**: No execution action under current roadmap. Reopen only through Phase 2.6 exception workflow or explicit unfreeze decision with `2.6-G-*` evidence closure.

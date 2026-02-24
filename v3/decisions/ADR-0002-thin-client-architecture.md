@@ -5,6 +5,9 @@
 **Date**: 2026-02-06
 
 **Deciders**: User + AI Architect
+**SupersededBy**: N/A
+**Supersedes**: N/A
+**Scope**: target
 
 ---
 
@@ -191,5 +194,5 @@ class UploadQueue:
 
 ## References
 
-- Phase 5 detailed plan: `/Users/pyw/new/MyRecall/v3/milestones/roadmap-status.md` (lines 164-220)
-- Master prompt deployment constraints: `/Users/pyw/new/MyRecall/v3/plan/00-master-prompt.md` (lines 76-78)
+- Phase 5 detailed plan: `v3/milestones/roadmap-status.md#phase-5-deployment-migration-serial-after-phase-3-4`
+- Master prompt deployment constraints: `v3/plan/00-master-prompt.md#6-deployment-evolution`

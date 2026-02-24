@@ -4,18 +4,29 @@
 **Date**: 2026-02-06
 **Deciders**: Product Owner + Chief Architect
 **Context**: MyRecall-v3 technology stack selection
+**SupersededBy**: N/A
+**Supersedes**: N/A
+**Scope**: target
 
 ---
 
 ## Context and Problem Statement
 
-MyRecall-v3 requires multi-modal data capture (video + audio) with continuous 24/7 recording, which is performance-intensive. The reference project (screenpipe) uses Rust for performance. Should MyRecall-v3 follow the same approach, or maintain a Python-first architecture?
+MyRecall-v3 was originally planned as multi-modal data capture (video + audio) with continuous 24/7 recording, which is performance-intensive. The reference project (screenpipe) uses Rust for performance. Should MyRecall-v3 follow the same approach, or maintain a Python-first architecture?
+
+## Recontextualization (2026-02-23, ADR-0005)
+
+This ADR remains active after the vision-only pivot:
+
+- The MVP critical path is now vision-only (Search/Chat), but the language/runtime constraint is unchanged.
+- Python-first still applies to all current and future phases.
+- Audio freeze changes priority, not the architectural language decision.
 
 ---
 
 ## Decision Drivers
 
-1. **Development Speed**: Time to market is critical (20周硬约束,约5个月,用于Phase 5部署迁移)
+1. **Development Speed**: Time to market is critical (Week 22 outer bound for MVP deployment)
 2. **Maintainability**: Team familiarity with technology stack
 3. **Ecosystem**: Availability of libraries for ML/AI tasks (OCR, Whisper, embeddings)
 4. **Performance**: Ability to handle 24/7 recording without excessive resource usage
@@ -67,7 +78,7 @@ MyRecall-v3 requires multi-modal data capture (video + audio) with continuous 24
 
 ### Rationale
 
-1. **20-Week (5-Month) Deadline is Hard Constraint**: 20周硬约束对应Phase 5 (Week 16-20) 关键路径。Rewriting to Rust would jeopardize the deployment migration deadline (P4). Python leverages existing codebase and team expertise.
+1. **Delivery Deadline is Hard Constraint**: Week 22 remains the outer bound for MVP deployment. Rewriting to Rust would jeopardize that critical path. Python leverages existing codebase and team expertise.
 
 2. **Bottlenecks Can Be Mitigated**:
    - **Video recording**: Use FFmpeg CLI (battle-tested, efficient)
@@ -144,7 +155,8 @@ If Phase 1 gates fail after exhausting Python optimization sequence (1-2 weeks o
 
 - **ADR-0002**: Thin Client Architecture (deployment model, affects Phase 5 planning)
 - **ADR-0003**: P3 Memory Scope Definition (clarifies "memory capability" requirements)
-- **ADR-0004**: Speaker Identification as Optional Feature (Phase 2.1 decision)
+- **ADR-0004**: Speaker Identification as Optional Feature (historical, superseded for MVP path)
+- **ADR-0005**: Vision-Only Chat Pivot + Audio Freeze
 
 ### Planned ADRs (TBD)
 
@@ -161,7 +173,7 @@ Future architectural decisions that may be documented:
 
 ## References
 
-- screenpipe architecture: `/Users/pyw/new/screenpipe/crates/`
+- screenpipe architecture: `screenpipe/crates/`
 - Python multiprocessing: https://docs.python.org/3/library/multiprocessing.html
 - faster-whisper benchmark: https://github.com/guillaumekln/faster-whisper#benchmark
 - CTranslate2 (faster-whisper backend): https://github.com/OpenNMT/CTranslate2

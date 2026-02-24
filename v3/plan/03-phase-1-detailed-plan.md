@@ -14,8 +14,12 @@ This document remains the execution baseline plan. The implementation has been c
 
 Post-baseline bugfixes and hardening changes are tracked in:
 
-- `/Users/pyw/new/MyRecall/v3/results/phase-1-validation.md`
-- `/Users/pyw/new/MyRecall/v3/results/phase-1-post-baseline-changelog.md`
+- `/Users/pyw/newpart/MyRecall/v3/results/phase-1-validation.md`
+- `/Users/pyw/newpart/MyRecall/v3/results/phase-1-post-baseline-changelog.md`
+
+Audio Freeze relationship:
+- This is a historical execution document for vision pipeline hardening.
+- As of ADR-0005, audio extensions are frozen for MVP critical path and do not gate this plan's completed status.
 
 ---
 
@@ -924,7 +928,7 @@ test_gate_1DG03_ocr_pii_detection_optional
 
 ## 6. Gate Traceability Matrix
 
-All gate criteria sourced exclusively from `/Users/pyw/new/MyRecall/v3/metrics/phase-gates.md`.
+All gate criteria sourced exclusively from `/Users/pyw/newpart/MyRecall/v3/metrics/phase-gates.md`.
 
 ### Phase 1 Functional Gates
 
@@ -1128,18 +1132,18 @@ All gate criteria sourced exclusively from `/Users/pyw/new/MyRecall/v3/metrics/p
 
 ---
 
-## 10. Execution Readiness Checklist
+## 10. Historical Execution Readiness Snapshot (Completed)
 
-1. [ ] Phase 0 complete and baseline frozen (v3-phase0-go tag confirmed)
-2. [ ] FFmpeg installed and functional on development machine (`ffmpeg -version`)
-3. [ ] Screen recording permission granted (macOS: System Preferences → Privacy)
-4. [ ] Development environment: Python 3.10+, pytest, psutil available
-5. [ ] Phase 0 test suite still passes (`pytest tests/test_phase0_*.py -v`)
-6. [ ] Sufficient disk space for 7-day stability test (~150-350GB available)
-7. [ ] This plan reviewed and approved by Product Owner
-8. [ ] No conflicting changes in progress on the codebase
-9. [ ] Phase 1 Git branch created from Phase 0 baseline
-10. [ ] Day 1 tasks (FFmpegManager) have no external dependencies — can start immediately
+1. [x] Phase 0 complete and baseline frozen (v3-phase0-go tag confirmed)
+2. [x] FFmpeg installed and functional on development machine (`ffmpeg -version`)
+3. [x] Screen recording permission granted (macOS: System Preferences → Privacy)
+4. [x] Development environment: Python 3.10+, pytest, psutil available
+5. [x] Phase 0 test suite still passes (`pytest tests/test_phase0_*.py -v`)
+6. [x] Sufficient disk space for 7-day stability test (~150-350GB available)
+7. [x] This plan reviewed and approved by Product Owner
+8. [x] No conflicting changes in progress on the codebase
+9. [x] Phase 1 Git branch created from Phase 0 baseline
+10. [x] Day 1 tasks (FFmpegManager) had no external dependencies and started immediately
 
 ---
 

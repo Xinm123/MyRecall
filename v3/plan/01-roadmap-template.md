@@ -6,7 +6,9 @@
 
 ## Phase N: [Phase Name]
 
-**Status**: [Not Started | In Progress | Complete | Blocked]
+**Status**: [Not Started | In Progress | Complete | Blocked | Paused | Frozen | Superseded]
+**Scope Type**: [Target Plan | Current-State Snapshot | Historical Record]
+**Superseded By**: [ADR-XXXX | N/A]
 **Timeline**: Week X-Y (Z days)
 **Owner**: [Name]
 **Priority**: [P0 | P1 | P2 | P3 | P4]
@@ -61,6 +63,12 @@
 **Outputs** (deliverables for next phases):
 - ✅ Output A for Phase N+1 (e.g., video chunks in database)
 - ✅ Output B for Phase N+1 (e.g., timeline API endpoint)
+
+**Current vs Target Drift (Required when Scope Type = Target Plan)**:
+
+| Surface | Target Contract | Current Reality | Gap Owner | Target Phase |
+|---|---|---|---|---|
+| `/api/v1/example` | [Desired behavior] | [Current behavior] | [Owner] | [Phase] |
 
 ---
 
@@ -174,7 +182,7 @@
 | **Resource Usage** | [Metric name] | [Target value] | TBD | ⬜️ |
 | **User Experience** | [Metric name] | [Target value] | TBD | ⬜️ |
 
-**Validation Report Location**: `/Users/pyw/new/MyRecall/v3/results/phase-N-validation.md`
+**Validation Report Location**: `v3/results/phase-N-validation.md`
 
 ---
 
@@ -232,9 +240,9 @@
 ### 17. Documentation Updates
 
 **Docs to Update During This Phase**:
-- [ ] `/Users/pyw/new/MyRecall/v3/milestones/roadmap-status.md` (progress tracking)
-- [ ] `/Users/pyw/new/MyRecall/v3/decisions/ADR-NNNN-*.md` (if major decision made)
-- [ ] `/Users/pyw/new/MyRecall/README.md` (user-facing features)
+- [ ] `v3/milestones/roadmap-status.md` (progress tracking)
+- [ ] `v3/decisions/ADR-NNNN-*.md` (if major decision made)
+- [ ] `README.md` (user-facing features)
 - [ ] Code comments (inline documentation)
 
 ---
@@ -252,4 +260,4 @@
 - **Planned By**: [Name] on [Date]
 - **Reviewed By**: [Name] on [Date]
 - **Approved By**: [Name] on [Date]
-- **Status**: [Draft | Under Review | Approved | Rejected]
+- **Status**: [Draft | Under Review | Approved | Rejected | Paused | Frozen | Superseded]

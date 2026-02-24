@@ -1,9 +1,9 @@
 # MyRecall-v3 Phase Gates & Acceptance Criteria
 
-**Version**: 1.6
-**Last Updated**: 2026-02-09
+**Version**: 2.3
+**Last Updated**: 2026-02-24
 
-⚠️ **Authority Notice**: 此文件为所有Phase (0-7) 的权威Go/No-Go验收标准。Roadmap文档仅引用此处定义,不重复定义Phase gates。任何关于Phase验收标准的变更必须首先更新本文件。
+⚠️ **Authority Notice**: 此文件为所有Phase (0-8) 的权威Go/No-Go验收标准。Roadmap文档仅引用此处定义,不重复定义Phase gates。任何关于Phase验收标准的变更必须首先更新本文件。
 
 ---
 
@@ -290,16 +290,105 @@ These checks do not change the original 21 gate counts. They capture high-priori
 
 ---
 
-## Phase 3: Multi-Modal Search Integration
+## Phase 2.6: Audio Freeze Governance (Hard Gate Before Phase 2.7)
+
+This phase is a governance gate. It does not introduce runtime API behavior by itself.
+
+### 1. Governance Gates (`2.6-G-*`)
+
+| Gate | Criteria | Validation Method | Status |
+|------|----------|-------------------|--------|
+| **2.6-G-01 Stability Evidence** | 24h continuous stability evidence archived; no unresolved P0/P1 incidents in freeze scope | Review stability report + incident register | ⬜️ |
+| **2.6-G-02 Performance Budget** | CPU growth ≤+12%, storage growth ≤+10%, query p95 no regression (target +10%-20% improvement) | Compare benchmark package vs Phase 1.5 baseline | ⬜️ |
+| **2.6-G-03 Quality Baseline** | Label mismatch ≤2%-5%, Precision@10 uplift ≥20% vs Phase 1.5 baseline | Run fixed evaluation suite and verify report | ⬜️ |
+| **2.6-G-04 Rollback Readiness** | Rollback drill succeeds and recovery objective met (<2 minutes) | Run rollback drill and verify integrity checks | ⬜️ |
+| **2.6-G-05 Config Drift Audit** | No unauthorized changes in freeze scope files/keys during freeze window | Review drift audit log + approval mapping | ⬜️ |
+
+### 2. Governance Interfaces (Document Layer)
+
+| Interface | Purpose | Required Fields |
+|-----------|---------|-----------------|
+| `FreezeScopeMatrix` | Defines frozen code/config boundary and ownership | object, path/key, owner, risk_tier, exception_allowed |
+| `ExceptionRequest` | Controls approved emergency changes during freeze | request_id, severity, reason, impact_scope, risk_assessment, rollback_plan, approvers, ttl, status |
+| `GateEvidenceManifest` | Tracks evidence artifacts per gate | gate_id, artifact_path, generated_at, validator, result, notes |
+
+### 3. Entry / Exit Criteria
+
+- **Entry**: Phase 2.5 complete, Audio Freeze active, freeze scope matrix published.
+- **Exit (GO)**: all `2.6-G-*` gates are PASS and evidence manifests are complete.
+- **Exit (NO-GO)**: any single gate fails or required evidence is missing.
+
+### 4. Failure Signals
+
+| Failure Signal | Action |
+|----------------|--------|
+| Missing or stale evidence for any `2.6-G-*` gate | Block Phase 2.7 and request evidence refresh |
+| Unauthorized freeze-scope changes detected | Initiate incident review, reject unfreeze, require remediation |
+| Rollback drill exceeds RTO or fails integrity check | Keep freeze active and rerun rollback hardening |
+
+---
+
+## Phase 2.7: Frame Label Alignment Gate (Hard Gate Before Phase 3)
+
+**Evaluation Dataset Constraint**: All Phase 2.7 metrics and gates are evaluated only on records ingested at/after `T0` (`timestamp >= T0`). Historical records are excluded from Phase 2.7 Go/No-Go.
+**Dependency Constraint**: Phase 2.7 evaluation can only start after Phase 2.6 governance gates are all PASS.
 
 ### 1. Functional Gates
 
 | Gate | Criteria | Validation Method | Status |
 |------|----------|-------------------|--------|
-| **Unified Search API** | Single API endpoint returns results from both vision and audio | `GET /api/v1/search?q=test&content_type=all`, verify mixed results | ⬜️ |
-| **Content Type Filtering** | Can filter by `vision` only, `audio` only, or `all` | Test each content_type parameter, verify filtering works | ⬜️ |
-| **Time Range Filtering** | Search respects `start_time` and `end_time` parameters | Query with time bounds, verify all results within range | ⬜️ |
-| **Web UI Rendering** | UI distinguishes vision results (thumbnails) from audio (transcription snippets) | Manual inspection of search results page | ⬜️ |
+| **2.7-F-01 Metadata Source Traceability** | Every new frame row has `metadata_source` in `{frame_observed, chunk_fallback, inferred}` | Query recent frames and validate enum coverage + null-free writes | ⬜️ |
+| **2.7-F-02 Metadata Confidence Range** | Every new frame row has `metadata_confidence` in `[0.0, 1.0]` | Validate bounded values and null policy on sampled writes | ⬜️ |
+| **2.7-F-03 Search/Timeline Quality Field** | `/api/v1/search` and `/api/v1/timeline` expose `label_quality_score` | API contract tests for field presence and serialization | ⬜️ |
+| **2.7-F-04 Strict Fallback Filter** | Strict mode can exclude `metadata_source=chunk_fallback` rows | API query tests verify no fallback rows returned under strict filter | ⬜️ |
+| **2.7-F-05 Label Dedup Contract** | Label normalization + uniqueness/conflict policy blocks duplicate churn | Replay duplicated labels; verify conflict path keeps single canonical entry | ⬜️ |
+
+### 2. Performance Gates
+
+| Metric | Target | Measurement Method | Status |
+|--------|--------|-------------------|--------|
+| **2.7-P-01 Search p95** | No regression vs baseline; target 10%-20% improvement | Compare Phase 1.5 baseline vs post-2.7 p95 on fixed query set | ⬜️ |
+| **2.7-P-02 Index Freshness SLA** | Deferred indexing visible in search <=60s | Timestamp write -> searchable visibility across 100 samples | ⬜️ |
+| **2.7-P-03 Write Contention** | Write lock contention reduced by 15%-30% | Compare lock wait metrics before/after normalization path | ⬜️ |
+
+### 3. Quality Gates
+
+| Metric | Target | Measurement Method | Status |
+|--------|--------|-------------------|--------|
+| **2.7-Q-01 Label Mismatch Rate** | <=2%-5% | Manual annotation set (same-chunk app/window switch cases) | ⬜️ |
+| **2.7-Q-02 Precision Lift** | Search `Precision@10` improves >=20% vs Phase 1.5 baseline | Run fixed eval query set pre/post 2.7 | ⬜️ |
+| **2.7-Q-03 Provenance Coverage** | `frame_observed` share increases materially in browser-active sessions | Compare provenance distribution report vs baseline | ⬜️ |
+
+### 4. Resource Gates
+
+| Metric | Target | Measurement Method | Status |
+|--------|--------|-------------------|--------|
+| **2.7-R-01 CPU Growth** | <=+12% vs baseline | Benchmark ingestion+query workload pre/post changes | ⬜️ |
+| **2.7-R-02 Storage Growth** | <=+10% vs baseline | Compare DB/table growth on fixed ingest corpus | ⬜️ |
+
+### 5. Stability and Compatibility Gates
+
+| Gate | Criteria | Validation Method | Status |
+|------|----------|-------------------|--------|
+| **2.7-S-01 New-Write API/Contract Stability** | New ingest/search/timeline path remains contract-stable for `timestamp >= T0` data | Run contract + regression tests on new-write flows | ⬜️ |
+| **2.7-S-02 Forward-Only Schema Integrity** | Forward-only schema evolution preserves new-write integrity without historical backfill requirements | Schema checks + integrity checks focused on new-write paths | ⬜️ |
+
+---
+
+## Phase 3: Vision Search Parity (Screenpipe-Aligned, Vision-Only)
+
+### 1. Functional Gates
+
+| Gate | Criteria | Validation Method | Status |
+|------|----------|-------------------|--------|
+| **Vision-Only Search** | `/api/v1/search` returns **OCR-only** results (vision-only pivot) | Query with `content_type=ocr` (or default), verify every item is OCR | ⬜️ |
+| **q Optional + Browse Mode** | `q` is optional; when missing/empty, endpoint returns OCR items ordered by `timestamp DESC` (screenpipe-like browse) | Call `/api/v1/search?start_time=...&q=` and verify ordering | ⬜️ |
+| **Time Bounds Required** | `start_time` is **required** (reject missing); `end_time` is optional (defaults to now) | Call without `start_time` and expect 400; call without `end_time` and verify server uses now | ⬜️ |
+| **Time Range Filtering** | Search respects `start_time` and `end_time` (epoch seconds) | Query with bounds, verify all results within range | ⬜️ |
+| **Vision Filters** | Supports `app_name`, `window_name`, `focused`, `browser_url` | Call with each filter, verify all results match | ⬜️ |
+| **Keyword Mode Ordering** | When `q` is non-empty, results are ranked; tie-break uses `timestamp DESC` for stability | Run same query twice, verify stable ordering | ⬜️ |
+| **Pagination** | Supports pagination (`limit/offset` and/or `page/page_size`) with stable ordering (no gaps/duplicates) | Paginate across 3 pages, verify continuity | ⬜️ |
+| **WebUI Time Filters End-to-End** | `/search` page uses time bounds end-to-end; empty `q` renders browse/feed mode | Manual inspection of `/search` behavior | ⬜️ |
 
 ### 2. Performance Gates
 
@@ -319,17 +408,22 @@ These checks do not change the original 21 gate counts. They capture high-priori
 
 ---
 
-## Phase 4: Chat Capability
+## Phase 4: Vision Chat MVP (Evidence-First, Non-Streaming)
 
 ### 1. Functional Gates
 
 | Gate | Criteria | Validation Method | Status |
 |------|----------|-------------------|--------|
-| **Chat API Functional** | `POST /api/v1/chat` returns relevant response | Send test message "what did I work on yesterday?", verify response | ⬜️ |
-| **Tool Calling Works** | Chat correctly calls `search_timeline` tool | Send query requiring search, verify tool_calls in response | ⬜️ |
-| **Time Parsing** | Natural language time expressions parsed (`@yesterday`, `last hour`) | Test queries with time expressions, verify correct time range used | ⬜️ |
-| **Web UI Chat Page** | `/chat` page renders, accepts input, displays responses | Manual testing of chat interface | ⬜️ |
-| **Tool Call Visualization** | UI shows which tool calls were made and results | Verify expandable tool call cards in UI | ⬜️ |
+| **Chat API Functional** | `POST /api/v1/chat` returns `{ answer_md, evidence[] }` for time-range questions | Send request: “总结一下我今天 14:00-17:00 做了什么”, verify response | ⬜️ |
+| **Single Retrieval + Single Summary** | Chat grounding is **one retrieval step + one LLM call** (no tool-calling loop in Phase 4) | Inspect server logs / unit test ensures no tool-call orchestration | ⬜️ |
+| **Uses Search Browse (Screenpipe-Aligned)** | For time-range summaries, server retrieves candidates using Phase 3 search browse semantics (`q=\"\"`) | Verify chat request triggers a bounded browse query | ⬜️ |
+| **Sampling Policy (5min bucket, 2 frames/bucket)** | Time-range summaries sample across the full range: default 5 minutes per bucket, max 2 frames per bucket | Unit tests on sampler (range coverage + max per bucket) | ⬜️ |
+| **Auto-Widen for Long Ranges** | When range too long, bucket size increases automatically to keep within a fixed frame budget | Unit tests: 1h/12h/24h ranges stay within budget | ⬜️ |
+| **No Images to LLM (Phase 4)** | LLM request contains OCR+metadata (+ frame_url), not raw frame images | Inspect LLM request payload builder | ⬜️ |
+| **Evidence Contract** | For activity/time claims, response includes `evidence[]` with real `frame_id + timestamp + frame_url`; never fabricate | Inject invalid evidence in test, verify server rejects | ⬜️ |
+| **Client Time Authority** | Browser-local timezone computes epoch seconds; server does not parse “today/yesterday” as source of truth | Manual test: different TZ machine, verify consistent | ⬜️ |
+| **Web UI Chat Page** | `/chat` page renders like screenpipe: input + message list + evidence list with clickable frames | Manual testing of chat interface | ⬜️ |
+| **Mention Shortcuts** | `@today/@yesterday/@last-hour/@selection` implemented as UI shortcuts that set time ranges | Manual test: each shortcut populates time range | ⬜️ |
 
 ### 2. Performance Gates
 
@@ -337,14 +431,14 @@ These checks do not change the original 21 gate counts. They capture high-priori
 |--------|--------|-------------------|--------|
 | **Chat Latency (Median)** | <5 seconds | Measure 50 typical queries, compute median latency | ⬜️ |
 | **Chat Latency (p95)** | <10 seconds | Measure 50 typical queries, compute 95th percentile | ⬜️ |
-| **Tool Execution Latency** | <2 seconds per tool call | Measure time for `search_timeline` execution | ⬜️ |
+| **Retrieval Latency** | <2 seconds per retrieval step | Measure time for bounded search browse + sampling | ⬜️ |
 
 ### 3. Quality Gates
 
 | Metric | Target | Measurement Method | Status |
 |--------|--------|-------------------|--------|
 | **Relevance** | ≥80% of responses on-topic | Human evaluation on 50 test queries | ⬜️ |
-| **Groundedness** | ≥90% of facts from tool results (no hallucination) | Manual fact-checking on 50 responses | ⬜️ |
+| **Groundedness** | ≥90% of activity/time claims supported by evidence items (no hallucination) | Manual fact-checking on 50 responses | ⬜️ |
 | **Helpfulness** | ≥70% of responses actionable/useful | User survey (5-point Likert scale) | ⬜️ |
 | **Hallucination Rate** | <10% | Count hallucinated facts / total facts in 50 responses | ⬜️ |
 
@@ -359,8 +453,8 @@ These checks do not change the original 21 gate counts. They capture high-priori
 
 | Scenario | Expected Behavior | Validation Method | Status |
 |----------|-------------------|-------------------|--------|
-| **Infinite Tool Call Loop** | Max 2 tool calls enforced, chat returns partial result | Craft query triggering loop, verify limit enforced | ⬜️ |
-| **Tool Execution Timeout** | Chat returns error after 30s, graceful failure | Simulate slow search, verify timeout handling | ⬜️ |
+| **Retrieval Timeout** | Chat returns error after 30s, graceful failure | Simulate slow DB/search, verify timeout handling | ⬜️ |
+| **Too Many Candidate Frames** | Sampler caps frame budget; chat still returns a summary + evidence | Test with dense range, verify cap enforced | ⬜️ |
 | **LLM API Failure** | Fallback to cached response or error message | Disconnect from OpenAI API, verify fallback | ⬜️ |
 
 ---
@@ -453,10 +547,12 @@ These checks do not change the original 21 gate counts. They capture high-priori
 | **Phase 1** | Storage exceeds 50GB/day | Increase compression (CRF 28 → 32) or reduce resolution |
 | **Phase 2** | Whisper transcription backlog grows indefinitely | Switch to faster model (base → tiny), add GPU, or simplify pipeline |
 | **Phase 2** | Transcription WER >40% on typical audio | Re-evaluate Whisper model or add preprocessing |
+| **Phase 2.6** | Any `2.6-G-*` evidence missing or unauthorized freeze-scope drift detected | Block Phase 2.7 start, close governance gaps, and rerun audits |
+| **Phase 2.7** | Label mismatch rate stays >10% after rollout | Block Phase 3 kickoff, roll back normalization path, and re-baseline provenance logic |
 | **Phase 3** | Search latency >1s p95 | Optimize FTS queries, add caching, or parallelize |
 | **Phase 4** | Hallucination rate >30% | Improve prompt, add more grounding, or switch LLM |
 | **Phase 4** | Cost per query >$0.20 | Reduce context size, use cheaper model, or add local LLM |
-| **Phase 4** | Chat latency >20s median | Optimize tool execution, reduce tool calls, or simplify search |
+| **Phase 4** | Chat latency >20s median | Optimize retrieval + sampling + context size, or use a faster model |
 | **Phase 5** | Upload failure rate >10% over 24 hours | Debug network issues, improve retry logic, or increase timeout |
 | **Phase 5** | Data corruption detected during migration | Halt migration, debug export/import scripts, restore from backup |
 
@@ -497,6 +593,22 @@ Placeholder section for Phase 7 gates. Go/No-Go criteria to be defined after Pha
 
 ---
 
+## Phase 8: Full Screenpipe Alignment (FUTURE, Required Post-MVP)
+
+Placeholder section for Phase 8. This phase is required after MVP and targets end-to-end alignment with screenpipe semantics.
+
+**Initial Goal**:
+- Align capture-time metadata semantics, indexing freshness behavior, and evidence-grounded retrieval/chat behavior to screenpipe standards.
+
+**Scope Boundary**:
+- Detailed interface/gate definition is deferred to a dedicated Phase 8 planning document.
+
+**Timeline**: Post-MVP, starts after Phase 7 completion
+
+**Owner**: TBD
+
+---
+
 ## Version History
 
 | Version | Date | Changes |
@@ -508,8 +620,12 @@ Placeholder section for Phase 7 gates. Go/No-Go criteria to be defined after Pha
 | 1.4 | 2026-02-07 | Upload-failure gate observability tightened: validation now explicitly checks consumer dispatch logs for `item_type` and target uploader branch. |
 | 1.5 | 2026-02-07 | Added Phase 1 post-baseline regression checks (non-gating): legacy video upload routing, search-debug video-only render safety, runtime recording pause/resume semantics, and OCR startup warm-up validation. |
 | 1.6 | 2026-02-09 | Phase 1 decision status updated to COMPLETE for roadmap progression; 7 long-run items remain `PENDING` and move to future non-blocking observation tracking. |
+| 1.7 | 2026-02-23 | Pivot Phase 3/4 gates to vision-only: screenpipe-aligned search contract (q optional + browse) and Phase 4 single-retrieval grounding (no tool-calling). |
 | 2.0 | 2026-02-09 | Phase 2.0 Audio MVP engineering complete: 15/17 gates PASS, 1 PENDING (2-S-01 24h stability), 1 N/A (2-DG-02 optional PII redaction). Full test suite: 477 passed, 19 skipped, 0 failed. |
+| 2.1 | 2026-02-24 | Added Phase 2.7 hard-gate metrics for frame-label alignment (metadata provenance/confidence, strict fallback filtering, quality/resource/stability thresholds) before Phase 3. |
+| 2.2 | 2026-02-24 | Constrained Phase 2.7 to `T0/new-data-only` evaluation semantics, updated `2.7-S-*` to forward-only new-write integrity, and added required Post-MVP Phase 8 placeholder section. |
+| 2.3 | 2026-02-24 | Added Phase 2.6 hard-governance gates (`2.6-G-*`) with evidence interfaces (`FreezeScopeMatrix`, `ExceptionRequest`, `GateEvidenceManifest`) and made Phase 2.7 explicitly dependent on Phase 2.6 PASS status. |
 
 ---
 
-**Next Update**: Long-run observation evidence append (1-P-02/1-P-03/1-Q-01/1-S-01/1-S-02/1-R-01/1-R-02) after Week 9-12 tracking window.
+**Next Update**: Add Phase 2.6 governance evidence bundle (`2.6-G-*`) and Phase 2.7 (`timestamp >= T0`) gate evidence package, plus Phase 8 detailed planning stub and long-run observation append (1-P-02/1-P-03/1-Q-01/1-S-01/1-S-02/1-R-01/1-R-02).
