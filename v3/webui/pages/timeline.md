@@ -28,9 +28,10 @@
 
 ## 4. Target Positioning
 
-1. Timeline 保持运维/回放视角，可继续 mixed 展示。
-2. Search/Chat grounding 维持 vision-only 主线（不依赖 timeline mixed 默认）。
-3. 文档语义避免把 “Search/Chat 的 vision-only” 错写为 “Timeline API 已 vision-only”。
+1. Timeline 在 target 合同中默认返回 video-only（证据主链优先）。
+2. Audio 仅通过显式参数（如 `source=audio`）或审批后的调试模式可见。
+3. Search/Chat grounding 维持 vision-only 主线，不依赖 timeline audio 路径。
+4. 文档语义必须区分 current mixed 现实与 target video-only 默认合同。
 
 ## 5. 数据流（Current）
 
@@ -49,20 +50,20 @@ flowchart LR
 | 接口 | 方法 | Current | Target |
 |---|---|---|---|
 | `/timeline` | GET | SSR 页面，视觉回看主入口 | 保持 |
-| `/api/v1/timeline` | GET | 默认 mixed；可按 `source` 过滤 | 保持 mixed 作为 ops 视角 |
+| `/api/v1/timeline` | GET | 默认 mixed；可按 `source` 过滤 | 默认 video-only；audio 仅显式参数/调试模式路径 |
 | `/api/v1/frames/:id` | GET | 帧图片服务（含 fallback） | 证据 drill-down 基础能力 |
 
 ## 7. 风险与盲点
 
-1. 把 timeline 文档写成“vision-only”会与 API 现实冲突。
-2. 若忽略 mixed 默认行为，Chat/Search 评估时会错误推断数据语义。
-3. Audio Freeze 的主线约束应放在 Search/Chat，而非错误外溢到 timeline API 现实描述。
+1. 若把 target 合同误写成 current 现实，会造成排障与验收误判。
+2. 若不声明 target 默认 video-only，Search/Chat 的证据边界会继续被 mixed 语义污染。
+3. 若不保留 explicit audio 调试入口描述，会影响例外流程下的运维可用性。
 
 ## 8. 验收清单（文档层）
 
 - [x] 明确 timeline 页面与 timeline API 的语义差异。
 - [x] 明确 `/api/v1/timeline` 当前 mixed 默认行为。
-- [x] 明确 Search/Chat vision-only 与 timeline mixed 并存关系。
+- [x] 明确 target 合同默认 video-only，audio 仅显式参数/调试模式可见。
 
 ## 9. 相关文档
 

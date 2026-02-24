@@ -5,10 +5,10 @@
 **Status**: Frozen Historical Plan (superseded for MVP critical path by ADR-0005)
 **Scope Type**: historical
 **Superseded By**: ADR-0005 (Vision-only Chat Pivot + Audio Freeze)
-**Governed By**: `/Users/pyw/newpart/MyRecall/v3/plan/phase-2.6-audio-freeze-governance.md`
+**Governed By**: `v3/decisions/ADR-0007-phase-2.6-audio-freeze-governance.md` + `v3/metrics/phase-gates.md`
 **Timeline**: Week 7-8 (10 working days, 2026-02-09 to 2026-02-20)
 **Owner**: Solo Developer
-**Authority**: `/Users/pyw/newpart/MyRecall/v3/metrics/phase-gates.md` (gate thresholds are canonical and immutable)
+**Authority**: `v3/metrics/phase-gates.md` (gate thresholds are canonical and immutable)
 **ADR References**: ADR-0001 (Python-first), ADR-0002 (Thin client, remote-first API), ADR-0004 (Speaker ID optional), ADR-0007 (Phase 2.6 audio freeze governance)
 
 ---

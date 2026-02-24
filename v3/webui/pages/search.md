@@ -36,8 +36,9 @@
 
 1. `GET /api/v1/search` 支持 browse/feed：空 `q` 返回按时间倒序结果。
 2. `start_time` 作为有界检索硬约束（MyRecall policy）。
-3. Search/Chat grounding 收敛为 vision-only（OCR 证据路径）。
+3. Search/Chat grounding 收敛为 vision-only（OCR 证据路径），默认不纳入 audio candidate。
 4. 过滤能力统一：`app_name/window_name/focused/browser_url`。
+5. 若出现 audio 调试需求，仅允许经审批后走显式调试路径，不进入默认主链。
 
 ### 4.2 与 Screenpipe 对齐层级
 
@@ -63,13 +64,13 @@ flowchart LR
 |---|---|---|---|
 | `/search` | GET | SSR 调试页；仅 `q` 生效 | 保持为调试/观察入口 |
 | `/api/search` | GET | legacy JSON 搜索 | 兼容保留 |
-| `/api/v1/search` | GET | 空 `q` 返回空分页；`start_time` 未强制 | browse/feed + bounded 合同 |
+| `/api/v1/search` | GET | 空 `q` 返回空分页；`start_time` 未强制；仍可能混入 audio candidate | browse/feed + bounded + vision-only 合同（audio 默认不参与） |
 | `/api/v1/frames/:id` | GET | 帧图片服务 | 作为 evidence drill-down 核心 |
 
 ## 7. 风险与盲点
 
 1. 将 target 契约写成 current 事实会误导测试与排障。
-2. 若不显式标注 audio 候选仍在 SearchEngine 中，容易与 vision-only MVP 口径冲突。
+2. 若不显式标注 “current 仍可能出现 audio 候选” 与 “target 默认禁入 audio”，会持续引发口径冲突。
 3. 若不区分 API 层行为与 agent 操作纪律，容易错误声称“已与 screenpipe 完全同构”。
 
 ## 8. 验收清单（文档层）
@@ -78,6 +79,7 @@ flowchart LR
 - [x] 明确 `/search` 与 `/api/v1/search` 当前差异。
 - [x] 明确 screenpipe 对齐层级（semantic/discipline/divergence）。
 - [x] 明确 vision-only 是 Search/Chat 目标约束，而非当前全部链路现实。
+- [x] 明确 audio 在 Search/Chat 中的 target 语义为默认禁入，仅审批后可走调试路径。
 
 ## 9. 相关文档
 

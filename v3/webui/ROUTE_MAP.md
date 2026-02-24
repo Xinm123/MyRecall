@@ -11,6 +11,8 @@
 | Video Dashboard | `/video` | `openrecall/server/app.py:video()` | `video.html` |
 | Control Center | 布局内组件 | `layout.html` 前端脚本 | `layout.html` |
 
+> Target contract note: `/audio` 页面属于非默认路径；仅在审批后的调试模式中显式可见。
+
 ## 2. 页面依赖 API（Current）
 
 ### 2.1 Legacy API
@@ -54,7 +56,8 @@
 | `/api/v1/search` empty `q` | 空分页 | browse/feed（有界范围） |
 | `/api/v1/search` `start_time` | 未强制 | 强制（MyRecall policy） |
 | Search modality | 仍可能混入 audio candidate | Search/Chat grounding 走 vision-only |
-| `/api/v1/timeline` | mixed 默认 | 保持 mixed（ops），但不作为 Chat 证据源主链 |
+| WebUI audio visibility | `/audio` 页面可见 | 默认隐藏 audio 入口；仅调试模式可见 |
+| `/api/v1/timeline` | mixed 默认 | target 默认 video-only；audio 仅显式参数/调试模式 |
 
 ## 4. Screenpipe 对齐说明
 

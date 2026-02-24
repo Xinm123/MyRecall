@@ -55,7 +55,7 @@ This spec is target-authoritative. Current implementation deviations are explici
 | `GET /api/v1/search` time bounds | `start_time` required, `end_time` optional | `start_time` not enforced at route layer | Add hard request validation in Phase 3 |
 | Search modality | Vision-only retrieval for Chat grounding | Search engine still includes audio FTS candidates | Enforce vision-only search path for Chat in Phase 3 |
 | `POST /api/v1/chat` | Exists and returns `answer_md + evidence[]` | Endpoint not implemented yet | Implement Phase 4 Chat API |
-| `GET /api/v1/timeline` usage | Chat grounding relies on vision evidence only | Timeline returns mixed video+audio by default | Keep timeline mixed for ops; enforce vision-only in Search/Chat pipeline |
+| `GET /api/v1/timeline` usage | Chat grounding relies on vision evidence only; target contract default is video-only | Timeline returns mixed video+audio by default | Converge contract to default video-only; keep explicit audio path only for approved debug/ops scenarios |
 
 ---
 

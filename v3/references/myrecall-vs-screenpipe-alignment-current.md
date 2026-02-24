@@ -14,7 +14,7 @@
 | Time bounds discipline | API allows optional bounds; skills enforce `start_time` | route 未强制 `start_time` | 强制 `start_time`（MyRecall policy） | High |
 | Search filters | app/window/focused/browser_url supported | filters contract写入文档但未完整落地到 v1 search route | 完整过滤链路 | Medium |
 | Retrieval modality | multi-content (`ocr/audio/input/...`) | SearchEngine仍含audio candidates | Search/Chat grounding vision-only | Medium |
-| Timeline default | rich multi-source retrieval | `/api/v1/timeline` 默认 mixed | 保持 mixed for ops，不作为 chat 主证据源 | High |
+| Timeline default | rich multi-source retrieval | `/api/v1/timeline` 默认 mixed | target 默认 video-only；audio 仅显式参数或审批后调试路径 | High |
 | Chat grounding | bounded retrieval + evidence discipline | chat endpoint 未实现 | answer + evidence[] 合同 | Medium |
 
 ## Intentional Divergences
@@ -52,5 +52,5 @@
 
 1. Roadmap: keep `Current vs Target` table updated whenever search behavior changes.
 2. ADR-0006: maintain semantic/discipline/divergence labels in contract text.
-3. Phase gates: keep 2.6 governance-only; place quality uplift metrics in 2.7.
+3. Phase gates: keep 2.6 as governance + default full-chain pause; quality uplift metrics stay in 2.7.
 4. WebUI docs: maintain dual-track language (`Current verified` vs `Target contract`).

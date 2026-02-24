@@ -1,6 +1,6 @@
 # MyRecall-v3 Roadmap Status Tracker
 
-**Last Updated**: 2026-02-24T16:00:00Z
+**Last Updated**: 2026-02-24T22:10:00Z
 **Overall Status**: 🟩 Phase 0 Complete / 🟩 Phase 1 Complete / 🟩 Phase 2.5 Complete / ⏸ Audio (Phase 2.0/2.1) Paused / ⬜ Phase 2.6 Audio Freeze Governance / ⬜ Phase 2.7 Label Alignment Gate / ⬜ Phase 3 Vision Search / ⬜ Phase 4 Vision Chat / ⬜ Phase 5 Deployment / ⬜ Phase 8 Full Alignment
 **Target Completion**: Week 22 (2026-07-04) remains the outer bound for MVP deployment (Phase 3-5). Audio is excluded from MVP scope under the vision-only pivot.
 
@@ -12,8 +12,9 @@ This revision inserts a standalone governance phase between Phase 2.5 and Phase 
 
 - **Phase 2.6 Added**: `Audio Freeze Governance` as a hard governance gate.
 - **Hard Gate Policy**: Phase 2.7 cannot start until Phase 2.6 gates (`2.6-G-*`) are all PASS.
-- **Governance Scope**: frozen client/server audio modules plus critical audio-related config keys.
-- **Controlled Exception Path**: only approved P0/P1 fixes can bypass freeze, with mandatory evidence closure.
+- **Governance Scope**: frozen client/server audio modules plus critical audio-related config keys, with default full-chain pause contract.
+- **Default Contract**: no auto capture, no auto processing/indexing, no default audio UI visibility, no Search/Chat audio grounding.
+- **Controlled Exception Path**: only approved P0/P1 fixes can temporarily bypass freeze, with mandatory TTL, rollback, and closure evidence.
 - **Alignment Strategy**: follow screenpipe quality-gate and rollback discipline principles, while preserving MyRecall phase-gate control model.
 
 This revision does not re-open audio feature scope. It formalizes freeze governance so downstream quality evidence remains auditable.
@@ -76,7 +77,7 @@ Target documents remain authoritative. The table below records known implementat
 | Search modality | Vision-only for Search/Chat | Search engine still includes audio FTS candidates | Add vision-only enforcement for Search/Chat path in Phase 3 |
 | Frame label provenance | Per-frame label truth with source traceability for search grounding | Most frame labels still inherit chunk-level fallback (low granularity under intra-chunk app/window switch) | Lock freeze scope in Phase 2.6, then implement and gate in Phase 2.7 before Phase 3 |
 | `/api/v1/chat` | Phase 4 endpoint returns `answer + evidence[]` | Endpoint not implemented yet | Deliver Phase 4 API + evidence contract |
-| `/api/v1/timeline` | Chat/Search MVP depends on vision-only evidence path | Timeline currently returns mixed video+audio by default | Keep timeline mixed for ops views, but enforce vision-only in Search/Chat grounding |
+| `/api/v1/timeline` | Chat/Search MVP depends on vision-only evidence path; target contract defaults timeline to video-only (audio only via explicit parameter/debug mode) | Timeline currently returns mixed video+audio by default | Introduce target default video-only contract in docs; keep current mixed behavior documented until convergence |
 
 This section must be updated whenever code reality changes or when convergence work lands.
 
@@ -417,13 +418,14 @@ This section must be updated whenever code reality changes or when convergence w
 **Planned**: Relative R1 (must pass before Phase 2.7 starts)
 **Actual**: TBD
 **Owner**: Product Owner + Chief Architect
-**Detailed Plan**: `v3/plan/phase-2.6-audio-freeze-governance.md`
+**Authority Docs**: `v3/decisions/ADR-0007-phase-2.6-audio-freeze-governance.md`, `v3/metrics/phase-gates.md`, `v3/milestones/roadmap-status.md`
 **Decision Record**: `v3/decisions/ADR-0007-phase-2.6-audio-freeze-governance.md`
 
 **Purpose**:
-- Turn Audio Freeze into an auditable control phase.
-- Lock client/server audio code + config boundaries.
-- Provide controlled P0/P1 exception workflow.
+- Turn Audio Freeze into an auditable control phase with default full-chain pause semantics.
+- Lock client/server audio code + config boundaries and default behavior boundaries.
+- Keep Search/Chat target contract vision-only and timeline target contract default video-only.
+- Provide controlled P0/P1 exception workflow with TTL + rollback + closure evidence.
 - Produce evidence package required for Phase 2.7 kickoff.
 
 **Governance Interfaces**:
@@ -432,11 +434,11 @@ This section must be updated whenever code reality changes or when convergence w
 - `GateEvidenceManifest`
 
 **Go/No-Go Gates** (authority: `v3/metrics/phase-gates.md`):
-- [ ] 2.6-G-01: 24h stability evidence archived with no unresolved P0/P1 incidents in freeze scope.
-- [ ] 2.6-G-02: Freeze-scope performance budget validated (no unacceptable regression in governed modules).
-- [ ] 2.6-G-03: Exception workflow closure validated (all approved exceptions closed with evidence and TTL compliance).
-- [ ] 2.6-G-04: Rollback drill evidence passes and recovery objective met (<2 minutes).
-- [ ] 2.6-G-05: Config/code drift audit closed (no unauthorized freeze-scope changes).
+- [ ] 2.6-G-01: Default capture pause verified (no automatic audio capture in freeze mode).
+- [ ] 2.6-G-02: Default processing pause verified (no automatic VAD/transcribe/index in freeze mode).
+- [ ] 2.6-G-03: UI/retrieval contract verified (audio hidden by default; Search/Chat vision-only; timeline target default video-only).
+- [ ] 2.6-G-04: Exception workflow closure validated (approved exceptions closed with TTL + rollback + closure evidence).
+- [ ] 2.6-G-05: Drift and rollback readiness validated (no unauthorized drift; rollback objective <2 minutes).
 
 **Blockers**: Blocks Phase 2.7 until all `2.6-G-*` gates PASS.
 
@@ -671,7 +673,7 @@ After Phase 5 (Thin Client):
 | Metric | Phase 1 Target | Phase 2 Target | Phase 2.6 Target | Phase 2.7 Target | Phase 3 Target | Phase 4 Target | Phase 5 Target |
 |--------|----------------|----------------|------------------|------------------|----------------|----------------|----------------|
 | **Performance** | Frame <2s | N/A (paused) | Freeze-scope modules show no unacceptable regression | Query p95 no regression; target +10%-20% | Search <500ms | Chat <5s | Upload <5min |
-| **Accuracy** | OCR ≥95% | N/A (paused) | N/A (governance-only phase) | Label mismatch <=2%-5%; P@10 uplift >=20% vs baseline | P@10 ≥0.7 | Hallucination <10% | Checksum 100% |
+| **Accuracy** | OCR ≥95% | N/A (paused) | Freeze contract evidence complete (capture/processing/UI/retrieval boundaries auditable) | Label mismatch <=2%-5%; P@10 uplift >=20% vs baseline | P@10 ≥0.7 | Hallucination <10% | Checksum 100% |
 | **Stability** | 7-day 0-crash | N/A (paused) | 24h stability evidence + rollback drill pass | No API compatibility or migration regression | N/A | N/A | >99.5% uptime |
 | **Resource** | <5% CPU | N/A (paused) | Config/code drift audit = 0 unauthorized changes | CPU <=+12%, storage <=+10% | N/A | <$0.05/query | Queue <10 p95 |
 
@@ -771,13 +773,14 @@ This section tracks questions that have been resolved through architectural deci
 
 **Decision**:
 - Add standalone **Phase 2.6** between Phase 2.5 and Phase 2.7.
-- Define hard gates `2.6-G-*` for stability, performance budget, quality baseline, rollback readiness, and config drift audit.
-- Allow only approved P0/P1 exception workflow during freeze.
+- Upgrade Phase 2.6 semantics from governance-only to governance + default full-chain pause contract.
+- Define hard gates `2.6-G-*` for default capture pause, default processing pause, UI/retrieval contract lock, exception closure, and drift/rollback readiness.
+- Allow only approved P0/P1 exception workflow with TTL, rollback, and closure evidence.
 
 **Rationale**:
 - Prevents governance controls from being mixed into feature-change phases.
 - Improves traceability, auditability, and incident handling.
-- Reduces noise contamination risk before Phase 2.7 quality evidence collection.
+- Reduces noise contamination and accidental audio-surface expansion before Phase 2.7 quality evidence collection.
 
 ---
 
@@ -829,6 +832,7 @@ The following open questions are currently active and must be resolved before co
 
 | Date | Type | Description | Impact |
 |------|------|-------------|--------|
+| 2026-02-24 | Freeze Contract Upgrade | Upgraded Phase 2.6 from governance-only to governance + default full-chain pause contract (`no auto capture/processing`, `no default audio UI`, `no Search/Chat audio grounding`) and removed dependency on missing plan file. | Clarifies default behavior boundary and closes governance/documentation gap before Phase 2.7 |
 | 2026-02-24 | Governance Hardening | Added Phase 2.6 Audio Freeze Governance as a standalone hard gate with explicit exception workflow and evidence contract. | Converts freeze from status text to auditable control; Phase 2.7 start now gated by `2.6-G-*` closure |
 | 2026-02-24 | Scope Hardening | Added Phase 2.7 Frame Label Alignment as hard pre-Phase-3 gate; introduced explicit frame metadata quality and indexing alignment targets. | Reduces retrieval noise risk before Search/Chat scaling; sequence updated to R1-R11 |
 | 2026-02-24 | Roadmap Refactor | Removed former mid-phase metadata track, added required Post-MVP Phase 8 (Full Screenpipe Alignment), and constrained Phase 2.7 to new-data-only (`timestamp >= T0`). | Eliminates phase overlap, clarifies ownership, and stabilizes MVP gate semantics |

@@ -62,8 +62,9 @@ flowchart LR
 
 1. `GET /api/v1/search` becomes canonical bounded retrieval primitive.
 2. Empty `q` enters browse/feed over bounded time range.
-3. Search/Chat grounding uses vision-only evidence path.
-4. Timeline may remain mixed for ops replay, but not as primary chat evidence source.
+3. Search/Chat grounding uses vision-only evidence path; audio candidates are excluded by default.
+4. Timeline target default is video-only; audio access is explicit parameter or approved debug-mode path.
+5. WebUI default navigation does not expose audio dashboard entrypoints.
 
 ## 4. Failure and Degradation Paths (Current)
 

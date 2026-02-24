@@ -1,6 +1,6 @@
 # MyRecall-v3 Master Prompt (Version Control)
 
-**Version**: 1.4
+**Version**: 1.5
 **Last Updated**: 2026-02-24
 **Status**: Active (Vision-only pivot; evidence-first Chat MVP planning)
 **Scope Type**: target
@@ -71,7 +71,13 @@ MyRecall-v3 (Third major version)
 
 ### 3. Audio Freeze (Paused)
 - **Decision**: 本阶段及可预见未来，暂停所有音频相关开发（采集/存储/检索/Chat 集成/对齐 screenpipe）。
+- **Default Contract (四不)**:
+  1. 不自动采集 audio。
+  2. 不自动处理/转写/索引 audio。
+  3. WebUI 默认不展示 audio 入口与默认 audio 结果。
+  4. Search/Chat 不使用 audio 作为 grounding 数据源。
 - **Rationale**: 聚焦 Chat 核心闭环，避免 multi-modal 复杂度与隐私面扩张。
+- **Exception Path**: 仅允许经 `ExceptionRequest` 审批后的临时手动启用，且必须包含 TTL、回滚方案与闭环证据。
 - **Implication**: Chat/Search 的所有用例必须可在 “vision-only 数据” 上成立；无法成立的用例必须改写或延期。
 
 ### 4. Time Semantics (Screenpipe-Aligned)
@@ -105,7 +111,7 @@ MyRecall-v3 (Third major version)
 | `GET /api/v1/search` time bounds | `start_time` 必填，`end_time` 可选 | 路由层未强制 `start_time` | Phase 3 增加硬校验 |
 | Search modality | Search/Chat 为 vision-only | 搜索引擎仍会合并 audio FTS 候选 | Phase 3 收敛为 vision-only contract |
 | `POST /api/v1/chat` | Phase 4 返回 `answer + evidence[]` | 当前未实现该 endpoint | Phase 4 实现 API + evidence 校验 |
-| `GET /api/v1/timeline` | Chat/Search grounding 使用 vision evidence | timeline 默认混合 video+audio | 保留 timeline 运维视图混合；但 Search/Chat 严格走 vision-only |
+| `GET /api/v1/timeline` | Chat/Search grounding 使用 vision evidence；目标合同默认 video-only | timeline 默认混合 video+audio | 目标合同改为默认 video-only；audio 仅显式参数或调试模式可见；Search/Chat 严格走 vision-only |
 
 ---
 
@@ -232,6 +238,7 @@ MyRecall-v3 (Third major version)
 | 1.2 | 2026-02-06 | Phase state updated to Phase 1 post-execution validation mode; constraints aligned to acceptance workflow. |
 | 1.3 | 2026-02-23 | Vision-only pivot lock: screenpipe-aligned time semantics + Search contract; Phase 4 grounding clarified as single retrieval + single summary (no tool-calling). |
 | 1.4 | 2026-02-24 | Documentation contract hardening: added Scope Type, unified alignment levels (`semantic/discipline/divergence`), synchronized sequence wording with roadmap (`R1-R11`), and switched core path references to repo-relative style. |
+| 1.5 | 2026-02-24 | Audio Freeze contract upgraded to default full-chain pause semantics (no auto capture/process, no default audio UI, no Search/Chat audio grounding) with exception workflow requirements. |
 
 ---
 

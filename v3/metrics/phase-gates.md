@@ -1,6 +1,6 @@
 # MyRecall-v3 Phase Gates & Acceptance Criteria
 
-**Version**: 2.4
+**Version**: 2.5
 **Last Updated**: 2026-02-24
 
 ⚠️ **Authority Notice**: 此文件为所有Phase (0-8) 的权威Go/No-Go验收标准。Roadmap文档仅引用此处定义,不重复定义Phase gates。任何关于Phase验收标准的变更必须首先更新本文件。
@@ -25,7 +25,7 @@ High-priority examples:
 | Phase | Gate Scope | Gate Owner Phase |
 |------|------------|------------------|
 | Phase 2.1 | historical/frozen | N/A (not on MVP critical path) |
-| Phase 2.6 | target (governance-only) | Phase 2.6 |
+| Phase 2.6 | target (governance + default full-chain pause) | Phase 2.6 |
 | Phase 2.7 | target (quality hardening) | Phase 2.7 |
 
 ---
@@ -311,38 +311,40 @@ This phase is retained for audit completeness. It is currently outside MVP criti
 
 ## Phase 2.6: Audio Freeze Governance (Hard Gate Before Phase 2.7)
 
-This phase is a governance gate. It does not introduce runtime API behavior by itself.
+This phase defines both governance controls and target default behavior contract.  
+`Current (verified)` implementation can differ; Phase 2.6 governs convergence and exception handling.
 
 ### 1. Governance Gates (`2.6-G-*`)
 
 | Gate | Criteria | Validation Method | Status |
 |------|----------|-------------------|--------|
-| **2.6-G-01 Stability Evidence** | 24h continuous stability evidence archived; no unresolved P0/P1 incidents in freeze scope | Review stability report + incident register | ⬜️ |
-| **2.6-G-02 Performance Budget** | Freeze-scope governed modules show no unacceptable regression | Compare freeze-scope benchmark package against approved baseline | ⬜️ |
-| **2.6-G-03 Exception Closure** | All approved exception requests are closed with evidence and TTL compliance | Audit exception register and closure artifacts | ⬜️ |
-| **2.6-G-04 Rollback Readiness** | Rollback drill succeeds and recovery objective met (<2 minutes) | Run rollback drill and verify integrity checks | ⬜️ |
-| **2.6-G-05 Config Drift Audit** | No unauthorized changes in freeze scope files/keys during freeze window | Review drift audit log + approval mapping | ⬜️ |
+| **2.6-G-01 Default Capture Pause** | Default contract disables automatic audio capture in freeze scope | Verify `FreezeScopeMatrix` + config contract snapshots and 24h operation report with no unattended audio-capture activation | ⬜️ |
+| **2.6-G-02 Default Processing Pause** | Default contract disables automatic VAD/transcription/indexing for audio | Verify processing path manifests + queue/worker evidence showing no default auto-processing in freeze mode | ⬜️ |
+| **2.6-G-03 UI and Retrieval Contract** | WebUI default path hides audio entrypoints; Search/Chat contracts are vision-only; timeline target default is video-only | Review WebUI contract docs + API contract artifacts (`search`, `timeline`, `chat`) for scope consistency | ⬜️ |
+| **2.6-G-04 Exception Closure** | All approved exceptions are closed with TTL compliance, rollback proof, and closure evidence | Audit `ExceptionRequest` register + closure bundle and auto-revert logs | ⬜️ |
+| **2.6-G-05 Drift and Rollback Readiness** | No unauthorized freeze-scope drift and rollback drill meets RTO (<2 minutes) | Review drift audit mapping + rollback drill artifacts and integrity checks | ⬜️ |
 
 ### 2. Governance Interfaces (Document Layer)
 
 | Interface | Purpose | Required Fields |
 |-----------|---------|-----------------|
-| `FreezeScopeMatrix` | Defines frozen code/config boundary and ownership | object, path/key, owner, risk_tier, exception_allowed |
-| `ExceptionRequest` | Controls approved emergency changes during freeze | request_id, severity, reason, impact_scope, risk_assessment, rollback_plan, approvers, ttl, status |
-| `GateEvidenceManifest` | Tracks evidence artifacts per gate | gate_id, artifact_path, generated_at, validator, result, notes |
+| `FreezeScopeMatrix` | Defines frozen code/config boundary and default posture | object, path/key, owner, risk_tier, exception_allowed, default_capture_state, default_processing_state, ui_default_visibility, search_chat_modalities |
+| `ExceptionRequest` | Controls approved temporary enablement during freeze | request_id, severity, reason, impact_scope, risk_assessment, rollback_plan, approvers, ttl, status, enable_window, auto_revert_rule, closure_evidence |
+| `GateEvidenceManifest` | Tracks evidence artifacts per gate | gate_id, artifact_path, generated_at, validator, result, notes, contract_scope, exception_link |
 
 ### 3. Entry / Exit Criteria
 
 - **Entry**: Phase 2.5 complete, Audio Freeze active, freeze scope matrix published.
 - **Exit (GO)**: all `2.6-G-*` gates are PASS and evidence manifests are complete.
-- **Exit (NO-GO)**: any single gate fails or required evidence is missing.
+- **Exit (NO-GO)**: any single gate fails, required evidence is missing, or unauthorized freeze-scope behavior is detected.
 
 ### 4. Failure Signals
 
 | Failure Signal | Action |
 |----------------|--------|
-| Missing or stale evidence for any `2.6-G-*` gate | Block Phase 2.7 and request evidence refresh |
-| Unauthorized freeze-scope changes detected | Initiate incident review, reject unfreeze, require remediation |
+| Any `2.6-G-*` evidence missing or stale | Block Phase 2.7 and request evidence refresh |
+| Default pause contract violated (capture/processing/UI/search-chat scope) | Trigger incident review, force rollback to freeze baseline, and revalidate gates |
+| Exception exceeded TTL or lacks closure evidence | Mark NO-GO, close exception debt, and rerun gate audit |
 | Rollback drill exceeds RTO or fails integrity check | Keep freeze active and rerun rollback hardening |
 
 ---
@@ -566,7 +568,7 @@ This phase is a governance gate. It does not introduce runtime API behavior by i
 | **Phase 1** | Storage exceeds 50GB/day | Increase compression (CRF 28 → 32) or reduce resolution |
 | **Phase 2** | Whisper transcription backlog grows indefinitely | Switch to faster model (base → tiny), add GPU, or simplify pipeline |
 | **Phase 2** | Transcription WER >40% on typical audio | Re-evaluate Whisper model or add preprocessing |
-| **Phase 2.6** | Any `2.6-G-*` evidence missing or unauthorized freeze-scope drift detected | Block Phase 2.7 start, close governance gaps, and rerun audits |
+| **Phase 2.6** | Any `2.6-G-*` evidence missing, default-pause contract violated, or unauthorized freeze-scope drift detected | Block Phase 2.7 start, close governance gaps, and rerun audits |
 | **Phase 2.7** | Label mismatch rate stays >10% after rollout | Block Phase 3 kickoff, roll back normalization path, and re-baseline provenance logic |
 | **Phase 3** | Search latency >1s p95 | Optimize FTS queries, add caching, or parallelize |
 | **Phase 4** | Hallucination rate >30% | Improve prompt, add more grounding, or switch LLM |
@@ -644,7 +646,8 @@ Placeholder section for Phase 8. This phase is required after MVP and targets en
 | 2.1 | 2026-02-24 | Added Phase 2.7 hard-gate metrics for frame-label alignment (metadata provenance/confidence, strict fallback filtering, quality/resource/stability thresholds) before Phase 3. |
 | 2.2 | 2026-02-24 | Constrained Phase 2.7 to `T0/new-data-only` evaluation semantics, updated `2.7-S-*` to forward-only new-write integrity, and added required Post-MVP Phase 8 placeholder section. |
 | 2.3 | 2026-02-24 | Added Phase 2.6 hard-governance gates (`2.6-G-*`) with evidence interfaces (`FreezeScopeMatrix`, `ExceptionRequest`, `GateEvidenceManifest`) and made Phase 2.7 explicitly dependent on Phase 2.6 PASS status. |
+| 2.5 | 2026-02-24 | Upgraded Phase 2.6 semantics from governance-only to governance + default full-chain pause; expanded gate evidence contract for capture/processing/UI/search-chat freeze boundaries and exception auto-revert closure. |
 
 ---
 
-**Next Update**: Add Phase 2.6 governance evidence bundle (`2.6-G-*`) and Phase 2.7 (`timestamp >= T0`) gate evidence package, plus Phase 8 detailed planning stub and long-run observation append (1-P-02/1-P-03/1-Q-01/1-S-01/1-S-02/1-R-01/1-R-02).
+**Next Update**: Add Phase 2.6 closure package for default full-chain pause (`2.6-G-*`) plus Phase 2.7 (`timestamp >= T0`) gate evidence package, and append long-run observation artifacts (1-P-02/1-P-03/1-Q-01/1-S-01/1-S-02/1-R-01/1-R-02).
