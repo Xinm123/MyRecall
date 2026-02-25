@@ -154,16 +154,16 @@ flowchart LR
 
 ---
 
-## 10. Phase 2.6 Freeze Scope — Video 不受影响的声明
+## 10. Phase 2.6 Hard Shutdown Scope — Video 不受影响的声明
 
-**Phase**: 2.6 Audio Freeze Governance
+**Phase**: 2.6 Audio Hard Shutdown
 **状态**: ⬜️ Planned（本节内容为计划态契约声明）
 **Code Changes**: NONE
-**权威文档**: `v3/decisions/ADR-0007-phase-2.6-audio-freeze-governance.md`
+**权威文档**: `v3/metrics/phase-gates.md`
 
-### 10.1 Video 链路不在 Audio Freeze 范围内
+### 10.1 Video 链路不在 Audio Hard Shutdown 范围内
 
-Phase 2.6 Audio Freeze Governance **仅针对音频链路冻结**，视频链路**全部保持正常运行**：
+Phase 2.6 Audio Hard Shutdown **仅针对音频链路关闭**，视频链路**保持正常运行**：
 
 | 模块 | 路径 | Phase 2.6 状态 |
 |------|------|---------------|
@@ -178,7 +178,7 @@ Phase 2.6 Audio Freeze Governance **仅针对音频链路冻结**，视频链路
 
 ### 10.2 Audio vs Video 对比摘要
 
-| 维度 | Audio（Phase 2.6 Freeze） | Video（Phase 2.6 不受影响） |
+| 维度 | Audio（Phase 2.6 Hard Shutdown） | Video（Phase 2.6 不受影响） |
 |------|------------------------|-----------------------------|
 | 默认采集 | **disabled** | 激活（正常录制） |
 | 默认处理 | **disabled** | Worker 自动运行 |
@@ -187,11 +187,11 @@ Phase 2.6 Audio Freeze Governance **仅针对音频链路冻结**，视频链路
 | UI 入口可见性 | **Phase 2.6 target：hidden** | **默认可见** |
 | Timeline 默认显示 | 排除 | **默认显示**（target video-only） |
 
-### 10.3 关联 Gates 对 Video 不产生西验证要求
+### 10.3 关联 Gates 对 Video 的影响边界
 
 - 2.6-G-01（capture pause）：**仅针对 audio**，video capture 不需验证
 - 2.6-G-02（processing pause）：**仅针对 audio processing**，video processing 不需验证
-- 2.6-G-03（UI/retrieval contract）：**间接相关**—Timeline target video-only 默认 = video 作为主要模态被确认
-- 2.6-G-04/G-05：**不小 Video 页面沵及**
+- 2.6-G-03（retrieval off）：**间接相关**，需要确认 timeline/search 的主路径返回 video 结果且无 audio 混入
+- 2.6-G-04/G-05：不直接要求改动 Video 页面逻辑，但要求主导航与运行模式不通过 video 页面间接暴露 audio 主链路
 
 **结论**：本页面（`/video`）在 Phase 2.6 期间**无任何行为变更**，仅需确认 Timeline 默认显示内容符合 video-only 目标契约即可。

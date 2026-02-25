@@ -1,7 +1,7 @@
 # MyRecall-v3 Phase Gates & Acceptance Criteria
 
-**Version**: 2.5
-**Last Updated**: 2026-02-24
+**Version**: 2.6
+**Last Updated**: 2026-02-25
 
 ⚠️ **Authority Notice**: 此文件为所有Phase (0-8) 的权威Go/No-Go验收标准。Roadmap文档仅引用此处定义,不重复定义Phase gates。任何关于Phase验收标准的变更必须首先更新本文件。
 
@@ -25,7 +25,7 @@ High-priority examples:
 | Phase | Gate Scope | Gate Owner Phase |
 |------|------------|------------------|
 | Phase 2.1 | historical/frozen | N/A (not on MVP critical path) |
-| Phase 2.6 | target (governance + default full-chain pause) | Phase 2.6 |
+| Phase 2.6 | target (audio hard shutdown) | Phase 2.6 |
 | Phase 2.7 | target (quality hardening) | Phase 2.7 |
 
 ---
@@ -309,50 +309,52 @@ This phase is retained for audit completeness. It is currently outside MVP criti
 
 ---
 
-## Phase 2.6: Audio Freeze Governance (Hard Gate Before Phase 2.7)
+## Phase 2.6: Audio Hard Shutdown (Hard Gate Before Phase 2.7)
 
-This phase defines both governance controls and target default behavior contract.  
-`Current (verified)` implementation can differ; Phase 2.6 governs convergence and exception handling.
+This phase enforces complete removal of audio from MVP runtime mainline.
+`Current (verified)` implementation can differ; Phase 2.6 closes the gap to hard-shutdown contract.
 
-### 1. Governance Gates (`2.6-G-*`)
+### 1. Hard Shutdown Gates (`2.6-G-*`)
 
 | Gate | Criteria | Validation Method | Status |
 |------|----------|-------------------|--------|
-| **2.6-G-01 Default Capture Pause** | Default contract disables automatic audio capture in freeze scope | Verify `FreezeScopeMatrix` + config contract snapshots and 24h operation report with no unattended audio-capture activation | ⬜️ |
-| **2.6-G-02 Default Processing Pause** | Default contract disables automatic VAD/transcription/indexing for audio | Verify processing path manifests + queue/worker evidence showing no default auto-processing in freeze mode | ⬜️ |
-| **2.6-G-03 UI and Retrieval Contract** | WebUI default path hides audio entrypoints; Search/Chat contracts are vision-only; timeline target default is video-only | Review WebUI contract docs + API contract artifacts (`search`, `timeline`, `chat`) for scope consistency | ⬜️ |
-| **2.6-G-04 Exception Closure** | All approved exceptions are closed with TTL compliance, rollback proof, and closure evidence | Audit `ExceptionRequest` register + closure bundle and auto-revert logs | ⬜️ |
-| **2.6-G-05 Drift and Rollback Readiness** | No unauthorized freeze-scope drift and rollback drill meets RTO (<2 minutes) | Review drift audit mapping + rollback drill artifacts and integrity checks | ⬜️ |
+| **2.6-G-01 Capture Off** | No automatic audio capture in default runtime path | Run 24h standard runtime and verify `audio_chunks` count delta = 0 | ⬜️ |
+| **2.6-G-02 Processing Off** | No automatic VAD/transcription/indexing for audio | Verify no active audio processing worker and `audio_transcriptions` delta = 0 in same 24h window | ⬜️ |
+| **2.6-G-03 Retrieval Off** | search/timeline paths exclude audio results | API contract tests + sampled responses (`search`, `timeline`) must show audio item count = 0 | ⬜️ |
+| **2.6-G-04 UI Off** | MVP primary UI path does not expose audio entrypoints | Review route map + navigation rendering + page-flow checks | ⬜️ |
+| **2.6-G-05 Anti-Bypass** | Runtime/config toggles cannot restore audio mainline behavior | Negative tests for audio-related env/mode switches; verify downgrade/reject behavior | ⬜️ |
 
-### 2. Governance Interfaces (Document Layer)
+### 2. Required Evidence Artifacts
 
-| Interface | Purpose | Required Fields |
-|-----------|---------|-----------------|
-| `FreezeScopeMatrix` | Defines frozen code/config boundary and default posture | object, path/key, owner, risk_tier, exception_allowed, default_capture_state, default_processing_state, ui_default_visibility, search_chat_modalities |
-| `ExceptionRequest` | Controls approved temporary enablement during freeze | request_id, severity, reason, impact_scope, risk_assessment, rollback_plan, approvers, ttl, status, enable_window, auto_revert_rule, closure_evidence |
-| `GateEvidenceManifest` | Tracks evidence artifacts per gate | gate_id, artifact_path, generated_at, validator, result, notes, contract_scope, exception_link |
+| Artifact | Purpose |
+|----------|---------|
+| `v3/evidence/phase2.6/24h_capture_delta.txt` | Proves `audio_chunks`增量为 0 |
+| `v3/evidence/phase2.6/24h_processing_delta.txt` | Proves `audio_transcriptions`增量为 0 且无 audio worker |
+| `v3/evidence/phase2.6/retrieval_contract_checks.txt` | Proves search/timeline 不含 audio |
+| `v3/evidence/phase2.6/ui_surface_checks.txt` | Proves主导航/主流程无 audio 入口 |
+| `v3/evidence/phase2.6/anti_bypass_checks.txt` | Proves配置/模式无法恢复 audio 主链路 |
 
 ### 3. Entry / Exit Criteria
 
-- **Entry**: Phase 2.5 complete, Audio Freeze active, freeze scope matrix published.
-- **Exit (GO)**: all `2.6-G-*` gates are PASS and evidence manifests are complete.
-- **Exit (NO-GO)**: any single gate fails, required evidence is missing, or unauthorized freeze-scope behavior is detected.
+- **Entry**: Phase 2.5 complete and Phase 2.6 hard-shutdown implementation plan locked.
+- **Exit (GO)**: all `2.6-G-*` gates PASS with complete evidence artifacts.
+- **Exit (NO-GO)**: any gate fails, evidence missing, or audio runtime path remains reachable.
 
 ### 4. Failure Signals
 
 | Failure Signal | Action |
 |----------------|--------|
-| Any `2.6-G-*` evidence missing or stale | Block Phase 2.7 and request evidence refresh |
-| Default pause contract violated (capture/processing/UI/search-chat scope) | Trigger incident review, force rollback to freeze baseline, and revalidate gates |
-| Exception exceeded TTL or lacks closure evidence | Mark NO-GO, close exception debt, and rerun gate audit |
-| Rollback drill exceeds RTO or fails integrity check | Keep freeze active and rerun rollback hardening |
+| Any `2.6-G-*` evidence missing or stale | Block Phase 2.7 and require evidence refresh |
+| Any non-zero audio write delta (`audio_chunks` or `audio_transcriptions`) | Mark NO-GO, keep Phase 2.7 blocked, and rerun shutdown hardening |
+| search/timeline returns any audio entry | Mark NO-GO and fix retrieval contract before re-audit |
+| Config/mode can re-enable audio mainline without code change | Mark NO-GO and harden anti-bypass guards |
 
 ---
 
 ## Phase 2.7: Frame Label Alignment Gate (Hard Gate Before Phase 3)
 
 **Evaluation Dataset Constraint**: All Phase 2.7 metrics and gates are evaluated only on records ingested at/after `T0` (`timestamp >= T0`). Historical records are excluded from Phase 2.7 Go/No-Go.
-**Dependency Constraint**: Phase 2.7 evaluation can only start after Phase 2.6 governance gates are all PASS.
+**Dependency Constraint**: Phase 2.7 evaluation can only start after Phase 2.6 hard-shutdown gates are all PASS.
 
 ### 1. Functional Gates
 
@@ -568,7 +570,7 @@ This phase defines both governance controls and target default behavior contract
 | **Phase 1** | Storage exceeds 50GB/day | Increase compression (CRF 28 → 32) or reduce resolution |
 | **Phase 2** | Whisper transcription backlog grows indefinitely | Switch to faster model (base → tiny), add GPU, or simplify pipeline |
 | **Phase 2** | Transcription WER >40% on typical audio | Re-evaluate Whisper model or add preprocessing |
-| **Phase 2.6** | Any `2.6-G-*` evidence missing, default-pause contract violated, or unauthorized freeze-scope drift detected | Block Phase 2.7 start, close governance gaps, and rerun audits |
+| **Phase 2.6** | Any `2.6-G-*` evidence missing, audio write delta non-zero, retrieval path returns audio, or config bypass restores audio mainline | Block Phase 2.7 start, close shutdown gaps, and rerun hard-shutdown audits |
 | **Phase 2.7** | Label mismatch rate stays >10% after rollout | Block Phase 3 kickoff, roll back normalization path, and re-baseline provenance logic |
 | **Phase 3** | Search latency >1s p95 | Optimize FTS queries, add caching, or parallelize |
 | **Phase 4** | Hallucination rate >30% | Improve prompt, add more grounding, or switch LLM |
@@ -647,7 +649,8 @@ Placeholder section for Phase 8. This phase is required after MVP and targets en
 | 2.2 | 2026-02-24 | Constrained Phase 2.7 to `T0/new-data-only` evaluation semantics, updated `2.7-S-*` to forward-only new-write integrity, and added required Post-MVP Phase 8 placeholder section. |
 | 2.3 | 2026-02-24 | Added Phase 2.6 hard-governance gates (`2.6-G-*`) with evidence interfaces (`FreezeScopeMatrix`, `ExceptionRequest`, `GateEvidenceManifest`) and made Phase 2.7 explicitly dependent on Phase 2.6 PASS status. |
 | 2.5 | 2026-02-24 | Upgraded Phase 2.6 semantics from governance-only to governance + default full-chain pause; expanded gate evidence contract for capture/processing/UI/search-chat freeze boundaries and exception auto-revert closure. |
+| 2.6 | 2026-02-25 | Replaced Phase 2.6 governance/open-window semantics with Audio Hard Shutdown gates (`capture off`, `processing off`, `retrieval off`, `UI off`, `anti-bypass`) and removed exception workflow dependency. |
 
 ---
 
-**Next Update**: Add Phase 2.6 closure package for default full-chain pause (`2.6-G-*`) plus Phase 2.7 (`timestamp >= T0`) gate evidence package, and append long-run observation artifacts (1-P-02/1-P-03/1-Q-01/1-S-01/1-S-02/1-R-01/1-R-02).
+**Next Update**: Add Phase 2.6 closure package for audio hard shutdown (`2.6-G-*`) plus Phase 2.7 (`timestamp >= T0`) gate evidence package, and append long-run observation artifacts (1-P-02/1-P-03/1-Q-01/1-S-01/1-S-02/1-R-01/1-R-02).

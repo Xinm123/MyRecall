@@ -63,9 +63,9 @@ flowchart LR
 1. `GET /api/v1/search` becomes canonical bounded retrieval primitive.
 2. Empty `q` enters browse/feed over bounded time range.
 3. Search/Chat grounding uses vision-only evidence path; audio candidates are excluded by default.
-4. Timeline target default is video-only; audio access is explicit parameter or approved debug-mode path.
+4. Timeline 默认/标准路径为 video-only；audio 不在主检索路径返回。
 5. WebUI default navigation does not expose audio dashboard entrypoints.
-6. **Audio Freeze 全链路契约（Phase 2.6，Code changes: NONE）**: capture（AudioManager/AudioRecorder，disabled by default）→ processing（VAD/Transcriber/Worker，disabled by default）→ indexing（audio_transcriptions FTS write-path，paused）→ retrieval（vision-only，audio FTS excluded）→ UI（/audio entrypoint hidden by default）；例外通过 ExceptionRequest（TTL + rollback + closure evidence）申请；目标契约文档已发布，代码收敛在 Phase 3。
+6. **Audio Hard Shutdown 全链路契约（Phase 2.6）**: capture（AudioManager/AudioRecorder 关闭）→ processing（VAD/Transcriber/Worker 关闭）→ indexing（audio_transcriptions FTS 写入关闭）→ retrieval（search/timeline 默认与标准路径不返回 audio）→ UI（主导航与主流程无 `/audio` 入口）；无 Exception 开窗流程，偏差即失败信号并触发 `2.6-G-*` 重验证。
 
 ## 4. Failure and Degradation Paths (Current)
 
@@ -73,7 +73,7 @@ flowchart LR
 2. 心跳中断：Control Center 显示 offline，但历史数据仍可读。
 3. 帧文件缺失：`/api/v1/frames/:id` 触发按需抽帧 fallback。
 4. dashboard 无数据：显示空态，不阻断页面加载。
-5. **Audio Freeze 违规应急（Phase 2.6 Rollback Playbook）**: 若 AudioManager/AudioRecorder 在无批准 ExceptionRequest 情况下被激活，立即停止进程（RTO < 2 分钟）；检查 audio_chunks delta；记录 incident 到 exception_register.yaml；触发 2.6-G-01 重验证；详见 `v3/plan/07-phase-2.6-audio-freeze-governance-detailed-plan.md` WB-06。
+5. **Audio Hard Shutdown 违规应急（Phase 2.6 Playbook）**: 若检测到 AudioManager/AudioRecorder 或音频处理链路被激活，立即停止相关进程（RTO < 2 分钟）；检查 `audio_chunks`/`audio_transcriptions` delta；记录 incident 到 `v3/results/phase-2.6-validation.md` Failure Analysis；修复后重跑 `2.6-G-01/02/05`。
 
 ## 5. Screenpipe 对齐层级
 
@@ -87,4 +87,4 @@ flowchart LR
   1. `v3/milestones/roadmap-status.md`
   2. `v3/decisions/ADR-0006-screenpipe-search-contract.md`
   3. `v3/webui/pages/search.md`
-- **Phase 2.6 Audio Freeze 契约维护规则**：任何涉及 audio 模块路径（AudioManager/AudioRecorder/VAD/Transcriber/Worker）的变更，必须先通过 ExceptionRequest 审批，并在 `v3/evidence/phase2.6/exception_register.yaml` 中注册；文档契约（本文件 Section 3 第 6 条 + ROUTE_MAP.md Section 3 Audio 行）同步更新；变更后需重新验证受影响的 `2.6-G-*` gates。
+- **Phase 2.6 Audio Hard Shutdown 契约维护规则**：任何涉及 audio 模块路径（AudioManager/AudioRecorder/VAD/Transcriber/Worker）的变更，必须同步更新本文件与 `v3/webui/ROUTE_MAP.md`，并重新验证受影响的 `2.6-G-*` gates。禁止通过配置或运行模式临时恢复 audio 主链路。

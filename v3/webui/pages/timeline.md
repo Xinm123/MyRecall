@@ -29,7 +29,7 @@
 ## 4. Target Positioning
 
 1. Timeline 在 target 合同中默认返回 video-only（证据主链优先）。
-2. Audio 仅通过显式参数（如 `source=audio`）或审批后的调试模式可见。
+2. Phase 2.6 起，主路径与标准检索路径不返回 audio 项。
 3. Search/Chat grounding 维持 vision-only 主线，不依赖 timeline audio 路径。
 4. 文档语义必须区分 current mixed 现实与 target video-only 默认合同。
 
@@ -50,20 +50,20 @@ flowchart LR
 | 接口 | 方法 | Current | Target |
 |---|---|---|---|
 | `/timeline` | GET | SSR 页面，视觉回看主入口 | 保持 |
-| `/api/v1/timeline` | GET | 默认 mixed；可按 `source` 过滤 | 默认 video-only；audio 仅显式参数/调试模式路径 |
+| `/api/v1/timeline` | GET | 默认 mixed；可按 `source` 过滤 | 默认/标准路径 video-only；不返回 audio |
 | `/api/v1/frames/:id` | GET | 帧图片服务（含 fallback） | 证据 drill-down 基础能力 |
 
 ## 7. 风险与盲点
 
 1. 若把 target 合同误写成 current 现实，会造成排障与验收误判。
 2. 若不声明 target 默认 video-only，Search/Chat 的证据边界会继续被 mixed 语义污染。
-3. 若不保留 explicit audio 调试入口描述，会影响例外流程下的运维可用性。
+3. 若运行时仍可通过配置/模式绕回 audio 返回，会直接违反 2.6-G-05（Anti-Bypass）。
 
 ## 8. 验收清单（文档层）
 
 - [x] 明确 timeline 页面与 timeline API 的语义差异。
 - [x] 明确 `/api/v1/timeline` 当前 mixed 默认行为。
-- [x] 明确 target 合同默认 video-only，audio 仅显式参数/调试模式可见。
+- [x] 明确 target 合同默认/标准路径 video-only，audio 不在主检索路径返回。
 
 ## 9. 相关文档
 

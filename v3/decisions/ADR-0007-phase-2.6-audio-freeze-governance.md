@@ -1,12 +1,12 @@
-# ADR-0007: Phase 2.6 Audio Freeze Governance
+# ADR-0007: Phase 2.6 Audio Hard Shutdown
 
 **Status**: Accepted  
 **SupersededBy**: N/A  
-**Supersedes**: N/A  
+**Supersedes**: 2026-02-24 rev.2（Governance + Exception 语义）  
 **Scope**: target
 
 **Date**: 2026-02-24  
-**Updated**: 2026-02-24 (semantic upgrade: governance-only -> governance + default full-chain pause)
+**Updated**: 2026-02-25（Phase 2.6 语义升级为 Hard Shutdown）
 
 **Deciders**: Product Owner + Chief Architect
 
@@ -16,95 +16,76 @@
 
 ## Context and Problem Statement
 
-Audio Freeze has been documented, but the old Phase 2.6 semantics were still governance-heavy and behavior-light:
+旧版 Phase 2.6（governance + exception）存在运行边界歧义：
 
-1. Freeze semantics were inconsistent across roadmap, gates, and WebUI docs.
-2. Default behavior boundaries were unclear (capture/processing/UI/search/chat).
-3. Existing docs allowed mixed interpretations such as "freeze is active but audio still default-visible."
+1. 文档允许“冻结中但可临时开窗恢复音频主链路”的解释空间。
+2. Search/Timeline/UI 的 audio 可见性没有形成不可绕行约束。
+3. Phase 2.7 前置条件缺乏“音频主链路已完全摘除”的硬证据要求。
 
-The project needs a decision-complete, auditable contract that keeps "Current (verified)" and "Target (contract)" separated while locking a stable MVP boundary.
+项目需要一个可执行、可审计、不可绕过的硬停机合同。
 
 ---
 
 ## Decision Drivers
 
-1. **Auditability**: freeze state must be evidence-backed, not narrative-only.
-2. **Default-safe behavior**: audio should be opt-in by approved exception, not opt-out by convention.
-3. **Reliability**: Phase 2.7 quality evidence must not be contaminated by ungoverned audio drift.
-4. **Security and privacy**: reduce accidental audio collection/processing surface under MVP.
-5. **Delivery focus**: keep Search/Chat vision-only critical path explicit and enforceable.
+1. **Auditability**: 2.6 gate 必须由可复现实证据支撑。
+2. **Boundary clarity**: 明确 MVP 主链路仅保留 vision。
+3. **Reliability**: 避免 audio 残留污染 2.7/3/4 的质量评估。
+4. **Security/Privacy**: 降低默认音频采集与处理风险面。
+5. **Delivery focus**: 在进入 Phase 2.7 前完成硬边界收口。
 
 ---
 
 ## Considered Options
 
-### Option A: Keep governance-only gate (historical baseline)
+### Option A: Governance + Exception（旧方案）
 
-- **Description**: Phase 2.6 remains audit/exception governance without default behavior contract.
+- **Description**: 通过 ExceptionRequest 管理临时启用音频。
 - **Pros**:
-  - Lowest doc-change cost.
-  - Minimal migration effort.
+  - 迁移成本低。
+  - 保留调试便利性。
 - **Cons**:
-  - Cannot constrain default runtime posture at contract level.
-  - Leaves WebUI/search/timeline semantics open to drift.
+  - 主链路可被配置/流程回开。
+  - 审计边界依赖流程执行质量，风险较高。
 
-### Option B: Governance + default full-chain pause (Chosen)
+### Option B: Hard Shutdown（Chosen）
 
-- **Description**: Phase 2.6 governs and defines audio default posture end-to-end.
+- **Description**: Phase 2.6 直接执行音频主链路硬停机，移除例外开窗机制。
 - **Pros**:
-  - Makes freeze semantics decision-complete across capture, processing, UI, search/chat.
-  - Reduces ambiguity in phase-gate evidence and operational expectations.
-  - Supports controlled exceptions with explicit TTL and closure evidence.
+  - 边界清晰，不可绕过。
+  - 与 `2.6-G-*` gate 一一对齐。
+  - 为 Phase 2.7 提供稳定前置条件。
 - **Cons**:
-  - Requires synchronized document updates across ADR/gates/roadmap/WebUI docs.
-  - Adds governance overhead for temporary enablement.
-
-### Option C: Full audio retirement from active docs
-
-- **Description**: Remove audio from active contract surfaces entirely.
-- **Pros**:
-  - Smallest default privacy surface.
-  - Simplest mainline messaging.
-- **Cons**:
-  - Conflicts with existing historical implementation and ops troubleshooting needs.
-  - Higher future re-entry cost.
+  - 需要同步更新多份文档并完成代码收敛。
 
 ---
 
 ## Decision Outcome
 
-Adopt **Option B**.
+Adopt **Option B（Hard Shutdown）**。
 
 ### What is locked
 
-1. Insert **Phase 2.6** between Phase 2.5 and Phase 2.7 as a hard gate.
-2. Phase 2.6 is now **governance + default full-chain pause**, not governance-only.
-3. Default audio behavior contract:
+1. Phase 2.6 是 **Audio Hard Shutdown**，不是治理窗口。
+2. 必须同时满足以下约束：
    - No automatic audio capture.
    - No automatic audio processing/transcription/indexing.
-   - WebUI default path does not show audio entrypoints/results.
-   - Search/Chat contract excludes audio grounding.
-4. Audio may be enabled only through approved `ExceptionRequest` with TTL, rollback plan, and closure evidence.
-5. Phase 2.7 start condition remains `Phase 2.6 = GO`.
-
-### Governance interfaces (document-layer only)
-
-- `FreezeScopeMatrix`
-  - Added required fields: `default_capture_state`, `default_processing_state`, `ui_default_visibility`, `search_chat_modalities`.
-- `ExceptionRequest`
-  - Added required fields: `enable_window`, `auto_revert_rule`, `closure_evidence`.
-- `GateEvidenceManifest`
-  - Added required fields: `contract_scope`, `exception_link`.
+   - No audio retrieval in default search/timeline path.
+   - No audio entrypoints in MVP primary UI path.
+   - No runtime/config bypass that restores audio mainline.
+3. **No Exception Workflow**：Phase 2.6 合同内不再保留 ExceptionRequest/TTL 临时开窗流程。
+4. Phase 2.7 仅在 `2.6-G-01..05` 全部 PASS 后启动。
 
 ---
 
 ## Contract Implications (Target)
 
-1. `GET /api/v1/search`: vision-only contract path for Search/Chat grounding.
-2. `GET /api/v1/timeline`: target default is video-only; audio access is explicit parameter/debug-mode path.
-3. `POST /api/v1/chat`: evidence contract is limited to vision sources.
+1. `GET /api/v1/search`: 默认/标准路径不返回 audio。
+2. `GET /api/v1/timeline`: 默认/标准路径不返回 audio。
+3. WebUI 主导航不暴露 audio 主入口。
+4. 音频历史数据仅用于离线审计，不进入 MVP 主路径。
 
-This ADR defines target contract semantics. It does not claim all code paths are already converged.
+This ADR defines target contract semantics. It does not claim all code paths are already converged at document update time.
 
 ---
 
@@ -112,38 +93,38 @@ This ADR defines target contract semantics. It does not claim all code paths are
 
 ### Positive
 
-- Reduces freeze ambiguity and documentation drift.
-- Improves incident attribution and exception traceability.
-- Lowers default audio privacy surface in MVP documentation contract.
+- 清除文档和实现边界歧义。
+- 降低音频链路误激活概率。
+- 提高 2.7 启动前的可审计性。
 
 ### Negative
 
-- Increases doc synchronization burden.
-- Requires stricter exception governance operations.
+- 需要一次性完成文档与代码的联动收敛。
+- 对历史调试路径提出更严格约束。
 
 ### Neutral
 
-- No immediate runtime code mutation is introduced by this ADR alone.
+- 历史音频数据可保留但不作为主链路数据源。
 
 ---
 
 ## Rollback Conditions
 
-Rollback this ADR only if one of the following is true:
+Rollback this ADR only if:
 
-1. Organization-wide release-control framework supersedes phase-gate governance.
-2. MVP critical path is rebaselined and Phase 2.7 is removed.
-3. Hard evidence shows default full-chain pause increases delivery risk more than risk reduction value.
+1. 组织级别发布控制策略替代当前 phase-gate 体系；或
+2. MVP 关键路径被重排且 Phase 2.6 不再作为前置硬门槛。
 
 If rolled back:
+
 - Mark this ADR as `Superseded`.
-- Publish replacement ADR with explicit freeze behavior semantics.
-- Update roadmap + gates + WebUI contract docs in one change set.
+- Publish replacement ADR with explicit phase boundary semantics.
+- Update roadmap + gates + webui docs in one synchronized change set.
 
 ---
 
 ## Implementation Notes
 
 - Gate authority: `v3/metrics/phase-gates.md`
-- Roadmap and sequencing authority: `v3/milestones/roadmap-status.md`
-- Search/Chat contract context: `v3/decisions/ADR-0006-screenpipe-search-contract.md`
+- Roadmap authority: `v3/milestones/roadmap-status.md`
+- Detailed plan: `v3/plan/07-phase-2.6-audio-freeze-governance-detailed-plan.md`

@@ -144,50 +144,44 @@ flowchart LR
 
 ---
 
-## 10. Phase 2.6 Freeze Status
+## 10. Phase 2.6 Hard Shutdown Status
 
-**Phase**: 2.6 Audio Freeze Governance
-**状态**: ⬜️ Planned（未执行；本节内容均为计划态契约，不是 Done/Pass 预写）
-**Code Changes**: NONE
-**权威文档**: `v3/decisions/ADR-0007-phase-2.6-audio-freeze-governance.md`，`v3/metrics/phase-gates.md`
+**Phase**: 2.6 Audio Hard Shutdown  
+**状态**: ⬜️ Planned（未执行；本节内容为目标契约，不预写 Done/Pass）  
+**Code Changes**: REQUIRED（Phase 2.6 要求对运行链路做硬停机收敛）  
+**权威文档**: `v3/metrics/phase-gates.md`，`v3/plan/07-phase-2.6-audio-freeze-governance-detailed-plan.md`
 
-### 10.1 `/audio` 页面在 Phase 2.6 中的地位
+### 10.1 `/audio` 页面在 Phase 2.6 的合同定位
 
-| 维度 | Current Behavior | Phase 2.6 Target Contract | 收敛阶段 |
-|------|-----------------|--------------------------|--------|
-| 页面可访问性 | **可访问**（URL 直接打开，返回 200） | 保持 可访问（历史兼容）；不在 Phase 2.6 封锁 | N/A |
-| Nav 图标常驻 | **常驻**（Phase 2.5 实现 5-page toolbar） | Phase 2.6 **target：默认不渲染** | Phase 3 代码收敛 |
-| 页面内容 searchability | **不索引**（音频配置可见，但 audio 数据默认不采集） | 保持现状；展示"暂停采集"状态标识（计划态） | Phase 3 |
-| Audio FTS 检索 | 技术上可调用 | **Phase 2.6 target：配置总记中标记 vision-only**；代码封锁 Phase 3 | Phase 3 |
+| 维度 | Current Behavior | Phase 2.6 Target Contract |
+|------|------------------|---------------------------|
+| 页面可访问性 | 可直接访问 `/audio` | 可保留历史路径，但不属于 MVP 主路径 |
+| 主导航入口 | Nav 中常驻 Audio 图标 | 主导航与主流程不暴露 audio 入口（2.6-G-04） |
+| 检索链路 | search/timeline 可能混入 audio 结果 | search/timeline 默认与标准路径不返回 audio（2.6-G-03） |
+| 音频写入链路 | 采集/处理链路仍存在可触发路径 | capture/processing/indexing 全部关闭（2.6-G-01/02） |
 
-### 10.2 Audio 全链路冻结范围（FreezeScopeMatrix 摘要）
+### 10.2 Audio 关闭范围（Hard Shutdown Scope）
 
-| 模块 | 路径 | 冻结状态 |
-|------|------|----------|
-| `AudioManager` | `openrecall/client/audio_manager.py` | **disabled by default** |
-| `AudioRecorder` | `openrecall/client/audio_recorder.py` | **disabled by default** |
-| `VoiceActivityDetector` | `openrecall/server/audio/vad.py` | **disabled by default** |
-| `WhisperTranscriber` | `openrecall/server/audio/transcriber.py` | **disabled by default** |
-| `AudioChunkProcessor` | `openrecall/server/audio/processor.py` | **disabled by default** |
-| `AudioProcessingWorker` | `openrecall/server/audio/worker.py` | **disabled by default** |
-| `audio_transcriptions_fts` | SQLite FTS5 table | **write-path paused** |
-| `search_audio_fts()` | `openrecall/server/search/engine.py` | **vision-only（excluded）** |
-| Audio nav icon | `layout.html` | **target: hidden by default** |
+| 模块 | 路径 | Phase 2.6 目标状态 |
+|------|------|---------------------|
+| `AudioManager` | `openrecall/client/audio_manager.py` | off |
+| `AudioRecorder` | `openrecall/client/audio_recorder.py` | off |
+| `VoiceActivityDetector` | `openrecall/server/audio/vad.py` | off |
+| `WhisperTranscriber` | `openrecall/server/audio/transcriber.py` | off |
+| `AudioChunkProcessor` | `openrecall/server/audio/processor.py` | off |
+| `AudioProcessingWorker` | `openrecall/server/audio/worker.py` | off |
+| `audio_transcriptions` / `audio_transcriptions_fts` | SQLite | write-path off |
+| `search_audio_fts()` | `openrecall/server/search/engine.py` | excluded |
+| Audio nav icon | `layout.html` | hidden in MVP main nav |
 
-### 10.3 关联 Gates
+### 10.3 Gate 对应关系
 
-- **2.6-G-01**: Default capture pause — `AudioManager`/`AudioRecorder` 默认不启动
-- **2.6-G-02**: Default processing pause — VAD/Transcriber/Worker 默认不启动
-- **2.6-G-03**: UI/retrieval contract — `/audio` 入口默认隐藏；Search vision-only；Timeline target video-only—**本页此节即是 2.6-G-03 的主要 evidence artifact**
+- **2.6-G-01 Capture Off**: 默认运行 24h，`audio_chunks` delta = 0  
+- **2.6-G-02 Processing Off**: 默认运行 24h，`audio_transcriptions` delta = 0 且无 audio worker  
+- **2.6-G-03 Retrieval Off**: `/api/v1/search` 与 `/api/v1/timeline` 不返回 audio  
+- **2.6-G-04 UI Off**: 主导航与主流程无 audio entrypoints  
+- **2.6-G-05 Anti-Bypass**: 配置/模式切换不能恢复 audio 主链路
 
-### 10.4 例外运用（ExceptionRequest）
+### 10.4 Policy Clarification
 
-若需临时开启 audio 功能（如 debug 录音测试）：
-
-1. 提交 `ExceptionRequest`（字段：request_id / severity / reason / impact_scope / ttl / approvers）
-2. 得到 Product Owner + Chief Architect 双签批准（P0）或 Product Owner 单签（P1）
-3. 在 `enable_window` 内运行；TTL 到期自动回滇
-4. 关闭阶段提交 `closure_evidence`（包含 `revert_timestamp` + `no_drift_check`）
-5. 更新 `v3/evidence/phase2.6/exception_register.yaml` 中对应记录为 CLOSED
-
-**详细 template 见**: `v3/plan/07-phase-2.6-audio-freeze-governance-detailed-plan.md` WB-02 / Appendix B
+Phase 2.6 合同中不保留 ExceptionRequest/TTL 临时开窗机制。若检测到 audio 主链路被激活，按 incident 处理并重跑受影响的 `2.6-G-*` gates。

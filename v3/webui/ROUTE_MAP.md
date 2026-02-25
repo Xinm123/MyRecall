@@ -11,7 +11,7 @@
 | Video Dashboard | `/video` | `openrecall/server/app.py:video()` | `video.html` |
 | Control Center | 布局内组件 | `layout.html` 前端脚本 | `layout.html` |
 
-> Target contract note: `/audio` 页面属于非默认路径；仅在审批后的调试模式中显式可见。
+> Target contract note: `/audio` 页面不属于 MVP 主路径；Phase 2.6 主导航与主流程不暴露 audio 入口。
 
 ## 2. 页面依赖 API（Current）
 
@@ -56,9 +56,9 @@
 | `/api/v1/search` empty `q` | 空分页 | browse/feed（有界范围） | — |
 | `/api/v1/search` `start_time` | 未强制 | 强制（MyRecall policy） | — |
 | Search modality | 仍可能混入 audio candidate | Search/Chat grounding 走 vision-only | **Phase 2.6 target：audio 候选默认排除**；ADR-0005 vision-only contract |
-| WebUI audio visibility | `/audio` 页面可见 | 默认隐藏 audio 入口；仅调试模式可见 | **Phase 2.6 target：默认隐藏**；Current 为可见（已知 deviation，Phase 3 收敛） |
-| `/api/v1/timeline` | mixed 默认 | target 默认 video-only；audio 仅显式参数/调试模式 | **Phase 2.6 target：video-only**；Current mixed（已知 deviation，Phase 3 收敛） |
-| Audio nav icon | nav toolbar 常驻 | 默认不渲染 | **Phase 2.6 target：默认不渲染**；Current 常驻（已知 deviation，Phase 3 收敛） |
+| WebUI audio visibility | `/audio` 页面可见 | MVP 主导航与主流程不暴露 audio 入口 | **2.6-G-04（UI Off）**：主路径无 audio entrypoint |
+| `/api/v1/timeline` | mixed 默认 | 默认/标准路径仅 video（audio 不返回） | **2.6-G-03（Retrieval Off）**：timeline 不含 audio 结果 |
+| Audio nav icon | nav toolbar 常驻 | 默认不渲染 | **2.6-G-04（UI Off）**：主导航无 audio icon |
 
 ## 4. Screenpipe 对齐说明
 

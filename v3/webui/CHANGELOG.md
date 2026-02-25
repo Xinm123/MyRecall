@@ -191,29 +191,29 @@
 
 ---
 
-## Phase 2.6: Audio Freeze Governance WebUI Contract（计划态）
+## Phase 2.6: Audio Hard Shutdown WebUI Contract（计划态）
 
 **日期**: 2026-02-25（计划；实际执行时更新）
 **状态**: ⬜️ Planned
 **Phase 2.6 详细计划**: `v3/plan/07-phase-2.6-audio-freeze-governance-detailed-plan.md`
-**Code Changes**: NONE（本阶段仅更新文档契约）
+**Code Changes**: REQUIRED（本阶段包含运行链路硬停机实施）
 
 ### 变更内容（计划态，非 Done）
 
 | 变更项 | 文件 | 当前行为 | 目标契约（Phase 2.6 声明） | 收敛阶段 |
 |--------|------|---------|--------------------------|---------|
-| `/audio` 页面可见性契约 | `v3/webui/ROUTE_MAP.md` | 可见（nav icon 常驻） | **默认隐藏**；仅 debug 模式或批准 ExceptionRequest 激活期可见 | 文档声明（Phase 3 代码收敛） |
-| Audio nav icon 渲染 | `v3/webui/ROUTE_MAP.md` | 5-page toolbar 常驻 | **Phase 2.6 target：默认不渲染** | Phase 3 |
-| Search/Chat grounding 模态 | `v3/webui/DATAFLOW.md` | 可能混入 audio candidate | **vision-only**；audio 候选默认排除 | Phase 3 → Phase 4 |
-| Timeline 默认显示范围 | `v3/webui/DATAFLOW.md` | mixed 默认（video + audio） | **target 默认 video-only**；audio 仅 explicit param/debug | Phase 3 |
-| Audio Freeze 全链路契约 | `v3/webui/DATAFLOW.md` | 无 freeze contract 条目 | 新增 Section 3 第 6 条（Audio Freeze 全链路契约声明） | Phase 2.6 |
-| `/audio` 页面 Phase 2.6 状态标注 | `v3/webui/pages/audio.md` | 无 freeze 状态标注 | 新增 Section 10：Phase 2.6 Freeze Status | Phase 2.6 |
-| `/video` 页面 Phase 2.6 对比说明 | `v3/webui/pages/video.md` | 无 Phase 2.6 说明 | 新增 Section 10：Phase 2.6 Freeze Scope — Video 不受影响的声明 | Phase 2.6 |
+| `/audio` 页面可见性契约 | `v3/webui/ROUTE_MAP.md` | 可见（nav icon 常驻） | 主导航/主流程不暴露 audio 入口 | Phase 2.6 |
+| Audio nav icon 渲染 | `v3/webui/ROUTE_MAP.md` | 5-page toolbar 常驻 | 默认不渲染 | Phase 2.6 |
+| Search/Chat grounding 模态 | `v3/webui/DATAFLOW.md` | 可能混入 audio candidate | vision-only；audio 候选排除 | Phase 2.6 |
+| Timeline 默认显示范围 | `v3/webui/DATAFLOW.md` | mixed 默认（video + audio） | 默认/标准路径 video-only（不返回 audio） | Phase 2.6 |
+| Audio Hard Shutdown 全链路契约 | `v3/webui/DATAFLOW.md` | 仅 freeze 叙述 | capture/processing/indexing/retrieval/UI 全链路 hard shutdown | Phase 2.6 |
+| `/audio` 页面 Phase 2.6 状态标注 | `v3/webui/pages/audio.md` | 无 hard shutdown 状态标注 | 新增 Section 10：Phase 2.6 Hard Shutdown Status | Phase 2.6 |
+| `/video` 页面 Phase 2.6 对比说明 | `v3/webui/pages/video.md` | 无 Phase 2.6 说明 | 新增 Section 10：Phase 2.6 Hard Shutdown Scope — Video 不受影响声明 | Phase 2.6 |
 
 ### 关联 Gates（authority: `v3/metrics/phase-gates.md`）
 
-- 2.6-G-03: UI/retrieval contract verified — 本批文档更新是 2.6-G-03 的主要 evidence artifact
-- 2.6-G-01/G-02: Capture/Processing pause — WebUI 入口契约间接支撑
+- 2.6-G-03（Retrieval Off）：search/timeline 主路径不返回 audio
+- 2.6-G-04（UI Off）：主导航与主流程无 audio entrypoints
 
 ### 验证命令（计划态）
 

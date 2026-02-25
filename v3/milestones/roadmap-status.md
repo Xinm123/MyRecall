@@ -1,23 +1,22 @@
 # MyRecall-v3 Roadmap Status Tracker
 
-**Last Updated**: 2026-02-24T22:10:00Z
-**Overall Status**: 🟩 Phase 0 Complete / 🟩 Phase 1 Complete / 🟩 Phase 2.5 Complete / ⏸ Audio (Phase 2.0/2.1) Paused / ⬜ Phase 2.6 Audio Freeze Governance / ⬜ Phase 2.7 Label Alignment Gate / ⬜ Phase 3 Vision Search / ⬜ Phase 4 Vision Chat / ⬜ Phase 5 Deployment / ⬜ Phase 8 Full Alignment
+**Last Updated**: 2026-02-25T16:00:00Z
+**Overall Status**: 🟩 Phase 0 Complete / 🟩 Phase 1 Complete / 🟩 Phase 2.5 Complete / ⏸ Audio (Phase 2.0/2.1) Paused / ⬜ Phase 2.6 Audio Hard Shutdown / ⬜ Phase 2.7 Label Alignment Gate / ⬜ Phase 3 Vision Search / ⬜ Phase 4 Vision Chat / ⬜ Phase 5 Deployment / ⬜ Phase 8 Full Alignment
 **Target Completion**: Week 22 (2026-07-04) remains the outer bound for MVP deployment (Phase 3-5). Audio is excluded from MVP scope under the vision-only pivot.
 
 ---
 
-## Roadmap Revision (2026-02-24, rev.2)
+## Roadmap Revision (2026-02-25, rev.3)
 
-This revision inserts a standalone governance phase between Phase 2.5 and Phase 2.7:
+This revision fully replaces the former Phase 2.6 governance/open-window design:
 
-- **Phase 2.6 Added**: `Audio Freeze Governance` as a hard governance gate.
+- **Phase 2.6 Renamed/Reframed**: `Audio Hard Shutdown` (not governance-only).
 - **Hard Gate Policy**: Phase 2.7 cannot start until Phase 2.6 gates (`2.6-G-*`) are all PASS.
-- **Governance Scope**: frozen client/server audio modules plus critical audio-related config keys, with default full-chain pause contract.
-- **Default Contract**: no auto capture, no auto processing/indexing, no default audio UI visibility, no Search/Chat audio grounding.
-- **Controlled Exception Path**: only approved P0/P1 fixes can temporarily bypass freeze, with mandatory TTL, rollback, and closure evidence.
-- **Alignment Strategy**: follow screenpipe quality-gate and rollback discipline principles, while preserving MyRecall phase-gate control model.
+- **Contract Scope**: no audio capture, no audio processing/indexing, no audio retrieval usage in timeline/search, no audio UI primary entrypoints.
+- **No Exception Workflow**: remove ExceptionRequest/TTL temporary enablement path from Phase 2.6 contract.
+- **Execution Outcome**: audio is removed from MVP runtime mainline, and vision-only contract is enforced before Phase 2.7.
 
-This revision does not re-open audio feature scope. It formalizes freeze governance so downstream quality evidence remains auditable.
+This revision supersedes the 2026-02-24 rev.2 Phase 2.6 semantics.
 
 ## Roadmap Revision (2026-02-24)
 
@@ -51,7 +50,7 @@ This revision **supersedes** the 2026-02-14 decision that made Phase 2.1 audio p
 | Phase 1: Video Recording | Historical Week 3-6 | Engineering complete; long-run evidence deferred | 🟩 Complete |
 | Phase 2.x: Audio (2.0/2.1) | Frozen branch | Not on MVP critical path | ⏸ Paused |
 | Phase 2.5: WebUI Dashboards | Historical mini-sprint (~5 days) | Completed 2026-02-12 | 🟩 Complete |
-| Phase 2.6: Audio Freeze Governance | **R1** | Hard governance lock before any pre-Phase-3 quality hardening | ⬜️ Not Started |
+| Phase 2.6: Audio Hard Shutdown | **R1** | Hard shutdown of audio chain before any pre-Phase-3 quality hardening | ⬜️ Not Started |
 | Phase 2.7: Frame Label Alignment Gate | **R2** | Immediate quality hard-gate before Phase 3 kickoff | ⬜️ Not Started |
 | Phase 3: Vision Search Parity | **R3-R4** | Starts only after Phase 2.7 GO; bounded by Week 22 outer deadline | ⬜️ Not Started |
 | Phase 4: Vision Chat MVP | **R5-R6** | Assigned after Phase 3 completion; bounded by Week 22 | ⬜️ Not Started |
@@ -75,9 +74,9 @@ Target documents remain authoritative. The table below records known implementat
 | `/api/v1/search` browse mode | `q` optional; empty/missing `q` returns browse feed ordered by `timestamp DESC` | Empty/missing `q` returns empty paginated payload | Implement browse/feed retrieval path in Phase 3 |
 | `/api/v1/search` time bounds | `start_time` required; `end_time` optional | `start_time` is not enforced at route level | Enforce request validation in Phase 3 |
 | Search modality | Vision-only for Search/Chat | Search engine still includes audio FTS candidates | Add vision-only enforcement for Search/Chat path in Phase 3 |
-| Frame label provenance | Per-frame label truth with source traceability for search grounding | Most frame labels still inherit chunk-level fallback (low granularity under intra-chunk app/window switch) | Lock freeze scope in Phase 2.6, then implement and gate in Phase 2.7 before Phase 3 |
+| Frame label provenance | Per-frame label truth with source traceability for search grounding | Most frame labels still inherit chunk-level fallback (low granularity under intra-chunk app/window switch) | Complete audio hard shutdown in Phase 2.6, then implement and gate Phase 2.7 before Phase 3 |
 | `/api/v1/chat` | Phase 4 endpoint returns `answer + evidence[]` | Endpoint not implemented yet | Deliver Phase 4 API + evidence contract |
-| `/api/v1/timeline` | Chat/Search MVP depends on vision-only evidence path; target contract defaults timeline to video-only (audio only via explicit parameter/debug mode) | Timeline currently returns mixed video+audio by default | Introduce target default video-only contract in docs; keep current mixed behavior documented until convergence |
+| `/api/v1/timeline` | Chat/Search MVP depends on vision-only evidence path; target contract is timeline video-only with no audio results | Timeline currently returns mixed video+audio by default | Introduce target timeline no-audio contract in docs; keep current mixed behavior documented until convergence |
 
 This section must be updated whenever code reality changes or when convergence work lands.
 
@@ -413,32 +412,30 @@ This section must be updated whenever code reality changes or when convergence w
 
 ---
 
-### Phase 2.6: Audio Freeze Governance (Hard Governance Gate)
+### Phase 2.6: Audio Hard Shutdown (Hard Gate Before Phase 2.7)
 **Status**: ⬜️ Not Started
 **Planned**: Relative R1 (must pass before Phase 2.7 starts)
 **Actual**: TBD
-**Estimated Duration**: 4 working days
+**Estimated Duration**: 5 working days
 **Owner**: Product Owner + Chief Architect
 **Detailed Plan**: `v3/plan/07-phase-2.6-audio-freeze-governance-detailed-plan.md`
-**Authority Docs**: `v3/decisions/ADR-0007-phase-2.6-audio-freeze-governance.md`, `v3/metrics/phase-gates.md`, `v3/milestones/roadmap-status.md`
-**Decision Record**: `v3/decisions/ADR-0007-phase-2.6-audio-freeze-governance.md`
+**Authority Docs**: `v3/metrics/phase-gates.md`, `v3/milestones/roadmap-status.md`, `v3/plan/07-phase-2.6-audio-freeze-governance-detailed-plan.md`
+**Decision Record**: 2026-02-25 rev.3（本文件 Revision 区块）
 **Evidence Directory**: `v3/evidence/phase2.6/` (计划态；执行期填充)
 
 **Purpose**:
-- Turn Audio Freeze into an auditable control phase with default full-chain pause semantics.
-- Lock client/server audio code + config boundaries and default behavior boundaries.
-- Keep Search/Chat target contract vision-only and timeline target contract default video-only.
-- Provide controlled P0/P1 exception workflow with TTL + rollback + closure evidence.
-- Produce evidence package required for Phase 2.7 kickoff.
+- Fully stop audio capture and processing chains in runtime paths.
+- Ensure timeline/search are vision-only and do not consume audio data.
+- Remove audio entrypoints from MVP UI primary navigation path.
+- Produce hard evidence package proving audio chain cannot be reactivated by standard runtime/config usage.
 
-**Code Changes**: NONE（本阶段仅产出文档；工程变更在 Phase 3 收敛）
+**Code Changes**: REQUIRED（本阶段包含音频链路下线工程，不再是纯文档阶段）
 
 **Dependencies**:
 
 | Dependency | Source | Status |
 |------------|--------|--------|
 | Phase 2.5 Go/No-Go = GO | `v3/results/phase-2.5-validation.md` | ✅ Satisfied |
-| ADR-0007 Accepted | `v3/decisions/ADR-0007-*.md` | Must confirm before execution |
 | `2.6-G-*` gate definitions exist in phase-gates.md | `v3/metrics/phase-gates.md` | ✅ Confirmed |
 | Phase 2.7 not yet In Progress | `v3/milestones/roadmap-status.md` | ✅ Satisfied |
 
@@ -446,43 +443,37 @@ This section must be updated whenever code reality changes or when convergence w
 
 | Day | Focus | Deliverable |
 |-----|-------|-------------|
-| D1 | FreezeScopeMatrix + ExceptionRequest template | WB-01 + WB-02 drafts |
-| D2 | GateEvidenceManifest + 双层采证方案（20 分钟预检 + 24h 正式验收） | WB-03 + WB-04 drafts |
-| D3 | WebUI contract 更新（5 文件）+ Rollback Playbook | WB-05 + WB-06 |
-| D4 | Gate Traceability 自审 + Checklist + validation template | WB-07 + D-08 + D-09 |
-
-**Governance Interfaces**:
-- `FreezeScopeMatrix`（五维度：capture/processing/indexing/retrieval/UI）
-- `ExceptionRequest`（申请→审批→TTL→auto-revert→closure evidence）
-- `GateEvidenceManifest`（`2.6-G-*` 到 evidence artifact 路径的映射）
+| D1 | Contract freeze + implementation scope lock | 新路线图定稿 + 目标文件清单 |
+| D2 | Capture/processing shutdown | 音频采集与处理链路下线 |
+| D3 | Retrieval/UI hard cut | timeline/search 去音频 + UI 入口移除 |
+| D4 | Config anti-bypass + regression | 配置绕过封堵 + 关键回归通过 |
+| D5 | Evidence packaging + gate review | `2.6-G-*` 验收证据与 Go/No-Go 包 |
 
 **Go/No-Go Gates** (authority: `v3/metrics/phase-gates.md`):
-- [ ] 2.6-G-01: Default capture pause verified (no automatic audio capture in freeze mode).
-- [ ] 2.6-G-02: Default processing pause verified (no automatic VAD/transcribe/index in freeze mode).
-- [ ] 2.6-G-03: UI/retrieval contract verified (audio hidden by default; Search/Chat vision-only; timeline target default video-only).
-- [ ] 2.6-G-04: Exception workflow closure validated (approved exceptions closed with TTL + rollback + closure evidence).
-- [ ] 2.6-G-05: Drift and rollback readiness validated (no unauthorized drift; rollback objective <2 minutes).
+- [ ] 2.6-G-01: Capture Off（24h 窗口 `audio_chunks` 增量 = 0）。
+- [ ] 2.6-G-02: Processing Off（24h 窗口 `audio_transcriptions` 增量 = 0，且无音频处理 worker）。
+- [ ] 2.6-G-03: Retrieval Off（timeline/search 音频项 = 0）。
+- [ ] 2.6-G-04: UI Off（主导航及主交互流不暴露 audio 入口）。
+- [ ] 2.6-G-05: Anti-Bypass（配置或模式切换无法恢复音频主链路）。
 
 **Review Checkpoints**:
 
 | Checkpoint | When | Reviewer | Purpose |
 |-----------|------|----------|---------|
-| WB-01/02 draft review | D1 end | Chief Architect | FreezeScopeMatrix 完整性 + ExceptionRequest 字段审核 |
-| WB-03/04 draft review | D2 end | Product Owner | GateEvidenceManifest 可追溯性 + 采证方案可行性 |
-| WebUI docs review | D3 end | Chief Architect | 5 个文件更新正确性 + Rollback Playbook 三场景 |
-| Go/No-Go Review | D4 | Product Owner + Chief Architect | `2.6-G-*` 全部 PASS；所有 evidence artifact 存在 |
+| Scope lock review | D1 end | Chief Architect | 下线范围与文件清单准确性 |
+| Runtime cut review | D3 end | Product Owner | 主链路去音频完成度 |
+| Regression review | D4 end | Chief Architect | 无音频回流与无旁路 |
+| Go/No-Go Review | D5 | Product Owner + Chief Architect | `2.6-G-*` 全部 PASS；证据完整 |
 
 **Open Questions**:
 
 | # | Question | Owner | Status |
 |---|----------|-------|--------|
-| OQ-01 | Rollback RTO 目标是否需从 "< 2 分钟" 放宽？ | Product Owner | Pending |
-| OQ-02 | Phase 2.6 执行期间是否有预审请 ExceptionRequest？ | Product Owner | Pending |
-| OQ-03 | `/audio` nav icon 隐藏是否需 Phase 2.6 代码实现，还是 Phase 3 收敛？ | Chief Architect | 默认：Phase 3 收敛，Code changes: NONE |
-| OQ-04 | Drift Audit 范围是否含 `.sh`、`.env`、`config/` 目录？ | Chief Architect | 默认：包含 |
-| OQ-05 | `v3/evidence/phase2.6/` 是否纳入 Git 版本控制？ | Product Owner | 默认：纳入 |
+| OQ-01 | 历史 audio 数据是否仅保留离线审计访问（不对产品接口暴露）？ | Product Owner | Pending |
+| OQ-02 | `/audio` 路由是否完全移除还是仅保留内部 debug-only？ | Chief Architect | Pending |
+| OQ-03 | `v3/evidence/phase2.6/` 是否纳入 Git 版本控制？ | Product Owner | 默认：纳入 |
 
-**Blockers**: Blocks Phase 2.7 until all `2.6-G-*` gates PASS.
+**Blockers**: Blocks Phase 2.7 until all `2.6-G-*` hard-shutdown gates PASS.
 
 ---
 
@@ -513,7 +504,7 @@ This section must be updated whenever code reality changes or when convergence w
 - [ ] Resource growth bounded (CPU <=+12%, storage <=+10%).
 - [ ] No API compatibility regression and no unsafe migration side effects.
 
-**Blockers**: Phase 2.6 hard-governance gate not completed.
+**Blockers**: Phase 2.6 hard-shutdown gate not completed.
 
 ---
 
@@ -809,20 +800,20 @@ This section tracks questions that have been resolved through architectural deci
 
 ---
 
-### ✅ Resolution 6: Phase 2.6 Hard Freeze Governance Before Phase 2.7 (2026-02-24)
+### ✅ Resolution 6: Phase 2.6 Audio Hard Shutdown Before Phase 2.7 (2026-02-25)
 
-**Original Question**: Should audio freeze remain a roadmap note, or become a standalone auditable gate?
+**Original Question**: Should Phase 2.6 keep governance+exception semantics, or move to complete audio shutdown?
 
 **Decision**:
-- Add standalone **Phase 2.6** between Phase 2.5 and Phase 2.7.
-- Upgrade Phase 2.6 semantics from governance-only to governance + default full-chain pause contract.
-- Define hard gates `2.6-G-*` for default capture pause, default processing pause, UI/retrieval contract lock, exception closure, and drift/rollback readiness.
-- Allow only approved P0/P1 exception workflow with TTL, rollback, and closure evidence.
+- Keep standalone **Phase 2.6** between Phase 2.5 and Phase 2.7.
+- Replace governance/open-window semantics with **Audio Hard Shutdown** semantics.
+- Define hard gates `2.6-G-*` for capture off, processing off, retrieval off, UI off, and anti-bypass.
+- Remove ExceptionRequest/TTL temporary enablement path from Phase 2.6 contract.
 
 **Rationale**:
-- Prevents governance controls from being mixed into feature-change phases.
-- Improves traceability, auditability, and incident handling.
-- Reduces noise contamination and accidental audio-surface expansion before Phase 2.7 quality evidence collection.
+- Matches product direction: vision-only retrieval with zero audio dependency.
+- Reduces accidental data collection and operational ambiguity.
+- Eliminates policy loopholes where audio could re-enter MVP through temporary exceptions.
 
 ---
 
@@ -862,7 +853,7 @@ This section tracks questions that have been resolved through architectural deci
 
 The following open questions are currently active and must be resolved before corresponding execution gates:
 
-1. **Phase 2.6 evidence granularity**: What exact artifact schema is required for exception-closure evidence so that review is deterministic?
+1. **Phase 2.6 history policy**: Historical audio data should be retained audit-only, or include one-time cleanup policy?
 2. **Phase 2.7 baseline lock**: Which concrete dataset snapshot ID is frozen as the Phase 1.5 comparison baseline for mismatch/P@10 checks?
 3. **Phase 3 browse semantics transition**: During migration from empty-q=empty-payload to empty-q=browse-feed, what compatibility notice window is required for existing callers?
 
@@ -874,6 +865,7 @@ The following open questions are currently active and must be resolved before co
 
 | Date | Type | Description | Impact |
 |------|------|-------------|--------|
+| 2026-02-25 | Hard Shutdown Replan | Replaced Phase 2.6 governance/open-window roadmap with Audio Hard Shutdown roadmap (`no capture`, `no processing`, `no timeline/search audio`, `no exception path`). | Aligns Phase 2.6 directly with vision-only MVP boundary and removes audio re-entry ambiguity |
 | 2026-02-24 | Freeze Contract Upgrade | Upgraded Phase 2.6 from governance-only to governance + default full-chain pause contract (`no auto capture/processing`, `no default audio UI`, `no Search/Chat audio grounding`) and removed dependency on missing plan file. | Clarifies default behavior boundary and closes governance/documentation gap before Phase 2.7 |
 | 2026-02-24 | Governance Hardening | Added Phase 2.6 Audio Freeze Governance as a standalone hard gate with explicit exception workflow and evidence contract. | Converts freeze from status text to auditable control; Phase 2.7 start now gated by `2.6-G-*` closure |
 | 2026-02-24 | Scope Hardening | Added Phase 2.7 Frame Label Alignment as hard pre-Phase-3 gate; introduced explicit frame metadata quality and indexing alignment targets. | Reduces retrieval noise risk before Search/Chat scaling; sequence updated to R1-R11 |
@@ -924,7 +916,7 @@ The following open questions are currently active and must be resolved before co
 **Sequence**:
 ```
 MVP:
-R1:    Phase 2.6 (Audio Freeze Governance)
+R1:    Phase 2.6 (Audio Hard Shutdown)
 R2:    Phase 2.7 (Frame Label Alignment Gate)
 R3-R4: Phase 3 (Vision Search Parity)
 R5-R6: Phase 4 (Vision Chat MVP)
@@ -935,7 +927,7 @@ Post-MVP:
 ```
 
 **Cross-Phase Dependencies**:
-- Phase 2.7 depends on Phase 2.6 governance hard-gate completion
+- Phase 2.7 depends on Phase 2.6 hard-shutdown gate completion
 - Phase 3 depends on Phase 2.7 hard-gate completion
 - Phase 4 depends on Phase 3 completion (bounded vision retrieval/search needed for chat grounding)
 - Phase 5 depends on Phase 4 completion (chat/search must work remotely)
@@ -963,8 +955,8 @@ Post-MVP:
    - Remaining evidence tracked under `Phase 1 Long-Run Observation Plan (Future, Non-Blocking)`
 
 4. **R2 Checkpoint (Phase 2.7 Go/No-Go)**
-   - Validate Phase 2.6 closure evidence (`2.6-G-*`) and exception log closure
-   - Confirm Phase 2.7 can start with stable freeze boundary
+   - Validate Phase 2.6 closure evidence (`2.6-G-*`) for full audio shutdown
+   - Confirm Phase 2.7 can start with stable vision-only boundary
 
 5. **R4 Checkpoint (Phase 3 Go/No-Go)**
    - Validate vision search parity gates (bounded time-range filtering, UX drill-down, p95 latency)
