@@ -417,9 +417,12 @@ This section must be updated whenever code reality changes or when convergence w
 **Status**: ⬜️ Not Started
 **Planned**: Relative R1 (must pass before Phase 2.7 starts)
 **Actual**: TBD
+**Estimated Duration**: 4 working days
 **Owner**: Product Owner + Chief Architect
+**Detailed Plan**: `v3/plan/07-phase-2.6-audio-freeze-governance-detailed-plan.md`
 **Authority Docs**: `v3/decisions/ADR-0007-phase-2.6-audio-freeze-governance.md`, `v3/metrics/phase-gates.md`, `v3/milestones/roadmap-status.md`
 **Decision Record**: `v3/decisions/ADR-0007-phase-2.6-audio-freeze-governance.md`
+**Evidence Directory**: `v3/evidence/phase2.6/` (计划态；执行期填充)
 
 **Purpose**:
 - Turn Audio Freeze into an auditable control phase with default full-chain pause semantics.
@@ -428,10 +431,30 @@ This section must be updated whenever code reality changes or when convergence w
 - Provide controlled P0/P1 exception workflow with TTL + rollback + closure evidence.
 - Produce evidence package required for Phase 2.7 kickoff.
 
+**Code Changes**: NONE（本阶段仅产出文档；工程变更在 Phase 3 收敛）
+
+**Dependencies**:
+
+| Dependency | Source | Status |
+|------------|--------|--------|
+| Phase 2.5 Go/No-Go = GO | `v3/results/phase-2.5-validation.md` | ✅ Satisfied |
+| ADR-0007 Accepted | `v3/decisions/ADR-0007-*.md` | Must confirm before execution |
+| `2.6-G-*` gate definitions exist in phase-gates.md | `v3/metrics/phase-gates.md` | ✅ Confirmed |
+| Phase 2.7 not yet In Progress | `v3/milestones/roadmap-status.md` | ✅ Satisfied |
+
+**Day-by-Day Timeline**:
+
+| Day | Focus | Deliverable |
+|-----|-------|-------------|
+| D1 | FreezeScopeMatrix + ExceptionRequest template | WB-01 + WB-02 drafts |
+| D2 | GateEvidenceManifest + 双层采证方案（20 分钟预检 + 24h 正式验收） | WB-03 + WB-04 drafts |
+| D3 | WebUI contract 更新（5 文件）+ Rollback Playbook | WB-05 + WB-06 |
+| D4 | Gate Traceability 自审 + Checklist + validation template | WB-07 + D-08 + D-09 |
+
 **Governance Interfaces**:
-- `FreezeScopeMatrix`
-- `ExceptionRequest`
-- `GateEvidenceManifest`
+- `FreezeScopeMatrix`（五维度：capture/processing/indexing/retrieval/UI）
+- `ExceptionRequest`（申请→审批→TTL→auto-revert→closure evidence）
+- `GateEvidenceManifest`（`2.6-G-*` 到 evidence artifact 路径的映射）
 
 **Go/No-Go Gates** (authority: `v3/metrics/phase-gates.md`):
 - [ ] 2.6-G-01: Default capture pause verified (no automatic audio capture in freeze mode).
@@ -439,6 +462,25 @@ This section must be updated whenever code reality changes or when convergence w
 - [ ] 2.6-G-03: UI/retrieval contract verified (audio hidden by default; Search/Chat vision-only; timeline target default video-only).
 - [ ] 2.6-G-04: Exception workflow closure validated (approved exceptions closed with TTL + rollback + closure evidence).
 - [ ] 2.6-G-05: Drift and rollback readiness validated (no unauthorized drift; rollback objective <2 minutes).
+
+**Review Checkpoints**:
+
+| Checkpoint | When | Reviewer | Purpose |
+|-----------|------|----------|---------|
+| WB-01/02 draft review | D1 end | Chief Architect | FreezeScopeMatrix 完整性 + ExceptionRequest 字段审核 |
+| WB-03/04 draft review | D2 end | Product Owner | GateEvidenceManifest 可追溯性 + 采证方案可行性 |
+| WebUI docs review | D3 end | Chief Architect | 5 个文件更新正确性 + Rollback Playbook 三场景 |
+| Go/No-Go Review | D4 | Product Owner + Chief Architect | `2.6-G-*` 全部 PASS；所有 evidence artifact 存在 |
+
+**Open Questions**:
+
+| # | Question | Owner | Status |
+|---|----------|-------|--------|
+| OQ-01 | Rollback RTO 目标是否需从 "< 2 分钟" 放宽？ | Product Owner | Pending |
+| OQ-02 | Phase 2.6 执行期间是否有预审请 ExceptionRequest？ | Product Owner | Pending |
+| OQ-03 | `/audio` nav icon 隐藏是否需 Phase 2.6 代码实现，还是 Phase 3 收敛？ | Chief Architect | 默认：Phase 3 收敛，Code changes: NONE |
+| OQ-04 | Drift Audit 范围是否含 `.sh`、`.env`、`config/` 目录？ | Chief Architect | 默认：包含 |
+| OQ-05 | `v3/evidence/phase2.6/` 是否纳入 Git 版本控制？ | Product Owner | 默认：纳入 |
 
 **Blockers**: Blocks Phase 2.7 until all `2.6-G-*` gates PASS.
 

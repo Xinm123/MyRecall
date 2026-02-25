@@ -51,13 +51,14 @@
 
 ## 3. Current vs Target（关键差异）
 
-| Surface | Current (verified) | Target (Phase 3/4 contract) |
-|---|---|---|
-| `/api/v1/search` empty `q` | 空分页 | browse/feed（有界范围） |
-| `/api/v1/search` `start_time` | 未强制 | 强制（MyRecall policy） |
-| Search modality | 仍可能混入 audio candidate | Search/Chat grounding 走 vision-only |
-| WebUI audio visibility | `/audio` 页面可见 | 默认隐藏 audio 入口；仅调试模式可见 |
-| `/api/v1/timeline` | mixed 默认 | target 默认 video-only；audio 仅显式参数/调试模式 |
+| Surface | Current (verified) | Target (Phase 3/4 contract) | Phase 2.6 Contract Note |
+|---|---|---|---|
+| `/api/v1/search` empty `q` | 空分页 | browse/feed（有界范围） | — |
+| `/api/v1/search` `start_time` | 未强制 | 强制（MyRecall policy） | — |
+| Search modality | 仍可能混入 audio candidate | Search/Chat grounding 走 vision-only | **Phase 2.6 target：audio 候选默认排除**；ADR-0005 vision-only contract |
+| WebUI audio visibility | `/audio` 页面可见 | 默认隐藏 audio 入口；仅调试模式可见 | **Phase 2.6 target：默认隐藏**；Current 为可见（已知 deviation，Phase 3 收敛） |
+| `/api/v1/timeline` | mixed 默认 | target 默认 video-only；audio 仅显式参数/调试模式 | **Phase 2.6 target：video-only**；Current mixed（已知 deviation，Phase 3 收敛） |
+| Audio nav icon | nav toolbar 常驻 | 默认不渲染 | **Phase 2.6 target：默认不渲染**；Current 常驻（已知 deviation，Phase 3 收敛） |
 
 ## 4. Screenpipe 对齐说明
 

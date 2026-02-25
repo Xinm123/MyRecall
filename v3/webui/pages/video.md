@@ -151,3 +151,47 @@ flowchart LR
 - `/Users/pyw/new/MyRecall/tests/test_phase25_video_page.py` — 8 passed
 - `/Users/pyw/new/MyRecall/tests/test_phase25_navigation.py` — 13 passed
 - `/Users/pyw/new/MyRecall/v3/results/phase-2.5-validation.md`
+
+---
+
+## 10. Phase 2.6 Freeze Scope — Video 不受影响的声明
+
+**Phase**: 2.6 Audio Freeze Governance
+**状态**: ⬜️ Planned（本节内容为计划态契约声明）
+**Code Changes**: NONE
+**权威文档**: `v3/decisions/ADR-0007-phase-2.6-audio-freeze-governance.md`
+
+### 10.1 Video 链路不在 Audio Freeze 范围内
+
+Phase 2.6 Audio Freeze Governance **仅针对音频链路冻结**，视频链路**全部保持正常运行**：
+
+| 模块 | 路径 | Phase 2.6 状态 |
+|------|------|---------------|
+| `VideoRecorder` | `openrecall/client/video_recorder.py` | **不受影响（正常运行）** |
+| `FrameExtractor` | `openrecall/server/video/frame_extractor.py` | **不受影响** |
+| `VideoProcessingWorker` | `openrecall/server/video/worker.py` | **不受影响** |
+| `RetentionWorker` | `openrecall/server/workers/retention.py` | **不受影响** |
+| `/video` 页面 | `openrecall/server/app.py:video()` | **可访问，Nav icon 常驻（默认可见）** |
+| `GET /api/v1/timeline` video items | `openrecall/server/api_v1.py` | **正常返回**（target contract 为 video-only 默认） |
+| `GET /api/v1/frames/:id` | `openrecall/server/api_v1.py` | **不受影响** |
+| Video FTS 检索 | `openrecall/server/search/engine.py` | **正常可用**（vision-only grounding 的主要路径） |
+
+### 10.2 Audio vs Video 对比摘要
+
+| 维度 | Audio（Phase 2.6 Freeze） | Video（Phase 2.6 不受影响） |
+|------|------------------------|-----------------------------|
+| 默认采集 | **disabled** | 激活（正常录制） |
+| 默认处理 | **disabled** | Worker 自动运行 |
+| FTS 索引 | **write-path paused** | 正常写入 |
+| 默认检索模态 | **excluded** | vision-only（主要模态） |
+| UI 入口可见性 | **Phase 2.6 target：hidden** | **默认可见** |
+| Timeline 默认显示 | 排除 | **默认显示**（target video-only） |
+
+### 10.3 关联 Gates 对 Video 不产生西验证要求
+
+- 2.6-G-01（capture pause）：**仅针对 audio**，video capture 不需验证
+- 2.6-G-02（processing pause）：**仅针对 audio processing**，video processing 不需验证
+- 2.6-G-03（UI/retrieval contract）：**间接相关**—Timeline target video-only 默认 = video 作为主要模态被确认
+- 2.6-G-04/G-05：**不小 Video 页面沵及**
+
+**结论**：本页面（`/video`）在 Phase 2.6 期间**无任何行为变更**，仅需确认 Timeline 默认显示内容符合 video-only 目标契约即可。

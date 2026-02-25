@@ -141,3 +141,53 @@ flowchart LR
 - `/Users/pyw/new/MyRecall/tests/test_phase25_audio_page.py` — 8 passed
 - `/Users/pyw/new/MyRecall/tests/test_phase25_navigation.py` — 13 passed
 - `/Users/pyw/new/MyRecall/v3/results/phase-2.5-validation.md`
+
+---
+
+## 10. Phase 2.6 Freeze Status
+
+**Phase**: 2.6 Audio Freeze Governance
+**状态**: ⬜️ Planned（未执行；本节内容均为计划态契约，不是 Done/Pass 预写）
+**Code Changes**: NONE
+**权威文档**: `v3/decisions/ADR-0007-phase-2.6-audio-freeze-governance.md`，`v3/metrics/phase-gates.md`
+
+### 10.1 `/audio` 页面在 Phase 2.6 中的地位
+
+| 维度 | Current Behavior | Phase 2.6 Target Contract | 收敛阶段 |
+|------|-----------------|--------------------------|--------|
+| 页面可访问性 | **可访问**（URL 直接打开，返回 200） | 保持 可访问（历史兼容）；不在 Phase 2.6 封锁 | N/A |
+| Nav 图标常驻 | **常驻**（Phase 2.5 实现 5-page toolbar） | Phase 2.6 **target：默认不渲染** | Phase 3 代码收敛 |
+| 页面内容 searchability | **不索引**（音频配置可见，但 audio 数据默认不采集） | 保持现状；展示"暂停采集"状态标识（计划态） | Phase 3 |
+| Audio FTS 检索 | 技术上可调用 | **Phase 2.6 target：配置总记中标记 vision-only**；代码封锁 Phase 3 | Phase 3 |
+
+### 10.2 Audio 全链路冻结范围（FreezeScopeMatrix 摘要）
+
+| 模块 | 路径 | 冻结状态 |
+|------|------|----------|
+| `AudioManager` | `openrecall/client/audio_manager.py` | **disabled by default** |
+| `AudioRecorder` | `openrecall/client/audio_recorder.py` | **disabled by default** |
+| `VoiceActivityDetector` | `openrecall/server/audio/vad.py` | **disabled by default** |
+| `WhisperTranscriber` | `openrecall/server/audio/transcriber.py` | **disabled by default** |
+| `AudioChunkProcessor` | `openrecall/server/audio/processor.py` | **disabled by default** |
+| `AudioProcessingWorker` | `openrecall/server/audio/worker.py` | **disabled by default** |
+| `audio_transcriptions_fts` | SQLite FTS5 table | **write-path paused** |
+| `search_audio_fts()` | `openrecall/server/search/engine.py` | **vision-only（excluded）** |
+| Audio nav icon | `layout.html` | **target: hidden by default** |
+
+### 10.3 关联 Gates
+
+- **2.6-G-01**: Default capture pause — `AudioManager`/`AudioRecorder` 默认不启动
+- **2.6-G-02**: Default processing pause — VAD/Transcriber/Worker 默认不启动
+- **2.6-G-03**: UI/retrieval contract — `/audio` 入口默认隐藏；Search vision-only；Timeline target video-only—**本页此节即是 2.6-G-03 的主要 evidence artifact**
+
+### 10.4 例外运用（ExceptionRequest）
+
+若需临时开启 audio 功能（如 debug 录音测试）：
+
+1. 提交 `ExceptionRequest`（字段：request_id / severity / reason / impact_scope / ttl / approvers）
+2. 得到 Product Owner + Chief Architect 双签批准（P0）或 Product Owner 单签（P1）
+3. 在 `enable_window` 内运行；TTL 到期自动回滇
+4. 关闭阶段提交 `closure_evidence`（包含 `revert_timestamp` + `no_drift_check`）
+5. 更新 `v3/evidence/phase2.6/exception_register.yaml` 中对应记录为 CLOSED
+
+**详细 template 见**: `v3/plan/07-phase-2.6-audio-freeze-governance-detailed-plan.md` WB-02 / Appendix B
