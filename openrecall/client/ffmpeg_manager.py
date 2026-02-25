@@ -30,7 +30,7 @@ class FFmpegManager:
         fps: int = 30,
         crf: int = 23,
         resolution: str = "",
-        on_chunk_complete: Optional[Callable[[str], None]] = None,
+        on_chunk_complete: Optional[Callable[[str, float], None]] = None,
         on_chunk_started: Optional[Callable[[str], None]] = None,
         monitor_id: str = "",
         segment_list_filename: str = "segments.csv",
@@ -101,7 +101,10 @@ class FFmpegManager:
         if self._active_chunk_path:
             return self._active_chunk_path
 
-        if self._last_detected_chunk_path and Path(self._last_detected_chunk_path).exists():
+        if (
+            self._last_detected_chunk_path
+            and Path(self._last_detected_chunk_path).exists()
+        ):
             return self._last_detected_chunk_path
 
         if self.pipeline_mode == "segment":
@@ -251,7 +254,9 @@ class FFmpegManager:
         else:
             if active_chunk_before_stop and Path(active_chunk_before_stop).exists():
                 last_chunk = active_chunk_before_stop
-                self._emit_chunk_completed(active_chunk_before_stop)
+                self._emit_chunk_completed(
+                    active_chunk_before_stop, self._current_chunk_started_at
+                )
 
         self._process = None
         self._active_chunk_path = None
@@ -299,7 +304,9 @@ class FFmpegManager:
             and active_chunk_before_restart
             and Path(active_chunk_before_restart).exists()
         ):
-            self._emit_chunk_completed(active_chunk_before_restart)
+            self._emit_chunk_completed(
+                active_chunk_before_restart, self._current_chunk_started_at
+            )
 
         if self._stop_event.is_set():
             return
@@ -348,7 +355,9 @@ class FFmpegManager:
             now_monotonic = time.monotonic()
             self._current_chunk_started_at = now_wallclock
             self._chunk_started_monotonic = now_monotonic
-            self._chunk_deadline_monotonic = now_monotonic + self._chunk_duration_seconds
+            self._chunk_deadline_monotonic = (
+                now_monotonic + self._chunk_duration_seconds
+            )
         else:
             self._current_chunk_started_at = 0.0
             self._chunk_started_monotonic = 0.0
@@ -609,7 +618,9 @@ class FFmpegManager:
                 self._poll_active_chunk_start()
                 new_segments = self._poll_segments()
                 for segment_path in new_segments:
-                    self._emit_chunk_completed(segment_path)
+                    self._emit_chunk_completed(
+                        segment_path, self._current_chunk_started_at
+                    )
 
             process = self._process
             if (
@@ -718,11 +729,13 @@ class FFmpegManager:
             except Exception as exc:
                 logger.error("Chunk start callback error: %s", exc)
 
-    def _emit_chunk_completed(self, chunk_path: str) -> None:
+    def _emit_chunk_completed(
+        self, chunk_path: str, chunk_start_time: float = 0.0
+    ) -> None:
         self._last_detected_chunk_path = chunk_path
         if self.on_chunk_complete:
             try:
-                self.on_chunk_complete(chunk_path)
+                self.on_chunk_complete(chunk_path, chunk_start_time)
             except Exception as exc:
                 logger.error("Chunk completion callback error: %s", exc)
 
@@ -812,10 +825,11 @@ class FFmpegManager:
         self._last_write_completed_monotonic = 0.0
         self._chunk_started_monotonic = 0.0
         self._chunk_deadline_monotonic = 0.0
+        chunk_start_time = self._current_chunk_started_at
         self._current_chunk_started_at = 0.0
 
         if current_chunk and Path(current_chunk).exists():
-            self._emit_chunk_completed(current_chunk)
+            self._emit_chunk_completed(current_chunk, chunk_start_time)
 
         if self._stop_event.is_set():
             self._active_chunk_path = None

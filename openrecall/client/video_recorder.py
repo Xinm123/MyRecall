@@ -335,7 +335,9 @@ class VideoRecorder:
             chunk_duration=settings.video_chunk_duration,
             fps=settings.video_fps,
             crf=settings.video_crf,
-            on_chunk_complete=lambda path: self._on_chunk_complete(path, None),
+            on_chunk_complete=lambda path, start_time: self._on_chunk_complete(
+                path, None, start_time
+            ),
         )
 
         # Backward-compatible alias used by existing tests.
@@ -526,7 +528,9 @@ class VideoRecorder:
                 chunk_deadline_in_seconds = float(
                     getattr(manager, "chunk_deadline_in_seconds", 0.0) or 0.0
                 )
-                last_write_ago_seconds = getattr(manager, "seconds_since_last_write", None)
+                last_write_ago_seconds = getattr(
+                    manager, "seconds_since_last_write", None
+                )
                 if callable(last_write_ago_seconds):
                     last_write_ago_seconds = last_write_ago_seconds()
                 if last_write_ago_seconds is None:
@@ -634,13 +638,16 @@ class VideoRecorder:
         self._attempt_sck_start_once()
 
     def _pause_recording_backend_for_runtime_toggle(self) -> None:
-        """Pause recording without tearing down monitor pipelines."""
+        """Pause recording by stopping FFmpeg and completing current chunk."""
         self._paused_previous_state = self._capture_state
         if self._use_legacy_mode:
             if self._legacy_ffmpeg.is_alive():
                 self._legacy_ffmpeg.stop()
         else:
-            self._stop_monitor_sources_only()
+            # Stop FFmpeg completely to prevent creating empty chunks during pause.
+            # This will complete the current chunk and trigger upload.
+            # Unlike _stop_monitor_sources_only(), this stops FFmpeg entirely.
+            self._stop_monitor_capture(clear_metadata=False)
         self._capture_state = CaptureModeState.PAUSED_BY_TOGGLE
 
     def _resume_recording_backend_for_runtime_toggle(self) -> bool:
@@ -883,9 +890,9 @@ class VideoRecorder:
                     chunk_duration=settings.video_chunk_duration,
                     fps=settings.video_fps,
                     crf=settings.video_crf,
-                    on_chunk_complete=lambda path, m=monitor: self._on_chunk_complete(
-                        path, m
-                    ),
+                    on_chunk_complete=lambda path,
+                    start_time,
+                    m=monitor: self._on_chunk_complete(path, m, start_time),
                     monitor_id=monitor.monitor_id,
                     segment_list_filename=f"segments_{monitor.monitor_id}.csv",
                     pipeline_mode=settings.video_pipeline_mode,
@@ -1031,7 +1038,9 @@ class VideoRecorder:
                 stagnant_for = now - progress[1]
 
             seconds_since_write = controller.seconds_since_last_write(now_monotonic)
-            manager_seconds_since_write = getattr(manager, "seconds_since_last_write", None)
+            manager_seconds_since_write = getattr(
+                manager, "seconds_since_last_write", None
+            )
             if callable(manager_seconds_since_write):
                 manager_seconds_since_write = manager_seconds_since_write()
             if manager_seconds_since_write is not None:
@@ -1052,10 +1061,8 @@ class VideoRecorder:
                 pipeline_mode == "segment"
                 and stagnant_for >= self._pipeline_stall_timeout_seconds
             )
-            overdue = (
-                pipeline_mode == "chunk_process"
-                and chunk_age_seconds
-                > (float(settings.video_chunk_duration) + self._chunk_process_grace_seconds)
+            overdue = pipeline_mode == "chunk_process" and chunk_age_seconds > (
+                float(settings.video_chunk_duration) + self._chunk_process_grace_seconds
             )
             should_restart = (
                 no_chunk_progress
@@ -1156,7 +1163,10 @@ class VideoRecorder:
                     )
 
     def _on_chunk_complete(
-        self, chunk_path: str, monitor: Optional[MonitorInfo] = None
+        self,
+        chunk_path: str,
+        monitor: Optional[MonitorInfo] = None,
+        chunk_start_time: float = 0.0,
     ) -> None:
         try:
             path = Path(chunk_path)
@@ -1171,9 +1181,24 @@ class VideoRecorder:
 
             monitor_id = monitor.monitor_id if monitor else "legacy"
 
-            # Calculate actual duration from file creation time
-            file_mtime = path.stat().st_mtime
-            actual_duration = time.time() - file_mtime
+            if chunk_start_time <= 0:
+                controller = self._pipelines.get(monitor_id)
+                if not controller:
+                    parent_dir = path.parent.name
+                    if parent_dir.startswith("monitor_"):
+                        monitor_id = parent_dir.replace("monitor_", "")
+                        controller = self._pipelines.get(monitor_id)
+
+                if controller:
+                    chunk_start_time = (
+                        controller.ffmpeg_manager.get_current_chunk_start_time()
+                    )
+
+            if chunk_start_time > 0:
+                actual_duration = time.time() - chunk_start_time
+            else:
+                file_mtime = path.stat().st_mtime
+                actual_duration = time.time() - file_mtime
 
             logger.info(
                 "Video chunk recording ended | file=%s | size_mb=%.1f | duration=%.1fs | monitor_id=%s",
@@ -1184,13 +1209,18 @@ class VideoRecorder:
             )
 
             checksum = self._compute_checksum(chunk_path)
-            timestamp = int(time.time())
+            end_time = int(time.time())
+            start_time = (
+                int(chunk_start_time)
+                if chunk_start_time > 0
+                else int(end_time - actual_duration)
+            )
 
             metadata = {
                 "type": "video_chunk",
-                "timestamp": timestamp,
-                "start_time": timestamp - settings.video_chunk_duration,
-                "end_time": timestamp,
+                "timestamp": end_time,
+                "start_time": start_time,
+                "end_time": end_time,
                 "device_name": monitor.name if monitor else "primary_display",
                 "monitor_id": monitor.monitor_id if monitor else "",
                 "monitor_width": monitor.width if monitor else 0,
