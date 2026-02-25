@@ -971,7 +971,7 @@ python -m pytest tests/test_phase1_*.py tests/test_phase2_*.py -v --tb=short
 Before starting Day 1 of Phase 2.0, verify all items:
 
 - [ ] **Phase 1 Go**: Roadmap status shows Phase 1 complete (engineering gates passed)
-- [ ] **Database healthy**: `sqlite3 ~/MRS/openrecall.db ".tables"` shows `audio_chunks`, `audio_transcriptions`, `audio_transcriptions_fts`
+- [ ] **Database healthy**: `sqlite3 ~/MRS/db/recall.db ".tables"` shows `audio_chunks`, `audio_transcriptions`, `audio_transcriptions_fts`
 - [ ] **Migration runner works**: `MigrationRunner(settings.db_path).run()` returns `success=True`
 - [ ] **Upload pipeline functional**: Video upload E2E works (client → server → DB)
 - [ ] **Dependencies installable**: `pip install sounddevice faster-whisper jiwer` succeeds

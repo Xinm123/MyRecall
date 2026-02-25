@@ -231,10 +231,23 @@ closure_evidence:
 **计划态采证命令（Appendix C）**：
 
 ```bash
+# Step 0：解析运行时 DB 路径（与代码实现一致）
+# 代码来源：settings.db_path = OPENRECALL_SERVER_DATA_DIR/db/recall.db（默认 ~/MRS/db/recall.db）
+SERVER_ENV_FILE="${OPENRECALL_ENV_FILE:-/Users/pyw/newpart/MyRecall/myrecall_server.env}"
+set -a
+source "$SERVER_ENV_FILE"
+set +a
+DB_PATH="$(python3 - <<'PY'
+from openrecall.shared.config import settings
+print(settings.db_path)
+PY
+)"
+echo "Using DB_PATH=${DB_PATH}"
+
 # === 2.6-G-01：20 分钟预检（no-auto-capture）===
 
 # Step 1：记录预检基线
-sqlite3 ~/MRS/db/openrecall.db \
+sqlite3 "$DB_PATH" \
   "SELECT COUNT(*) AS baseline_count, MAX(created_at) AS last_created FROM audio_chunks;" \
   > v3/evidence/phase2.6/20m_capture_baseline.txt
 
@@ -242,7 +255,7 @@ sqlite3 ~/MRS/db/openrecall.db \
 # ./run_server.sh --debug  # 由执行者手动执行
 
 # Step 3：20 分钟后记录预检终态
-sqlite3 ~/MRS/db/openrecall.db \
+sqlite3 "$DB_PATH" \
   "SELECT COUNT(*) AS final_count, MAX(created_at) AS last_created FROM audio_chunks;" \
   > v3/evidence/phase2.6/20m_precheck_report.txt
 
@@ -251,7 +264,7 @@ sqlite3 ~/MRS/db/openrecall.db \
 # === 2.6-G-01：24h 正式验收（no-auto-capture）===
 
 # Step 1：记录基线 — audio chunk 数量快照
-sqlite3 ~/MRS/db/openrecall.db \
+sqlite3 "$DB_PATH" \
   "SELECT COUNT(*) AS baseline_count, MAX(created_at) AS last_created FROM audio_chunks;" \
   > v3/evidence/phase2.6/24h_capture_baseline.txt
 
@@ -259,7 +272,7 @@ sqlite3 ~/MRS/db/openrecall.db \
 # ./run_server.sh --debug  # 由执行者手动执行
 
 # Step 3：24h 后记录终态 — audio chunk 数量对比
-sqlite3 ~/MRS/db/openrecall.db \
+sqlite3 "$DB_PATH" \
   "SELECT COUNT(*) AS final_count, MAX(created_at) AS last_created FROM audio_chunks;" \
   >> v3/evidence/phase2.6/24h_no_capture_report.txt
 
@@ -273,14 +286,14 @@ ps aux | grep -E "audio_recorder|audio_manager|AudioRecorder" | grep -v grep \
 # === 2.6-G-02：20 分钟预检（no-auto-processing）===
 
 # Step 1：记录预检基线 — 同一指标用于前后对比
-sqlite3 ~/MRS/db/openrecall.db "
+sqlite3 "$DB_PATH" "
   SELECT
     (SELECT COUNT(*) FROM audio_transcriptions) AS transcriptions_baseline,
     (SELECT COUNT(*) FROM audio_chunks WHERE status = 'PENDING') AS pending_baseline;
 " > v3/evidence/phase2.6/20m_processing_baseline.txt
 
 # Step 2：20 分钟后对比终态（与基线保持同一指标）
-sqlite3 ~/MRS/db/openrecall.db "
+sqlite3 "$DB_PATH" "
   SELECT
     (SELECT COUNT(*) FROM audio_transcriptions) AS transcriptions_final,
     (SELECT COUNT(*) FROM audio_chunks WHERE status = 'PENDING') AS pending_final;
@@ -292,14 +305,14 @@ sqlite3 ~/MRS/db/openrecall.db "
 # === 2.6-G-02：24h 正式验收（no-auto-processing）===
 
 # Step 1：记录基线 — audio_transcriptions 数量 + PENDING chunk 数量
-sqlite3 ~/MRS/db/openrecall.db "
+sqlite3 "$DB_PATH" "
   SELECT
     (SELECT COUNT(*) FROM audio_transcriptions) AS transcriptions_baseline,
     (SELECT COUNT(*) FROM audio_chunks WHERE status = 'PENDING') AS pending_baseline;
 " > v3/evidence/phase2.6/24h_processing_baseline.txt
 
 # Step 2：24h 后对比到终态
-sqlite3 ~/MRS/db/openrecall.db "
+sqlite3 "$DB_PATH" "
   SELECT
     (SELECT COUNT(*) FROM audio_transcriptions) AS transcriptions_final,
     (SELECT COUNT(*) FROM audio_chunks WHERE status = 'PENDING') AS pending_final;
@@ -507,11 +520,11 @@ grep "2.6-G-0" v3/plan/07-phase-2.6-audio-freeze-governance-detailed-plan.md | w
 
 | 检查项 | 命令（计划态） | 通过标准 |
 |--------|-------------|---------|
-| 20 分钟预检：无新增 audio_chunk | `sqlite3 ~/MRS/db/openrecall.db "SELECT COUNT(*) FROM audio_chunks"` 对比 20m 基线 | delta = 0 |
-| 20 分钟预检：无新增 audio_transcription | `sqlite3 ~/MRS/db/openrecall.db "SELECT COUNT(*) FROM audio_transcriptions"` 对比 20m 基线 | delta = 0 |
-| 24h 正式验收：无新增 audio_chunk | `sqlite3 ~/MRS/db/openrecall.db "SELECT COUNT(*) FROM audio_chunks"` 对比 24h 基线 | delta = 0 |
-| 24h 正式验收：无新增 audio_transcription | `sqlite3 ~/MRS/db/openrecall.db "SELECT COUNT(*) FROM audio_transcriptions"` 对比 24h 基线 | delta = 0 |
-| 20m/24h 两窗口：audio_chunks PENDING 数未异常增长 | `sqlite3 ~/MRS/db/openrecall.db "SELECT COUNT(*) FROM audio_chunks WHERE status='PENDING'"` | delta <= 0 或按白名单波动解释 |
+| 20 分钟预检：无新增 audio_chunk | `sqlite3 "$DB_PATH" "SELECT COUNT(*) FROM audio_chunks"` 对比 20m 基线 | delta = 0 |
+| 20 分钟预检：无新增 audio_transcription | `sqlite3 "$DB_PATH" "SELECT COUNT(*) FROM audio_transcriptions"` 对比 20m 基线 | delta = 0 |
+| 24h 正式验收：无新增 audio_chunk | `sqlite3 "$DB_PATH" "SELECT COUNT(*) FROM audio_chunks"` 对比 24h 基线 | delta = 0 |
+| 24h 正式验收：无新增 audio_transcription | `sqlite3 "$DB_PATH" "SELECT COUNT(*) FROM audio_transcriptions"` 对比 24h 基线 | delta = 0 |
+| 20m/24h 两窗口：audio_chunks PENDING 数未异常增长 | `sqlite3 "$DB_PATH" "SELECT COUNT(*) FROM audio_chunks WHERE status='PENDING'"` | delta <= 0 或按白名单波动解释 |
 
 ### 7.3 API Smoke（契约不含音频候选验证）
 
@@ -585,7 +598,7 @@ grep "2.6-G-0" v3/plan/07-phase-2.6-audio-freeze-governance-detailed-plan.md | w
 - [ ] ADR-0007 已处于 Accepted 状态（不是 Draft/Proposed）
 - [ ] `v3/metrics/phase-gates.md` `2.6-G-*` 节已存在（不允许执行时新增 gate）
 - [ ] `v3/evidence/phase2.6/` 目录已创建（或确认可写权限）
-- [ ] SQLite DB 路径可访问（`~/MRS/db/openrecall.db` 或等效路径）
+- [ ] SQLite DB 路径可访问（`$DB_PATH`，默认 `~/MRS/db/recall.db`）
 - [ ] Product Owner 和 Chief Architect 均已收到本计划文档并确认
 - [ ] Phase 2.7 未进入 In Progress 状态（防止乱序执行）
 - [ ] 本计划文档（本文件）已落盘到 `v3/plan/07-*.md`
