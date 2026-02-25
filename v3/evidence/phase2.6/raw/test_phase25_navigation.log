@@ -1,0 +1,23 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.11.14, pytest-9.0.2, pluggy-1.6.0 -- /opt/homebrew/Caskroom/miniforge/base/envs/v3/bin/python3
+cachedir: .pytest_cache
+rootdir: /Users/pyw/newpart/MyRecall
+configfile: pytest.ini
+plugins: anyio-4.12.1
+collecting ... collected 13 items
+
+tests/test_phase25_navigation.py::TestNavLinks::test_audio_link_removed_from_header PASSED [  7%]
+tests/test_phase25_navigation.py::TestNavLinks::test_video_link_in_header PASSED [ 15%]
+tests/test_phase25_navigation.py::TestNavLinks::test_audio_icon_not_rendered_in_header PASSED [ 23%]
+tests/test_phase25_navigation.py::TestNavLinks::test_video_icon_rendered PASSED [ 30%]
+tests/test_phase25_navigation.py::TestCSSHighlighting::test_audio_css_rule_removed PASSED [ 38%]
+tests/test_phase25_navigation.py::TestCSSHighlighting::test_video_css_rule_present PASSED [ 46%]
+tests/test_phase25_navigation.py::TestJSDetection::test_audio_path_detection_removed PASSED [ 53%]
+tests/test_phase25_navigation.py::TestJSDetection::test_video_path_detection PASSED [ 61%]
+tests/test_phase25_navigation.py::TestExistingPagesRegression::test_index_returns_200 PASSED [ 69%]
+tests/test_phase25_navigation.py::TestExistingPagesRegression::test_timeline_returns_200 PASSED [ 76%]
+tests/test_phase25_navigation.py::TestExistingPagesRegression::test_search_returns_200 PASSED [ 84%]
+tests/test_phase25_navigation.py::TestExistingPagesRegression::test_audio_returns_200 PASSED [ 92%]
+tests/test_phase25_navigation.py::TestExistingPagesRegression::test_video_returns_200 PASSED [100%]
+
+============================== 13 passed in 1.57s ==============================

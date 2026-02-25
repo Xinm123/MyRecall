@@ -120,7 +120,7 @@ class TestAudioFTSSearch:
 
 
 class TestSearchAPIAudio:
-    """Tests for /api/v1/search audio integration."""
+    """Tests for /api/v1/search audio hard-shutdown behavior."""
 
     def test_search_endpoint_exists(self, flask_client):
         """Search endpoint should be accessible."""
@@ -133,3 +133,42 @@ class TestSearchAPIAudio:
         assert response.status_code == 200
         data = response.get_json()
         assert data["data"] == []
+
+    def test_search_filters_out_audio_candidates(self, flask_client, monkeypatch):
+        """Audio candidates returned by engine must be dropped at API layer."""
+        import openrecall.server.api_v1 as api_v1
+
+        class _FakeSearchEngine:
+            def search(self, _q, limit=50):
+                return [
+                    {
+                        "source": "audio_transcription",
+                        "audio_data": {
+                            "id": 1,
+                            "timestamp": 1700000000.0,
+                            "device_name": "mic",
+                            "transcription": "audio should be excluded",
+                            "snippet": "audio should be excluded",
+                        },
+                    },
+                    {
+                        "source": "video_frame",
+                        "video_data": {
+                            "frame_id": 9,
+                            "timestamp": 1700000001.0,
+                            "app_name": "Chrome",
+                            "window_name": "Docs",
+                            "text_snippet": "video result",
+                            "focused": 1,
+                            "browser_url": "https://example.com",
+                        },
+                    },
+                ][:limit]
+
+        monkeypatch.setattr(api_v1, "_get_search_engine", lambda: _FakeSearchEngine())
+
+        response = flask_client.get("/api/v1/search?q=excluded")
+        assert response.status_code == 200
+        data = response.get_json()
+        assert all(item.get("scene_tag") != "audio_transcription" for item in data["data"])
+        assert any(item.get("scene_tag") == "video_frame" for item in data["data"])

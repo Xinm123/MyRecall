@@ -1,0 +1,18 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.11.14, pytest-9.0.2, pluggy-1.6.0 -- /opt/homebrew/Caskroom/miniforge/base/envs/v3/bin/python3
+cachedir: .pytest_cache
+rootdir: /Users/pyw/newpart/MyRecall
+configfile: pytest.ini
+plugins: anyio-4.12.1
+collecting ... collected 8 items
+
+tests/test_phase2_search.py::TestAudioFTSSearch::test_insert_and_search_transcription PASSED [ 12%]
+tests/test_phase2_search.py::TestAudioFTSSearch::test_search_no_results PASSED [ 25%]
+tests/test_phase2_search.py::TestAudioFTSSearch::test_search_audio_fts_pagination PASSED [ 37%]
+tests/test_phase2_search.py::TestAudioFTSSearch::test_get_audio_transcriptions_by_time_range PASSED [ 50%]
+tests/test_phase2_search.py::TestAudioFTSSearch::test_get_audio_transcriptions_outside_range PASSED [ 62%]
+tests/test_phase2_search.py::TestSearchAPIAudio::test_search_endpoint_exists PASSED [ 75%]
+tests/test_phase2_search.py::TestSearchAPIAudio::test_search_empty_query PASSED [ 87%]
+tests/test_phase2_search.py::TestSearchAPIAudio::test_search_filters_out_audio_candidates PASSED [100%]
+
+============================== 8 passed in 2.18s ===============================

@@ -1,0 +1,54 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.11.14, pytest-9.0.2, pluggy-1.6.0 -- /opt/homebrew/Caskroom/miniforge/base/envs/v3/bin/python3
+cachedir: .pytest_cache
+rootdir: /Users/pyw/newpart/MyRecall
+configfile: pytest.ini
+plugins: anyio-4.12.1
+collecting ... collected 44 items
+
+tests/test_phase2_6_hard_shutdown.py::test_audio_enabled_is_forced_off_by_config PASSED [  2%]
+tests/test_phase2_6_hard_shutdown.py::TestHardShutdownContracts::test_v1_upload_rejects_audio_payload PASSED [  4%]
+tests/test_phase2_6_hard_shutdown.py::TestHardShutdownContracts::test_legacy_upload_rejects_audio_payload PASSED [  6%]
+tests/test_phase2_6_hard_shutdown.py::TestHardShutdownContracts::test_timeline_audio_source_returns_empty PASSED [  9%]
+tests/test_phase2_6_hard_shutdown.py::TestHardShutdownContracts::test_primary_navigation_has_no_audio_entry PASSED [ 11%]
+tests/test_phase2_6_hard_shutdown.py::TestHardShutdownContracts::test_search_api_drops_audio_results PASSED [ 13%]
+tests/test_phase2_ingestion.py::TestAudioUploadHardShutdown::test_audio_upload_rejected_v1 PASSED [ 15%]
+tests/test_phase2_ingestion.py::TestAudioUploadHardShutdown::test_audio_upload_rejected_legacy_api PASSED [ 18%]
+tests/test_phase2_ingestion.py::TestAudioUploadHardShutdown::test_audio_upload_rejected_does_not_create_db_entry PASSED [ 20%]
+tests/test_phase2_ingestion.py::TestAudioUploadHardShutdown::test_upload_no_file_returns_400 PASSED [ 22%]
+tests/test_phase2_ingestion.py::TestAudioUploadHardShutdown::test_upload_no_metadata_returns_400 PASSED [ 25%]
+tests/test_phase2_ingestion.py::TestAudioAuditAPIs::test_list_audio_chunks_empty PASSED [ 27%]
+tests/test_phase2_ingestion.py::TestAudioAuditAPIs::test_audio_transcriptions_empty PASSED [ 29%]
+tests/test_phase2_ingestion.py::TestAudioAuditAPIs::test_queue_status_includes_audio PASSED [ 31%]
+tests/test_phase2_timeline.py::TestTimelineAPI::test_timeline_endpoint_exists PASSED [ 34%]
+tests/test_phase2_timeline.py::TestTimelineAPI::test_timeline_empty_range PASSED [ 36%]
+tests/test_phase2_timeline.py::TestTimelineAPI::test_timeline_excludes_audio_transcriptions PASSED [ 38%]
+tests/test_phase2_timeline.py::TestTimelineAPI::test_timeline_source_filter_audio_returns_empty PASSED [ 40%]
+tests/test_phase2_timeline.py::TestTimelineAPI::test_timeline_source_filter_video PASSED [ 43%]
+tests/test_phase2_timeline.py::TestTimelineAPI::test_timeline_pagination PASSED [ 45%]
+tests/test_phase2_timeline.py::TestTimelineAPI::test_timeline_invalid_times PASSED [ 47%]
+tests/test_phase2_timeline.py::TestAudioTranscriptionsAPI::test_transcriptions_endpoint_exists PASSED [ 50%]
+tests/test_phase2_timeline.py::TestAudioTranscriptionsAPI::test_transcriptions_with_data PASSED [ 52%]
+tests/test_phase2_search.py::TestAudioFTSSearch::test_insert_and_search_transcription PASSED [ 54%]
+tests/test_phase2_search.py::TestAudioFTSSearch::test_search_no_results PASSED [ 56%]
+tests/test_phase2_search.py::TestAudioFTSSearch::test_search_audio_fts_pagination PASSED [ 59%]
+tests/test_phase2_search.py::TestAudioFTSSearch::test_get_audio_transcriptions_by_time_range PASSED [ 61%]
+tests/test_phase2_search.py::TestAudioFTSSearch::test_get_audio_transcriptions_outside_range PASSED [ 63%]
+tests/test_phase2_search.py::TestSearchAPIAudio::test_search_endpoint_exists PASSED [ 65%]
+tests/test_phase2_search.py::TestSearchAPIAudio::test_search_empty_query PASSED [ 68%]
+tests/test_phase2_search.py::TestSearchAPIAudio::test_search_filters_out_audio_candidates PASSED [ 70%]
+tests/test_phase25_navigation.py::TestNavLinks::test_audio_link_removed_from_header PASSED [ 72%]
+tests/test_phase25_navigation.py::TestNavLinks::test_video_link_in_header PASSED [ 75%]
+tests/test_phase25_navigation.py::TestNavLinks::test_audio_icon_not_rendered_in_header PASSED [ 77%]
+tests/test_phase25_navigation.py::TestNavLinks::test_video_icon_rendered PASSED [ 79%]
+tests/test_phase25_navigation.py::TestCSSHighlighting::test_audio_css_rule_removed PASSED [ 81%]
+tests/test_phase25_navigation.py::TestCSSHighlighting::test_video_css_rule_present PASSED [ 84%]
+tests/test_phase25_navigation.py::TestJSDetection::test_audio_path_detection_removed PASSED [ 86%]
+tests/test_phase25_navigation.py::TestJSDetection::test_video_path_detection PASSED [ 88%]
+tests/test_phase25_navigation.py::TestExistingPagesRegression::test_index_returns_200 PASSED [ 90%]
+tests/test_phase25_navigation.py::TestExistingPagesRegression::test_timeline_returns_200 PASSED [ 93%]
+tests/test_phase25_navigation.py::TestExistingPagesRegression::test_search_returns_200 PASSED [ 95%]
+tests/test_phase25_navigation.py::TestExistingPagesRegression::test_audio_returns_200 PASSED [ 97%]
+tests/test_phase25_navigation.py::TestExistingPagesRegression::test_video_returns_200 PASSED [100%]
+
+============================== 44 passed in 2.51s ==============================

@@ -1,0 +1,29 @@
+16:23:49 | INFO    | openrecall.client | ==================================================
+16:23:49 | INFO    | openrecall.client | OpenRecall Client Starting
+16:23:49 | INFO    | openrecall.client | ==================================================
+16:23:49 | INFO    | openrecall.client | Debug mode: ON
+16:23:49 | INFO    | openrecall.client | Buffer path: /Users/pyw/testnew/MRC/buffer
+16:23:49 | INFO    | openrecall.client | Client screenshots: /Users/pyw/testnew/MRC/screenshots (enabled=False)
+16:23:49 | INFO    | openrecall.client | Cache folder: /Users/pyw/testnew/MRS/cache
+16:23:49 | INFO    | openrecall.client | Server API: http://localhost:18083/api
+16:23:49 | INFO    | openrecall.client | Capture interval: 20s
+16:23:49 | INFO    | openrecall.client | Upload timeout: 180s
+16:23:49 | INFO    | openrecall.client | Primary monitor only: True
+16:23:49 | INFO    | openrecall.client | Video monitor IDs: auto
+16:23:49 | INFO    | openrecall.client | Profile-change restart: True | Pool max bytes: 67108864
+16:23:49 | INFO    | openrecall.client | SCK retries: max=3 backoff=2s perm_backoff=30s auto_recover=True
+16:23:49 | INFO    | openrecall.client | ==================================================
+16:23:49 | INFO    | openrecall.client.recorder | Recording mode: auto -> video (FFmpeg available)
+16:23:49 | INFO    | openrecall.client | Audio hard shutdown active: skipping audio recorder startup
+16:23:49 | INFO    | openrecall.client.video_recorder | 🎥 [VIDEO] Video recorder started (monitor-id pipeline)
+16:23:49 | INFO    | openrecall.client.video_recorder | 🎥 [VIDEO]   Chunk duration: 60s | FPS: 30 | CRF: 23
+16:23:49 | INFO    | openrecall.client.consumer | 🚀 Consumer started | Pending uploads: 6
+16:23:49 | INFO    | openrecall.client.video_recorder | 🎥 [VIDEO]   Pipeline mode: chunk_process | Pipe write timeout: 1500ms | No-progress timeout: 180s
+16:23:49 | INFO    | openrecall.client.video_recorder | 🎥 [VIDEO]   Output dir: /Users/pyw/testnew/MRC/video_chunks
+16:23:49 | INFO    | openrecall.client.consumer | Dispatch buffered item | id=20260225_161939_509337_b770ecb0 | item_type=video_chunk | target=upload_video_chunk
+16:23:49 | INFO    | openrecall.client.consumer | Uploading video chunk | id=20260225_161939_509337_b770ecb0 | file=monitor_1_2026-02-25_08-19-05.mp4 | size_mb=12.3 | monitor_id=1
+16:23:49 | WARNING | openrecall.client.consumer | Video chunk upload failed | file=monitor_1_2026-02-25_08-19-05.mp4 | size_mb=12.3 | monitor_id=1
+16:23:49 | WARNING | openrecall.client.consumer | Upload failed. Backing off for 60s (retry #1)
+16:23:49 | INFO    | openrecall.client.video_recorder | Selected monitors: 1
+16:23:57 | INFO    | openrecall.client | 
+16:23:57 | INFO    | openrecall.client | Received shutdown signal, stopping client...

@@ -1,0 +1,37 @@
+Phase 2.6 Gate: 2.6-G-05 Anti-Bypass
+Generated At (UTC): 2026-02-25T08:26:49Z
+Evidence File: /Users/pyw/newpart/MyRecall/v3/evidence/phase2.6/anti_bypass_checks.txt
+
+Authority:
+- /Users/pyw/newpart/MyRecall/v3/metrics/phase-gates.md (2.6-G-05)
+
+Config-Level Bypass Check:
+1) OPENRECALL_AUDIO_ENABLED=true python3 - <<'PY'
+from openrecall.shared.config import settings
+print(f"OPENRECALL_AUDIO_ENABLED input=true -> settings.audio_enabled={settings.audio_enabled}")
+PY
+   Output: OPENRECALL_AUDIO_ENABLED input=true -> settings.audio_enabled=False
+
+Startup-Level Bypass Check:
+2) Server startup log shows audio worker not started:
+   rg -n "Audio hard shutdown active: skipping audio worker initialization" /Users/pyw/newpart/MyRecall/v3/evidence/phase2.6/raw/startup_server.log
+   Output: line 72 matched
+
+3) Client startup log shows audio recorder not started:
+   rg -n "Audio hard shutdown active: skipping audio recorder startup" /Users/pyw/newpart/MyRecall/v3/evidence/phase2.6/raw/startup_client.log
+   Output: line 17 matched
+
+Upload-Level Bypass Check:
+4) Contract test bundle log:
+   /Users/pyw/newpart/MyRecall/v3/evidence/phase2.6/raw/test_phase2_6_contract_bundle.log
+   Assertions:
+   - test_v1_upload_rejects_audio_payload PASSED
+   - test_legacy_upload_rejects_audio_payload PASSED
+   - test_audio_upload_rejected_v1 PASSED
+   - test_audio_upload_rejected_legacy_api PASSED
+   - response code: AUDIO_HARD_SHUTDOWN (validated by tests)
+
+Runtime Mode Bypass Check:
+- No runtime/config path observed that restores audio mainline behavior under current code + tests.
+
+Gate status: PASS

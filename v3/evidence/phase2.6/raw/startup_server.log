@@ -1,0 +1,109 @@
+16:23:21 | DEBUG   | asyncio | Using selector: KqueueSelector
+16:23:24 | DEBUG   | openrecall.server.database.migrations.runner | Migration v1 already applied, skipping
+16:23:24 | DEBUG   | openrecall.server.database.migrations.runner | Migration v2 already applied, skipping
+16:23:24 | DEBUG   | openrecall.server.database.migrations.runner | Migration v3 already applied, skipping
+16:23:24 | DEBUG   | openrecall.server.database.migrations.runner | Migration v4 already applied, skipping
+16:23:24 | DEBUG   | openrecall.server.database.migrations.runner | Migration v5 already applied, skipping
+16:23:24 | DEBUG   | openrecall.server.database.migrations.runner | Migration v6 already applied, skipping
+16:23:24 | DEBUG   | openrecall.server.database.migrations.runner | Migration v7 already applied, skipping
+16:23:24 | DEBUG   | openrecall.server.database.migrations.runner | Migration v8 already applied, skipping
+16:23:24 | INFO    | openrecall.server.database.sql | Database migrations ensured (version=8, elapsed=0.002s)
+16:23:24 | INFO    | openrecall.server.database.vector_store | Creating LanceDB table 'semantic_snapshots'
+16:23:24 | DEBUG   | openrecall.server.database.migrations.runner | Migration v1 already applied, skipping
+16:23:24 | DEBUG   | openrecall.server.database.migrations.runner | Migration v2 already applied, skipping
+16:23:24 | DEBUG   | openrecall.server.database.migrations.runner | Migration v3 already applied, skipping
+16:23:24 | DEBUG   | openrecall.server.database.migrations.runner | Migration v4 already applied, skipping
+16:23:24 | DEBUG   | openrecall.server.database.migrations.runner | Migration v5 already applied, skipping
+16:23:24 | DEBUG   | openrecall.server.database.migrations.runner | Migration v6 already applied, skipping
+16:23:24 | DEBUG   | openrecall.server.database.migrations.runner | Migration v7 already applied, skipping
+16:23:24 | DEBUG   | openrecall.server.database.migrations.runner | Migration v8 already applied, skipping
+16:23:24 | INFO    | openrecall.server.database.sql | Database migrations ensured (version=8, elapsed=0.001s)
+16:23:24 | INFO    | openrecall.server.ai.providers | OpenAIEmbeddingProvider configured: base=https://api.siliconflow.cn/v1 model=Qwen/Qwen3-Embedding-0.6B
+16:23:24 | INFO    | openrecall.server.services.reranker | Initialized APIReranker with URL: https://api.siliconflow.cn/v1/rerank
+16:23:24 | INFO    | openrecall.server.search.engine | SearchEngine initialized with Reranker: api (Qwen/Qwen3-Reranker-0.6B)
+16:23:24 | DEBUG   | openrecall.server.database.migrations.runner | Migration v1 already applied, skipping
+16:23:24 | DEBUG   | openrecall.server.database.migrations.runner | Migration v2 already applied, skipping
+16:23:24 | DEBUG   | openrecall.server.database.migrations.runner | Migration v3 already applied, skipping
+16:23:24 | DEBUG   | openrecall.server.database.migrations.runner | Migration v4 already applied, skipping
+16:23:24 | DEBUG   | openrecall.server.database.migrations.runner | Migration v5 already applied, skipping
+16:23:24 | DEBUG   | openrecall.server.database.migrations.runner | Migration v6 already applied, skipping
+16:23:24 | DEBUG   | openrecall.server.database.migrations.runner | Migration v7 already applied, skipping
+16:23:24 | DEBUG   | openrecall.server.database.migrations.runner | Migration v8 already applied, skipping
+16:23:24 | INFO    | openrecall.server.database.sql | Database migrations ensured (version=8, elapsed=0.001s)
+16:23:25 | DEBUG   | openrecall.server.database.migrations.runner | Migration v1 already applied, skipping
+16:23:25 | DEBUG   | openrecall.server.database.migrations.runner | Migration v2 already applied, skipping
+16:23:25 | DEBUG   | openrecall.server.database.migrations.runner | Migration v3 already applied, skipping
+16:23:25 | DEBUG   | openrecall.server.database.migrations.runner | Migration v4 already applied, skipping
+16:23:25 | DEBUG   | openrecall.server.database.migrations.runner | Migration v5 already applied, skipping
+16:23:25 | DEBUG   | openrecall.server.database.migrations.runner | Migration v6 already applied, skipping
+16:23:25 | DEBUG   | openrecall.server.database.migrations.runner | Migration v7 already applied, skipping
+16:23:25 | DEBUG   | openrecall.server.database.migrations.runner | Migration v8 already applied, skipping
+16:23:25 | INFO    | openrecall.server.database.sql | Database migrations ensured (version=8, elapsed=0.001s)
+16:23:25 | INFO    | openrecall.server | ==================================================
+16:23:25 | INFO    | openrecall.server | OpenRecall Server Starting
+16:23:25 | INFO    | openrecall.server | ==================================================
+16:23:25 | INFO    | openrecall.server | Debug mode: ON
+16:23:25 | INFO    | openrecall.server | Data folder: /Users/pyw/testnew/MRS
+16:23:25 | INFO    | openrecall.server | Cache folder: /Users/pyw/testnew/MRS/cache
+16:23:25 | INFO    | openrecall.server | Screenshots: /Users/pyw/testnew/MRS/screenshots
+16:23:25 | INFO    | openrecall.server | Database: /Users/pyw/testnew/MRS/db/recall.db
+16:23:25 | INFO    | openrecall.server | Bind: 127.0.0.1:18083
+16:23:25 | INFO    | openrecall.server | API URL: http://127.0.0.1:18083/api
+16:23:25 | INFO    | openrecall.server | Web UI: http://127.0.0.1:18083
+16:23:25 | INFO    | openrecall.server | Device: cpu
+16:23:25 | INFO    | openrecall.server | Processing: LIFO threshold = 10
+16:23:25 | INFO    | openrecall.server | OCR Provider: rapidocr
+16:23:25 | INFO    | openrecall.server |   - Mode: Local Models
+16:23:25 | INFO    | openrecall.server |   - Model Dir: /Users/tiiny/models/RapidAI/RapidOCR
+16:23:25 | INFO    | openrecall.server | ==================================================
+16:23:25 | INFO    | openrecall.server | Preloading AI models (this may take a minute)...
+16:23:25 | INFO    | openrecall.server | Skipping VL model preload (provider=openai)
+16:23:25 | INFO    | openrecall.server | Skipping embedding model preload (provider=openai)
+16:23:25 | INFO    | openrecall.server.ocr.rapid_backend | Initializing RapidOCRBackend (use_local=True)
+16:23:29 | INFO    | openrecall.server | ✅ OCR model warmed up (provider=rapidocr)
+16:23:29 | INFO    | openrecall.server | Model preloading complete
+16:23:29 | INFO    | openrecall.server.worker | ProcessingWorker initialized
+16:23:29 | INFO    | openrecall.server.worker | 🚀 ProcessingWorker started
+16:23:29 | INFO    | openrecall.server.app | Background Processing Worker started successfully.
+16:23:29 | INFO    | openrecall.server.database.vector_store | Creating LanceDB table 'semantic_snapshots'
+16:23:29 | INFO    | openrecall.server.video.worker | 📹 [VIDEO-SERVER] VideoProcessingWorker initialized
+16:23:29 | INFO    | openrecall.server.video.worker | 📹 [VIDEO-SERVER] VideoProcessingWorker started
+16:23:29 | INFO    | openrecall.server.app | Video Processing Worker started successfully.
+16:23:29 | INFO    | openrecall.server | Audio hard shutdown active: skipping audio worker initialization
+ * Serving Flask app 'openrecall.server.app'
+ * Debug mode: on
+16:23:29 | DEBUG   | openrecall.server.database.migrations.runner | Migration v1 already applied, skipping
+16:23:29 | DEBUG   | openrecall.server.database.migrations.runner | Migration v2 already applied, skipping
+16:23:29 | DEBUG   | openrecall.server.database.migrations.runner | Migration v3 already applied, skipping
+16:23:29 | DEBUG   | openrecall.server.database.migrations.runner | Migration v4 already applied, skipping
+16:23:29 | DEBUG   | openrecall.server.database.migrations.runner | Migration v5 already applied, skipping
+16:23:29 | DEBUG   | openrecall.server.database.migrations.runner | Migration v6 already applied, skipping
+16:23:29 | DEBUG   | openrecall.server.database.migrations.runner | Migration v7 already applied, skipping
+16:23:29 | DEBUG   | openrecall.server.database.migrations.runner | Migration v8 already applied, skipping
+16:23:29 | DEBUG   | openrecall.server.database.migrations.runner | Migration v1 already applied, skipping
+16:23:29 | DEBUG   | openrecall.server.database.migrations.runner | Migration v2 already applied, skipping
+16:23:29 | DEBUG   | openrecall.server.database.migrations.runner | Migration v3 already applied, skipping
+16:23:29 | DEBUG   | openrecall.server.database.migrations.runner | Migration v4 already applied, skipping
+16:23:29 | DEBUG   | openrecall.server.database.migrations.runner | Migration v5 already applied, skipping
+16:23:29 | DEBUG   | openrecall.server.database.migrations.runner | Migration v6 already applied, skipping
+16:23:29 | DEBUG   | openrecall.server.database.migrations.runner | Migration v7 already applied, skipping
+16:23:29 | DEBUG   | openrecall.server.database.migrations.runner | Migration v8 already applied, skipping
+16:23:29 | INFO    | openrecall.server.database.sql | Database migrations ensured (version=8, elapsed=0.003s)
+16:23:29 | INFO    | openrecall.server.database.sql | Database migrations ensured (version=8, elapsed=0.003s)
+16:23:29 | INFO    | openrecall.server.ai.providers | OpenAIProvider configured: base=https://api.siliconflow.cn/v1 model=Qwen/Qwen3-VL-8B-Instruct
+16:23:29 | INFO    | openrecall.server.worker | 🤖 AI Engine initialized: vision=openai, ocr=rapidocr, embedding=openai, rerank=api(Qwen/Qwen3-Reranker-0.6B)
+16:23:29 | INFO    | openrecall.server.database.sql | Reset 1 stuck video chunks from PROCESSING to PENDING
+16:23:29 | WARNING | openrecall.server.video.worker | Recovered 1 stuck video chunks from previous session
+16:23:29 | INFO    | openrecall.server.video.worker | 📹 [VIDEO-SERVER] Processing chunk | id=9 | path=/Users/pyw/testnew/MRS/video_chunks/8004950a2ec44cd1192e378724740dddd394b4527e10688f46972c0e695b7549.mp4
+16:23:29 | INFO    | werkzeug | [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on http://127.0.0.1:18083
+16:23:29 | INFO    | werkzeug | [33mPress CTRL+C to quit[0m
+16:23:31 | INFO    | werkzeug | 127.0.0.1 - - [25/Feb/2026 16:23:31] "POST /api/heartbeat HTTP/1.1" 200 -
+16:23:32 | INFO    | openrecall.server | 
+16:23:32 | INFO    | openrecall.server | Received shutdown signal, stopping server...
+16:23:32 | INFO    | openrecall.server | Stopping background worker...
+16:23:32 | INFO    | openrecall.server.worker | Stop signal received
+16:23:32 | INFO    | openrecall.server.worker | ProcessingWorker stopped and connection closed
+16:23:32 | INFO    | openrecall.server | Background worker stopped
+16:23:32 | INFO    | openrecall.server | Stopping video worker...
+16:23:32 | INFO    | openrecall.server.video.worker | 📹 [VIDEO-SERVER] VideoProcessingWorker stop signal received

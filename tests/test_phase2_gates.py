@@ -330,12 +330,11 @@ class TestGate2F04AudioFTSIndexed:
 
 
 class TestGate2F05UnifiedTimeline:
-    """2-F-05: Timeline API returns both video frames AND audio transcriptions."""
+    """2-F-05 (Phase 2.6 override): timeline default path is video-only."""
 
-    def test_timeline_returns_both_types(self, tmp_path):
-        """Simulate a timeline query that merges video + audio entries."""
-        # We test the data-layer merge: both query methods return results
-        # that a timeline endpoint would combine.
+    def test_timeline_default_is_video_only(self, tmp_path):
+        """Simulate timeline retrieval that ignores historical audio rows."""
+        # Audio rows may exist for audit, but default timeline contracts to video-only.
         db_path = tmp_path / "unified.db"
         db_path.parent.mkdir(parents=True, exist_ok=True)
         conn = sqlite3.connect(str(db_path))
@@ -385,20 +384,16 @@ class TestGate2F05UnifiedTimeline:
         )
         conn.commit()
 
-        # Query both
+        # Timeline default path queries video only.
         video_frames = conn.execute(
             "SELECT id, timestamp, 'video_frame' AS type FROM frames WHERE timestamp >= 999 AND timestamp <= 1100"
         ).fetchall()
-        audio_trans = conn.execute(
-            "SELECT id, timestamp, 'audio_transcription' AS type FROM audio_transcriptions WHERE timestamp >= 999 AND timestamp <= 1100"
-        ).fetchall()
-
-        combined = sorted(video_frames + audio_trans, key=lambda r: r[1])
+        combined = sorted(video_frames, key=lambda r: r[1])
         types_present = {r[2] for r in combined}
 
         assert "video_frame" in types_present, "Timeline missing video frames"
-        assert "audio_transcription" in types_present, "Timeline missing audio transcriptions"
-        assert len(combined) == 2
+        assert "audio_transcription" not in types_present, "Timeline should exclude audio transcriptions"
+        assert len(combined) == 1
         conn.close()
 
 

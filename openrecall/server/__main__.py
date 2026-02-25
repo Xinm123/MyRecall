@@ -119,11 +119,10 @@ def main():
     preload_ai_models()
     
     # Start workers AFTER preloading models
-    from openrecall.server.app import init_background_worker, init_video_worker, init_audio_worker
+    from openrecall.server.app import init_background_worker, init_video_worker
     init_background_worker(app)
     init_video_worker(app)
-    if settings.audio_enabled:
-        init_audio_worker(app)
+    logger.info("Audio hard shutdown active: skipping audio worker initialization")
 
     # Flag to prevent duplicate signal handling
     _shutting_down = False

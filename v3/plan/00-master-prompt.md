@@ -1,6 +1,6 @@
 # MyRecall-v3 Master Prompt (Version Control)
 
-**Version**: 1.6
+**Version**: 1.7
 **Last Updated**: 2026-02-25
 **Status**: Active (Vision-only pivot; evidence-first Chat MVP planning)
 **Scope Type**: target
@@ -109,9 +109,9 @@ MyRecall-v3 (Third major version)
 |---|---|---|---|
 | `GET /api/v1/search` browse mode | `q` 可选；`q=""` 返回 browse/feed (`timestamp DESC`) | 空/缺失 `q` 当前返回空结果 | Phase 3 实现 browse/feed |
 | `GET /api/v1/search` time bounds | `start_time` 必填，`end_time` 可选 | 路由层未强制 `start_time` | Phase 3 增加硬校验 |
-| Search modality | Search/Chat 为 vision-only | 搜索引擎仍会合并 audio FTS 候选 | Phase 2.6 先完成主路径去音频，Phase 3 持续收敛边缘路径 |
+| Search modality | Search/Chat 为 vision-only | 搜索主路径已排除 audio 候选 | Phase 3 继续收敛 browse/time-bound 合同 |
 | `POST /api/v1/chat` | Phase 4 返回 `answer + evidence[]` | 当前未实现该 endpoint | Phase 4 实现 API + evidence 校验 |
-| `GET /api/v1/timeline` | Chat/Search grounding 使用 vision evidence；Phase 2.6/2.7/3 主路径不返回 audio | timeline 默认混合 video+audio | 收敛为 video-only 主路径，移除默认/标准 audio 返回 |
+| `GET /api/v1/timeline` | Chat/Search grounding 使用 vision evidence；Phase 2.6/2.7/3 主路径不返回 audio | timeline 默认/标准路径已为 video-only（audio source 空分页） | Phase 3 继续保持与检索契约一致 |
 
 ---
 
@@ -240,6 +240,7 @@ MyRecall-v3 (Third major version)
 | 1.4 | 2026-02-24 | Documentation contract hardening: added Scope Type, unified alignment levels (`semantic/discipline/divergence`), synchronized sequence wording with roadmap (`R1-R11`), and switched core path references to repo-relative style. |
 | 1.5 | 2026-02-24 | Audio Freeze contract upgraded to default full-chain pause semantics (no auto capture/process, no default audio UI, no Search/Chat audio grounding) with exception workflow requirements. |
 | 1.6 | 2026-02-25 | Phase 2.6 contract aligned to Audio Hard Shutdown: removed Exception workflow semantics and tightened timeline/search/UI boundaries to no-audio mainline. |
+| 1.7 | 2026-02-25 | Phase 2.6 execution landed: search/timeline current reality updated to vision-only retrieval contract in deviation snapshot. |
 
 ---
 

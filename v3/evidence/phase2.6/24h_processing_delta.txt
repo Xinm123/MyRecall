@@ -1,0 +1,27 @@
+Phase 2.6 Gate: 2.6-G-02 Processing Off
+Generated At (UTC): 2026-02-25T08:26:49Z
+Evidence File: /Users/pyw/newpart/MyRecall/v3/evidence/phase2.6/24h_processing_delta.txt
+
+Authority:
+- /Users/pyw/newpart/MyRecall/v3/metrics/phase-gates.md (2.6-G-02)
+
+Database:
+- /Users/pyw/testnew/MRS/db/recall.db
+
+Commands:
+1) sqlite3 -cmd '.timeout 5000' /Users/pyw/testnew/MRS/db/recall.db "select count(*), ifnull(max(created_at),'NULL') from audio_transcriptions;"
+   Output: 0|NULL
+
+2) Server startup evidence (audio worker disabled):
+   rg -n "Audio hard shutdown active: skipping audio worker initialization" /Users/pyw/newpart/MyRecall/v3/evidence/phase2.6/raw/startup_server.log
+   Output: line 72 matched
+
+Observed Window:
+- T0 (baseline): 2026-02-25T08:26:49Z, audio_transcriptions=0
+- T+24h: 2026-02-26T08:26:50Z, audio_transcriptions=0
+- 24h-window delta: 0
+
+24h Gate Judgment:
+- Required 24h window end: 2026-02-26T08:26:49Z
+- Current status: PASS (24h window elapsed)
+- Zero new audio transcriptions and no active audio worker observed during the full 24h window. Gate PASS.

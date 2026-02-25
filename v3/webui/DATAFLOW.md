@@ -55,8 +55,8 @@ flowchart LR
 
 1. `/search` SSR route currently uses `q` as primary switch.
 2. `/api/v1/search` empty `q` currently returns empty paginated payload.
-3. `/api/v1/timeline` currently merges video + audio by default and supports `source` filtering.
-4. SearchEngine still has audio FTS merge path in current implementation.
+3. `/api/v1/timeline` 默认 video-only，`source=audio|audio_transcription` 返回空分页。
+4. SearchEngine 主路径不再合并 audio FTS candidate（Phase 2.6 hard shutdown 已生效）。
 
 ## 3. Target Dataflow (Phase 3/4 Contract)
 
@@ -65,7 +65,7 @@ flowchart LR
 3. Search/Chat grounding uses vision-only evidence path; audio candidates are excluded by default.
 4. Timeline 默认/标准路径为 video-only；audio 不在主检索路径返回。
 5. WebUI default navigation does not expose audio dashboard entrypoints.
-6. **Audio Hard Shutdown 全链路契约（Phase 2.6）**: capture（AudioManager/AudioRecorder 关闭）→ processing（VAD/Transcriber/Worker 关闭）→ indexing（audio_transcriptions FTS 写入关闭）→ retrieval（search/timeline 默认与标准路径不返回 audio）→ UI（主导航与主流程无 `/audio` 入口）；无 Exception 开窗流程，偏差即失败信号并触发 `2.6-G-*` 重验证。
+6. **Audio Hard Shutdown 全链路契约（Phase 2.6）** 已落地：capture（AudioManager/AudioRecorder 关闭）→ processing（VAD/Transcriber/Worker 关闭）→ indexing（audio_transcriptions FTS 写入关闭）→ retrieval（search/timeline 默认与标准路径不返回 audio）→ UI（主导航与主流程无 `/audio` 入口）；无 Exception 开窗流程。
 
 ## 4. Failure and Degradation Paths (Current)
 

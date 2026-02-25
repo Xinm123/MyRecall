@@ -191,42 +191,38 @@
 
 ---
 
-## Phase 2.6: Audio Hard Shutdown WebUI Contract（计划态）
+## Phase 2.6: Audio Hard Shutdown WebUI Contract（执行态）
 
-**日期**: 2026-02-25（计划；实际执行时更新）
-**状态**: ⬜️ Planned
+**日期**: 2026-02-25  
+**状态**: ✅ Engineering Complete（Release 仍等待 24h gate 闭环）  
 **Phase 2.6 详细计划**: `v3/plan/07-phase-2.6-audio-freeze-governance-detailed-plan.md`
-**Code Changes**: REQUIRED（本阶段包含运行链路硬停机实施）
 
-### 变更内容（计划态，非 Done）
+### 新增
+- `/audio` 页面新增 audit-only banner：`Audio disabled in Phase 2.6 / Audit-only`。
 
-| 变更项 | 文件 | 当前行为 | 目标契约（Phase 2.6 声明） | 收敛阶段 |
-|--------|------|---------|--------------------------|---------|
-| `/audio` 页面可见性契约 | `v3/webui/ROUTE_MAP.md` | 可见（nav icon 常驻） | 主导航/主流程不暴露 audio 入口 | Phase 2.6 |
-| Audio nav icon 渲染 | `v3/webui/ROUTE_MAP.md` | 5-page toolbar 常驻 | 默认不渲染 | Phase 2.6 |
-| Search/Chat grounding 模态 | `v3/webui/DATAFLOW.md` | 可能混入 audio candidate | vision-only；audio 候选排除 | Phase 2.6 |
-| Timeline 默认显示范围 | `v3/webui/DATAFLOW.md` | mixed 默认（video + audio） | 默认/标准路径 video-only（不返回 audio） | Phase 2.6 |
-| Audio Hard Shutdown 全链路契约 | `v3/webui/DATAFLOW.md` | 仅 freeze 叙述 | capture/processing/indexing/retrieval/UI 全链路 hard shutdown | Phase 2.6 |
-| `/audio` 页面 Phase 2.6 状态标注 | `v3/webui/pages/audio.md` | 无 hard shutdown 状态标注 | 新增 Section 10：Phase 2.6 Hard Shutdown Status | Phase 2.6 |
-| `/video` 页面 Phase 2.6 对比说明 | `v3/webui/pages/video.md` | 无 Phase 2.6 说明 | 新增 Section 10：Phase 2.6 Hard Shutdown Scope — Video 不受影响声明 | Phase 2.6 |
+### 修改
+- `layout.html` 主导航移除 `/audio` icon/link。
+- `layout.html` 移除 `/audio` 对应 CSS 高亮规则与 `currentPath === '/audio'` 检测分支。
+- `ROUTE_MAP.md` 更新为 `/audio` audit-only 直达语义，主路径不暴露。
+- `DATAFLOW.md` 更新为 retrieval 已收敛：search/timeline 主路径不返回 audio。
+- `pages/timeline.md` 更新 current 语义为默认 video-only（不再 mixed）。
+- `pages/video.md` 保持“Video 不受 Phase 2.6 关闭影响”的说明，并与当前实现对齐。
+
+### 废弃
+- “Phase 2.6 计划态”叙述（已转为执行态结果记录）。
 
 ### 关联 Gates（authority: `v3/metrics/phase-gates.md`）
+- 2.6-G-03（Retrieval Off）: ✅ Pass
+- 2.6-G-04（UI Off）: ✅ Pass
 
-- 2.6-G-03（Retrieval Off）：search/timeline 主路径不返回 audio
-- 2.6-G-04（UI Off）：主导航与主流程无 audio entrypoints
+### 验证
+- `python3 -m pytest tests/test_phase25_navigation.py -v` → `13 passed`
+- `python3 -m pytest tests/test_phase2_timeline.py -v` → `9 passed`
+- `python3 -m pytest tests/test_phase2_6_hard_shutdown.py -v` → `6 passed`
 
-### 验证命令（计划态）
-
-```bash
-# 验证 5 个 WebUI 文件均含 Phase 2.6 标注
-grep -l "Phase 2.6" \
-  v3/webui/CHANGELOG.md \
-  v3/webui/ROUTE_MAP.md \
-  v3/webui/DATAFLOW.md \
-  v3/webui/pages/audio.md \
-  v3/webui/pages/video.md
-# 预期：5 行
-```
+### 证据
+- `/Users/pyw/newpart/MyRecall/v3/evidence/phase2.6/ui_surface_checks.txt`
+- `/Users/pyw/newpart/MyRecall/v3/evidence/phase2.6/retrieval_contract_checks.txt`
 
 ---
 

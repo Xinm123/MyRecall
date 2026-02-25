@@ -1,0 +1,20 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.11.14, pytest-9.0.2, pluggy-1.6.0 -- /opt/homebrew/Caskroom/miniforge/base/envs/v3/bin/python3
+cachedir: .pytest_cache
+rootdir: /Users/pyw/newpart/MyRecall
+configfile: pytest.ini
+plugins: anyio-4.12.1
+collecting ... collected 10 items
+
+tests/test_phase1_5_focused_browser_url.py::TestInsertFrameFocusedBrowserUrl::test_insert_frame_focused_true_stores_1 PASSED [ 10%]
+tests/test_phase1_5_focused_browser_url.py::TestInsertFrameFocusedBrowserUrl::test_insert_frame_focused_none_stores_null PASSED [ 20%]
+tests/test_phase1_5_focused_browser_url.py::TestInsertFrameFocusedBrowserUrl::test_insert_frame_browser_url_stored PASSED [ 30%]
+tests/test_phase1_5_focused_browser_url.py::TestInsertFrameFocusedBrowserUrl::test_insert_frame_browser_url_none_stores_null PASSED [ 40%]
+tests/test_phase1_5_focused_browser_url.py::TestQueryReturnsFocusedBrowserUrl::test_query_frames_returns_focused_browser_url PASSED [ 50%]
+tests/test_phase1_5_focused_browser_url.py::TestQueryReturnsFocusedBrowserUrl::test_query_frames_normalizes_null_focused PASSED [ 60%]
+tests/test_phase1_5_focused_browser_url.py::TestQueryReturnsFocusedBrowserUrl::test_search_video_fts_returns_focused_browser_url PASSED [ 70%]
+tests/test_phase1_5_focused_browser_url.py::TestTimelineAPIFocusedBrowserUrl::test_timeline_response_includes_focused_and_browser_url PASSED [ 80%]
+tests/test_phase1_5_focused_browser_url.py::TestSearchAPIFocusedBrowserUrlCompatibility::test_search_video_result_includes_focused_browser_url PASSED [ 90%]
+tests/test_phase1_5_focused_browser_url.py::TestSearchAPIFocusedBrowserUrlCompatibility::test_search_snapshot_result_keeps_old_shape_plus_null_optionals PASSED [100%]
+
+============================== 10 passed in 3.88s ==============================

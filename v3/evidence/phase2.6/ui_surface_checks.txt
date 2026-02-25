@@ -1,0 +1,28 @@
+Phase 2.6 Gate: 2.6-G-04 UI Off
+Generated At (UTC): 2026-02-25T08:26:49Z
+Evidence File: /Users/pyw/newpart/MyRecall/v3/evidence/phase2.6/ui_surface_checks.txt
+
+Authority:
+- /Users/pyw/newpart/MyRecall/v3/metrics/phase-gates.md (2.6-G-04)
+
+Static Surface Checks:
+1) rg -n "href=\"/audio\"|icon_audio|currentPath === '/audio'|data-current-view=\"audio\"" /Users/pyw/newpart/MyRecall/openrecall/server/templates/layout.html
+   Output: <empty> (no matches)
+
+2) rg -n "Audio disabled in Phase 2.6 / Audit-only|audit-only-banner" /Users/pyw/newpart/MyRecall/openrecall/server/templates/audio.html
+   Output:
+   - line 67: .audit-only-banner
+   - line 562: audit banner block
+   - line 563: "Audio disabled in Phase 2.6 / Audit-only"
+
+Behavioral Check:
+- python3 -m pytest tests/test_phase25_navigation.py -v
+- Raw log: /Users/pyw/newpart/MyRecall/v3/evidence/phase2.6/raw/test_phase25_navigation.log
+- Summary: 13 passed in 1.57s
+- Includes:
+  - test_audio_link_removed_from_header PASSED
+  - test_audio_icon_not_rendered_in_header PASSED
+  - test_audio_path_detection_removed PASSED
+  - test_audio_returns_200 PASSED (audit direct access retained)
+
+Gate status: PASS

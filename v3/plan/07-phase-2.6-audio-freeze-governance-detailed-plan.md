@@ -1,8 +1,8 @@
 # Phase 2.6: Audio Hard Shutdown — Detailed Roadmap
 
 **Version**: 2.0
-**Status**: Planned
-**Last Updated**: 2026-02-25
+**Status**: Completed (2026-02-26)
+**Last Updated**: 2026-02-26
 **Supersedes**: 本文件历史版本（Audio Freeze Governance v1.0，治理+例外开窗方案）
 
 ---

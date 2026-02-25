@@ -1,0 +1,27 @@
+Phase 2.6 Gate: 2.6-G-01 Capture Off
+Generated At (UTC): 2026-02-25T08:26:49Z
+Evidence File: /Users/pyw/newpart/MyRecall/v3/evidence/phase2.6/24h_capture_delta.txt
+
+Authority:
+- /Users/pyw/newpart/MyRecall/v3/metrics/phase-gates.md (2.6-G-01)
+
+Database:
+- /Users/pyw/testnew/MRS/db/recall.db
+
+Commands:
+1) sqlite3 /Users/pyw/testnew/MRS/db/recall.db "select count(*), ifnull(max(created_at),'NULL') from audio_chunks;"
+   Output: 1|2026-02-25 07:45:02
+
+2) Startup evidence (capture path hard shutdown):
+   rg -n "Audio hard shutdown active: skipping audio recorder startup" /Users/pyw/newpart/MyRecall/v3/evidence/phase2.6/raw/startup_client.log
+   Output: line 17 matched
+
+Observed Window:
+- T0 (baseline): 2026-02-25T08:26:49Z, audio_chunks=1
+- T+24h: 2026-02-26T08:26:50Z, audio_chunks=1
+- 24h-window delta: 0
+
+24h Gate Judgment:
+- Required 24h window end: 2026-02-26T08:26:49Z
+- Current status: PASS (24h window elapsed)
+- Zero new automatic audio capture observed during the full 24h window. Gate PASS.

@@ -1,7 +1,4 @@
-"""Phase 2 Smoke Tests: End-to-end audio pipeline validation.
-
-Chains the full audio flow: upload -> DB insert -> FTS index -> search -> timeline -> list endpoints.
-"""
+"""Phase 2.6 smoke tests: audio hard-shutdown end-to-end behavior."""
 
 import io
 import json
@@ -9,7 +6,6 @@ import time
 import wave
 
 import numpy as np
-import pytest
 
 
 def _make_wav_bytes(duration_s: float = 1.0, sr: int = 16000) -> bytes:
@@ -25,18 +21,16 @@ def _make_wav_bytes(duration_s: float = 1.0, sr: int = 16000) -> bytes:
     return buf.getvalue()
 
 
-class TestPhase2SmokeEndToEnd:
-    """End-to-end smoke test chaining upload -> transcription -> search -> timeline."""
+class TestPhase26HardShutdownSmoke:
+    """Smoke validations for the hard-shutdown contract."""
 
-    def test_full_audio_pipeline(self, flask_app, flask_client):
-        """Upload audio, insert transcription+FTS, search, timeline, list endpoints."""
+    def test_audio_upload_rejected_and_timeline_excludes_audio(self, flask_app, flask_client):
         from openrecall.server.database import SQLStore
 
         sql_store = SQLStore()
         ts = time.time()
-        phrase = "phase2_smoke_test_unique_phrase"
 
-        # 1. Upload audio chunk via API
+        # 1) Upload audio chunk via v1 -> must be rejected
         wav_data = _make_wav_bytes(duration_s=0.5)
         metadata = {
             "type": "audio_chunk",
@@ -44,7 +38,6 @@ class TestPhase2SmokeEndToEnd:
             "device_name": "smoke_mic",
             "checksum": "sha256:smoke_test_001",
         }
-
         resp = flask_client.post(
             "/api/v1/upload",
             data={
@@ -53,110 +46,98 @@ class TestPhase2SmokeEndToEnd:
             },
             content_type="multipart/form-data",
         )
-        assert resp.status_code == 202, f"Upload failed: {resp.get_json()}"
-        chunk_id = resp.get_json()["chunk_id"]
-        assert isinstance(chunk_id, int)
+        assert resp.status_code == 403
+        assert resp.get_json()["code"] == "AUDIO_HARD_SHUTDOWN"
 
-        # 2. Simulate processing: insert transcription + FTS (normally done by worker)
-        trans_id = sql_store.insert_audio_transcription(
+        # 2) Seed historical audio data directly to verify retrieval remains audio-free.
+        chunk_id = sql_store.insert_audio_chunk(
+            file_path="/tmp/phase26_smoke.wav",
+            timestamp=ts,
+            device_name="seeded_mic",
+        )
+        sql_store.insert_audio_transcription(
             audio_chunk_id=chunk_id,
             offset_index=0,
             timestamp=ts,
-            transcription=phrase,
-        )
-        assert trans_id > 0
-
-        sql_store.insert_audio_transcription_fts(
-            transcription=phrase,
-            device="smoke_mic",
-            audio_chunk_id=chunk_id,
-            speaker_id=None,
+            transcription="phase2_smoke_audio_should_not_be_retrieved",
         )
 
-        # Mark completed via direct SQL (worker methods use conn parameter)
-        import sqlite3 as _sqlite3
-        from openrecall.shared.config import settings
-        with _sqlite3.connect(str(settings.db_path)) as conn:
-            conn.execute(
-                "UPDATE audio_chunks SET status='COMPLETED' WHERE id=?",
-                (chunk_id,),
-            )
-
-        # 3. Verify audio chunks list endpoint
-        resp = flask_client.get("/api/v1/audio/chunks")
-        assert resp.status_code == 200
-        chunks_data = resp.get_json()
-        assert any(c["id"] == chunk_id for c in chunks_data["data"])
-
-        # 4. Verify audio transcriptions endpoint
-        resp = flask_client.get(
-            f"/api/v1/audio/transcriptions?start_time={ts - 60}&end_time={ts + 60}"
-        )
-        assert resp.status_code == 200
-        trans_data = resp.get_json()
-        assert trans_data["meta"]["total"] >= 1
-
-        # 5. Verify timeline includes audio transcription
+        # 3) Timeline default path must not return audio.
         resp = flask_client.get(
             f"/api/v1/timeline?start_time={ts - 60}&end_time={ts + 60}"
         )
         assert resp.status_code == 200
         timeline_data = resp.get_json()
-        audio_items = [
-            d for d in timeline_data["data"]
-            if d.get("type") == "audio_transcription"
-        ]
-        assert len(audio_items) >= 1
+        assert all(item.get("type") != "audio_transcription" for item in timeline_data["data"])
 
-        # 6. Verify FTS search returns the transcription
-        fts_results = sql_store.search_audio_fts(phrase, limit=10)
-        assert len(fts_results) >= 1
-        # FTS returns snippet field with <b> tags
-        assert any(
-            phrase in r.get("snippet", "").replace("<b>", "").replace("</b>", "")
-            for r in fts_results
+        # 4) Explicit audio source request must return empty page.
+        resp = flask_client.get(
+            f"/api/v1/timeline?start_time={ts - 60}&end_time={ts + 60}&source=audio"
         )
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert data["data"] == []
 
-        # 7. Verify queue status includes audio_queue
+        # 5) Queue status still exposes audio_queue for audit.
         resp = flask_client.get("/api/v1/queue/status")
         assert resp.status_code == 200
         queue_data = resp.get_json()
         assert "audio_queue" in queue_data
 
-    def test_audio_upload_then_chunks_status(self, flask_app, flask_client):
-        """Upload multiple chunks and verify status filtering."""
-        from openrecall.server.database import SQLStore
+    def test_legacy_audio_upload_is_rejected(self, flask_client):
+        wav_data = _make_wav_bytes(duration_s=0.5)
+        metadata = {
+            "type": "audio_chunk",
+            "timestamp": int(time.time()),
+            "device_name": "legacy_mic",
+        }
 
-        sql_store = SQLStore()
-        ts = time.time()
+        resp = flask_client.post(
+            "/api/upload",
+            data={
+                "file": (io.BytesIO(wav_data), "legacy.wav", "audio/wav"),
+                "metadata": json.dumps(metadata),
+            },
+            content_type="multipart/form-data",
+        )
 
-        # Upload two chunks
-        for i in range(2):
-            wav_data = _make_wav_bytes(duration_s=0.3)
-            metadata = {
-                "type": "audio_chunk",
-                "timestamp": int(ts) + i,
-                "device_name": "smoke_mic",
-                "checksum": f"sha256:smoke_multi_{i}",
-            }
-            resp = flask_client.post(
-                "/api/v1/upload",
-                data={
-                    "file": (io.BytesIO(wav_data), f"multi_{i}.wav", "audio/wav"),
-                    "metadata": json.dumps(metadata),
-                },
-                content_type="multipart/form-data",
-            )
-            assert resp.status_code == 202
+        assert resp.status_code == 403
+        assert resp.get_json()["code"] == "AUDIO_HARD_SHUTDOWN"
 
-        # Both should be PENDING
-        resp = flask_client.get("/api/v1/audio/chunks?status=PENDING")
+    def test_search_filters_out_audio_candidates(self, flask_client, monkeypatch):
+        import openrecall.server.api_v1 as api_v1
+
+        class _FakeSearchEngine:
+            def search(self, _q, limit=50):
+                return [
+                    {
+                        "source": "audio_transcription",
+                        "audio_data": {
+                            "id": 101,
+                            "timestamp": 1700000000.0,
+                            "device_name": "mic",
+                            "transcription": "secret audio",
+                            "snippet": "secret audio",
+                        },
+                    },
+                    {
+                        "source": "video_frame",
+                        "video_data": {
+                            "frame_id": 22,
+                            "timestamp": 1700000001.0,
+                            "app_name": "Chrome",
+                            "window_name": "Docs",
+                            "text_snippet": "vision hit",
+                            "focused": 1,
+                            "browser_url": "https://example.com",
+                        },
+                    },
+                ][:limit]
+
+        monkeypatch.setattr(api_v1, "_get_search_engine", lambda: _FakeSearchEngine())
+
+        resp = flask_client.get("/api/v1/search?q=secret")
         assert resp.status_code == 200
-        pending = resp.get_json()["data"]
-        assert len(pending) >= 2
-
-        # No COMPLETED yet
-        resp = flask_client.get("/api/v1/audio/chunks?status=COMPLETED")
-        assert resp.status_code == 200
-        completed = resp.get_json()["data"]
-        assert len(completed) == 0
+        data = resp.get_json()["data"]
+        assert all(item.get("scene_tag") != "audio_transcription" for item in data)
+        assert any(item.get("scene_tag") == "video_frame" for item in data)

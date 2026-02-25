@@ -1,7 +1,7 @@
 # MyRecall-v3 Phase Gates & Acceptance Criteria
 
-**Version**: 2.6
-**Last Updated**: 2026-02-25
+**Version**: 2.7
+**Last Updated**: 2026-02-26
 
 ⚠️ **Authority Notice**: 此文件为所有Phase (0-8) 的权威Go/No-Go验收标准。Roadmap文档仅引用此处定义,不重复定义Phase gates。任何关于Phase验收标准的变更必须首先更新本文件。
 
@@ -318,11 +318,11 @@ This phase enforces complete removal of audio from MVP runtime mainline.
 
 | Gate | Criteria | Validation Method | Status |
 |------|----------|-------------------|--------|
-| **2.6-G-01 Capture Off** | No automatic audio capture in default runtime path | Run 24h standard runtime and verify `audio_chunks` count delta = 0 | ⬜️ |
-| **2.6-G-02 Processing Off** | No automatic VAD/transcription/indexing for audio | Verify no active audio processing worker and `audio_transcriptions` delta = 0 in same 24h window | ⬜️ |
-| **2.6-G-03 Retrieval Off** | search/timeline paths exclude audio results | API contract tests + sampled responses (`search`, `timeline`) must show audio item count = 0 | ⬜️ |
-| **2.6-G-04 UI Off** | MVP primary UI path does not expose audio entrypoints | Review route map + navigation rendering + page-flow checks | ⬜️ |
-| **2.6-G-05 Anti-Bypass** | Runtime/config toggles cannot restore audio mainline behavior | Negative tests for audio-related env/mode switches; verify downgrade/reject behavior | ⬜️ |
+| **2.6-G-01 Capture Off** | No automatic audio capture in default runtime path | Run 24h standard runtime and verify `audio_chunks` count delta = 0 | ✅ PASS (24h closed) |
+| **2.6-G-02 Processing Off** | No automatic VAD/transcription/indexing for audio | Verify no active audio processing worker and `audio_transcriptions` delta = 0 in same 24h window | ✅ PASS (24h closed) |
+| **2.6-G-03 Retrieval Off** | search/timeline paths exclude audio results | API contract tests + sampled responses (`search`, `timeline`) must show audio item count = 0 | ✅ PASS |
+| **2.6-G-04 UI Off** | MVP primary UI path does not expose audio entrypoints | Review route map + navigation rendering + page-flow checks | ✅ PASS |
+| **2.6-G-05 Anti-Bypass** | Runtime/config toggles cannot restore audio mainline behavior | Negative tests for audio-related env/mode switches; verify downgrade/reject behavior | ✅ PASS |
 
 ### 2. Required Evidence Artifacts
 
@@ -650,6 +650,7 @@ Placeholder section for Phase 8. This phase is required after MVP and targets en
 | 2.3 | 2026-02-24 | Added Phase 2.6 hard-governance gates (`2.6-G-*`) with evidence interfaces (`FreezeScopeMatrix`, `ExceptionRequest`, `GateEvidenceManifest`) and made Phase 2.7 explicitly dependent on Phase 2.6 PASS status. |
 | 2.5 | 2026-02-24 | Upgraded Phase 2.6 semantics from governance-only to governance + default full-chain pause; expanded gate evidence contract for capture/processing/UI/search-chat freeze boundaries and exception auto-revert closure. |
 | 2.6 | 2026-02-25 | Replaced Phase 2.6 governance/open-window semantics with Audio Hard Shutdown gates (`capture off`, `processing off`, `retrieval off`, `UI off`, `anti-bypass`) and removed exception workflow dependency. |
+| 2.7 | 2026-02-26 | Phase 2.6 Audio Hard Shutdown 24h closed. Gates 2.6-G-01 and 2.6-G-02 marked as PASS. |
 
 ---
 

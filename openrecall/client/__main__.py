@@ -60,24 +60,7 @@ def main():
     # Get recorder (manages Producer + Consumer)
     recorder = get_recorder()
 
-    # Start audio recording if enabled
-    audio_recorder = None
-    if settings.audio_enabled:
-        try:
-            from openrecall.client.audio_recorder import AudioRecorder
-
-            audio_recorder = AudioRecorder()
-            audio_recorder.start()
-            if audio_recorder.is_running():
-                logger.info("✅ Audio recording initialized")
-            else:
-                logger.info("Audio recording: no devices available")
-                audio_recorder = None
-        except Exception as e:
-            logger.warning(f"Failed to start audio recorder: {e}")
-            audio_recorder = None
-    else:
-        logger.info("Audio capture disabled by configuration")
+    logger.info("Audio hard shutdown active: skipping audio recorder startup")
 
     # Status logging thread
     status_stop_event = threading.Event()
@@ -97,24 +80,6 @@ def main():
 
                 # Build status components
                 status_parts = []
-
-                # Audio status with current chunk file and duration
-                if audio_recorder and audio_recorder.is_running():
-                    active_devices = sum(
-                        1 for m in audio_recorder._managers if m.is_alive()
-                    )
-                    audio_duration = audio_recorder.get_total_recording_duration()
-                    # Get current chunk file name from first active manager
-                    current_file = "none"
-                    for mgr in audio_recorder._managers:
-                        if mgr.is_alive() and mgr._current_path:
-                            current_file = mgr._current_path.name
-                            break
-                    status_parts.append(
-                        f"🎤 [AUDIO] Recording | devices={active_devices}/{len(audio_recorder._managers)} | file={current_file} | duration={audio_duration:.0f}s"
-                    )
-                elif settings.audio_enabled:
-                    status_parts.append("🎤 [AUDIO] Idle")
 
                 # Video status with current chunk file and duration
                 video_recorder = None
@@ -171,11 +136,6 @@ def main():
         logger.info("")
         logger.info("Received shutdown signal, stopping client...")
         status_stop_event.set()
-        if audio_recorder is not None:
-            try:
-                audio_recorder.stop()
-            except Exception as e:
-                logger.warning(f"Error stopping audio recorder: {e}")
         recorder.stop()
         logger.info("Client shutdown complete")
         sys.exit(0)
@@ -191,11 +151,6 @@ def main():
     finally:
         if not _shutting_down:
             status_stop_event.set()
-            if audio_recorder is not None:
-                try:
-                    audio_recorder.stop()
-                except Exception:
-                    pass
             recorder.stop()
             logger.info("Client shutdown complete")
         sys.exit(0)

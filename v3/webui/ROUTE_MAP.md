@@ -7,7 +7,7 @@
 | Home Grid | `/` | `openrecall/server/app.py:index()` | `index.html` |
 | Timeline | `/timeline` | `openrecall/server/app.py:timeline()` | `timeline.html` |
 | Search | `/search` | `openrecall/server/app.py:search()` | `search.html` |
-| Audio Dashboard | `/audio` | `openrecall/server/app.py:audio()` | `audio.html` |
+| Audio Dashboard（Audit-only） | `/audio` | `openrecall/server/app.py:audio()` | `audio.html` |
 | Video Dashboard | `/video` | `openrecall/server/app.py:video()` | `video.html` |
 | Control Center | 布局内组件 | `layout.html` 前端脚本 | `layout.html` |
 
@@ -33,12 +33,12 @@
 | API | 用途 | Current 语义 |
 |---|---|---|
 | `GET /api/v1/search` | 标准分页检索接口 | 空 `q` 返回空分页；`start_time` 当前未强制 |
-| `GET /api/v1/timeline` | 时间范围分页查询 | 默认 mixed（video + audio）；支持 `source` 过滤 |
+| `GET /api/v1/timeline` | 时间范围分页查询 | 默认 video-only；`source=audio|audio_transcription` 返回空分页 |
 | `GET /api/v1/frames/:id` | 帧服务 | 文件直出 + 按需抽帧 fallback |
 | `GET/POST /api/v1/config` | v1 配置读写 | 与 legacy 语义一致 |
 | `POST /api/v1/heartbeat` | v1 心跳 | 远程模式替代入口 |
 | `GET /api/v1/vision/status` | v1 健康诊断 | 只读 |
-| `POST /api/v1/upload` | v1 上传入口 | 视频/音频/截图摄取 |
+| `POST /api/v1/upload` | v1 上传入口 | 视频/截图摄取；audio payload 403 (`AUDIO_HARD_SHUTDOWN`) |
 | `GET /api/v1/upload/status` | v1 上传状态 | 断点续传查询 |
 | `GET /api/v1/audio/chunks` | 音频 chunk 列表 | 支持 `device` 过滤 |
 | `GET /api/v1/audio/transcriptions` | 音频转写列表 | 分页与时间过滤 |
@@ -55,10 +55,10 @@
 |---|---|---|---|
 | `/api/v1/search` empty `q` | 空分页 | browse/feed（有界范围） | — |
 | `/api/v1/search` `start_time` | 未强制 | 强制（MyRecall policy） | — |
-| Search modality | 仍可能混入 audio candidate | Search/Chat grounding 走 vision-only | **Phase 2.6 target：audio 候选默认排除**；ADR-0005 vision-only contract |
-| WebUI audio visibility | `/audio` 页面可见 | MVP 主导航与主流程不暴露 audio 入口 | **2.6-G-04（UI Off）**：主路径无 audio entrypoint |
-| `/api/v1/timeline` | mixed 默认 | 默认/标准路径仅 video（audio 不返回） | **2.6-G-03（Retrieval Off）**：timeline 不含 audio 结果 |
-| Audio nav icon | nav toolbar 常驻 | 默认不渲染 | **2.6-G-04（UI Off）**：主导航无 audio icon |
+| Search modality | audio candidate 已默认排除 | Search/Chat grounding 走 vision-only | **2.6-G-03 已收敛** |
+| WebUI audio visibility | `/audio` 仅审计直达 | MVP 主导航与主流程不暴露 audio 入口 | **2.6-G-04 已收敛** |
+| `/api/v1/timeline` | 默认 video-only；audio source 空分页 | 默认/标准路径仅 video（audio 不返回） | **2.6-G-03 已收敛** |
+| Audio nav icon | 已从主导航移除 | 默认不渲染 | **2.6-G-04 已收敛** |
 
 ## 4. Screenpipe 对齐说明
 
@@ -72,3 +72,4 @@
 - [x] v1 search/timeline/frames 路由存在。
 - [x] audio/video dashboard 路由与 API 存在。
 - [x] control-center 配置与心跳接口存在。
+- [x] 主导航无 `/audio` 入口，`/audio` 保留 audit-only 直达。

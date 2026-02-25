@@ -75,8 +75,8 @@ class SearchEngine:
             snap = item.get("snapshot")
             if snap is not None:
                 output.append(self._attach_score(snap, item["score"]))
-            elif item.get("source") in ("video_frame", "audio_transcription"):
-                # Pass through video/audio results as dicts for API serialization
+            elif item.get("source") == "video_frame":
+                # Phase 2.6 retrieval contract: only video frame dicts pass through.
                 output.append(item)
         return output
 
@@ -114,32 +114,7 @@ class SearchEngine:
                 )
                 continue
 
-            if item.get("snapshot") is None and item.get("source") == "audio_transcription":
-                ar = item.get("audio_data") or {}
-                dbg = item.get("debug") or {}
-                out.append(
-                    {
-                        "id": f"atranscription:{ar.get('id')}",
-                        "timestamp": float(ar.get("timestamp") or 0),
-                        "app": ar.get("device_name") or "audio",
-                        "title": ar.get("transcription") or "",
-                        "description": ar.get("snippet") or ar.get("transcription") or "",
-                        "filename": None,
-                        "image_url": "",
-                        "final_rank": idx + 1,
-                        "final_score": float(item.get("score") or 0.0),
-                        "rerank_rank": dbg.get("rerank_rank"),
-                        "rerank_score": float(dbg.get("rerank_score") or 0.0) if dbg.get("rerank_score") is not None else None,
-                        "combined_rank": dbg.get("combined_rank"),
-                        "vector_rank": dbg.get("vector_rank"),
-                        "vector_score": float(dbg.get("vector_score") or 0.0),
-                        "vector_distance": dbg.get("vector_distance"),
-                        "vector_metric": dbg.get("vector_metric"),
-                        "fts_rank": dbg.get("fts_rank"),
-                        "fts_bm25": dbg.get("fts_bm25"),
-                        "fts_boost": float(dbg.get("fts_boost") or 0.0),
-                    }
-                )
+            if item.get("snapshot") is None:
                 continue
 
             snap = item["snapshot"]
@@ -401,34 +376,6 @@ class SearchEngine:
                     logger.debug(f"Video FTS | q='{fts_query}' | candidates={len(video_fts_results)}")
             except Exception as e:
                 logger.warning(f"Video FTS search failed: {e}")
-
-        # Phase 2: Audio FTS search
-        if fts_query:
-            try:
-                audio_fts_results = self.sql_store.search_audio_fts(fts_query, limit=limit)
-                for ar in audio_fts_results:
-                    key = f"atranscription:{ar['id']}"
-                    if key not in results_map:
-                        results_map[key] = {
-                            'snapshot': None,
-                            'score': 0.15,
-                            'source': 'audio_transcription',
-                            'audio_data': ar,
-                            'debug': {
-                                'vector_score': 0.0,
-                                'vector_distance': None,
-                                'vector_metric': None,
-                                'base_score': 0.15,
-                                'fts_rank': None,
-                                'fts_boost': 0.0,
-                                'is_fts_match': True,
-                                'fts_bm25': ar.get('score'),
-                            }
-                        }
-                if settings.debug:
-                    logger.debug(f"Audio FTS | q='{fts_query}' | candidates={len(audio_fts_results)}")
-            except Exception as e:
-                logger.warning(f"Audio FTS search failed: {e}")
 
         sorted_results = sorted(
             results_map.values(), 

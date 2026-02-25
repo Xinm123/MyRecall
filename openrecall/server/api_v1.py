@@ -174,6 +174,15 @@ def _normalize_source_filter(value: str) -> str:
     raise ValueError("source must be one of input, output, unknown")
 
 
+def _audio_hard_shutdown_response():
+    """Standard rejection payload for audio mainline requests."""
+    return jsonify({
+        "status": "error",
+        "code": "AUDIO_HARD_SHUTDOWN",
+        "message": "Audio mainline is disabled in Phase 2.6 (hard shutdown).",
+    }), 403
+
+
 @api_v1_bp.route("/health", methods=["GET"])
 @require_auth
 def health():
@@ -218,7 +227,12 @@ def upload():
         if is_video:
             return _handle_video_upload(file, metadata, start_time)
         elif is_audio:
-            return _handle_audio_upload(file, metadata, start_time)
+            logger.warning(
+                "Audio hard shutdown: rejected /api/v1/upload audio payload | filename=%s | content_type=%s",
+                file.filename,
+                file.content_type,
+            )
+            return _audio_hard_shutdown_response()
         else:
             return _handle_screenshot_upload(file, metadata, start_time)
 
@@ -441,7 +455,7 @@ def search_api():
         for item in results:
             flat = None
 
-            # Newer search engine result shape: dict with snapshot/video_data/audio_data.
+            # Newer search engine result shape: dict with snapshot/video_data.
             if isinstance(item, dict):
                 snap = item.get("snapshot")
                 if snap is not None:
@@ -457,20 +471,14 @@ def search_api():
                         "focused": None,
                         "browser_url": None,
                     }
-                elif item.get("source") == "audio_transcription":
-                    audio_data = item.get("audio_data") or {}
-                    flat = {
-                        "id": f"atranscription:{audio_data.get('id')}",
-                        "timestamp": float(audio_data.get("timestamp") or 0.0),
-                        "app_name": audio_data.get("device_name") or "audio",
-                        "window_title": audio_data.get("transcription") or "",
-                        "caption": audio_data.get("snippet") or audio_data.get("transcription") or "",
-                        "scene_tag": "audio_transcription",
-                        "image_path": "",
-                        "focused": None,
-                        "browser_url": None,
-                    }
-                else:
+                elif (
+                    item.get("source") == "video_frame"
+                    or (
+                        item.get("source") in (None, "")
+                        and item.get("video_data") is not None
+                        and item.get("audio_data") is None
+                    )
+                ):
                     video_data = item.get("video_data") or {}
                     frame_id = video_data.get("frame_id")
                     flat = {
@@ -484,6 +492,8 @@ def search_api():
                         "focused": video_data.get("focused"),
                         "browser_url": video_data.get("browser_url"),
                     }
+                else:
+                    flat = None
             else:
                 # Legacy shape: SemanticSnapshot object.
                 flat = {
@@ -498,7 +508,9 @@ def search_api():
                     "browser_url": None,
                 }
 
-            serialized.append(flat)
+            # Phase 2.6 retrieval contract: audio candidates are not serializable.
+            if flat is not None and flat.get("scene_tag") != "audio_transcription":
+                serialized.append(flat)
 
         total = len(serialized)
         page = serialized[offset: offset + limit]
@@ -731,7 +743,7 @@ def heartbeat():
 @api_v1_bp.route("/timeline", methods=["GET"])
 @require_auth
 def timeline_api():
-    """Get unified timeline entries (video frames + audio transcriptions) within a time range."""
+    """Get timeline entries (video frames only in Phase 2.6) within a time range."""
     try:
         start_time = float(request.args.get("start_time", 0))
     except (ValueError, TypeError):
@@ -745,44 +757,26 @@ def timeline_api():
     source_filter = request.args.get("source", "").strip().lower()
 
     try:
+        # Phase 2.6 retrieval contract: explicit audio source requests return empty page.
+        if source_filter in ("audio", "audio_transcription"):
+            return jsonify(_paginate_response([], 0, limit, offset)), 200
+
         fetch_limit = limit + offset
 
         frames = []
         frames_total = 0
-        transcriptions = []
-        trans_total = 0
 
-        # Video frames (unless filtered to audio only)
-        if source_filter not in ("audio", "audio_transcription"):
-            frames, frames_total = sql_store.query_frames_by_time_range(
-                start_time=start_time,
-                end_time=end_time,
-                limit=fetch_limit,
-                offset=0,
-            )
-            for f in frames:
-                f["type"] = "video_frame"
+        frames, frames_total = sql_store.query_frames_by_time_range(
+            start_time=start_time,
+            end_time=end_time,
+            limit=fetch_limit,
+            offset=0,
+        )
+        for frame in frames:
+            frame["type"] = "video_frame"
 
-        # Audio transcriptions (unless filtered to video only)
-        if source_filter not in ("video", "video_frame"):
-            try:
-                transcriptions, trans_total = sql_store.get_audio_transcriptions_by_time_range(
-                    start_time=start_time,
-                    end_time=end_time,
-                    limit=fetch_limit,
-                    offset=0,
-                )
-                for t in transcriptions:
-                    t["type"] = "audio_transcription"
-            except Exception:
-                logger.debug("Audio transcriptions query failed (table may not exist yet)")
-
-        # Merge and sort by timestamp descending
-        merged = frames + transcriptions
-        merged.sort(key=lambda x: float(x.get("timestamp", 0)), reverse=True)
-
-        total = frames_total + trans_total
-        page = merged[offset: offset + limit]
+        total = frames_total
+        page = frames[offset: offset + limit]
 
         return jsonify(_paginate_response(page, total, limit, offset)), 200
     except Exception as e:

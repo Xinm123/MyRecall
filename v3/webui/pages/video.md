@@ -97,7 +97,7 @@ flowchart LR
 | 队列监控 | 仅通过 API 获取 | Dashboard 直接展示 queue status badges |
 | 统计概览 | 无 video 聚合统计 UI | Stats bar 展示 chunks/frames/duration/storage |
 | API 覆盖 | `GET /api/v1/timeline`（unified）、`GET /api/v1/frames/:id` | 新增 `video/chunks` + `video/chunks/:id/file` + `video/frames` + `video/stats` |
-| Navigation | 3 page icons | 5 page icons (+Audio/Video) |
+| Navigation | 3 page icons | 4 page icons（+Video；Audio 已从主导航移除） |
 
 变化原因与影响：
 - 原因：Phase 1 完成了 video pipeline 但缺少专属管理入口。Video data 仅通过 timeline/search 间接访问，缺少 chunk-level 管理和 video playback 功能。
@@ -154,11 +154,11 @@ flowchart LR
 
 ---
 
-## 10. Phase 2.6 Hard Shutdown Scope — Video 不受影响的声明
+## 10. Phase 2.6 Hard Shutdown Scope — Video 不受影响的声明（执行态）
 
 **Phase**: 2.6 Audio Hard Shutdown
-**状态**: ⬜️ Planned（本节内容为计划态契约声明）
-**Code Changes**: NONE
+**状态**: ✅ Confirmed（无行为变更）
+**Code Changes**: NONE（Video 主链路保持不变）
 **权威文档**: `v3/metrics/phase-gates.md`
 
 ### 10.1 Video 链路不在 Audio Hard Shutdown 范围内
@@ -184,7 +184,7 @@ Phase 2.6 Audio Hard Shutdown **仅针对音频链路关闭**，视频链路**�
 | 默认处理 | **disabled** | Worker 自动运行 |
 | FTS 索引 | **write-path paused** | 正常写入 |
 | 默认检索模态 | **excluded** | vision-only（主要模态） |
-| UI 入口可见性 | **Phase 2.6 target：hidden** | **默认可见** |
+| UI 入口可见性 | **主导航隐藏** | **默认可见** |
 | Timeline 默认显示 | 排除 | **默认显示**（target video-only） |
 
 ### 10.3 关联 Gates 对 Video 的影响边界

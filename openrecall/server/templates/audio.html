@@ -64,6 +64,17 @@
   .queue-badge.processing { background: #D1ECF1; color: #0C5460; }
   .queue-badge.failed { background: #F8D7DA; color: #721C24; }
 
+  .audit-only-banner {
+    margin-bottom: 14px;
+    padding: 10px 12px;
+    border: 1px solid #F1D38A;
+    border-radius: 10px;
+    background: #FFF8E1;
+    color: #7A5A00;
+    font-size: 12px;
+    font-weight: 600;
+  }
+
   /* Section Title */
   .section-title {
     font-size: 15px;
@@ -547,6 +558,12 @@
 
 {% block content %}
 <div x-data="audioDashboard()" x-init="init()" x-cloak>
+  {% if audio_audit_only %}
+    <div class="audit-only-banner">
+      Audio disabled in Phase 2.6 / Audit-only
+    </div>
+  {% endif %}
+
   <!-- Error Banner -->
   <template x-if="error">
     <div class="error-banner">

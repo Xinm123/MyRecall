@@ -1,0 +1,21 @@
+Phase 2.6 Gate: 2.6-G-03 Retrieval Off
+Generated At (UTC): 2026-02-25T08:26:49Z
+Evidence File: /Users/pyw/newpart/MyRecall/v3/evidence/phase2.6/retrieval_contract_checks.txt
+
+Authority:
+- /Users/pyw/newpart/MyRecall/v3/metrics/phase-gates.md (2.6-G-03)
+
+Primary Command:
+- python3 -m pytest tests/test_phase2_6_hard_shutdown.py tests/test_phase2_ingestion.py tests/test_phase2_timeline.py tests/test_phase2_search.py tests/test_phase25_navigation.py -v
+- Raw log: /Users/pyw/newpart/MyRecall/v3/evidence/phase2.6/raw/test_phase2_6_contract_bundle.log
+
+Key Assertions (from test log):
+- tests/test_phase2_6_hard_shutdown.py::TestHardShutdownContracts::test_timeline_audio_source_returns_empty PASSED
+- tests/test_phase2_6_hard_shutdown.py::TestHardShutdownContracts::test_search_api_drops_audio_results PASSED
+- tests/test_phase2_timeline.py::TestTimelineAPI::test_timeline_excludes_audio_transcriptions PASSED
+- tests/test_phase2_timeline.py::TestTimelineAPI::test_timeline_source_filter_audio_returns_empty PASSED
+- tests/test_phase2_search.py::TestSearchAPIAudio::test_search_filters_out_audio_candidates PASSED
+
+Summary:
+- Contract bundle result: 44 passed in 2.51s
+- Gate status: PASS

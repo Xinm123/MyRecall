@@ -27,6 +27,17 @@ sql_store = SQLStore()
 search_engine = SearchEngine()
 
 
+def _audio_hard_shutdown_response():
+    """Standard rejection payload for audio mainline requests."""
+    return jsonify(
+        {
+            "status": "error",
+            "code": "AUDIO_HARD_SHUTDOWN",
+            "message": "Audio mainline is disabled in Phase 2.6 (hard shutdown).",
+        }
+    ), 403
+
+
 def _build_vision_status() -> dict:
     capture_mode = runtime_settings.capture_mode or "unknown"
     last_error = (runtime_settings.sck_last_error_code or "").strip()
@@ -273,11 +284,9 @@ def upload():
         if is_audio:
             if settings.debug:
                 logger.debug(
-                    "📥 Legacy /api/upload detected audio payload; forwarding to v1 audio handler"
+                    "📥 Legacy /api/upload detected audio payload; hard shutdown rejection"
                 )
-            from openrecall.server.api_v1 import _handle_audio_upload
-
-            return _handle_audio_upload(file, metadata, start_time)
+            return _audio_hard_shutdown_response()
 
         timestamp = int(metadata.get("timestamp", 0))
         active_app = str(metadata.get("app_name", "Unknown"))

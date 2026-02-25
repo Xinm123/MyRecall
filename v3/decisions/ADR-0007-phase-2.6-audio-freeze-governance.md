@@ -76,6 +76,17 @@ Adopt **Option B（Hard Shutdown）**。
 3. **No Exception Workflow**：Phase 2.6 合同内不再保留 ExceptionRequest/TTL 临时开窗流程。
 4. Phase 2.7 仅在 `2.6-G-01..05` 全部 PASS 后启动。
 
+### Implementation Status (2026-02-25)
+
+- Code convergence completed for capture/processing/retrieval/UI/anti-bypass shutdown paths.
+- Gate runtime status at this timestamp:
+  - `2.6-G-03`: PASS
+  - `2.6-G-04`: PASS
+  - `2.6-G-05`: PASS
+  - `2.6-G-01`: PENDING（24h window）
+  - `2.6-G-02`: PENDING（24h window）
+- Release decision remains NO-GO until `2.6-G-01` and `2.6-G-02` are closed with 24h evidence.
+
 ---
 
 ## Contract Implications (Target)

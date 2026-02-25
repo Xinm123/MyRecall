@@ -2,9 +2,9 @@
 
 ## 1. 页面定位
 
-- 目标：Audio pipeline 综合 dashboard，提供 chunk 管理、媒体播放、transcription 浏览、队列状态和聚合统计。
-- 目标用户：需要查看和管理 audio 采集数据的运维人员和开发者。
-- 场景：检查 audio 采集状态、浏览 transcription 结果、播放 audio chunks、监控处理队列。
+- 目标：Audio pipeline 审计页面（audit-only），用于历史音频数据核查。
+- 目标用户：运维与审计场景下需要回看历史 audio 数据的开发者。
+- 场景：核查历史 chunk/transcription、验证硬停机后的残留状态。
 
 ## 2. 入口与路由
 
@@ -25,6 +25,7 @@
 - 页面不提供搜索功能，搜索请使用 `/search`。
 - 无 waveform 或 spectrum 可视化，使用浏览器原生 audio controls。
 - `speaker_id` 始终为 NULL（Phase 2.0），不展示。
+- Phase 2.6 起该页面不在主导航主流程暴露，仅保留直达审计用途。
 - 上传暂停/重试对数据新鲜度的影响：upload buffer 中的 audio chunks 在上传成功前不会出现在 chunk 列表中，页面展示可能有延迟。
 - API fetch 失败时显示 error banner，10s 后自动重试。
 - 无数据时显示友好的空态提示："No audio chunks recorded yet"。
@@ -91,7 +92,7 @@ flowchart LR
 | 队列监控 | 仅通过 `/api/v1/queue/status` API 获取 | Dashboard 页面直接展示 queue status badges |
 | 统计概览 | 无 audio 聚合统计 UI | Stats bar 展示 total chunks/transcriptions/duration/storage |
 | API 覆盖 | `GET /api/v1/audio/chunks`（无 device filter）、`GET /api/v1/audio/transcriptions` | 新增 `audio/chunks/:id/file` + `audio/stats` + extend chunks with `device` filter |
-| Navigation | 3 page icons (Home/Timeline/Search) + Control Center | 5 page icons (+Audio/Video) |
+| Navigation | 3 page icons (Home/Timeline/Search) + Control Center | 主导航移除 Audio 入口（`/audio` 保留直达） |
 
 变化原因与影响：
 - 原因：Phase 2.0 完成了 audio pipeline engineering，但缺少专属 UI 入口。用户需要一个集中查看和管理 audio 数据的 dashboard。
@@ -133,7 +134,7 @@ flowchart LR
 - [x] Queue status badges 正确反映处理状态。
 - [x] 空数据库时显示友好空态提示。
 - [x] WAV 文件缺失时 playback 显示 error 而非 crash。
-- [x] Navigation 中 Audio icon 在 `/audio` 页面 highlighted。
+- [x] 主导航不再暴露 Audio icon，`/audio` 可直达访问。
 - [x] 不影响已有页面（`/`, `/timeline`, `/search`）。
 
 相关验证来源：
@@ -144,21 +145,21 @@ flowchart LR
 
 ---
 
-## 10. Phase 2.6 Hard Shutdown Status
+## 10. Phase 2.6 Hard Shutdown Status（执行态）
 
 **Phase**: 2.6 Audio Hard Shutdown  
-**状态**: ⬜️ Planned（未执行；本节内容为目标契约，不预写 Done/Pass）  
-**Code Changes**: REQUIRED（Phase 2.6 要求对运行链路做硬停机收敛）  
+**状态**: ✅ Implemented（Release 仍需等待 24h gate 闭环）  
+**Code Changes**: Completed  
 **权威文档**: `v3/metrics/phase-gates.md`，`v3/plan/07-phase-2.6-audio-freeze-governance-detailed-plan.md`
 
 ### 10.1 `/audio` 页面在 Phase 2.6 的合同定位
 
 | 维度 | Current Behavior | Phase 2.6 Target Contract |
 |------|------------------|---------------------------|
-| 页面可访问性 | 可直接访问 `/audio` | 可保留历史路径，但不属于 MVP 主路径 |
-| 主导航入口 | Nav 中常驻 Audio 图标 | 主导航与主流程不暴露 audio 入口（2.6-G-04） |
-| 检索链路 | search/timeline 可能混入 audio 结果 | search/timeline 默认与标准路径不返回 audio（2.6-G-03） |
-| 音频写入链路 | 采集/处理链路仍存在可触发路径 | capture/processing/indexing 全部关闭（2.6-G-01/02） |
+| 页面可访问性 | 可直接访问 `/audio`（audit-only） | 可保留历史路径，但不属于 MVP 主路径 |
+| 主导航入口 | 主导航无 Audio 图标 | 主导航与主流程不暴露 audio 入口（2.6-G-04） |
+| 检索链路 | search/timeline 默认不返回 audio | search/timeline 默认与标准路径不返回 audio（2.6-G-03） |
+| 音频写入链路 | 上传与主链路写入均拒绝/关闭 | capture/processing/indexing 全部关闭（2.6-G-01/02） |
 
 ### 10.2 Audio 关闭范围（Hard Shutdown Scope）
 

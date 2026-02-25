@@ -117,9 +117,9 @@ def search():
 
 @app.route("/audio")
 def audio():
-    """Audio dashboard page."""
+    """Audio dashboard page (audit-only in Phase 2.6)."""
     stats = sql_store.get_audio_stats()
-    return render_template("audio.html", stats=stats)
+    return render_template("audio.html", stats=stats, audio_audit_only=True)
 
 
 @app.route("/video")
