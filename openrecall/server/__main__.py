@@ -28,34 +28,61 @@ def preload_ai_models():
     if not settings.preload_models:
         logger.info("Model preloading disabled")
         return
-    
+
     logger.info("Preloading AI models (this may take a minute)...")
-    
+    all_loaded = True
+
+    # 1. Vision/Language Model
     try:
         from openrecall.server.ai.factory import get_ai_provider
 
         provider = (settings.vision_provider or settings.ai_provider).strip().lower()
         if provider == "local":
             get_ai_provider("vision")
-            logger.info("✅ AI Engine (VL model) loaded")
+            logger.info("✅ VL Model loaded successfully")
         else:
-            logger.info(f"Skipping VL model preload (provider={provider})")
+            logger.info(f"⏭️  Skip VL model (provider={provider})")
     except Exception as e:
-        logger.warning(f"⚠️ Failed to preload AI Engine: {e}")
-    
+        logger.error(f"❌ Failed to load VL model: {e}")
+        all_loaded = False
+
+    # 2. Embedding Model
     try:
         from openrecall.server.ai.factory import get_embedding_provider
 
-        embedding_provider = (settings.embedding_provider or settings.ai_provider).strip().lower()
+        embedding_provider = (
+            (settings.embedding_provider or settings.ai_provider).strip().lower()
+        )
         if embedding_provider == "local":
             get_embedding_provider()
-            logger.info("✅ Embedding model loaded")
+            logger.info("✅ Embedding model loaded successfully")
         else:
-            logger.info(f"Skipping embedding model preload (provider={embedding_provider})")
+            logger.info(f"⏭️  Skip embedding model (provider={embedding_provider})")
     except Exception as e:
-        logger.warning(f"⚠️ Failed to preload Embedding model: {e}")
-    
-    logger.info("Model preloading complete")
+        logger.error(f"❌ Failed to load embedding model: {e}")
+        all_loaded = False
+
+    # 3. OCR Model (RapidOCR)
+    try:
+        ocr_provider = (settings.ocr_provider or settings.ai_provider).strip().lower()
+        if ocr_provider == "rapidocr" and settings.ocr_rapid_use_local:
+            # Initialize OCR to trigger model loading
+            from openrecall.server.ocr.rapid_backend import RapidOCRBackend
+
+            _ = RapidOCRBackend()
+            logger.info("✅ OCR model loaded successfully")
+        elif ocr_provider == "rapidocr":
+            logger.info("⏭️  Skip OCR model (using auto-download)")
+        else:
+            logger.info(f"⏭️  Skip OCR model (provider={ocr_provider})")
+    except Exception as e:
+        logger.error(f"❌ Failed to load OCR model: {e}")
+        all_loaded = False
+
+    if all_loaded:
+        logger.info("🎉 All AI models loaded successfully!")
+    else:
+        logger.warning("⚠️ Some models failed to load. Check logs above.")
 
 
 def main():
@@ -75,23 +102,26 @@ def main():
     logger.info(f"Web UI: http://{settings.host}:{settings.port}")
     logger.info(f"Device: {settings.device}")
     logger.info(f"Processing: LIFO threshold = {settings.processing_lifo_threshold}")
-    
+
     # Log OCR Provider Info
     ocr_provider = (settings.ocr_provider or settings.ai_provider).strip().lower()
     logger.info(f"OCR Provider: {ocr_provider}")
     if ocr_provider == "rapidocr":
         use_local = settings.ocr_rapid_use_local
+        use_gpu = settings.ocr_rapid_use_gpu
         logger.info(f"  - Mode: {'Local Models' if use_local else 'Auto-Download'}")
+        logger.info(f"  - GPU: {'Enabled' if use_gpu else 'Disabled (CPU)'}")
         if use_local:
             logger.info(f"  - Model Dir: {settings.ocr_rapid_model_dir}")
-            
+
     logger.info("=" * 50)
 
     # Preload AI models to avoid first-request timeout
     preload_ai_models()
-    
+
     # Start background processing worker AFTER preloading models
     from openrecall.server.app import init_background_worker
+
     init_background_worker(app)
 
     # Flag to prevent duplicate signal handling
@@ -102,36 +132,38 @@ def main():
         if _shutting_down:
             return
         _shutting_down = True
-        
+
         logger.info("")
         logger.info("Received shutdown signal, stopping server...")
-        
+
         # Stop worker gracefully if it was initialized
         try:
-            if hasattr(app, 'worker') and app.worker:
+            if hasattr(app, "worker") and app.worker:
                 logger.info("Stopping background worker...")
                 app.worker.stop()
                 app.worker.join(timeout=5)
                 logger.info("Background worker stopped")
         except Exception as e:
             logger.warning(f"Error stopping worker: {e}")
-        
+
         logger.info("Server shutdown complete")
         sys.exit(0)
-    
+
     # Register shutdown handlers
     signal.signal(signal.SIGINT, shutdown_handler)
     signal.signal(signal.SIGTERM, shutdown_handler)
-    atexit.register(lambda: app.worker.stop() if hasattr(app, 'worker') and app.worker else None)
+    atexit.register(
+        lambda: app.worker.stop() if hasattr(app, "worker") and app.worker else None
+    )
 
     # Start the Flask server
     try:
         app.run(
             host=settings.host,
-            port=settings.port, 
+            port=settings.port,
             debug=settings.debug,  # Enable Flask debug mode based on config
-            use_reloader=False, 
-            threaded=True
+            use_reloader=False,
+            threaded=True,
         )
     except KeyboardInterrupt:
         pass
