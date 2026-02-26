@@ -1,7 +1,7 @@
 # OpenRecall Hybrid Search Pipeline & Data Flow
 
-> ⚠️ **已过时（Deprecated）**：本文档可能包含与当前代码不一致的描述（例如向量库名称/Provider 细节）。请以 `docs/MyRecall_V2_Analysis.md` 中的 “Hybrid Search Pipeline / 混合检索流水线” 为准。
-> ⚠️ **Deprecated**: This document may contain outdated details (e.g., vector store naming/provider specifics). See the “Hybrid Search Pipeline” section in `docs/MyRecall_V2_Analysis.md`.
+> ⚠️ **已过时（Deprecated）**：本文档可能包含与当前代码不一致的描述（例如向量库名称/Provider 细节）。请以 `docs/v2/MyRecall_V2_Analysis.md` 中的 “Hybrid Search Pipeline / 混合检索流水线” 为准。
+> ⚠️ **Deprecated**: This document may contain outdated details (e.g., vector store naming/provider specifics). See the “Hybrid Search Pipeline” section in `docs/v2/MyRecall_V2_Analysis.md`.
 
 This document details the search architecture implemented in OpenRecall V2. The system uses a **3-Stage Hybrid Search Pipeline** combining Semantic Search (Vector), Keyword Search (FTS), and Deep Reranking (Cross-Encoder) to deliver high-precision results.
 

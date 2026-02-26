@@ -1,7 +1,7 @@
 # OpenRecall 项目分析报告
 
-> ⚠️ **已过时（Deprecated）**：本文档可能包含与当前实现不一致的描述（例如 FastAPI/JSON upload/单一数据目录等）。请以 `docs/MyRecall_V2_Analysis.md` 为准。
-> ⚠️ **Deprecated**: This document may not match the current code (e.g., Flask + multipart upload + split client/server data dirs). See `docs/MyRecall_V2_Analysis.md`.
+> ⚠️ **已过时（Deprecated）**：本文档可能包含与当前实现不一致的描述（例如 FastAPI/JSON upload/单一数据目录等）。请以 `docs/v2/MyRecall_V2_Analysis.md` 为准。
+> ⚠️ **Deprecated**: This document may not match the current code (e.g., Flask + multipart upload + split client/server data dirs). See `docs/v2/MyRecall_V2_Analysis.md`.
 
 ## 1. 项目概览
 
