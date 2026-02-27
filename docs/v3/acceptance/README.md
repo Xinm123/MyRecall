@@ -4,6 +4,8 @@
 - 目录：`MyRecall/docs/v3/acceptance/`
 - 记录模板：`TEMPLATE.md`
 - 记录要求：除性能数值外，必须填写功能完成度与完善度指标。
+- 若记录 Soft KPI（如引用覆盖率），必须标注 `non-blocking` 并附整改动作。
+- 指标口径 SSOT：`../gate_baseline.md`（公式、样本数、时间窗、判定规则）。
 
 ## 文件清单
 

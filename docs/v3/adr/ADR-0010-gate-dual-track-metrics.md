@@ -14,6 +14,11 @@
 - Gate 判定规则：
   - 任一“功能强制项”未达标 => Gate Fail。
   - 数值项允许在放宽阈值内波动，但不得突破阶段定义上限。
+- Chat 引用覆盖率采用分阶段 Soft KPI（non-blocking）：
+  - P1-S5 目标 >= 85%
+  - P1-S7 / Phase2 / Phase3 目标 >= 92%
+  - Stretch 目标 >= 95%
+- 所有统计定义与判定口径统一由 `MyRecall/docs/v3/gate_baseline.md` 管理。
 
 ## screenpipe 参考与对齐
 - screenpipe 侧重点在“可用能力闭环 + 实际运行稳定性”，并不只以单一延迟数字判断可用性。

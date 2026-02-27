@@ -18,6 +18,18 @@
 10. 010A：每个阶段与子阶段的验收必须形成详细 Markdown 记录并归档。  
 11. 011A：Gate 采用“数值指标适度放宽 + 功能完成度/完善度指标强化”的双轨策略。  
 12. 012A：UI Gate 采用“最小可用集”策略（增强可用性验收，不做 UI 重构）。  
+13. 013A：引用覆盖率采用 screenpipe 对齐软约束：分阶段目标（P1-S5>=85%，P1-S7/P2/P3>=92%，Stretch 95%）只用于观测与回归，不作为 Gate Fail 条件。  
+14. 014A：删除 fusion_text/caption/keywords 索引时预计算，完全对齐 screenpipe vision-only 处理链路（索引时零 AI 调用）。  
+15. 015A：embedding 保留为离线实验表 `ocr_text_embeddings`（对齐 screenpipe），不进入线上 search。  
+16. 016A：v3 全新数据起点，不做 v2 数据迁移。  
+17. 017A：数据模型完全对齐 screenpipe vision-only schema（表名/字段名 100% 对齐），仅追加 Edge-Centric 必需字段与 `chat_messages` 表。  
+18. 018A：`ocr_text` 与 `frames` 保持 1:1；`text_source` 放在 `frames` 表。  
+19. 019A：P1 ingest 协议采用单次幂等上传（`POST /v1/ingest`）+ 队列状态端点（`GET /v1/ingest/queue/status`）；重复 capture_id 返回 `200 OK + "status": "already_exists"`；session/chunk/commit/checkpoint 4 端点推迟到 P2 LAN 弱网场景实现，不破坏 P1 契约。  
+
+20. 020A：API 契约定义（P1 端点完整 schema）：`/v1/search` query params 对齐 screenpipe `SearchQuery`，response 含 `file_path` + `frame_url` 双字段；`/v1/frames/:frame_id` 返回图像二进制；`/v1/frames/:frame_id/metadata` 返回 JSON；统一错误响应含 `code` + `request_id`；`CapturePayload` 补全验证规则与幂等语义；Chat tool schema 推迟至 #4。  
+21. 021A：`ocr_text` 表新增 `app_name`/`window_name` 两列（对齐 screenpipe 历史 migration 20240716/20240815）；写入时从 `CapturePayload` 取值；接受与 `frames` 列潜在 drift（对齐 screenpipe 行为）。  
+22. 022A：Search SQL 主路径采用 `frames INNER JOIN ocr_text`，`frames_fts`/`ocr_text_fts` 按需追加，不使用 LEFT JOIN（对齐 screenpipe db.rs line 2753 性能注释）。  
+23. 023A：Migration 策略采用手写 SQL + `schema_migrations` 跟踪表，零额外依赖；文件命名 `YYYYMMDDHHMMSS_描述.sql`；P1 全量 DDL 放入单一初始迁移文件；`ocr_text_embeddings` 推迟至 P2+ migration 新增。  
 
 ## 1. 阶段目标与里程碑
 
@@ -49,7 +61,7 @@
 - P1-S3（处理，2026-03-09 ~ 2026-03-11）
   - 交付：
     - Edge AX-first + OCR-fallback（含 `ocr_preferred_apps` 初版）
-    - fusion 生成链路稳定运行
+    - OCR raw text 存入 `ocr_text` 表，AX/OCR 决策记录到 `frames.text_source`
     - Frame 详情可见处理来源（AX/OCR fallback）与处理时间戳
   - Gate：
     - AX-first/OCR-fallback 决策日志可追溯率 >= 95%
@@ -72,10 +84,9 @@
     - 引用链路落地（`capture_id/frame_id/timestamp`）
     - Chat 引用在 UI 中可点击并可回溯到 frame/timeline
   - Gate：
-    - Chat 引用覆盖率 >= 85%（阶段门槛）
-    - 无引用回答可被网关拒绝或标记
     - Chat 工具能力清单（search/frame lookup/time range expansion）完成率 = 100%
     - Chat 引用点击回溯成功率 >= 95%
+    - 观测 KPI（non-blocking）：Chat 引用覆盖率目标 >= 85%，未达标需提交整改动作
 - P1-S6（Chat-2 路由与流式，2026-03-17 ~ 2026-03-18）
   - 交付：
     - local/cloud 模型路由
@@ -94,12 +105,12 @@
     - P1 功能冻结清单（进入 P2/P3 的基线）
     - UI 关键路径回归报告（timeline -> search -> chat -> citation -> frame）
   - Gate：
-    - Chat 引用覆盖率 >= 92%
     - TTS P95 <= 12s
     - S1~S6 回归全通过
     - P1 功能清单完成率 = 100%
     - P1 验收记录完整率 = 100%
     - UI 关键路径脚本通过率 = 100%
+    - 观测 KPI（non-blocking）：Chat 引用覆盖率目标 >= 92%，Stretch >= 95%
 
 ## Phase 2：LAN 双机（另一台 Mac 作为 Edge）
 - 时间：2026-03-23 ~ 2026-04-17
@@ -114,6 +125,7 @@
   - 重放一致性校验通过率 = 100%（同一 `capture_id` 结果一致）
   - mTLS 握手与证书轮换演练通过率 = 100%
   - UI 关键路径在 LAN 24h 中致命中断次数 = 0
+  - 观测 KPI（non-blocking）：Chat 引用覆盖率目标 >= 92%，Stretch >= 95%
 
 ## Phase 3：Debian Edge（生产形态）
 - 时间：2026-04-20 ~ 2026-05-29
@@ -124,10 +136,10 @@
   - 灰度升级与回滚策略
 - 验收门槛：
   - 7 天稳定运行
-  - Chat 引用覆盖率 >= 92%
   - Debian 部署脚本（systemd/容器）成功率 = 100%
   - 回滚演练通过率 = 100%
   - UI 关键路径在 7 天内致命中断次数 = 0
+  - 观测 KPI（non-blocking）：Chat 引用覆盖率目标 >= 92%，Stretch >= 95%
 
 ## 2. 工作流分解（按链路）
 
@@ -136,7 +148,7 @@
 - P2/P3：功能冻结，仅做稳定性压测与参数调优。
 
 2. Processing
-- P1：完成功能实现（AX-first + OCR-fallback + fusion；Embedding 仅离线实验开关）。
+- P1：完成功能实现（AX-first + OCR-fallback；仅存储原始文本，不做索引时 AI 增强；Embedding 仅离线实验表）。
 - P2/P3：功能冻结，仅做资源与性能稳定性优化。
 
 3. Search
@@ -206,6 +218,11 @@
   - 可观测性检查项完成率（目标：100%，至少含日志/指标/错误码）
   - UI 关键路径通过率（按阶段定义，目标：100%）
   - 验收文档完整率（目标：100%）
+
+## 4.3 指标口径（SSOT）
+
+- Gate/SLO 的公式、样本数、时间窗、百分位算法与判定规则统一使用 `MyRecall/docs/v3/gate_baseline.md`。
+- 本文中的阶段阈值若与 `gate_baseline.md` 不一致，以 `gate_baseline.md` 为准。
 
 ## 5. Post-P3 可选演进（不纳入当前承诺范围）
 
