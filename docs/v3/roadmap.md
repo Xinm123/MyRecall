@@ -26,10 +26,11 @@
 18. 018A：`ocr_text` 与 `frames` 保持 1:1；`text_source` 放在 `frames` 表。  
 19. 019A：P1 ingest 协议采用单次幂等上传（`POST /v1/ingest`）+ 队列状态端点（`GET /v1/ingest/queue/status`）；重复 capture_id 返回 `200 OK + "status": "already_exists"`；session/chunk/commit/checkpoint 4 端点推迟到 P2 LAN 弱网场景实现，不破坏 P1 契约。  
 
-20. 020A：API 契约定义（P1 端点完整 schema）：`/v1/search` query params 对齐 screenpipe `SearchQuery`，response 含 `file_path` + `frame_url` 双字段；`/v1/frames/:frame_id` 返回图像二进制；`/v1/frames/:frame_id/metadata` 返回 JSON；统一错误响应含 `code` + `request_id`；`CapturePayload` 补全验证规则与幂等语义；Chat tool schema 推迟至 #4。  
+20. 020A：API 契约定义（P1 端点完整 schema）：`/v1/search` 合并 `/v1/search/keyword`（P1 无 embedding，拆分无意义），query params 对齐 screenpipe `SearchQuery`，response 含 `file_path` + `frame_url` 双字段；`/v1/frames/:frame_id` 返回图像二进制；`/v1/frames/:frame_id/metadata` 返回 JSON；统一错误响应含 `code` + `request_id`；`CapturePayload` 补全验证规则与幂等语义；Chat tool schema 推迟至 #4。  
 21. 021A：`ocr_text` 表新增 `app_name`/`window_name` 两列（对齐 screenpipe 历史 migration 20240716/20240815）；写入时从 `CapturePayload` 取值；接受与 `frames` 列潜在 drift（对齐 screenpipe 行为）。  
 22. 022A：Search SQL 主路径采用 `frames INNER JOIN ocr_text`，`frames_fts`/`ocr_text_fts` 按需追加，不使用 LEFT JOIN（对齐 screenpipe db.rs line 2753 性能注释）。  
 23. 023A：Migration 策略采用手写 SQL + `schema_migrations` 跟踪表，零额外依赖；文件命名 `YYYYMMDDHHMMSS_描述.sql`；P1 全量 DDL 放入单一初始迁移文件；`ocr_text_embeddings` 推迟至 P2+ migration 新增。  
+24. 024A：API 命名空间冻结：v3 对外 HTTP 契约统一 `/v1/*`；`/api/*` 仅用于 v2 历史描述，不纳入 P1~P3 Gate 与客户端默认调用路径。
 
 ## 1. 阶段目标与里程碑
 
@@ -46,6 +47,7 @@
   - Gate：
     - 同机断网恢复后可自动重传，且重复上传不重复入库
     - ingest 队列可观测（pending/processing/completed）完整
+    - 对外 API 命名空间一致性通过：验收脚本仅调用 `/v1/*`，旧 `/api/*` 路径不得返回业务成功（2xx）
     - UI 基线路由可达率 = 100%
     - UI 健康态/错误态展示检查通过率 = 100%
 - P1-S2（采集，2026-03-06 ~ 2026-03-08）
@@ -62,19 +64,22 @@
   - 交付：
     - Edge AX-first + OCR-fallback（含 `ocr_preferred_apps` 初版）
     - OCR raw text 存入 `ocr_text` 表，AX/OCR 决策记录到 `frames.text_source`
+    - 索引时零 AI 增强：不生成 `caption/keywords/fusion_text`，不写入 `ocr_text_embeddings`
     - Frame 详情可见处理来源（AX/OCR fallback）与处理时间戳
   - Gate：
     - AX-first/OCR-fallback 决策日志可追溯率 >= 95%
+    - 索引时零 AI 增强检查通过率 = 100%（禁用字段/写入路径回归为 0）
     - 处理来源字段 UI 展示完整率 = 100%
 - P1-S4（检索能力，2026-03-12 ~ 2026-03-13）
   - 交付：
-    - `/v1/search` 与 `/v1/search/keyword`（FTS+过滤完整语义）
+    - `/v1/search`（含 keyword 检索语义，FTS+过滤完整能力）
     - 返回结构包含 frame/citation 关键字段
     - Search 页过滤项与 API 参数 1:1 映射，结果可回溯到 frame/citation
   - Gate：
     - 精确词查询不低于对齐基线
     - Search P95 <= 1.8s（标准时间窗）
     - `/v1/search` 过滤参数契约完成率 = 100%
+    - Search SQL JOIN 策略一致性 = 100%（主路径 `frames INNER JOIN ocr_text`，不使用 LEFT JOIN）
     - 检索结果引用字段（capture_id/frame_id/timestamp）完整率 = 100%
     - Search UI 过滤项契约映射完成率 = 100%
     - 检索结果点击回溯成功率 >= 95%

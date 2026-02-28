@@ -4,7 +4,8 @@
 - 日期：2026-02-26
 
 ## Context
-- 现有 MyRecall v2 使用单次 `/api/upload`，适合同机或轻载，不足以应对频繁断连与重放。
+- 现有 MyRecall v2 使用单次 `/api/upload`（历史路径），适合同机或轻载，不足以应对频繁断连与重放。
+- v3 对外 API 命名空间冻结为 `/v1/*`；`/api/*` 不属于 v3 对外契约。
 
 ## Decision
 - 定义分阶段上传协议：session/chunk/commit/checkpoint。

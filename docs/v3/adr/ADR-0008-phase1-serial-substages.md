@@ -11,7 +11,7 @@
 - Phase 1 固定拆分为七个串行子阶段：
   - P1-S1：基础链路（Host 上传 + Edge ingest/queue + 页面可用）
   - P1-S2：采集（事件驱动 capture + idle fallback + AX 文本采集）
-  - P1-S3：处理（AX-first/OCR-fallback + fusion）
+  - P1-S3：处理（AX-first/OCR-fallback + text_source 记录，索引时零 AI 增强）
   - P1-S4：检索（FTS+过滤 API 与返回契约）
   - P1-S5：Chat-1（grounding 与引用）
   - P1-S6：Chat-2（模型路由、流式输出、超时降级）

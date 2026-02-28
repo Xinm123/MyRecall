@@ -501,9 +501,11 @@ def run_migrations(conn: sqlite3.Connection, migrations_dir: Path) -> None:
 ### MyRecall-v3 决策
 - Edge 执行"AX-first + OCR-fallback"（与 screenpipe 完全对齐）。
 - 对关键 app 维护 `ocr_preferred_apps`（TBD 初始名单）。
-- Edge 仅存储原始 OCR text 与 accessibility text，不做索引时 AI 增强（不生成 caption/keywords/fusion_text）。
+- Edge 仅存储原始 OCR text 与 accessibility text，不做索引时 AI 增强（不生成 caption/keywords/fusion_text，不写入 embedding）。
 - Chat grounding 由 Orchestrator 在查询时将原始文本送入 LLM 实时推理（与 screenpipe Pi agent 模式对齐）。
 - 已拍板（014A）：删除 fusion_text，索引时零 AI 调用，完全对齐 screenpipe vision-only 处理链路。
+- 处理链产物白名单（P1）：`ocr_text.text`、`ocr_text.text_json`、`frames.text_source`。
+- 禁止产物（P1）：`caption`、`keywords`、`fusion_text`、`ocr_text_embeddings` 写入。
 
 ### 对齐结论
 - 对齐级别：完全对齐（数据流与存储结构均与 screenpipe vision-only 一致）。
@@ -542,12 +544,18 @@ def run_migrations(conn: sqlite3.Connection, migrations_dir: Path) -> None:
 
 ### screenpipe 怎么做
 - `GET /search`：15+ 过滤参数，底层纯 FTS5（vision-only 路径无 embedding 参与，`search_ocr()` SQL 不 JOIN `ocr_text_embeddings`）。
-- `GET /search/keyword`：独立快速路径，绕过 embedding pipeline；v3 P1 无 embedding，无需拆分。
+- `GET /search/keyword`：独立快速路径（FTS 分组/高亮），仍是 SQL/FTS 逻辑，不涉及索引时 AI 推理。
 - Response 字段：`frame_id`, `text`, `timestamp`, `file_path`（磁盘绝对路径）, `app_name`, `window_name`, `browser_url`, `focused`, `device_name`, `tags`, `frame`（base64，可选）。
 
 ### MyRecall-v3 决策（020A）
 - Search 完全对齐 screenpipe（vision-only）：线上只保留 FTS5 + 过滤，不走 hybrid。
 - `/v1/search/keyword` 合并到 `/v1/search`（P1 无 embedding，拆分无意义；P2+ 若引入 embedding 再拆）。
+- 检索/推理边界：索引时仅入库 raw OCR + `text_source`；Chat/Orchestrator 仅在查询时实时推理。
+
+#### API 命名空间冻结（P0-01）
+- MyRecall-v3 对外 HTTP 契约统一使用 `/v1/*`。
+- `/api/*` 仅用于描述 v2 历史路径，不属于 v3 对外接口，不纳入 P1~P3 Gate。
+- 兼容 alias（如存在）必须标记为 legacy，且不得作为文档、SDK、验收脚本默认入口。
 
 #### `GET /v1/search` — 完整契约
 
@@ -925,3 +933,4 @@ P2+ 升级为 mTLS 强制（006A->B）。
 21. 021A：`ocr_text` 表新增 `app_name`/`window_name` 两列，完全对齐 screenpipe（screenpipe 通过历史 migration 20240716/20240815 逐步加入）；写入时从同一 `CapturePayload` 取值，与 `frames` 同源；接受与 `frames.app_name`/`window_name` 的潜在 drift（frames 行后续修正时 `ocr_text` 不联动，对齐 screenpipe 行为）。
 22. 022A：Search SQL JOIN 策略完全对齐 screenpipe `search_ocr()`：主骨架为 `frames INNER JOIN ocr_text`（无条件）；`frames_fts` 仅当 app/window/browser/focused 参数非空时追加 JOIN；`ocr_text_fts` 仅当 `q` 非空时追加 JOIN；`status = 'pending'/'processing'/'failed'` 的帧因 INNER JOIN 自然排除，无需额外过滤；主搜索路径不使用 LEFT JOIN（对齐 screenpipe 性能注释）。
 23. 023A：Migration 策略采用手写 SQL + `schema_migrations` 跟踪表（零额外依赖，对齐 screenpipe sqlx migrate 命名规范 `YYYYMMDDHHMMSS_描述.sql`）；P1 全量 DDL 放入单一初始迁移文件 `20260227000001_initial_schema.sql`；`ocr_text_embeddings` 表推迟至 P2+ migration 新增；已执行迁移文件不得修改。
+24. 024A：API 命名空间冻结：v3 对外 HTTP 契约统一 `/v1/*`；`/api/*` 仅用于 v2 历史描述，不纳入 P1~P3 Gate 与客户端默认调用路径。

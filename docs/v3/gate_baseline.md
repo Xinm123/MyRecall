@@ -38,7 +38,7 @@
 - 终点：该 capture 首次可被 `GET /v1/search` 查询返回的时间点。
 
 3. `Search P95`
-- 统计范围：`GET /v1/search` 与 `GET /v1/search/keyword`。
+- 统计范围：`GET /v1/search`（含 keyword 检索语义）。
 - 起点：Edge API 收到请求。
 - 终点：Edge API 返回最后一个字节。
 - 标准时间窗：查询窗口 <= 24h（超大时间窗单独统计，不纳入 Gate）。

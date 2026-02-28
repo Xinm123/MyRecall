@@ -20,7 +20,7 @@
 ### #3 数据模型与 Migration 策略 (Decisions 021A-023A)
 - **表结构对齐**：`ocr_text` 补齐 `app_name`/`window_name`，接受与 `frames` 表更新时的微小 drift。
 - **FTS 分工**：`ocr_text_fts` 专职处理 `text` 全文匹配，`frames_fts` 专职处理 `app_name/window_name` 等元数据过滤。
-- **Search JOIN 策略**：以 `frames INNER JOIN ocr_text` 为基座，按需 LEFT/INNER JOIN FTS 虚拟表。
+- **Search JOIN 策略**：以 `frames INNER JOIN ocr_text` 为基座；`frames_fts`/`ocr_text_fts` 仅按条件追加 INNER JOIN，主路径不使用 LEFT JOIN。
 - **Migration**：抛弃繁重的 ORM 迁移工具，手写 SQL + `schema_migrations` 表记录，零额外依赖。
 
 ---
@@ -30,6 +30,7 @@
 以下议题尚未进行深度讨论。下次会话可直接指定编号（如：“开始讨论 #4”）进行展开。
 
 ### #4 Chat Orchestrator 技术选型（Next In Line）
+- 讨论底稿：`MyRecall/docs/v3/chat_issues.md`
 - **核心争议**：RAG 的检索编排是在 Edge 的 Python 后端做，还是下发给前端大模型直接以 Tool call 形式做？
 - **需要收敛的决策**：
   - 本地模型（Ollama/Llama.cpp）与云端模型（OpenAI/Anthropic）的路由与统一封装策略。
