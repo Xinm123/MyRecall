@@ -23,14 +23,15 @@
 15. 015A：embedding 保留为离线实验表 `ocr_text_embeddings`（对齐 screenpipe），不进入线上 search。  
 16. 016A：v3 全新数据起点，不做 v2 数据迁移。  
 17. 017A：数据模型采用“主路径对齐 + 差异显式”策略：P1 对齐 `frames`/`ocr_text`/`frames_fts`/`ocr_text_fts` 的表名与核心字段；`ocr_text_embeddings` 保留为 P2+ 可选实验表（同名，不纳入 P1 完成定义）；仅追加 Edge-Centric 必需字段与 `chat_messages` 表。  
-18. 018A：`ocr_text` 与 `frames` 保持 1:1；`text_source` 放在 `frames` 表。  
+18. 018A → **018C（覆盖）**：Scheme C 分表写入 — AX 成功帧写入 `accessibility` 表（无 `ocr_text` 行），OCR fallback 帧写入 `ocr_text` 表（无 `accessibility` 行）；`text_source` 仍在 `frames` 表。详见 ADR-0012。  
 19. 019A：P1 ingest 协议采用单次幂等上传（`POST /v1/ingest`）+ 队列状态端点（`GET /v1/ingest/queue/status`）；重复 capture_id 返回 `200 OK + "status": "already_exists"`；session/chunk/commit/checkpoint 4 端点推迟到 P2 LAN 弱网场景实现，不破坏 P1 契约。  
 
 20. 020A：API 契约定义（P1 端点完整 schema）：`/v1/search` 合并 `/v1/search/keyword`（P1 无 embedding，拆分无意义），query params 对齐 screenpipe `SearchQuery`，response 含 `file_path` + `frame_url` 双字段；`/v1/frames/:frame_id` 返回图像二进制；`/v1/frames/:frame_id/metadata` 返回 JSON；统一错误响应含 `code` + `request_id`；`CapturePayload` 补全验证规则与幂等语义；Chat tool schema 已由 DA-3/DA-7 决定（Pi SKILL.md 格式）。  
 21. 021A：`ocr_text` 表新增 `app_name`/`window_name` 两列（对齐 screenpipe 历史 migration 20240716/20240815）；写入时从 `CapturePayload` 取值；接受与 `frames` 列潜在 drift（对齐 screenpipe 行为）。  
-22. 022A：Search SQL 主路径采用 `frames INNER JOIN ocr_text`，`frames_fts`/`ocr_text_fts` 按需追加，不使用 LEFT JOIN（对齐 screenpipe db.rs line 3133 性能注释）。  
+22. 022A → **022C（覆盖）**：Search SQL 拆为三路径分发（Scheme C）：`search_ocr()`（content_type=ocr）、`search_accessibility()`（content_type=accessibility）、`search_all()`（content_type=all 默认）。详见 ADR-0012。  
 23. 023A：Migration 策略采用手写 SQL + `schema_migrations` 跟踪表，零额外依赖；文件命名 `YYYYMMDDHHMMSS_描述.sql`；P1 全量 DDL 放入单一初始迁移文件；`ocr_text_embeddings` 推迟至 P2+ migration 新增。  
 24. 024A：API 命名空间冻结：v3 对外 HTTP 契约统一 `/v1/*`；`/api/*` 仅用于 v2 历史描述，不纳入 P1~P3 Gate 与客户端默认调用路径。
+25. **025A（新增）**：`accessibility` 表 P0 建表（Scheme C），含 `focused` 列（P0 修复 screenpipe limitation）+ `frame_id DEFAULT NULL`（精确关联 frames）；DDL 对齐 screenpipe migration `20250202000000` 并增强。详见 ADR-0012。
 
 ## 1. 阶段目标与里程碑
 
@@ -63,23 +64,28 @@
 - P1-S3（处理，2026-03-09 ~ 2026-03-11）
   - 交付：
     - Edge AX-first + OCR-fallback（含 `ocr_preferred_apps` 初版）
-    - OCR raw text 存入 `ocr_text` 表，AX/OCR 决策记录到 `frames.text_source`
+    - Scheme C 分表写入：AX 成功 → `accessibility` 表（含 `focused`/`frame_id`）；OCR fallback → `ocr_text` 表
+    - AX/OCR 决策记录到 `frames.text_source`
     - 索引时零 AI 增强：不生成 `caption/keywords/fusion_text`，不写入 `ocr_text_embeddings`
     - Frame 详情可见处理来源（AX/OCR fallback）与处理时间戳
   - Gate：
+    - AX 成功帧写入 `accessibility` 表的正确率 = 100%
     - AX-first/OCR-fallback 决策日志可追溯率 >= 95%
     - 索引时零 AI 增强检查通过率 = 100%（禁用字段/写入路径回归为 0）
     - 处理来源字段 UI 展示完整率 = 100%
 - P1-S4（检索能力，2026-03-12 ~ 2026-03-13）
   - 交付：
     - `/v1/search`（含 keyword 检索语义，FTS+过滤完整能力）
-    - 返回结构包含 frame/citation 关键字段
+    - Scheme C 三路径分发：`search_ocr()`、`search_accessibility()`、`search_all()`，由 `content_type` 参数路由
+    - `focused` 过滤在 `search_accessibility()` 直接支持（P0 修复，不做 screenpipe force-OCR 降级）
+    - 返回结构包含 frame/citation 关键字段，`type` 字段区分 `OCR`/`UI`
     - Search 页过滤项与 API 参数 1:1 映射，结果可回溯到 frame/citation
   - Gate：
     - 精确词查询不低于对齐基线
     - Search P95 <= 1.8s（标准时间窗）
-    - `/v1/search` 过滤参数契约完成率 = 100%
-    - Search SQL JOIN 策略一致性 = 100%（主路径 `frames INNER JOIN ocr_text`，不使用 LEFT JOIN）
+    - `/v1/search` 过滤参数契约完成率 = 100%（含 `content_type`）
+    - Search SQL 三路径分发一致性 = 100%（search_ocr：INNER JOIN ocr_text；search_accessibility：accessibility + FTS；search_all：并行合并）
+    - `focused` 过滤在 `search_accessibility()` 正确性 = 100%（不降级为 OCR-only）
     - 检索结果引用字段（capture_id/frame_id/timestamp）完整率 = 100%
     - Search UI 过滤项契约映射完成率 = 100%
     - 检索结果点击回溯成功率 >= 95%
@@ -157,11 +163,11 @@
 - P2/P3：功能冻结，仅做稳定性压测与参数调优。
 
 2. Processing
-- P1：完成功能实现（AX-first + OCR-fallback；仅存储原始文本，不做索引时 AI 增强；Embedding 仅离线实验表）。
+- P1：完成功能实现（AX-first + OCR-fallback；Scheme C 分表写入 — AX→accessibility 表，OCR→ocr_text 表；仅存储原始文本，不做索引时 AI 增强；Embedding 仅离线实验表）。
 - P2/P3：功能冻结，仅做资源与性能稳定性优化。
 
 3. Search
-- P1：完成功能实现（完全对齐 screenpipe vision-only：FTS+过滤 API 与返回契约）。
+- P1：完成功能实现（完全对齐 screenpipe vision-only：FTS+过滤 API 与返回契约；Scheme C 三路径分发 search_ocr/search_accessibility/search_all；`content_type` 参数路由）。
 - P2/P3：不新增检索功能，仅做性能与可观测性优化。
 
 4. Chat
@@ -176,8 +182,8 @@
 
 - P1-S1：Host 上传链路 + Edge ingest/queue + 页面保持可用
 - P1-S2：Capture 事件化能力闭环
-- P1-S3：AX-first/OCR-fallback 处理能力闭环
-- P1-S4：Search（FTS+过滤）能力闭环
+- P1-S3：AX-first/OCR-fallback 处理 + Scheme C 分表写入能力闭环
+- P1-S4：Search（FTS+过滤，三路径分发）能力闭环
 - P1-S5：Chat Grounding 与引用闭环
 - P1-S6：Chat 路由/流式/降级闭环
 - P1-S7：端到端验收（仅验收，不新增功能）

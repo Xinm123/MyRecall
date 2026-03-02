@@ -22,12 +22,14 @@
 | OQ-015 | P1 | embedding 是否进入线上 search 主路径 | A 仅离线实验表（推荐）/ B 线上 hybrid | A（已决） | 完全对齐 screenpipe，控制 P1 复杂度 | — | 2026-02-27 |
 | OQ-016 | P1 | v2 数据迁移 | A v3 全新起点不迁移（推荐）/ B 迁移 | A（已决） | 简化 P1 启动 | — | 2026-02-27 |
 | OQ-017 | P0 | 数据模型 schema 对齐策略 | A 主路径对齐 + 差异显式（推荐）/ B 自定义 | A（已决） | P1 对齐 `frames`/`ocr_text`/`frames_fts`/`ocr_text_fts`；`ocr_text_embeddings` 为 P2+ 可选实验表（同名保留，P1 不建） | — | 2026-02-27 |
-| OQ-018 | P0 | ocr_text 关系 + text_source 位置 | A ocr_text 1:1，text_source 放 frames（推荐）/ B 1:N | A（已决） | 与 screenpipe vision-only 对齐 | — | 2026-02-27 |
+| OQ-018 | P0 | ocr_text 关系 + text_source 位置 | A ocr_text 1:1 / B 1:N / ~~A~~ → C Scheme C 分表写入（已决） | C（已决，覆盖 A） | Scheme C：AX 成功 → accessibility 表（无 ocr_text 行）；OCR fallback → ocr_text 表（无 accessibility 行）；text_source 仍在 frames 表。证据：paired_capture.rs:153-154, db.rs:1538 | — | 2026-03-02 |
 | OQ-019 | P0 | P1 ingest 协议复杂度 | A 单次幂等上传 + queue/status 端点（推荐）/ B 4 端点全量 / C 折中 | A（已决） | P1 本机双进程，4 端点解决 P1 不存在的问题；session/chunk/commit/checkpoint 推迟 P2 | P2 LAN 场景需新增分片协议 | 2026-02-27 |
 | OQ-020 | P0 | API 契约定义（P1 端点完整 schema） | A 按 020A 落盘（推荐）/ B 留白 | A（已决） | P1-S4 Gate 必须有完整接口约束 | — | 2026-02-27 |
 | OQ-021 | P0 | `ocr_text` 表 `app_name`/`window_name` 补齐策略 | A 补齐列 + 接受 drift（推荐）/ B 触发器 JOIN frames | A（已决） | 对齐 screenpipe 历史 migration；B 引入不必要子查询耦合 | 与 frames 列潜在 drift（P1 内无修正场景，接受） | 2026-02-27 |
-| OQ-022 | P0 | Search SQL JOIN 策略 | A INNER JOIN 对齐 screenpipe（推荐）/ B LEFT JOIN | A（已决） | screenpipe 明确注释 LEFT JOIN 导致全表扫描（db.rs line 3133） | — | 2026-02-27 |
+| OQ-022 | P0 | Search SQL JOIN 策略 | A INNER JOIN 单路径 / ~~A~~ → C 三路径分发（已决） | C（已决，覆盖 A） | Scheme C 下 search 拆为 search_ocr()（INNER JOIN ocr_text）+ search_accessibility()（accessibility 表 + accessibility_fts）+ search_all()（并行合并 by timestamp DESC）；content_type 参数路由 | — | 2026-03-02 |
 | OQ-023 | P1 | Migration 策略 | A 手写 SQL + `schema_migrations` 表（推荐）/ B Alembic / C PRAGMA user_version | A（已决） | 零额外依赖；对齐 screenpipe sqlx migrate 命名规范 | — | 2026-02-27 |
+| OQ-025 | P0 | accessibility 表架构（Scheme C） | A P0 建表 + focused 修复 + frame_id 方案 3（推荐，已决）/ B 对齐 screenpipe 不加 focused / C P1+ 延迟建表 | A（已决） | (1) accessibility 表 P0 建，paired_capture 按 text_source 分表写入；(2) 新增 focused 列修复 screenpipe 的 focused→force OCR 限制（db.rs:1870-1872）；(3) frame_id DEFAULT NULL 精确关联 frames（paired_capture 填入，未来独立 walker 留 NULL） | DDL 复杂度+1（多一张表+FTS+triggers）；P0 范围略增 | 2026-03-02 |
+| OQ-026 | P1 | P1 Search UI 分页模式 | A 加载更多（对齐 screenpipe，推荐）/ B 跳页（需加 offset 上限约束） | A（已决） | screenpipe `search-modal.tsx` 纯"加载更多"（`hasMoreOcr/loadMoreOcr`），offset 步长=limit，实际不超过几百；跳页模式下 `search_all()` 过量拉取内存风险不可控（offset=10000 时各路径拉 10020 行）；P2+ keyset cursor 可彻底替代 | 若未来需跳页，需补 `offset max` 约束并在 `search_all()` 加运行时 reject | 2026-03-02 |
 
 ## 需实验清单
 
@@ -57,7 +59,7 @@
 15. OQ-015 = A：embedding 保留为离线实验表 `ocr_text_embeddings`（对齐 screenpipe），不进入线上 search 主路径。
 16. OQ-016 = A：v3 全新数据起点，不做 v2 数据迁移。
 17. OQ-017 = A：数据模型采用“主路径对齐 + 差异显式”策略：P1 对齐 `frames`/`ocr_text`/`frames_fts`/`ocr_text_fts` 的表名与核心字段；`ocr_text_embeddings` 为 P2+ 可选实验表（同名保留，P1 不建）；仅追加 Edge-Centric 必需字段（`capture_id`/`status`/`retry_count` 等）与 `chat_messages` 表。
-18. OQ-018 = A：`ocr_text` 与 `frames` 保持 1:1 关系；`text_source` 放在 `frames` 表。
+18. OQ-018 = C（覆盖 A）：Scheme C 分表写入 — AX 成功帧写入 `accessibility` 表（无 `ocr_text` 行），OCR fallback 帧写入 `ocr_text` 表（无 `accessibility` 行）；`text_source` 仍在 `frames` 表。
 
 ### 已拍板结论（2026-02-27，续）
 
@@ -70,3 +72,9 @@
 22. OQ-022 = A：Search SQL 主路径使用 `frames INNER JOIN ocr_text`（无条件）；`frames_fts`/`ocr_text_fts` 按需追加 JOIN；不使用 LEFT JOIN（对齐 screenpipe 性能注释 db.rs line 3133）；INNER JOIN 自然排除未处理帧，语义正确。
 
 23. OQ-023 = A：Migration 策略采用手写 SQL + `schema_migrations` 跟踪表，零额外依赖；文件命名 `YYYYMMDDHHMMSS_描述.sql` 对齐 screenpipe；P1 全量 DDL 放入 `20260227000001_initial_schema.sql`；`ocr_text_embeddings` 表推迟至 P2+ migration 新增；已执行迁移不得修改。
+
+### 已拍板结论（2026-03-02）
+
+24. OQ-022 = C（覆盖 A）：Search SQL 拆为三路径 — search_ocr()（INNER JOIN ocr_text，content_type=ocr）、search_accessibility()（accessibility + accessibility_fts，content_type=accessibility）、search_all()（并行合并 by timestamp DESC，content_type=all 默认）。v3 不做 screenpipe 的 focused/browser_url → force content_type=ocr 降级。
+25. OQ-025 = A：accessibility 表 P0 建表（Scheme C），含 focused 列（P0 修复 screenpipe 限制）+ frame_id DEFAULT NULL（方案 3，paired_capture 精确关联）。DDL 对齐 screenpipe migration 20250202000000 并增强。
+26. OQ-026 = A：P1 Search UI 采用"加载更多"分页模式（对齐 screenpipe `search-modal.tsx`），offset 单调递增步长=limit，实际不超过几百。`search_all()` 过量拉取内存可控前提成立；P2+ 可升级为 keyset cursor 分页彻底消除过量拉取。

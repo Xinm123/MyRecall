@@ -4,7 +4,7 @@
 - 日期：2026-03-01
 - 依赖决策：DA-2（修订）、DA-3、DA-5、DA-7=A、DA-8=A→B、DA-9=C
 - 依赖决策点：DP-1=A（Flask + threading）、DP-2=A（Edge 数据目录）、DP-3=A（Manager 始终从 chat_messages 注入历史）
-- 关联文档：`ADR-0004`、`spec.md` §3.6、`roadmap.md` P1-S5/S6/S7、`chat_baseline_myrecall.md`
+- 关联文档：`ADR-0004`、`spec.md` §3.6、`roadmap.md` P1-S5/S6/S7、`baselines/chat/chat_baseline_myrecall.md`
 
 ---
 
