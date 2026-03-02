@@ -12,7 +12,7 @@
   - capture：事件驱动 + idle fallback
   - processing：AX-first + OCR-fallback
   - search：FTS+过滤（vision-only）
-  - chat：tool-driven retrieval + 引用 + local/cloud 路由 + 流式输出 + 超时降级
+  - chat：Pi Sidecar + SKILL.md tool-driven retrieval + 提示词驱动引用 + provider/model 路由 + 流式输出 + timeout 处理
 - Phase 2（LAN 双机）和 Phase 3（Debian 生产）执行功能冻结：
   - 不新增业务功能
   - 仅允许缺陷修复、性能/稳定性治理、安全与运维收敛

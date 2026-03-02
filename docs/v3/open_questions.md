@@ -6,10 +6,10 @@
 | ID | 级别 | 问题 | 选项 | 建议 | 依据 | 风险 | 截止 |
 |---|---|---|---|---|---|---|---|
 | OQ-001 | P0 | "对齐 screenpipe" 的语义是行为对齐还是实现对齐？ | A 行为对齐（推荐）/ B 实现对齐 | A（已决） | 你的 Edge-Centric 要求与 screenpipe 单机拓扑冲突 | 不拍板会导致方案反复摇摆 | 2026-03-01 |
-| OQ-002 | P0 | Chat API 形态 | A OpenAI-compatible + tool schema（推荐）/ B 自定义协议 | A（已决） | 便于本地/云模型切换与客户端复用 | B 会增加前后端耦合 | 2026-03-03 |
+| OQ-002 | P0 | Chat API 形态 | A（修订）请求简单 JSON + 响应 SSE 透传 Pi 原生事件 / ~~原 A OpenAI-compatible~~ / B 自定义协议 | A 修订版（已决） | DA-7=A 确定 Pi Sidecar 后，Pi 有 11 种事件类型，OpenAI format 仅能无损映射 1 种；透传 Pi 原生事件避免有损翻译；行业趋势（AG-UI Protocol）验证 agent 场景用自定义事件协议；Chat UI 绿地开发无存量兼容需求 | 若未来需支持第三方 OpenAI-compatible 客户端（不在 P1-P3 范围），需额外适配层 | 2026-03-03 |
 | OQ-003 | P0 | Search 策略（vision-only） | A 完全对齐 screenpipe（FTS+元数据过滤，舍弃 hybrid）/ B 保留 MyRecall hybrid | A（已决，覆盖原003） | 你明确要求“search 完全和 screenpipe 对齐，舍弃 hybrid” | 语义召回能力可能下降 | 2026-03-05 |
 | OQ-004 | P1 | Host 是否采集 accessibility 文本 | A 采集（推荐）/ B 不采集 | A（已决） | 可对齐 screenpipe paired capture，降低 Edge OCR 压力 | A 需处理平台差异 | 2026-03-08 |
-| OQ-005 | P1 | Edge 默认模型策略 | A 本地与云端都支持，按配置切换（可选 fallback，推荐）/ B cloud-first 固定 | A（已决） | 与 screenpipe 的 provider 配置切换能力对齐，且不破坏 Edge-Centric | 需定义 fallback 触发阈值并做压测 | 2026-03-10 |
+| OQ-005 | P1 | Edge 默认模型策略 | A 本地与云端都支持，按配置切换（P1 不做自动 fallback，推荐）/ B cloud-first 固定 | A（修订后已决） | 与 screenpipe 的 provider 配置切换能力对齐，且不破坏 Edge-Centric | 若 provider 故障将直接返回 timeout/error，需保证错误可见性与恢复流程 | 2026-03-10 |
 | OQ-006 | P1 | 传输安全级别（LAN） | A token + TLS 可选（P1）/ B mTLS 强制（P2+） | A->B（已决） | 当前同 LAN，先保证可用性，再在 P2+ 强制 mTLS | 若迟迟不进入 B 阶段，存在长期内网信任风险 | 2026-03-12 |
 | OQ-007 | P1 | 页面/UI 在 P1~P3 的部署位置 | A 继续部署在 Edge（推荐）/ B 迁移到 Host | A（已决） | 先保障 Edge 主链路与 Chat 能力收敛，避免并行改造 UI 拖慢节奏 | Edge 计算与 UI 资源争用风险上升 | 2026-03-14 |
 | OQ-008 | P1 | 功能开发阶段策略 | A 功能集中在 P1 完成，P2/P3 功能冻结（推荐）/ B 功能按阶段渐进到 P3 | A（已决） | 你明确要求 P2/P3 只做部署与稳定性，不再做功能开发 | P1 范围膨胀导致延期风险上升 | 2026-03-16 |
@@ -21,7 +21,7 @@
 | OQ-014 | P0 | 是否删除 fusion_text/caption/keywords | A 删除，完全对齐 screenpipe 索引时零 AI（推荐）/ B 保留 | A（已决） | screenpipe 索引时不做 AI 预计算，Chat grounding 查询时实时推理 | — | 2026-02-27 |
 | OQ-015 | P1 | embedding 是否进入线上 search 主路径 | A 仅离线实验表（推荐）/ B 线上 hybrid | A（已决） | 完全对齐 screenpipe，控制 P1 复杂度 | — | 2026-02-27 |
 | OQ-016 | P1 | v2 数据迁移 | A v3 全新起点不迁移（推荐）/ B 迁移 | A（已决） | 简化 P1 启动 | — | 2026-02-27 |
-| OQ-017 | P0 | 数据模型 schema 对齐策略 | A 完全对齐 screenpipe vision-only（推荐）/ B 自定义 | A（已决） | 表名/字段名 100% 对齐，仅追加 Edge-Centric 必需字段 | — | 2026-02-27 |
+| OQ-017 | P0 | 数据模型 schema 对齐策略 | A 主路径对齐 + 差异显式（推荐）/ B 自定义 | A（已决） | P1 对齐 `frames`/`ocr_text`/`frames_fts`/`ocr_text_fts`；`ocr_text_embeddings` 为 P2+ 可选实验表（同名保留，P1 不建） | — | 2026-02-27 |
 | OQ-018 | P0 | ocr_text 关系 + text_source 位置 | A ocr_text 1:1，text_source 放 frames（推荐）/ B 1:N | A（已决） | 与 screenpipe vision-only 对齐 | — | 2026-02-27 |
 | OQ-019 | P0 | P1 ingest 协议复杂度 | A 单次幂等上传 + queue/status 端点（推荐）/ B 4 端点全量 / C 折中 | A（已决） | P1 本机双进程，4 端点解决 P1 不存在的问题；session/chunk/commit/checkpoint 推迟 P2 | P2 LAN 场景需新增分片协议 | 2026-02-27 |
 | OQ-020 | P0 | API 契约定义（P1 端点完整 schema） | A 按 020A 落盘（推荐）/ B 留白 | A（已决） | P1-S4 Gate 必须有完整接口约束 | — | 2026-02-27 |
@@ -38,10 +38,10 @@
 ## 已拍板结论（2026-02-26）
 
 1. OQ-001 = A：按“行为/能力对齐”执行，不追求与 screenpipe 的部署拓扑一致。
-2. OQ-002 = A：Chat API 采用 OpenAI-compatible + tool schema。
+2. OQ-002 = A（修订）：Chat 请求为简单 JSON，响应为 SSE 透传 Pi 原生事件（不做 OpenAI format 翻译）。Tool 以 Pi SKILL.md 格式定义。
 3. OQ-003 = A（覆盖）：Search 完全对齐 screenpipe（vision-only），线上仅保留 FTS+过滤，舍弃 hybrid。
 4. OQ-004 = A：Host 采集 accessibility 文本（仅采集，不做推理），Edge 继续 AX-first + OCR-fallback。
-5. OQ-005 = A：Edge 支持本地与云端模型，按配置切换（可选 fallback），对齐 screenpipe 的 provider 选择能力。
+5. OQ-005 = A（修订）：Edge 支持本地与云端模型，按配置切换；P1 不做自动 fallback，对齐 screenpipe 的 provider 选择能力。
 6. OQ-006 = A->B：P1 使用 token + TLS 可选，P2+ 升级为 mTLS 强制。
 7. OQ-007 = A：P1~P3 页面继续在 Edge，Host 不负责 UI；UI 迁移到 Host 仅作为 Post-P3 可选项。
 8. OQ-008 = A：功能开发集中在 P1 完成；P2/P3 功能冻结，仅做部署与稳定性。
@@ -56,14 +56,14 @@
 14. OQ-014 = A：删除 fusion_text/caption/keywords 索引时预计算，完全对齐 screenpipe vision-only 处理链路（索引时零 AI 调用，Chat grounding 由 LLM 查询时实时推理）。
 15. OQ-015 = A：embedding 保留为离线实验表 `ocr_text_embeddings`（对齐 screenpipe），不进入线上 search 主路径。
 16. OQ-016 = A：v3 全新数据起点，不做 v2 数据迁移。
-17. OQ-017 = A：数据模型完全对齐 screenpipe vision-only schema（`frames`/`ocr_text`/`frames_fts`/`ocr_text_fts`/`ocr_text_embeddings` 表名与字段名 100% 对齐），仅追加 Edge-Centric 必需字段（`capture_id`/`status`/`retry_count` 等）与 `chat_messages` 表。
+17. OQ-017 = A：数据模型采用“主路径对齐 + 差异显式”策略：P1 对齐 `frames`/`ocr_text`/`frames_fts`/`ocr_text_fts` 的表名与核心字段；`ocr_text_embeddings` 为 P2+ 可选实验表（同名保留，P1 不建）；仅追加 Edge-Centric 必需字段（`capture_id`/`status`/`retry_count` 等）与 `chat_messages` 表。
 18. OQ-018 = A：`ocr_text` 与 `frames` 保持 1:1 关系；`text_source` 放在 `frames` 表。
 
 ### 已拍板结论（2026-02-27，续）
 
 19. OQ-019 = A：P1 ingest 协议采用单次幂等上传（`POST /v1/ingest`）+ 队列状态端点（`GET /v1/ingest/queue/status`）。重复 `capture_id` 返回 `200 OK + "status": "already_exists"`（幂等语义，X 选项）。`GET /v1/ingest/queue/status` 返回 pending/processing/completed/failed 计数，供 Host client 决策与 P1-S1 Gate 验收（Y 选项）。session/chunk/commit/checkpoint 4 端点推迟到 P2 LAN 弱网场景实现，不破坏 P1 契约。
 
-20. OQ-020 = A：API 契约定义（P1 端点完整 schema，020A）：`/v1/search` 合并 `/search/keyword`（P1 无 embedding，拆分无意义）；search response 同时返回 `file_path`（Edge 本地路径，对齐 screenpipe）和 `frame_url`（`/v1/frames/:id`，P2+ 跨机器可用）；`GET /v1/frames/:frame_id` 返回图像二进制；`GET /v1/frames/:frame_id/metadata` 返回 JSON；统一错误响应增加 `code`（SNAKE_CASE）和 `request_id`（UUID v4），不对齐 screenpipe（v3 更严谨）；Chat tool schema 推迟至 #4 Chat Orchestrator 技术选型。
+20. OQ-020 = A：API 契约定义（P1 端点完整 schema，020A）：`/v1/search` 合并 `/v1/search/keyword`（P1 无 embedding，拆分无意义）；search response 同时返回 `file_path`（Edge 本地路径，对齐 screenpipe）和 `frame_url`（`/v1/frames/:id`，P2+ 跨机器可用）；`GET /v1/frames/:frame_id` 返回图像二进制；`GET /v1/frames/:frame_id/metadata` 返回 JSON；统一错误响应增加 `code`（SNAKE_CASE）和 `request_id`（UUID v4），不对齐 screenpipe（v3 更严谨）；Chat tool schema 已由 DA-3/DA-7 决定（Pi SKILL.md 格式）。
 
 21. OQ-021 = A：`ocr_text` 表新增 `app_name`/`window_name` 两列（对齐 screenpipe 历史 migration 20240716/20240815）。写入时从 `CapturePayload` 取值，与 `frames` 同源。接受与 `frames` 列潜在 drift（P1 内无 frames 修正场景，对齐 screenpipe 行为）。
 

@@ -14,7 +14,7 @@
   - P1-S3：处理（AX-first/OCR-fallback + text_source 记录，索引时零 AI 增强）
   - P1-S4：检索（FTS+过滤 API 与返回契约）
   - P1-S5：Chat-1（grounding 与引用）
-  - P1-S6：Chat-2（模型路由、流式输出、超时降级）
+  - P1-S6：Chat-2（provider/model 路由、Pi 事件流式输出、timeout 处理）
   - P1-S7：端到端验收（仅验收，不新增功能）
 - 执行规则：
   - 必须串行推进

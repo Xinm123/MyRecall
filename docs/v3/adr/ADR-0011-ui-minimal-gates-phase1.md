@@ -16,7 +16,7 @@
   - P1-S3：frame 详情可见 AX/OCR fallback 来源。
   - P1-S4：search 过滤项与 API 参数契约对齐，结果可回溯。
   - P1-S5：chat 引用可点击并可回溯。
-  - P1-S6：路由状态与降级提示可见。
+  - P1-S6：provider/model badge 与 timeout/error 状态可见。
   - P1-S7：`timeline -> search -> chat -> citation -> frame` 关键路径脚本化回归。
 - P2/P3 不新增 UI 功能，仅验证 LAN/Debian 场景下的 UI 稳定性与恢复行为。
 

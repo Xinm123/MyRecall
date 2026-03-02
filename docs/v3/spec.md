@@ -35,7 +35,7 @@ flowchart LR
     P[Vision Pipeline\nAX-first / OCR-fallback]
     IDX[Index Layer\nSQLite+FTS]
     S[Search API]
-    CH[Chat Orchestrator]
+    CH[Chat\nPi Sidecar + Manager]
     I --> Q --> P --> IDX
     IDX --> S --> CH
     W --> S
@@ -59,14 +59,14 @@ flowchart LR
 - Chat：RAG 编排（Orchestrator 在查询时将原始文本送入 LLM 实时推理）、工具调用、引用回溯、流式输出。
 - UI：继续承载现有 Flask 页面与静态资源（P1~P3）。
 
-## 3. 数据模型（Edge SQLite，完全对齐 screenpipe vision-only）
+## 3. 数据模型（Edge SQLite，主路径对齐 screenpipe vision-only，差异显式）
 
 ### 3.0.1 设计原则
 
 | 原则 | 说明 |
 |------|------|
 | Edge 是唯一事实源 | 所有持久化表在 Edge 的 `edge.db`（单一 SQLite 文件），Host 只有 spool 文件 |
-| 表名/字段名对齐 screenpipe | `frames` / `ocr_text` / `frames_fts` / `ocr_text_fts` / `ocr_text_embeddings` 完全同名 |
+| 表名/字段名对齐 screenpipe | P1 主路径同名：`frames` / `ocr_text` / `frames_fts` / `ocr_text_fts`；`ocr_text_embeddings` 为 P2+ 可选实验表（同名保留，P1 不建） |
 | 索引时零 AI 调用 | 仅存储 OCR raw text + accessibility text，不预计算 caption/keywords/fusion（与 screenpipe 一致） |
 | capture_id 全局幂等 | UUID v7（Host 生成），Edge 去重，贯穿全链路 |
 | v3 全新起点 | 不做 v2 数据迁移 |
@@ -264,7 +264,7 @@ CREATE INDEX idx_chat_session ON chat_messages(session_id, created_at);
 
 #### ~~Table 6: ocr_text_embeddings~~ （P1 不建）
 
-screenpipe 有此表但只存不用（实验性）。v3 P1 Search 为纯 FTS5，P2/P3 功能冻结，**P1 不建此表**。P2+ 有 embedding 需求时通过 migration 新增。
+screenpipe migration 中存在此表，但主检索路径未使用（实验性保留）。v3 P1 Search 为纯 FTS5，**P1 不建此表**；P2+ 若有 embedding 需求，通过独立 migration 新增，且默认不进入线上主路径。
 
 #### FTS 分工总结
 
@@ -340,7 +340,7 @@ LIMIT ? OFFSET ?
 | `ocr_text.window_name` | `ocr_text.window_name` | ocr_text | 100% |
 | `frames_fts` 4 indexed 列 | `frames_fts` 4 indexed 列 | FTS | 100% |
 | `ocr_text_fts` 3 indexed 列 | `ocr_text_fts` 3 indexed 列 | FTS | 100% |
-| `ocr_text_embeddings` | `ocr_text_embeddings` | embeddings | 100% |
+| `ocr_text_embeddings` | `ocr_text_embeddings` | embeddings | P2+ 可选（P1 不建） |
 | `frames.video_chunk_id` | *(不适用)* | — | v3 无视频录制 |
 | `frames.sync_id/machine_id` | *(Post-P3)* | — | v3 当前单 Host |
 
@@ -527,12 +527,12 @@ def run_migrations(conn: sqlite3.Connection, migrations_dir: Path) -> None:
   - `ocr_text`（OCR 原文 + bbox）← 对齐 screenpipe ocr_text
   - `frames_fts` / `ocr_text_fts`（FTS5 全文索引）← 对齐 screenpipe
   - `chat_messages`（Chat 会话记录）← v3 独有
-  - `ocr_text_embeddings`（离线实验）← 对齐 screenpipe
+  - `ocr_text_embeddings`（P2+ 可选离线实验表，P1 不建）← 参考 screenpipe 预留
 - Host 仅保留短期 spool，不做长期索引。
 - 详细 DDL 见 §3.0.3。
 
 ### 对齐结论
-- 对齐级别：完全对齐（表名、字段名、数据语义均与 screenpipe vision-only 一致）。
+- 对齐级别：主路径高对齐（P1 已落地表与核心字段对齐 screenpipe vision-only）；`ocr_text_embeddings` 为 P2+ 可选，不计入 P1“100% 对齐”定义。
 
 ### 风险
 - 索引与原始文档同步延迟导致检索可见性抖动。
@@ -616,7 +616,7 @@ def run_migrations(conn: sqlite3.Connection, migrations_dir: Path) -> None:
 
 ### 对齐结论
 - **高对齐**：query params 对齐 screenpipe `SearchQuery`，response 对齐 `OCRContent`。
-- **差异**：去掉 audio/speaker 相关参数（P1 无音频）；新增 `frame_url` 字段；`/search/keyword` 合并。
+- **差异**：去掉 audio/speaker 相关参数（P1 无音频）；新增 `frame_url` 字段；`/v1/search/keyword` 合并。
 
 ### 风险
 - 语义型查询（抽象描述、长尾表述）召回能力下降。
@@ -630,10 +630,13 @@ def run_migrations(conn: sqlite3.Connection, migrations_dir: Path) -> None:
 - 前端 chat 代理（Pi）调用 `/search` 等工具完成上下文检索；可选 `/ai/chat/completions`。
 
 ### MyRecall-v3 决策
-- Edge 增加 `Chat Orchestrator`（核心服务）：
-  - 工具：search/frame lookup/time range expansion。
-  - 软约束引用：提示词与工具策略要求尽量附 `capture_id/frame_id/timestamp`，不做运行时硬拒绝。
-  - 模型路由：本地与云端都支持，按配置切换（可选 fallback；在 Edge 完成，不在 Host）。
+- Edge 增加 **Pi Sidecar**（bun 进程，`--mode rpc`）+ **Python Manager**（进程管理 + 协议桥接）：
+  - 内层协议（Manager ↔ Pi）：Pi stdin/stdout JSON Lines（对齐 screenpipe `pi.rs` RPC 模式）。
+  - 外层协议（前端 ↔ Edge）：HTTP SSE（拓扑适配，per Decision 001A）。
+  - 请求：简单 JSON `{message, session_id, images?}`；响应：SSE 透传 Pi 原生事件（`message_update`/`tool_execution_*`/`agent_start/end`/`response`），不做 OpenAI format 翻译。
+  - 工具以 Pi SKILL.md 格式定义（对齐 screenpipe），P1-S5 最小集为 `myrecall-search` Skill（对标 `screenpipe-search`），`frame_lookup` 和 `time_range_expansion` 按需在 P1-S7 后拆分。
+  - 软约束引用：提示词与工具策略要求尽量附 `capture_id/frame_id/timestamp`，不做运行时硬拒绝。P1-S5 不做结构化 citation（DA-8=A），评估是否在 P1-S7 增加。
+  - 模型路由：通过 Pi `--provider`/`--model` 启动参数 + `models.json` 配置控制（对齐 screenpipe）。P1 不做自动 fallback chain（对齐 screenpipe）。
 - P1~P3：chat UI 与会话输入输出由 Edge 页面承载；Host 不负责 UI 与推理。
 - 上述 Chat 能力要求在 P1 达成；P2/P3 不新增 Chat 功能，仅做稳定性与性能治理。
 - Post-P3（可选，不纳入当前里程碑）：再评估 UI 是否迁移到 Host。
@@ -911,10 +914,10 @@ P2+ 升级为 mTLS 强制（006A->B）。
 ## 7. 已拍板基线（2026-02-26）
 
 1. 001A：与 screenpipe 做行为/能力对齐，不做拓扑对齐。
-2. 002A：Chat 接口统一为 OpenAI-compatible + tool schema。
+2. 002A（修订）：Chat 请求为简单 JSON，响应为 SSE 透传 Pi 原生事件（不做 OpenAI format 翻译）。Tool 以 Pi SKILL.md 格式定义。
 3. 003A（覆盖）：Search 完全对齐 screenpipe（vision-only），线上仅 FTS+过滤，舍弃 hybrid。
 4. 004A：Host 采集 accessibility 文本（采集端轻处理），Edge 负责重处理与推理。
-5. 005A：Edge 支持本地/云端模型并按配置切换（可选 fallback），与 screenpipe provider 策略对齐。
+5. 005A（修订）：Edge 支持本地/云端模型，通过 Pi `--provider`/`--model` + `models.json` 配置切换（对齐 screenpipe）；P1 不做自动 fallback。
 6. 006A->B：传输安全按阶段升级，P1 token + TLS 可选，P2+ mTLS 强制。
 7. 007A：P1~P3 页面继续在 Edge，Host 不负责 UI；UI 迁移到 Host 仅作为 Post-P3 可选项。
 8. 008A：功能开发集中在 Phase 1 完成；Phase 2/3 功能冻结，仅做部署与稳定性。
@@ -926,10 +929,10 @@ P2+ 升级为 mTLS 强制（006A->B）。
 14. 014A：删除 fusion_text/caption/keywords 索引时预计算，完全对齐 screenpipe vision-only 处理链路（索引时零 AI 调用，Chat grounding 由 LLM 查询时实时推理）。
 15. 015A：embedding 保留为离线实验表 `ocr_text_embeddings`（对齐 screenpipe），不进入线上 search 主路径。
 16. 016A：v3 全新数据起点，不做 v2 数据迁移。
-17. 017A：数据模型完全对齐 screenpipe vision-only schema（`frames`/`ocr_text`/`frames_fts`/`ocr_text_fts`/`ocr_text_embeddings` 表名与字段名 100% 对齐），仅追加 Edge-Centric 必需字段（`capture_id`/`status`/`retry_count` 等）与 `chat_messages` 表。
+17. 017A：数据模型采用“主路径对齐 + 差异显式”策略：P1 对齐 `frames`/`ocr_text`/`frames_fts`/`ocr_text_fts` 的表名与核心字段；`ocr_text_embeddings` 保留为 P2+ 可选实验表（同名，不纳入 P1 完成定义）；仅追加 Edge-Centric 必需字段（`capture_id`/`status`/`retry_count` 等）与 `chat_messages` 表。
 18. 018A：`ocr_text` 与 `frames` 保持 1:1 关系；`text_source` 放在 `frames` 表。
 19. 019A：P1 ingest 协议采用单次幂等上传（`POST /v1/ingest`）+ 队列状态端点（`GET /v1/ingest/queue/status`）；重复 capture_id 返回 `200 OK + "status": "already_exists"`（幂等语义）；session/chunk/commit/checkpoint 4 端点推迟到 P2 LAN 弱网场景实现，不破坏 P1 契约。
-20. 020A：API 契约定义（P1 端点完整 schema）：`/v1/search` 合并 `/search/keyword`，12 个 query params 对齐 screenpipe `SearchQuery`，response 含 `file_path`（Edge 本地路径）+ `frame_url`（`/v1/frames/:id`）双字段；`GET /v1/frames/:frame_id` 返回图像二进制（对齐 screenpipe）；`GET /v1/frames/:frame_id/metadata` 返回 JSON 元数据；Chat tool schema 推迟至 #4 Chat Orchestrator 技术选型；统一错误响应 `{"error", "code", "request_id"}`（不对齐 screenpipe，v3 更严谨）；`CapturePayload` 补全字段验证规则与幂等语义。
+20. 020A：API 契约定义（P1 端点完整 schema）：`/v1/search` 合并 `/v1/search/keyword`，12 个 query params 对齐 screenpipe `SearchQuery`，response 含 `file_path`（Edge 本地路径）+ `frame_url`（`/v1/frames/:id`）双字段；`GET /v1/frames/:frame_id` 返回图像二进制（对齐 screenpipe）；`GET /v1/frames/:frame_id/metadata` 返回 JSON 元数据；Chat tool schema 已由 DA-3/DA-7 决定（Pi SKILL.md 格式）；统一错误响应 `{"error", "code", "request_id"}`（不对齐 screenpipe，v3 更严谨）；`CapturePayload` 补全字段验证规则与幂等语义。
 21. 021A：`ocr_text` 表新增 `app_name`/`window_name` 两列，完全对齐 screenpipe（screenpipe 通过历史 migration 20240716/20240815 逐步加入）；写入时从同一 `CapturePayload` 取值，与 `frames` 同源；接受与 `frames.app_name`/`window_name` 的潜在 drift（frames 行后续修正时 `ocr_text` 不联动，对齐 screenpipe 行为）。
 22. 022A：Search SQL JOIN 策略完全对齐 screenpipe `search_ocr()`：主骨架为 `frames INNER JOIN ocr_text`（无条件）；`frames_fts` 仅当 app/window/browser/focused 参数非空时追加 JOIN；`ocr_text_fts` 仅当 `q` 非空时追加 JOIN；`status = 'pending'/'processing'/'failed'` 的帧因 INNER JOIN 自然排除，无需额外过滤；主搜索路径不使用 LEFT JOIN（对齐 screenpipe 性能注释）。
 23. 023A：Migration 策略采用手写 SQL + `schema_migrations` 跟踪表（零额外依赖，对齐 screenpipe sqlx migrate 命名规范 `YYYYMMDDHHMMSS_描述.sql`）；P1 全量 DDL 放入单一初始迁移文件 `20260227000001_initial_schema.sql`；`ocr_text_embeddings` 表推迟至 P2+ migration 新增；已执行迁移文件不得修改。

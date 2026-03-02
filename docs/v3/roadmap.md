@@ -7,10 +7,10 @@
 ## 0. 已锁定决策（Gate 0，2026-02-26）
 
 1. 001A：对齐策略采用“行为/能力对齐”。  
-2. 002A：Chat API 采用 OpenAI-compatible + tool schema。  
+2. 002A（修订）：Chat 请求为简单 JSON，响应为 SSE 透传 Pi 原生事件（不做 OpenAI format 翻译）；Tool 以 Pi SKILL.md 格式定义。  
 3. 003A（覆盖）：Search 完全对齐 screenpipe（vision-only），线上仅 FTS+过滤，舍弃 hybrid。  
 4. 004A：Host 采集 accessibility 文本（仅采集，不推理）。  
-5. 005A：Edge 支持本地/云端模型并按配置切换（可选 fallback）。  
+5. 005A（修订）：Edge 支持本地/云端模型，通过 Pi `--provider`/`--model` + `models.json` 配置切换（对齐 screenpipe）；P1 不做自动 fallback。  
 6. 006A->B：传输安全分阶段升级（P1 token + TLS 可选，P2+ mTLS 强制）。  
 7. 007A：P1~P3 页面继续在 Edge，Host 不负责 UI；Host 化仅作为 Post-P3 可选计划。  
 8. 008A：功能开发集中在 Phase 1 完成；Phase 2/3 功能冻结，仅做部署与稳定性。  
@@ -22,11 +22,11 @@
 14. 014A：删除 fusion_text/caption/keywords 索引时预计算，完全对齐 screenpipe vision-only 处理链路（索引时零 AI 调用）。  
 15. 015A：embedding 保留为离线实验表 `ocr_text_embeddings`（对齐 screenpipe），不进入线上 search。  
 16. 016A：v3 全新数据起点，不做 v2 数据迁移。  
-17. 017A：数据模型完全对齐 screenpipe vision-only schema（表名/字段名 100% 对齐），仅追加 Edge-Centric 必需字段与 `chat_messages` 表。  
+17. 017A：数据模型采用“主路径对齐 + 差异显式”策略：P1 对齐 `frames`/`ocr_text`/`frames_fts`/`ocr_text_fts` 的表名与核心字段；`ocr_text_embeddings` 保留为 P2+ 可选实验表（同名，不纳入 P1 完成定义）；仅追加 Edge-Centric 必需字段与 `chat_messages` 表。  
 18. 018A：`ocr_text` 与 `frames` 保持 1:1；`text_source` 放在 `frames` 表。  
 19. 019A：P1 ingest 协议采用单次幂等上传（`POST /v1/ingest`）+ 队列状态端点（`GET /v1/ingest/queue/status`）；重复 capture_id 返回 `200 OK + "status": "already_exists"`；session/chunk/commit/checkpoint 4 端点推迟到 P2 LAN 弱网场景实现，不破坏 P1 契约。  
 
-20. 020A：API 契约定义（P1 端点完整 schema）：`/v1/search` 合并 `/v1/search/keyword`（P1 无 embedding，拆分无意义），query params 对齐 screenpipe `SearchQuery`，response 含 `file_path` + `frame_url` 双字段；`/v1/frames/:frame_id` 返回图像二进制；`/v1/frames/:frame_id/metadata` 返回 JSON；统一错误响应含 `code` + `request_id`；`CapturePayload` 补全验证规则与幂等语义；Chat tool schema 推迟至 #4。  
+20. 020A：API 契约定义（P1 端点完整 schema）：`/v1/search` 合并 `/v1/search/keyword`（P1 无 embedding，拆分无意义），query params 对齐 screenpipe `SearchQuery`，response 含 `file_path` + `frame_url` 双字段；`/v1/frames/:frame_id` 返回图像二进制；`/v1/frames/:frame_id/metadata` 返回 JSON；统一错误响应含 `code` + `request_id`；`CapturePayload` 补全验证规则与幂等语义；Chat tool schema 已由 DA-3/DA-7 决定（Pi SKILL.md 格式）。  
 21. 021A：`ocr_text` 表新增 `app_name`/`window_name` 两列（对齐 screenpipe 历史 migration 20240716/20240815）；写入时从 `CapturePayload` 取值；接受与 `frames` 列潜在 drift（对齐 screenpipe 行为）。  
 22. 022A：Search SQL 主路径采用 `frames INNER JOIN ocr_text`，`frames_fts`/`ocr_text_fts` 按需追加，不使用 LEFT JOIN（对齐 screenpipe db.rs line 2753 性能注释）。  
 23. 023A：Migration 策略采用手写 SQL + `schema_migrations` 跟踪表，零额外依赖；文件命名 `YYYYMMDDHHMMSS_描述.sql`；P1 全量 DDL 放入单一初始迁移文件；`ocr_text_embeddings` 推迟至 P2+ migration 新增。  
@@ -85,25 +85,29 @@
     - 检索结果点击回溯成功率 >= 95%
 - P1-S5（Chat-1 Grounding 与引用，2026-03-14 ~ 2026-03-16）
   - 交付：
-    - Chat orchestrator 基础能力（tool-driven retrieval + frame lookup + time range expansion）
-    - 引用链路落地（`capture_id/frame_id/timestamp`）
-    - Chat 引用在 UI 中可点击并可回溯到 frame/timeline
+    - Pi Sidecar 基础能力：PiProcess（subprocess wrapper）、PiManager（singleton 进程管理）、protocol.py（Pi JSON Lines ↔ SSE 桥接）
+    - `myrecall-search` SKILL.md（tool-driven retrieval，对标 screenpipe `screenpipe-search`）
+    - `/v1/chat` SSE streaming endpoint（Flask + threading，DP-1=A）
+    - `chat_messages` 持久化（session history injection，DP-3=A）
+    - Chat UI minimal（Alpine.js + EventSource）
+    - 引用通过提示词引导 Pi 在回答中内嵌 timestamp/关键词（DA-8=A，UI 中可点击回溯到 frame/timeline）
   - Gate：
-    - Chat 工具能力清单（search/frame lookup/time range expansion）完成率 = 100%
+    - Chat 工具能力清单（search/frame lookup/time range expansion via myrecall-search SKILL.md）完成率 = 100%
     - Chat 引用点击回溯成功率 >= 95%
     - 观测 KPI（non-blocking）：Chat 引用覆盖率目标 >= 85%，未达标需提交整改动作
 - P1-S6（Chat-2 路由与流式，2026-03-17 ~ 2026-03-18）
   - 交付：
-    - local/cloud 模型路由
-    - 流式输出
-    - 超时降级与 fallback
-    - UI 可见模型路由状态与超时/降级提示
+    - Provider/model 路由（通过 Pi `--provider`/`--model` + `models.json` 配置，UI 配置页面切换）
+    - Pi 事件流式输出（SSE 透传 Pi 原生 11 种事件类型）
+    - PiManager watchdog（idle timeout、crash auto-restart、orphan cleanup）
+    - Provider timeout 处理（>15s first-token → abort → timeout error）；P1 不做 auto-fallback（DA-5，对齐 screenpipe）
+    - UI 可见 provider/model badge + timeout/error notification + Pi 健康状态
   - Gate：
     - Chat 首 token P95 <= 3.5s
-    - 路由切换与超时降级在故障注入下可重复通过
-    - 路由切换场景（local->cloud / cloud->local / timeout fallback）覆盖率 = 100%
+    - Provider 切换可重复通过
+    - 路由切换场景覆盖率 = 100%（provider 切换 + timeout 错误，不含 auto-fallback）
     - 流式输出协议一致性用例通过率 = 100%
-    - 路由与降级状态可见场景覆盖率 = 100%
+    - 路由与 timeout 状态可见场景覆盖率 = 100%
 - P1-S7（端到端验收，2026-03-19 ~ 2026-03-20）
   - 交付：
     - 端到端故障注入与回归报告（仅验收，不新增功能）
@@ -161,7 +165,7 @@
 - P2/P3：不新增检索功能，仅做性能与可观测性优化。
 
 4. Chat
-- P1：完成功能实现（tool-driven retrieval + 结构化引用 + local/cloud 路由 + 流式输出 + 超时降级）。
+- P1：完成功能实现（Pi Sidecar + SKILL.md tool-driven retrieval + 提示词驱动引用 + provider/model 路由 + 流式输出 + timeout 处理）。
 - P2/P3：不新增 Chat 功能，仅做延迟与稳定性治理。
 
 5. UI（Edge 页面）
