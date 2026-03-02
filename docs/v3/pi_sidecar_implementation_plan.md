@@ -105,7 +105,7 @@ tests/
 | S5-2 | PiProcess | `chat/process.py` | ~150 | `subprocess.Popen` wrapper；spawn Pi with `--mode rpc --provider --model`；stdin write JSON Lines；stdout readline loop（daemon thread）；graceful shutdown（SIGTERM → 3s → SIGKILL）；startup wait 1.5s |
 | S5-3 | PiManager | `chat/manager.py` | ~400 | Singleton；`start()`/`stop()`/`send_prompt(message, session_id, images?)`/`abort(req_id)`/`new_session()`；Session history injection（DP-3=A：每次 `send_prompt` 前从 `chat_messages` 读取最近 N 条，构造 `<conversation_history>` XML block 拼入 prompt）；Event queue（`queue.Queue`）供 SSE generator 消费 |
 | S5-4 | Protocol 桥接 | `chat/protocol.py` | ~100 | `parse_pi_event(json_line) → PiEvent`（dataclass：type, data, id）；`pi_event_to_sse(event) → str`（`data: {json}\n\n`）；处理 11 种 Pi 事件类型；stream end 判定：`response` 事件（success 或 error） |
-| S5-5 | myrecall-search Skill | `skills/myrecall-search/SKILL.md` | ~200 | 对标 `screenpipe-search/SKILL.md`（255 行）；定义 `curl http://localhost:{port}/v1/search` 调用方式；包含参数说明（query, app_name, start_time, end_time, limit）；包含返回格式说明和引用格式指引（提示 Pi 在回答中内嵌 timestamp/关键词） |
+| S5-5 | myrecall-search Skill | `skills/myrecall-search/SKILL.md` | ~200 | 对标 `screenpipe-search/SKILL.md`（255 行）；定义 `curl http://localhost:{port}/v1/search` 调用方式；包含参数说明（query, app_name, start_time, end_time, limit）；包含返回格式说明与引用规则：默认输出 `myrecall://frame/{frame_id}`，缺少 `frame_id` 时回退 `myrecall://timeline?timestamp=ISO8601`，且禁止伪造 ID/时间戳。 |
 | S5-6 | Skills 注入 | `chat/config.py` | ~60 | `inject_skills(pi_workdir)`：将 `openrecall/server/skills/*/SKILL.md` 复制到 `{pi_workdir}/skills/{name}/SKILL.md`；`detect_bun()`/`detect_pi()`：检查可执行文件可用性；`get_pi_workdir() → Path`：返回 `$OPENRECALL_SERVER_DATA_DIR/.pi`（DP-2=A） |
 | S5-7 | /v1/chat endpoint | `api.py`（修改） | ~80 | `POST /v1/chat`：解析 `{message, session_id, images?}`；调用 `PiManager.send_prompt()`；返回 `Response(stream_with_context(sse_generator()), mimetype='text/event-stream')`（DP-1=A：Flask + threading） |
 | S5-8 | 持久化 | `chat/persistence.py` | ~80 | `save_message(session_id, role, content, citations, tool_calls, model, latency_ms)`；`get_session_history(session_id, limit=20) → list[dict]`；`list_sessions() → list[dict]`；使用 `chat_messages` 表（schema per `spec.md` §3.0.3 Table 5）；stream end 后由 Manager 调用保存 user + assistant 消息 |
@@ -116,7 +116,7 @@ tests/
 ### S5 验收对照
 
 - Chat 工具能力清单完成率 = 100%（search/frame lookup/time range expansion 均通过 myrecall-search Skill 覆盖）
-- Chat 引用点击回溯成功率 >= 95%（通过 Skill 提示词引导 Pi 内嵌 timestamp，UI 中可点击跳转 timeline）
+- Chat 引用点击回溯成功率 >= 95%（通过 Skill 规则要求 Pi 输出 `myrecall://` 深链并禁止伪造 ID/时间戳；UI 可点击回溯）
 - 观测 KPI：Chat 引用覆盖率目标 >= 85%（non-blocking）
 
 ---

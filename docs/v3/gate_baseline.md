@@ -29,9 +29,10 @@
 
 ## 4. 指标定义（统一公式）
 
-1. `Citation Coverage`
+1. `Citation Coverage`（DA-8A 默认口径）
 - 公式：`coverage = (有有效引用的回答数 / 应当提供引用的回答总数) * 100%`
-- 有效引用：回答中包含 `capture_id`、`frame_id`、`timestamp`，且能回溯到真实 frame。
+- 有效引用（DA-8A）：回答中包含可解析 deep link（`myrecall://frame/{frame_id}` 或 `myrecall://timeline?timestamp=ISO8601`），且能回溯到真实 frame/timeline；`frame_id`/`timestamp` 必须来自真实检索结果，不得伪造。
+- 结构化增强（DA-8B，可选）：在 DA-8A 基础上，`chat_messages.citations` 可写入结构化引用（`frame_id`/`timestamp`，可选 `capture_id`）；未启用 DA-8B 前，不作为 Gate 前置条件。
 
 2. `TTS P95`（Time-to-Searchable）
 - 起点：Host 侧 capture 事件时间戳。
@@ -48,7 +49,12 @@
 - 终点：流式通道发出第一个 token。
 
 5. `Capture 丢失率`
-- 公式：`loss_rate = (应到达 capture 数 - 成功 commit capture 数) / 应到达 capture 数`
+   - 公式：`loss_rate = (应到达 capture 数 - 成功 commit capture 数) / 应到达 capture 数`
+
+6. **频率假设与 Power Profile 备注**
+   - P1 所有 SLO 均基于固定捕获频率假设（由 `OPENRECALL_CAPTURE_INTERVAL` 配置）。
+   - screenpipe v0.3.160 引入 Power Profile（Performance/Balanced/Saver，`power/profile.rs`），动态调整捕获间隔。MyRecall-v3 P1 不实现此能力。
+   - **若 P2+ 引入 Power Profile，TTS P95 与 Capture 丢失率的 SLO 阈值须按最坏情况（Saver 模式）重新定义。**
 
 ## 5. 统计与采样规则
 

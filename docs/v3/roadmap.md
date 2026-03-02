@@ -28,7 +28,7 @@
 
 20. 020A：API 契约定义（P1 端点完整 schema）：`/v1/search` 合并 `/v1/search/keyword`（P1 无 embedding，拆分无意义），query params 对齐 screenpipe `SearchQuery`，response 含 `file_path` + `frame_url` 双字段；`/v1/frames/:frame_id` 返回图像二进制；`/v1/frames/:frame_id/metadata` 返回 JSON；统一错误响应含 `code` + `request_id`；`CapturePayload` 补全验证规则与幂等语义；Chat tool schema 已由 DA-3/DA-7 决定（Pi SKILL.md 格式）。  
 21. 021A：`ocr_text` 表新增 `app_name`/`window_name` 两列（对齐 screenpipe 历史 migration 20240716/20240815）；写入时从 `CapturePayload` 取值；接受与 `frames` 列潜在 drift（对齐 screenpipe 行为）。  
-22. 022A：Search SQL 主路径采用 `frames INNER JOIN ocr_text`，`frames_fts`/`ocr_text_fts` 按需追加，不使用 LEFT JOIN（对齐 screenpipe db.rs line 2753 性能注释）。  
+22. 022A：Search SQL 主路径采用 `frames INNER JOIN ocr_text`，`frames_fts`/`ocr_text_fts` 按需追加，不使用 LEFT JOIN（对齐 screenpipe db.rs line 3133 性能注释）。  
 23. 023A：Migration 策略采用手写 SQL + `schema_migrations` 跟踪表，零额外依赖；文件命名 `YYYYMMDDHHMMSS_描述.sql`；P1 全量 DDL 放入单一初始迁移文件；`ocr_text_embeddings` 推迟至 P2+ migration 新增。  
 24. 024A：API 命名空间冻结：v3 对外 HTTP 契约统一 `/v1/*`；`/api/*` 仅用于 v2 历史描述，不纳入 P1~P3 Gate 与客户端默认调用路径。
 
@@ -90,7 +90,7 @@
     - `/v1/chat` SSE streaming endpoint（Flask + threading，DP-1=A）
     - `chat_messages` 持久化（session history injection，DP-3=A）
     - Chat UI minimal（Alpine.js + EventSource）
-    - 引用通过提示词引导 Pi 在回答中内嵌 timestamp/关键词（DA-8=A，UI 中可点击回溯到 frame/timeline）
+    - 引用通过提示词与 Skill 显式要求输出 deep link：默认 `myrecall://frame/{frame_id}`；当结果缺少 `frame_id` 时回退为 `myrecall://timeline?timestamp=ISO8601`。`frame_id`/`timestamp` 必须来自检索结果且禁止伪造（DA-8=A）
   - Gate：
     - Chat 工具能力清单（search/frame lookup/time range expansion via myrecall-search SKILL.md）完成率 = 100%
     - Chat 引用点击回溯成功率 >= 95%

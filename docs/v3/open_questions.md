@@ -26,7 +26,7 @@
 | OQ-019 | P0 | P1 ingest 协议复杂度 | A 单次幂等上传 + queue/status 端点（推荐）/ B 4 端点全量 / C 折中 | A（已决） | P1 本机双进程，4 端点解决 P1 不存在的问题；session/chunk/commit/checkpoint 推迟 P2 | P2 LAN 场景需新增分片协议 | 2026-02-27 |
 | OQ-020 | P0 | API 契约定义（P1 端点完整 schema） | A 按 020A 落盘（推荐）/ B 留白 | A（已决） | P1-S4 Gate 必须有完整接口约束 | — | 2026-02-27 |
 | OQ-021 | P0 | `ocr_text` 表 `app_name`/`window_name` 补齐策略 | A 补齐列 + 接受 drift（推荐）/ B 触发器 JOIN frames | A（已决） | 对齐 screenpipe 历史 migration；B 引入不必要子查询耦合 | 与 frames 列潜在 drift（P1 内无修正场景，接受） | 2026-02-27 |
-| OQ-022 | P0 | Search SQL JOIN 策略 | A INNER JOIN 对齐 screenpipe（推荐）/ B LEFT JOIN | A（已决） | screenpipe 明确注释 LEFT JOIN 导致全表扫描（db.rs line 2753） | — | 2026-02-27 |
+| OQ-022 | P0 | Search SQL JOIN 策略 | A INNER JOIN 对齐 screenpipe（推荐）/ B LEFT JOIN | A（已决） | screenpipe 明确注释 LEFT JOIN 导致全表扫描（db.rs line 3133） | — | 2026-02-27 |
 | OQ-023 | P1 | Migration 策略 | A 手写 SQL + `schema_migrations` 表（推荐）/ B Alembic / C PRAGMA user_version | A（已决） | 零额外依赖；对齐 screenpipe sqlx migrate 命名规范 | — | 2026-02-27 |
 
 ## 需实验清单
@@ -49,7 +49,7 @@
 10. OQ-010 = A：每个阶段/子阶段验收都必须有 Markdown 详细记录，并作为 Gate 输入。
 11. OQ-011 = A：Gate 采用双轨策略：数值阈值适度放宽，功能完成度/完善度指标强化。
 12. OQ-012 = A：UI Gate 采用“最小可用集”，在 P1 按子阶段强化 UI 可用性/可解释性验收，不做 UI 重构。
-13. OQ-013 = A：引用覆盖率采用 soft KPI（P1-S5>=85%，P1-S7/P2/P3>=92%，Stretch 95%），不作为 Gate Fail 条件，并以 `gate_baseline.md` 统一统计口径。
+13. OQ-013 = A：引用覆盖率采用 soft KPI（P1-S5>=85%，P1-S7/P2/P3>=92%，Stretch 95%），不作为 Gate Fail 条件；DA-8=A 口径为 deep link（默认 `myrecall://frame`，缺少 `frame_id` 时回退 `myrecall://timeline`）可解析且可回溯，DA-8=B 结构化 citations 为可选增强；统一口径以 `gate_baseline.md` 为准。
 
 ### 已拍板结论（2026-02-27）
 
@@ -67,6 +67,6 @@
 
 21. OQ-021 = A：`ocr_text` 表新增 `app_name`/`window_name` 两列（对齐 screenpipe 历史 migration 20240716/20240815）。写入时从 `CapturePayload` 取值，与 `frames` 同源。接受与 `frames` 列潜在 drift（P1 内无 frames 修正场景，对齐 screenpipe 行为）。
 
-22. OQ-022 = A：Search SQL 主路径使用 `frames INNER JOIN ocr_text`（无条件）；`frames_fts`/`ocr_text_fts` 按需追加 JOIN；不使用 LEFT JOIN（对齐 screenpipe 性能注释 db.rs line 2753）；INNER JOIN 自然排除未处理帧，语义正确。
+22. OQ-022 = A：Search SQL 主路径使用 `frames INNER JOIN ocr_text`（无条件）；`frames_fts`/`ocr_text_fts` 按需追加 JOIN；不使用 LEFT JOIN（对齐 screenpipe 性能注释 db.rs line 3133）；INNER JOIN 自然排除未处理帧，语义正确。
 
 23. OQ-023 = A：Migration 策略采用手写 SQL + `schema_migrations` 跟踪表，零额外依赖；文件命名 `YYYYMMDDHHMMSS_描述.sql` 对齐 screenpipe；P1 全量 DDL 放入 `20260227000001_initial_schema.sql`；`ocr_text_embeddings` 表推迟至 P2+ migration 新增；已执行迁移不得修改。
