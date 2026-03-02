@@ -1,4 +1,4 @@
-# MyRecall-v3 规格草案（Draft v0.1）
+# MyRecall-v3 规格草案（v1.0）
 
 - 日期：2026-02-26
 - 目标：在 vision-only 范围内，与 screenpipe 的视觉能力对齐，并强制落地 Edge-Centric 架构（Host 轻、Edge 重）。
@@ -736,12 +736,12 @@ def run_migrations(conn: sqlite3.Connection, migrations_dir: Path) -> None:
 
 | 版本 | 文件 | 内容 |
 |------|------|------|
-| 20260227000001 | `initial_schema.sql` | P1 全量 DDL（frames/ocr_text/frames_fts/ocr_text_fts/chat_messages） |
+| 20260227000001 | `initial_schema.sql` | P1 全量 DDL（frames/ocr_text/accessibility/frames_fts/ocr_text_fts/accessibility_fts/chat_messages） |
 | P2+ 时确定 | `add_embeddings.sql` | 新增 `ocr_text_embeddings` 表 |
 
 ## 4. 决策点逐项评审（含 screenpipe 对齐）
 
-## 3.1 使用场景与 non-goals
+### 4.1 使用场景与 non-goals
 
 ### screenpipe 怎么做
 - 主打"被动记忆"与"自然语言检索"，vision 结果可用于 timeline/search/chat。
@@ -764,7 +764,7 @@ def run_migrations(conn: sqlite3.Connection, migrations_dir: Path) -> None:
 ### 验证
 - 需求验收仅用 vision 数据集；audio 用例全部排除。
 
-## 3.2 Capture pipeline（Host/Edge 边界）
+### 4.2 Capture pipeline（Host/Edge 边界）
 
 ### screenpipe 怎么做
 - `event_driven_capture.rs`：事件驱动触发（app switch/click/typing/idle）。
@@ -786,7 +786,7 @@ def run_migrations(conn: sqlite3.Connection, migrations_dir: Path) -> None:
 - 指标：切窗场景 95% capture 在 3 秒内入 Edge 队列。
 - 压测：每分钟 300 次事件下，Host CPU < 25%，丢包率 < 0.3%。
 
-## 3.3 Vision processing（与 screenpipe 对齐，Scheme C）
+### 4.3 Vision processing（与 screenpipe 对齐，Scheme C）
 
 ### screenpipe 怎么做
 - accessibility 有文本时优先使用，OCR 作为 fallback（并对 terminal 类 app 做 OCR 偏好）。
@@ -829,7 +829,7 @@ paired_capture 处理一帧:
 - A/B：AX-first vs OCR-only，在同一数据集比较 Recall@20 与 NDCG@10。
 - P1-S3 Gate：AX 成功帧写入 `accessibility` 表的正确率 = 100%。
 
-## 3.4 索引与存储（Host/Edge 边界）
+### 4.4 索引与存储（Host/Edge 边界）
 
 ### screenpipe 怎么做
 - SQLite 主表 + FTS（`frames_fts`/`ocr_text_fts` 等），snapshot 直接落盘并在 DB 记录路径。
@@ -854,7 +854,7 @@ paired_capture 处理一帧:
 ### 验证
 - 每小时对账任务：`ocr_text` 行数 + `accessibility` 行数（paired_capture 写入）≈ `frames`（status=COMPLETED）行数（允许独立 walker 带来的 accessibility 行多出）。
 
-## 3.5 Search（召回与排序）
+### 4.5 Search（召回与排序）
 
 ### screenpipe 怎么做
 - `GET /search`：15+ 过滤参数，底层纯 FTS5（vision-only 路径无 embedding 参与，`search_ocr()` SQL 不 JOIN `ocr_text_embeddings`）。
@@ -958,7 +958,7 @@ paired_capture 处理一帧:
 ### 验证
 - 离线评测集拆分"精确词查询/语义查询"两组；保证精确词查询不低于对齐基线，并量化语义退化幅度。
 
-## 3.6 Chat（核心能力）
+### 4.6 Chat（核心能力）
 
 ### screenpipe 怎么做
 - screenpipe 的 Chat 主回答链路由 Pi 代理驱动（通过工具调用 `/search` 等检索端点）；`/ai/chat/completions` 仅用于 follow-up suggestions 辅助分支，不是主回答必经链路。
@@ -988,7 +988,7 @@ paired_capture 处理一帧:
   - Stretch 目标：>= 95%
   - 人工抽检 hallucination rate 持续下降
 
-## 3.7 同步与传输（LAN 主链路，断连恢复）
+### 4.7 同步与传输（LAN 主链路，断连恢复）
 
 ### screenpipe 怎么做
 - 有 sync provider（批次导入导出 + 标记同步），但不是 Host/Edge LAN 主链路模型。
@@ -1073,7 +1073,7 @@ P2+ 升级为 mTLS 强制（006A->B）。
 - 重复包去重正确率 = 100%（相同 capture_id 不重复入库）。
 - 503 背压场景：Host 遵守 retry_after，buffer 不丢、不爆。
 
-## 3.8 UI 能力与阶段 Gate（A：最小可用集）
+### 4.8 UI 能力与阶段 Gate（A：最小可用集）
 
 ### screenpipe 怎么做
 - UI 通过稳定 API 契约驱动核心交互（search/chat/timeline），而不是把“页面存在”当作完成标准。
@@ -1100,7 +1100,7 @@ P2+ 升级为 mTLS 强制（006A->B）。
 - 每个 P1 子阶段验收文档必须包含 UI 证据（截图/录屏 + 步骤 + 结论）。
 - UI 关键路径通过率与异常可见性指标纳入阶段 Gate。
 
-## 3.9 API 契约总览（P1 端点完整清单）
+### 4.9 API 契约总览（P1 端点完整清单）
 
 ### 端点清单
 
@@ -1189,7 +1189,7 @@ P2+ 升级为 mTLS 强制（006A->B）。
 **说明：** screenpipe 只返回 `{"error": "message"}`（无 `code`、无 `request_id`），v3 增加 `code` 和 `request_id` 用于日志追踪与客户端差异化处理。
 
 
-## 4. 演进路线（固定三阶段）
+## 5. 演进路线（固定三阶段）
 
 1. 本机模拟 Edge（进程级隔离）
 - Host 与 Edge 不共享进程，不共享业务内存。
@@ -1210,21 +1210,21 @@ P2+ 升级为 mTLS 强制（006A->B）。
 - 功能冻结：不新增业务功能，仅做部署、运维与回滚能力收敛。
 - 验收记录要求：每个阶段/子阶段必须输出 Markdown 详细记录，归档到 `MyRecall/docs/v3/acceptance/`，并使用统一模板 `TEMPLATE.md`。
 
-## 5. 可验证 SLO（首版）
+## 6. 可验证 SLO（首版）
 
 - TTS（time-to-searchable）P95 <= 12s（capture 到可检索）。
 - Capture 丢失率 <= 0.2%。
 - Search P95 <= 1.8s（不含超大时间窗）。
 - Chat 首 token P95 <= 3.5s（已有索引命中场景）。
 
-### 5.1 Chat 引用覆盖率（Soft KPI，non-blocking）
+### 6.1 Chat 引用覆盖率（Soft KPI，non-blocking）
 
 - P1-S5：目标 >= 85%
 - P1-S7 / P2 / P3：目标 >= 92%
 - Stretch：>= 95%
 - 说明：该指标用于质量观测与回归，不作为阶段 Gate Fail 条件。
 
-### 5.2 功能完成度/完善度 Gate 指标（强制）
+### 6.2 功能完成度/完善度 Gate 指标（强制）
 
 - 功能清单完成率 = 100%。
 - API/Schema 契约完成率 = 100%。
@@ -1233,19 +1233,19 @@ P2+ 升级为 mTLS 强制（006A->B）。
 - UI 关键路径通过率 = 100%（按阶段定义关键路径）。
 - 验收记录完整率 = 100%（基于 `acceptance/` 归档文件）。
 
-### 5.3 指标口径（SSOT）
+### 6.3 指标口径（SSOT）
 
 - 所有 Gate/SLO 的定义、样本数、时间窗、统计方法与 Pass/Fail 规则以 `MyRecall/docs/v3/gate_baseline.md` 为准。
 - 若本文件与 `gate_baseline.md` 冲突，以 `gate_baseline.md` 为准，并在 48 小时内修订冲突内容。
 
-## 6. 明确 TBD / 需实验 / 需查证
+## 7. 明确 TBD / 需实验 / 需查证
 
 - 已拍板（015A）：embedding 保留为离线实验表 `ocr_text_embeddings`（对齐 screenpipe），不进入线上 search 主路径。
 - 已拍板（016A）：v3 全新数据起点，不做 v2 数据迁移。
 - 需实验：AX-first 在多应用场景下对召回质量的净收益。
 - 需查证：Debian 上 RapidOCR 与候选本地 VL 模型的稳定组合。
 
-## 7. 已拍板基线（2026-02-26）
+## 8. 已拍板基线（2026-02-26）
 
 1. 001A：与 screenpipe 做行为/能力对齐，不做拓扑对齐。
 2. 002A（修订）：Chat 请求为简单 JSON，响应为 SSE 透传 Pi 原生事件（不做 OpenAI format 翻译）。Tool 以 Pi SKILL.md 格式定义。

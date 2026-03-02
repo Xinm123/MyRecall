@@ -47,7 +47,7 @@
     - UI 基线可用（路由可达 + 基础健康态/错误态可见）
   - Gate：
     - 同机断网恢复后可自动重传，且重复上传不重复入库
-    - ingest 队列可观测（pending/processing/completed）完整
+    - ingest 队列可观测（pending/processing/completed/failed）完整
     - 对外 API 命名空间一致性通过：验收脚本仅调用 `/v1/*`，旧 `/api/*` 路径不得返回业务成功（2xx）
     - UI 基线路由可达率 = 100%
     - UI 健康态/错误态展示检查通过率 = 100%
