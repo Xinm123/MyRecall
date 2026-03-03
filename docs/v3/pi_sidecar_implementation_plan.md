@@ -4,7 +4,7 @@
 - 日期：2026-03-01
 - 依赖决策：DA-2（修订）、DA-3、DA-5、DA-7=A、DA-8=A→B、DA-9=C
 - 依赖决策点：DP-1=A（Flask + threading）、DP-2=A（Edge 数据目录）、DP-3=A（Manager 始终从 chat_messages 注入历史）
-- 关联文档：`ADR-0004`、`spec.md` §3.6、`roadmap.md` P1-S5/S6/S7、`baselines/chat/chat_baseline_myrecall.md`
+- 关联文档：`ADR-0004`、`spec.md` §4.6、`roadmap.md` P1-S5/S6/S7、`baselines/chat/chat_baseline_myrecall.md`
 
 ---
 
@@ -108,7 +108,7 @@ tests/
 | S5-5 | myrecall-search Skill | `skills/myrecall-search/SKILL.md` | ~200 | 对标 `screenpipe-search/SKILL.md`（255 行）；定义 `curl http://localhost:{port}/v1/search` 调用方式；包含参数说明（query, app_name, start_time, end_time, limit）；包含返回格式说明与引用规则：默认输出 `myrecall://frame/{frame_id}`，缺少 `frame_id` 时回退 `myrecall://timeline?timestamp=ISO8601`，且禁止伪造 ID/时间戳。 |
 | S5-6 | Skills 注入 | `chat/config.py` | ~60 | `inject_skills(pi_workdir)`：将 `openrecall/server/skills/*/SKILL.md` 复制到 `{pi_workdir}/skills/{name}/SKILL.md`；`detect_bun()`/`detect_pi()`：检查可执行文件可用性；`get_pi_workdir() → Path`：返回 `$OPENRECALL_SERVER_DATA_DIR/.pi`（DP-2=A） |
 | S5-7 | /v1/chat endpoint | `api.py`（修改） | ~80 | `POST /v1/chat`：解析 `{message, session_id, images?}`；调用 `PiManager.send_prompt()`；返回 `Response(stream_with_context(sse_generator()), mimetype='text/event-stream')`（DP-1=A：Flask + threading） |
-| S5-8 | 持久化 | `chat/persistence.py` | ~80 | `save_message(session_id, role, content, citations, tool_calls, model, latency_ms)`；`get_session_history(session_id, limit=20) → list[dict]`；`list_sessions() → list[dict]`；使用 `chat_messages` 表（schema per `spec.md` §3.0.3 Table 5）；stream end 后由 Manager 调用保存 user + assistant 消息 |
+| S5-8 | 持久化 | `chat/persistence.py` | ~80 | `save_message(session_id, role, content, citations, tool_calls, model, latency_ms)`；`get_session_history(session_id, limit=20) → list[dict]`；`list_sessions() → list[dict]`；使用 `chat_messages` 表（schema per `data-model.md` §3.0.3 Table 5）；stream end 后由 Manager 调用保存 user + assistant 消息 |
 | S5-9 | Chat UI minimal | `templates/chat.html` | ~200 | Alpine.js + EventSource；消息列表（user/assistant 交替）；输入框 + 发送按钮；SSE 连接处理（`onmessage` 按事件类型更新 UI）；`message_update` → 追加 text delta；`tool_execution_*` → 显示工具调用状态；`response` → 流结束；错误状态展示 |
 
 **P1-S5 小计：~1330 行**

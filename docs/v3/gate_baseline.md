@@ -1,3 +1,12 @@
+---
+status: active
+owner: pyw
+last_updated: 2026-03-03
+depends_on:
+  - spec.md
+  - roadmap.md
+---
+
 # MyRecall-v3 Gate 指标口径基线（SSOT）
 
 - 版本：v1.1

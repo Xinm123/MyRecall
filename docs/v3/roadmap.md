@@ -1,37 +1,24 @@
+---
+status: draft
+owner: pyw
+last_updated: 2026-03-03
+depends_on:
+  - spec.md
+  - gate_baseline.md
+  - open_questions.md
+---
+
 # MyRecall-v3 路线图（Edge-Centric, vision-only）
 
 - 版本：Draft v0.1
 - 日期：2026-02-26
 - 节奏原则：每阶段都可独立验收；Edge 必须从 Day 1 参与。
 
-## 0. 已锁定决策（Gate 0，2026-02-26）
+## 0. 已锁定决策
 
-1. 001A：对齐策略采用“行为/能力对齐”。  
-2. 002A（修订）：Chat 请求为简单 JSON，响应为 SSE 透传 Pi 原生事件（不做 OpenAI format 翻译）；Tool 以 Pi SKILL.md 格式定义。  
-3. 003A（覆盖）：Search 完全对齐 screenpipe（vision-only），线上仅 FTS+过滤，舍弃 hybrid。  
-4. 004A：Host 采集 accessibility 文本（仅采集，不推理）。  
-5. 005A（修订）：Edge 支持本地/云端模型，通过 Pi `--provider`/`--model` + `models.json` 配置切换（对齐 screenpipe）；P1 不做自动 fallback。  
-6. 006A->B：传输安全分阶段升级（P1 token + TLS 可选，P2+ mTLS 强制）。  
-7. 007A：P1~P3 页面继续在 Edge，Host 不负责 UI；Host 化仅作为 Post-P3 可选计划。  
-8. 008A：功能开发集中在 Phase 1 完成；Phase 2/3 功能冻结，仅做部署与稳定性。  
-9. 009A：Phase 1 拆分为串行子阶段（P1-S1~S7），其中 P1-S2/P1-S3 分别为采集/处理，Chat 拆分为多子阶段，端到端验收独立为最后阶段。  
-10. 010A：每个阶段与子阶段的验收必须形成详细 Markdown 记录并归档。  
-11. 011A：Gate 采用“数值指标适度放宽 + 功能完成度/完善度指标强化”的双轨策略。  
-12. 012A：UI Gate 采用“最小可用集”策略（增强可用性验收，不做 UI 重构）。  
-13. 013A：引用覆盖率采用 screenpipe 对齐软约束：分阶段目标（P1-S5>=85%，P1-S7/P2/P3>=92%，Stretch 95%）只用于观测与回归，不作为 Gate Fail 条件。  
-14. 014A：删除 fusion_text/caption/keywords 索引时预计算，完全对齐 screenpipe vision-only 处理链路（索引时零 AI 调用）。  
-15. 015A：embedding 保留为离线实验表 `ocr_text_embeddings`（对齐 screenpipe），不进入线上 search。  
-16. 016A：v3 全新数据起点，不做 v2 数据迁移。  
-17. 017A：数据模型采用“主路径对齐 + 差异显式”策略：P1 对齐 `frames`/`ocr_text`/`frames_fts`/`ocr_text_fts` 的表名与核心字段；`ocr_text_embeddings` 保留为 P2+ 可选实验表（同名，不纳入 P1 完成定义）；仅追加 Edge-Centric 必需字段与 `chat_messages` 表。  
-18. 018A → **018C（覆盖）**：Scheme C 分表写入 — AX 成功帧写入 `accessibility` 表（无 `ocr_text` 行），OCR fallback 帧写入 `ocr_text` 表（无 `accessibility` 行）；`text_source` 仍在 `frames` 表。详见 ADR-0012。  
-19. 019A：P1 ingest 协议采用单次幂等上传（`POST /v1/ingest`）+ 队列状态端点（`GET /v1/ingest/queue/status`）；重复 capture_id 返回 `200 OK + "status": "already_exists"`；session/chunk/commit/checkpoint 4 端点推迟到 P2 LAN 弱网场景实现，不破坏 P1 契约。  
-
-20. 020A：API 契约定义（P1 端点完整 schema）：`/v1/search` 合并 `/v1/search/keyword`（P1 无 embedding，拆分无意义），query params 对齐 screenpipe `SearchQuery`，response 含 `file_path` + `frame_url` 双字段；`/v1/frames/:frame_id` 返回图像二进制；`/v1/frames/:frame_id/metadata` 返回 JSON；统一错误响应含 `code` + `request_id`；`CapturePayload` 补全验证规则与幂等语义；Chat tool schema 已由 DA-3/DA-7 决定（Pi SKILL.md 格式）。  
-21. 021A：`ocr_text` 表新增 `app_name`/`window_name` 两列（对齐 screenpipe 历史 migration 20240716/20240815）；写入时从 `CapturePayload` 取值；接受与 `frames` 列潜在 drift（对齐 screenpipe 行为）。  
-22. 022A → **022C（覆盖）**：Search SQL 拆为三路径分发（Scheme C）：`search_ocr()`（content_type=ocr）、`search_accessibility()`（content_type=accessibility）、`search_all()`（content_type=all 默认）。详见 ADR-0012。  
-23. 023A：Migration 策略采用手写 SQL + `schema_migrations` 跟踪表，零额外依赖；文件命名 `YYYYMMDDHHMMSS_描述.sql`；P1 全量 DDL 放入单一初始迁移文件；`ocr_text_embeddings` 推迟至 P2+ migration 新增。  
-24. 024A：API 命名空间冻结：v3 对外 HTTP 契约统一 `/v1/*`；`/api/*` 仅用于 v2 历史描述，不纳入 P1~P3 Gate 与客户端默认调用路径。
-25. **025A（新增）**：`accessibility` 表 P0 建表（Scheme C），含 `focused` 列（P0 修复 screenpipe limitation）+ `frame_id DEFAULT NULL`（精确关联 frames）；DDL 对齐 screenpipe migration `20250202000000` 并增强。详见 ADR-0012。
+> **SSOT**: [open_questions.md](open_questions.md) — "已拍板结论" 各节
+> 
+> 所有已锁定决策（当前范围：001A–026A）的完整内容以 open_questions.md 为唯一事实源。本节不再重复列举。
 
 ## 1. 阶段目标与里程碑
 
@@ -43,23 +30,29 @@
   - 交付：
     - Host spool + uploader（幂等、可续传）
     - Edge ingest + queue + processing pipeline 骨架
+    - 图片格式主契约统一（主采集/主读取链路 JPEG）
     - Edge 继续承载现有 Flask 页面（`/`、`/search`、`/timeline`）
     - UI 基线可用（路由可达 + 基础健康态/错误态可见）
   - Gate：
     - 同机断网恢复后可自动重传，且重复上传不重复入库
     - ingest 队列可观测（pending/processing/completed/failed）完整
+    - 图片格式契约一致性通过：`/v1/ingest` 主契约 `image/jpeg`，`/v1/frames/:frame_id` 返回 `image/jpeg`；兼容输入若启用，需验证入库前转码为 JPEG
     - 对外 API 命名空间一致性通过：验收脚本仅调用 `/v1/*`，旧 `/api/*` 路径不得返回业务成功（2xx）
     - UI 基线路由可达率 = 100%
     - UI 健康态/错误态展示检查通过率 = 100%
 - P1-S2（采集，2026-03-06 ~ 2026-03-08）
   - 交付：
-    - Host 事件驱动 capture（app switch/click/typing pause/idle）+ idle fallback
+    - Host 事件驱动 capture（app switch/click/idle）+ manual trigger + idle fallback（P1 触发枚举：`idle/app_switch/manual/click`；`window_focus` 不纳入 P1）
     - Host 采集 accessibility 文本并上传
+    - 高频事件抑制链路（对齐 screenpipe）：共享去抖（`min_capture_interval_ms`，默认 200ms）+ 内容去重（非 `idle/manual`）+ 有界通道 lag 折叠
     - Timeline 可见 capture 上传中/已入队状态
   - Gate：
     - 切窗场景 95% capture 在 3 秒内入 Edge 队列
     - 每分钟 300 次事件压测下 Host CPU < 25%，丢包率 < 0.3%
-    - 事件触发清单（app switch/click/typing pause/idle）覆盖率 >= 95%
+    - 事件触发清单（idle/app_switch/manual/click）覆盖率 >= 95%
+    - 去抖 Gate：同 monitor 连续 `app_switch/click` 入库间隔 < `min_capture_interval_ms`（200ms）的违规数 = 0
+    - 去重 Gate：重复内容压测下可观测到 dedup skip，且 30s 保底写入持续成立（避免 timeline 空洞）
+    - 背压 Gate：触发通道 lag 时发生折叠降级（collapse）而非无界堆积；处理链路不出现持续性 backlog 失控
     - 新 capture 在 timeline 可见性通过率 >= 95%
 - P1-S3（处理，2026-03-09 ~ 2026-03-11）
   - 交付：

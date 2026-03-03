@@ -1,0 +1,696 @@
+---
+status: draft
+owner: pyw
+last_updated: 2026-03-03
+depends_on:
+  - spec.md
+  - gate_baseline.md
+---
+
+# MyRecall-v3 数据模型（SSOT）
+
+> 本文件从 spec.md §3 提取，为数据模型的唯一事实源（SSOT）。
+
+## 3. 数据模型（Edge SQLite，主路径对齐 screenpipe vision-only，差异显式）
+
+### 3.0.1 设计原则
+
+| 原则 | 说明 |
+|------|------|
+| Edge 是唯一事实源 | 所有持久化表在 Edge 的 `edge.db`（单一 SQLite 文件），Host 只有 spool 文件 |
+| 表名/字段名对齐 screenpipe | P1 主路径同名：`frames` / `ocr_text` / `frames_fts` / `ocr_text_fts`；`ocr_text_embeddings` 为 P2+ 可选实验表（同名保留，P1 不建） |
+| 索引时零 AI 调用 | 仅存储 OCR raw text + accessibility text，不预计算 caption/keywords/fusion（与 screenpipe 一致） |
+| capture_id 全局幂等 | UUID v7（Host 生成），Edge 去重，贯穿全链路 |
+| v3 全新起点 | 不做 v2 数据迁移 |
+
+### 3.0.2 capture_id 生成规则
+
+```
+格式：UUID v7（RFC 9562）
+生成方：Host（采集时生成）
+特性：时间有序 + 全局唯一 + 无需中心协调
+示例：019528a0-73c4-7abc-8def-1234567890ab
+```
+
+### 3.0.3 DDL（Edge SQLite）
+
+#### Table 1: frames（对齐 screenpipe frames，vision-only 子集）
+
+```sql
+CREATE TABLE frames (
+    id                    INTEGER PRIMARY KEY AUTOINCREMENT,
+    timestamp             TIMESTAMP NOT NULL,
+    app_name              TEXT DEFAULT NULL,
+    window_name           TEXT DEFAULT NULL,
+    browser_url           TEXT DEFAULT NULL,
+    focused               BOOLEAN DEFAULT NULL,
+    device_name           TEXT NOT NULL DEFAULT '',
+    snapshot_path         TEXT DEFAULT NULL,       -- JPEG 快照路径（主链路，推荐 .jpg）
+    capture_trigger       TEXT DEFAULT NULL,       -- 'idle'|'app_switch'|'manual'|'click' (P1); P2+: 'window_focus'|'typing_pause'|'scroll_stop'|'clipboard'|'visual_change'
+    accessibility_text    TEXT DEFAULT NULL,
+    text_source           TEXT DEFAULT NULL,       -- 'ocr'|'accessibility'
+    content_hash          TEXT DEFAULT NULL,       -- sha256:hex，Edge 去重辅助
+    simhash               INTEGER DEFAULT NULL,    -- 感知哈希，近似重复检测
+
+    -- v3 Edge-Centric 追加
+    capture_id            TEXT NOT NULL UNIQUE,    -- UUID v7，Host 生成，幂等键
+    image_size_bytes      INTEGER,
+    ingested_at           TEXT NOT NULL
+                          DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+    status                TEXT NOT NULL DEFAULT 'pending',  -- 'pending'|'processing'|'completed'|'failed'
+    error_message         TEXT,
+    retry_count           INTEGER DEFAULT 0,
+    processed_at          TEXT
+);
+
+-- B-tree 索引（精确过滤 / 时间范围）
+CREATE INDEX idx_frames_timestamp     ON frames(timestamp);
+CREATE INDEX idx_frames_app_name      ON frames(app_name);
+CREATE INDEX idx_frames_window_name   ON frames(window_name);
+CREATE INDEX idx_frames_browser_url   ON frames(browser_url);
+CREATE INDEX idx_frames_focused       ON frames(focused);
+CREATE INDEX idx_frames_snapshot_path ON frames(snapshot_path)
+    WHERE snapshot_path IS NOT NULL;
+CREATE INDEX idx_frames_status        ON frames(status)
+    WHERE status IN ('pending', 'processing', 'failed');
+CREATE INDEX idx_frames_content_hash  ON frames(content_hash)
+    WHERE content_hash IS NOT NULL;
+```
+
+#### Table 2: ocr_text（对齐 screenpipe ocr_text，仅 OCR-fallback 帧写入）
+
+```sql
+CREATE TABLE ocr_text (
+    id                    INTEGER PRIMARY KEY AUTOINCREMENT,
+    frame_id              INTEGER NOT NULL,
+    text                  TEXT NOT NULL DEFAULT '',
+    text_json             TEXT,                    -- bounding box JSON（可选）
+    ocr_engine            TEXT,
+    text_length           INTEGER DEFAULT 0,
+    app_name              TEXT DEFAULT NULL,       -- 对齐 screenpipe，写入时从 CapturePayload 取值
+    window_name           TEXT DEFAULT NULL,       -- 对齐 screenpipe，写入时从 CapturePayload 取值
+    -- 注：与 frames.app_name/window_name 来源相同（同一 CapturePayload）；
+    --     若 frames 行后续被修正，ocr_text 不联动更新（接受 drift，对齐 screenpipe 行为）。
+    FOREIGN KEY (frame_id) REFERENCES frames(id) ON DELETE CASCADE
+);
+
+CREATE INDEX idx_ocr_text_frame_id ON ocr_text(frame_id);
+```
+
+#### Table 3: frames_fts（对齐 screenpipe frames_fts，FTS 全文语义过滤）
+
+```sql
+-- app_name/window_name/browser_url/focused/accessibility_text 走 FTS 全文语义（选 C）
+-- 去掉 screenpipe 的 name 字段（v3 无 frames.name）
+CREATE VIRTUAL TABLE frames_fts USING fts5(
+    app_name,
+    window_name,
+    browser_url,
+    focused,
+    accessibility_text,
+    id UNINDEXED,
+    tokenize='unicode61'
+);
+
+-- INSERT 触发器
+CREATE TRIGGER frames_ai AFTER INSERT ON frames BEGIN
+    INSERT INTO frames_fts(id, app_name, window_name, browser_url, focused, accessibility_text)
+    VALUES (
+        NEW.id,
+        COALESCE(NEW.app_name, ''),
+        COALESCE(NEW.window_name, ''),
+        COALESCE(NEW.browser_url, ''),
+        COALESCE(NEW.focused, 0),
+        COALESCE(NEW.accessibility_text, '')
+    );
+END;
+
+-- UPDATE 触发器（清空字段时也必须同步，避免陈旧 token）
+CREATE TRIGGER frames_au AFTER UPDATE ON frames BEGIN
+    DELETE FROM frames_fts WHERE id = OLD.id;
+    INSERT INTO frames_fts(id, app_name, window_name, browser_url, focused, accessibility_text)
+    VALUES (
+        NEW.id,
+        COALESCE(NEW.app_name, ''),
+        COALESCE(NEW.window_name, ''),
+        COALESCE(NEW.browser_url, ''),
+        COALESCE(NEW.focused, 0),
+        COALESCE(NEW.accessibility_text, '')
+    );
+END;
+
+-- DELETE 触发器
+CREATE TRIGGER frames_ad AFTER DELETE ON frames BEGIN
+    DELETE FROM frames_fts WHERE id = OLD.id;
+END;
+```
+
+#### Table 4: ocr_text_fts（对齐 screenpipe）
+
+```sql
+-- 对齐 screenpipe：保留 app_name/window_name
+-- 注：search_ocr() 的 ocr_text_fts MATCH 只传文字搜索词，不做列过滤；
+--     app/window 过滤由 frames_fts 承担（选 C）。
+--     保留两列的理由：FTS5 加列代价高（需 rebuild），预留未来列过滤扩展；当前无负面影响。
+CREATE VIRTUAL TABLE ocr_text_fts USING fts5(
+    text,
+    app_name,
+    window_name,
+    frame_id UNINDEXED,
+    tokenize='unicode61'
+);
+
+-- INSERT 触发器
+-- 注：ocr_text 现有 app_name/window_name 列（对齐 screenpipe），直接取 NEW 值，无需 JOIN frames
+CREATE TRIGGER ocr_text_ai AFTER INSERT ON ocr_text
+WHEN NEW.text IS NOT NULL AND NEW.text != '' AND NEW.frame_id IS NOT NULL
+BEGIN
+    INSERT OR IGNORE INTO ocr_text_fts(frame_id, text, app_name, window_name)
+    VALUES (
+        NEW.frame_id,
+        NEW.text,
+        COALESCE(NEW.app_name, ''),
+        COALESCE(NEW.window_name, '')
+    );
+END;
+
+-- UPDATE 触发器（clear-safe：text 被清空时必须删除旧索引）
+CREATE TRIGGER ocr_text_update AFTER UPDATE ON ocr_text BEGIN
+    DELETE FROM ocr_text_fts WHERE frame_id = OLD.frame_id;
+    INSERT INTO ocr_text_fts(frame_id, text, app_name, window_name)
+    SELECT
+        NEW.frame_id,
+        NEW.text,
+        COALESCE(NEW.app_name, ''),
+        COALESCE(NEW.window_name, '')
+    WHERE NEW.frame_id IS NOT NULL
+      AND NEW.text IS NOT NULL
+      AND NEW.text != '';
+END;
+
+-- DELETE 触发器
+CREATE TRIGGER ocr_text_delete AFTER DELETE ON ocr_text BEGIN
+    DELETE FROM ocr_text_fts WHERE frame_id = OLD.frame_id;
+END;
+```
+#### Table 5: chat_messages（v3 独有）
+
+```sql
+CREATE TABLE chat_messages (
+    id                    TEXT PRIMARY KEY,         -- UUID v4
+    session_id            TEXT NOT NULL,
+    role                  TEXT NOT NULL,            -- 'user'|'assistant'|'tool'
+    content               TEXT NOT NULL,
+    citations             TEXT,                     -- JSON 数组，frame_id 引用
+    tool_calls            TEXT,                     -- JSON，tool use（P2+）
+    model                 TEXT,
+    latency_ms            INTEGER,
+    created_at            TEXT NOT NULL
+                          DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+);
+
+CREATE INDEX idx_chat_session ON chat_messages(session_id, created_at);
+```
+
+#### ~~Table 6: ocr_text_embeddings~~ （P1 不建）
+
+screenpipe migration 中存在此表，但主检索路径未使用（实验性保留）。v3 P1 Search 为纯 FTS5，**P1 不建此表**；P2+ 若有 embedding 需求，通过独立 migration 新增，且默认不进入线上主路径。
+
+#### ~~Table 7: elements~~ （P1 不建）
+
+screenpipe v0.3.160 新增 `elements` 表（migration `20260301000000`），将 OCR+AX 逐元素结构化存储（含 bbox、element_type、FTS5），与 `ocr_text` 并行双写。v3 P1 Search/Chat 均基于 `ocr_text` 全文，无逐元素消费者；**P1 不建此表**；P2+ 若需细粒度 UI 元素检索（如按钮/标签级定位），通过独立 migration 新增，并同步实现双写逻辑与 `/elements` API。
+
+#### Table 8: accessibility（Scheme C，P0 建表，对齐 screenpipe migration 20250202000000 + v3 增强）
+
+screenpipe 中 `accessibility` 表由独立 `ui_recorder` 树遍历器写入（`ui_recorder.rs:542-633`），与 `paired_capture` 完全独立。v3 Scheme C 下，`paired_capture` 在 AX 成功时写入此表（代替 `ocr_text`），未来 P1+ 可增加独立 walker 管线。
+
+```sql
+CREATE TABLE accessibility (
+    id                    INTEGER PRIMARY KEY AUTOINCREMENT,
+    timestamp             DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    app_name              TEXT NOT NULL,
+    window_name           TEXT NOT NULL,
+    text_content          TEXT NOT NULL,
+    browser_url           TEXT,
+
+    -- v3 增强（screenpipe 无以下两列）
+    frame_id              INTEGER DEFAULT NULL,    -- paired_capture 写入时填入 frames.id；独立 walker 写入时留 NULL
+    focused               BOOLEAN DEFAULT NULL,    -- P0 修复：screenpipe accessibility 表无此列，导致 focused/browser_url 搜索强制降级到 OCR（db.rs:1870-1872）
+
+    FOREIGN KEY (frame_id) REFERENCES frames(id) ON DELETE SET NULL
+);
+
+-- B-tree 索引（对齐 screenpipe migration lines 22-27 + v3 追加）
+CREATE INDEX idx_accessibility_timestamp  ON accessibility(timestamp);
+CREATE INDEX idx_accessibility_app_name   ON accessibility(app_name);
+CREATE INDEX idx_accessibility_frame_id   ON accessibility(frame_id)
+    WHERE frame_id IS NOT NULL;
+CREATE INDEX idx_accessibility_focused    ON accessibility(focused)
+    WHERE focused IS NOT NULL;
+```
+
+**写入语义（Scheme C）**：
+- AX 成功 → `frames` 行（`text_source='accessibility'`）+ `accessibility` 行（`frame_id` = 对应 `frames.id`）+ **无 `ocr_text` 行**
+- AX 失败/OCR fallback → `frames` 行（`text_source='ocr'`）+ `ocr_text` 行 + **无 `accessibility` 行**
+
+**P0 修复说明**：screenpipe `search_accessibility()` 不接受 `focused` 参数（`db.rs:3408-3416`），`focused`/`browser_url` 存在时强制降级到 `content_type=ocr`（`db.rs:1870-1872`）。在 AX-first 模式下 ~90%+ 帧无 `ocr_text` 行，`search_ocr()` 用 `INNER JOIN ocr_text` 会漏掉这些帧。v3 通过在 `accessibility` 表增加 `focused` 列并让 `search_accessibility()` 支持过滤，修复此限制。
+
+#### Table 9: accessibility_fts（基于 screenpipe + browser_url 增强，FTS 全文检索）
+
+```sql
+CREATE VIRTUAL TABLE accessibility_fts USING fts5(
+    text_content,
+    app_name,
+    window_name,
+    browser_url,
+    content='accessibility',
+    content_rowid='id',
+    tokenize='unicode61'
+);
+
+-- INSERT 触发器
+CREATE TRIGGER accessibility_ai AFTER INSERT ON accessibility BEGIN
+    INSERT INTO accessibility_fts(rowid, text_content, app_name, window_name, browser_url)
+    VALUES (
+        NEW.id,
+        COALESCE(NEW.text_content, ''),
+        COALESCE(NEW.app_name, ''),
+        COALESCE(NEW.window_name, ''),
+        COALESCE(NEW.browser_url, '')
+    );
+END;
+
+-- UPDATE 触发器
+CREATE TRIGGER accessibility_au AFTER UPDATE ON accessibility BEGIN
+    INSERT INTO accessibility_fts(accessibility_fts, rowid, text_content, app_name, window_name, browser_url)
+    VALUES ('delete', OLD.id, OLD.text_content, OLD.app_name, OLD.window_name, OLD.browser_url);
+    INSERT INTO accessibility_fts(rowid, text_content, app_name, window_name, browser_url)
+    VALUES (
+        NEW.id,
+        COALESCE(NEW.text_content, ''),
+        COALESCE(NEW.app_name, ''),
+        COALESCE(NEW.window_name, ''),
+        COALESCE(NEW.browser_url, '')
+    );
+END;
+
+-- DELETE 触发器
+CREATE TRIGGER accessibility_ad AFTER DELETE ON accessibility BEGIN
+    INSERT INTO accessibility_fts(accessibility_fts, rowid, text_content, app_name, window_name, browser_url)
+    VALUES ('delete', OLD.id, OLD.text_content, OLD.app_name, OLD.window_name, OLD.browser_url);
+END;
+```
+
+**注**：`accessibility_fts` 使用 `content='accessibility'` + `content_rowid='id'`（content-sync 模式，对齐 screenpipe migration lines 30-37）。trigger 使用 delete command 而非 DELETE FROM（FTS5 content-sync 要求）。v3 `accessibility_fts` 比 screenpipe 多一列 `browser_url`（screenpipe 仅 `text_content, app_name, window_name` 3 列），此为有意偏离——确保 `browser_url` 参数在所有 `content_type` 路径下统一为 FTS token 序列匹配语义。
+
+**FTS 清空一致性契约（P1 强制）**：以 API/数据契约为 SSOT，`app_name/window_name/browser_url/focused/accessibility_text/text` 任一字段从非空更新为 `NULL/''` 后，旧 token 必须在同一事务内从 FTS 中移除，不得出现可检索陈旧命中。为满足该契约，v3 对 `frames_fts` 与 `ocr_text_fts` 的 UPDATE 触发器采用 `DELETE old + INSERT new(条件写入)` 的 clear-safe 模式，不复用 screenpipe 部分 migration 中的 `WHEN NEW.xxx != ''` 门控写法。
+
+#### FTS 分工总结
+
+**注**：Scheme C（025A）引入 `content_type` 参数路由。以下按路径分表说明。
+
+##### `content_type=ocr`（search_ocr 路径）
+
+| 过滤参数 | 走哪张表 | 方式 |
+|---------|---------|------|
+| `q`（文字搜索） | `ocr_text_fts` | `text MATCH ?` + BM25 排序 |
+| `app_name` | `frames_fts` | `app_name:? MATCH` |
+| `window_name` | `frames_fts` | `window_name:? MATCH` |
+| `browser_url` | `frames_fts` | `browser_url:? MATCH` |
+| `focused` | `frames_fts` | `focused:1 MATCH` |
+| `start_time`/`end_time` | `frames` B-tree | `timestamp >= ? AND timestamp <= ?` |
+| `min_length`/`max_length` | `ocr_text` | `text_length >= ? AND text_length <= ?` |
+
+##### `content_type=accessibility`（search_accessibility 路径）
+
+| 过滤参数 | 走哪张表 | 方式 |
+|---------|---------|------|
+| `q`（文字搜索） | `accessibility_fts` | `text_content MATCH ?` + BM25 排序 |
+| `app_name` | `accessibility` | `app_name = ?`（B-tree 精确匹配） |
+| `window_name` | `accessibility` | `window_name = ?`（B-tree 精确匹配） |
+| `browser_url` | `accessibility_fts` | `browser_url:? MATCH`（FTS token 序列匹配，对齐 search_ocr 路径语义） |
+| `focused` | `accessibility` | `focused = ?`（B-tree 精确匹配，**v3 P0 修复**，screenpipe 不支持） |
+| `start_time`/`end_time` | `accessibility` B-tree | `timestamp >= ? AND timestamp <= ?` |
+| `min_length`/`max_length` | — | 不适用（accessibility 行无 `text_length` 列） |
+
+##### `content_type=all`（search_all 路径，默认）
+
+并行执行 `search_ocr()` + `search_accessibility()`，结果按 `timestamp DESC` 合并。各路径内部路由同上。
+
+##### 路由规则
+
+当 `q` 为空时（search_ocr 路径）：只 JOIN `frames_fts`（若有 app/window/browser/focused 条件），ORDER BY `frames.timestamp DESC`。
+当 `q` 非空时（search_ocr 路径）：JOIN `ocr_text_fts`（必须，MATCH 只传文字搜索词），按需 JOIN `frames_fts`，ORDER BY `ocr_text_fts.rank, frames.timestamp DESC`。
+当 `q` 为空时（search_accessibility 路径）：B-tree 过滤（app_name/window_name/focused/timestamp）；若有 `browser_url` 条件则 JOIN `accessibility_fts`（`browser_url:? MATCH`），ORDER BY `accessibility.timestamp DESC`。
+当 `q` 非空时（search_accessibility 路径）：JOIN `accessibility_fts`（MATCH 传文字搜索词 + browser_url 列前缀（若有）），按需追加 B-tree 过滤（app_name/window_name/focused/timestamp），ORDER BY `accessibility_fts.rank, accessibility.timestamp DESC`。
+
+**注**：`ocr_text_fts` 保留 `app_name`/`window_name` 列（对齐 screenpipe），但当前查询路径不对这两列做 MATCH。预留 P2+ 列过滤扩展（FTS5 加列代价高，先建好）。
+
+**注**：v3 **不做** screenpipe 的 `focused/browser_url → force content_type=ocr` 降级（db.rs:1870-1872）。`focused` 过滤在 `search_accessibility()` 直接由 `accessibility.focused` 列支持（P0 修复，见 ADR-0012）。
+
+#### FTS 查询规范化（对齐 screenpipe `text_normalizer`，D1=B）
+
+##### sanitize_fts5_query（防注入，必须）
+
+用户输入的 `q` 在构造 `ocr_text_fts MATCH ?` 前必须经过 sanitize：
+- 按空白分词
+- 每个 token 去除内部双引号后用 `"token"` 包裹
+- 防止 FTS5 运算符（`OR`/`AND`/`NOT`/`*`/`(`/`)`/`:`/`.`）被误解释
+
+```python
+def sanitize_fts5_query(query: str) -> str:
+    tokens = query.strip().split()
+    return " ".join(f'"{t.replace(chr(34), "")}"' for t in tokens if t.replace('"', ''))
+```
+
+| 输入 | 输出 |
+|------|------|
+| `hello world` | `"hello" "world"` |
+| `100.100.0.42` | `"100.100.0.42"` |
+| `foo(bar)` | `"foo(bar)"` |
+| `C++` | `"C++"` |
+
+##### expand_search_query（OCR 黏连词拆分 + 前缀匹配，必须）
+
+用于主搜索路径。对每个 token：
+1. 驼峰拆分：`ActivityPerformance` → `Activity` + `Performance`
+2. 数字边界拆分：`test123` → `test` + `123`
+3. 每个部分生成 `"part"*` 前缀匹配子句
+4. 多部分用 `OR` 连接
+
+```python
+def expand_search_query(query: str) -> str:
+    # 对每个 word：
+    #   拆分 → parts
+    #   if len(parts) > 1: ("original"* OR "part1"* OR "part2"*)
+    #   else: "word"*
+    # 多 word 结果用 OR 连接并加括号
+```
+
+| 输入 | 输出 |
+|------|------|
+| `test` | `"test"*` |
+| `proStart` | `("proStart"* OR "pro"* OR "Start"*)` |
+| `test123` | `("test123"* OR "test"* OR "123"*)` |
+| `hello world` | `("hello"* OR "world"*)` |
+
+##### 调用时机
+
+| 场景 | 用哪个函数 |
+|------|-----------|
+| `q` 非空 → `ocr_text_fts MATCH ?` | `sanitize_fts5_query(q)` |
+| 元数据过滤（app_name/window_name/browser_url/focused）→ `frames_fts MATCH ?` | 直接构造列限定短语（同 screenpipe `search_ocr()`），不经过 expand |
+| 未来 fuzzy_match 场景（P2+） | `expand_search_query(q)` 替代 `sanitize_fts5_query(q)` |
+
+**注**：P1 主路径 `q` 使用 `sanitize_fts5_query`；`expand_search_query` 同步实现但默认不启用，作为 P2 fuzzy_match 的基础设施。
+
+#### Search SQL JOIN 策略（Scheme C 三路径分发，覆盖原 Q2 单路径）
+
+Scheme C（025A）将搜索拆为三条独立路径，由 `content_type` 参数路由（对齐 screenpipe `ContentType` 枚举）。
+
+##### 路径 1：`search_ocr()`（`content_type=ocr`）
+
+对齐 screenpipe `search_ocr()`（db.rs:2117-2119），仅搜索 OCR fallback 帧。
+
+```sql
+-- 骨架（无条件 INNER JOIN，对齐 screenpipe）
+SELECT frames.*, ocr_text.text, ocr_text.text_length, ocr_text.ocr_engine
+FROM frames
+INNER JOIN ocr_text ON frames.id = ocr_text.frame_id
+{frame_fts_join}   -- 仅 app/window/browser/focused 非空时追加
+{ocr_fts_join}     -- 仅 q 非空时追加
+WHERE 1=1
+    {frame_fts_condition}
+    {ocr_fts_condition}
+    AND (? IS NULL OR frames.timestamp >= ?)
+    AND (? IS NULL OR frames.timestamp <= ?)
+    AND (? IS NULL OR ocr_text.text_length >= ?)
+    AND (? IS NULL OR ocr_text.text_length <= ?)
+ORDER BY {order_clause}
+LIMIT ? OFFSET ?
+```
+
+| 条件 | `frame_fts_join` | `ocr_fts_join` | `order_clause` |
+|------|-----------------|----------------|----------------|
+| `q` 空，无 app/window/browser/focused | 无 | 无 | `frames.timestamp DESC` |
+| `q` 空，有 app/window/browser/focused | `JOIN frames_fts ON frames.id = frames_fts.id` | 无 | `frames.timestamp DESC` |
+| `q` 非空，无 app/window/browser/focused | 无 | `JOIN ocr_text_fts ON ocr_text.frame_id = ocr_text_fts.frame_id` | `ocr_text_fts.rank, frames.timestamp DESC` |
+| `q` 非空，有 app/window/browser/focused | `JOIN frames_fts ON frames.id = frames_fts.id` | `JOIN ocr_text_fts ON ocr_text.frame_id = ocr_text_fts.frame_id` | `ocr_text_fts.rank, frames.timestamp DESC` |
+
+**INNER JOIN 语义**：`status = 'pending'/'processing'/'failed'` 的帧，`ocr_text` 行尚不存在，自然不出现在搜索结果。AX 成功帧无 `ocr_text` 行，同样被 INNER JOIN 排除（正确行为——这些帧由 `search_accessibility()` 覆盖）。
+
+##### 路径 2：`search_accessibility()`（`content_type=accessibility`）
+
+对齐 screenpipe `search_accessibility()`（db.rs:3408-3483），搜索 AX 成功帧 + 独立 walker 数据。
+
+```sql
+SELECT a.id, a.text_content, a.timestamp, a.app_name, a.window_name,
+       a.browser_url, a.focused, a.frame_id,
+       f.snapshot_path, f.device_name
+FROM accessibility a
+LEFT JOIN frames f ON a.frame_id = f.id
+{accessibility_fts_join}   -- q 非空或 browser_url 非空时追加
+WHERE 1=1
+    AND (? IS NULL OR a.app_name = ?)
+    AND (? IS NULL OR a.window_name = ?)
+    AND (? IS NULL OR a.focused = ?)
+    AND (? IS NULL OR a.timestamp >= ?)
+    AND (? IS NULL OR a.timestamp <= ?)
+    {accessibility_fts_condition}
+ORDER BY {order_clause}
+LIMIT ? OFFSET ?
+```
+
+| 条件 | `accessibility_fts_join` | `accessibility_fts_condition` | `order_clause` |
+|------|------------------------|-------------------------------|----------------|
+| `q` 空 且无 `browser_url` | 无 | 无 | `a.timestamp DESC` |
+| `q` 空 但有 `browser_url` | `JOIN accessibility_fts ON a.id = accessibility_fts.rowid` | `AND accessibility_fts MATCH 'browser_url:"..."'` | `a.timestamp DESC` |
+| `q` 非空，无 `browser_url` | `JOIN accessibility_fts ON a.id = accessibility_fts.rowid` | `AND accessibility_fts MATCH ?`（text_content 列） | `accessibility_fts.rank, a.timestamp DESC` |
+| `q` 非空，有 `browser_url` | `JOIN accessibility_fts ON a.id = accessibility_fts.rowid` | `AND accessibility_fts MATCH ?`（text_content + browser_url 列前缀组合） | `accessibility_fts.rank, a.timestamp DESC` |
+
+**browser_url FTS 语义说明**：`browser_url` 过滤统一走 `accessibility_fts` 的 `browser_url:? MATCH`（FTS token 序列匹配），与 search_ocr 路径的 `frames_fts` `browser_url:? MATCH` 语义一致。v3 `accessibility_fts` 比 screenpipe 多一列 `browser_url`（screenpipe `accessibility_fts` 仅 3 列），此为有意偏离，确保 API 契约中 `browser_url` 参数在所有 `content_type` 路径下语义一致。
+
+**browser_url NULL 行为**：触发器写入时 `COALESCE(NEW.browser_url, '')` 将 NULL 转为空串；FTS5 `unicode61` 对空串不产生 token，因此非浏览器 app 的 accessibility 行（`browser_url IS NULL`）不会被任何 `browser_url` 查询命中。这是**预期行为**：用户传 `browser_url` 过滤时，只应返回有 URL 的记录（浏览器 app 产生的 AX 数据）。实现者不应将此误判为 bug 并修改 COALESCE 逻辑。`content_type=all` 时 OCR 路径与 AX 路径各自独立过滤后合并，浏览器页面上的帧（AX 成功或 OCR fallback）均被覆盖，无遗漏。
+
+**LEFT JOIN frames 说明**：`accessibility.frame_id` 为 `DEFAULT NULL`（方案 3）。`paired_capture` 写入的行有 `frame_id`，精确关联 frames；未来独立 walker 写入的行 `frame_id = NULL`，LEFT JOIN 返回 NULL 字段（`snapshot_path`/`device_name` 等为 NULL）。避免 screenpipe 的 ±1s 时间窗口 JOIN 模糊性。
+
+**注**：screenpipe `search_accessibility()` 不接受 `focused` 参数（db.rs:3408-3483）。v3 `search_accessibility()` 支持 `focused` 过滤（P0 修复，见 ADR-0012），不做 screenpipe 的 `focused → force content_type=ocr` 降级。
+
+##### 路径 3：`search_all()`（`content_type=all`，默认）
+
+并行执行 `search_ocr()` + `search_accessibility()`，结果按 `timestamp DESC` 合并（Scheme C 写入语义保证两条路径结果集天然互斥——AX 成功帧无 `ocr_text` 行，OCR fallback 帧无 `accessibility` 行——无需去重）。
+
+```python
+def search_all(params: SearchQuery) -> SearchResult:
+    # 过量拉取：各路径传 fetch_limit = limit + offset，offset = 0
+    # 确保合并后全局排序窗口内的数据完整（对齐 screenpipe db.rs:1880, 2043-2050）
+    fetch_limit = params.limit + params.offset
+    ocr_results = search_ocr(params._replace(limit=fetch_limit, offset=0))
+    ax_results = search_accessibility(params._replace(limit=fetch_limit, offset=0))
+    # 合并 + 全局按 timestamp DESC 排序
+    merged = sorted(ocr_results + ax_results, key=lambda r: r.timestamp, reverse=True)
+    # 统一应用一次分页（skip offset，take limit）
+    return apply_pagination(merged, skip=params.offset, take=params.limit)
+```
+
+**注**：各路径分别拉取 `limit+offset` 行（`offset=0`），最坏情况内存中合并 `2×(limit+offset)` 行。P1 场景 `limit≤100`、`offset` 通常小，内存可控——前提是 UI 采用"加载更多"而非跳页（**OQ-026=A 已决**，对齐 screenpipe）。screenpipe UI 为纯"加载更多"模式（`search-modal.tsx: hasMoreOcr/loadMoreOcr`），offset 单调递增步长=limit，实际不超过几百。P2+ 可升级为 keyset cursor 分页（`before_timestamp`），彻底消除过量拉取，届时需改 API 契约。对齐 screenpipe `db.rs:1876-1880, 2043-2050`。
+
+**注**：`min_length`/`max_length` 仅转发给 `search_ocr()`；`search_accessibility()` 函数签名不接受这两个参数（accessibility 表无 `text_length` 列），`content_type=all` 时 accessibility 结果不受 `min_length`/`max_length` 过滤影响。对齐 screenpipe `db.rs:1894-1895, 1911-1919`。
+
+**注**：`content_type=all` 的 `pagination.total` = `count_search_ocr()` + `count_search_accessibility()`，分别独立 COUNT 再求和。
+
+**注**：screenpipe 明确注释"Avoid LEFT JOIN ocr_text — it forces a scan of the entire ocr_text"（db.rs line 3133）。v3 `search_ocr()` 路径遵循同样规则，主搜索路径不使用 LEFT JOIN。`search_accessibility()` 的 LEFT JOIN frames 是对 `frames` 表（非 `ocr_text`），且 `frame_id` 有索引，性能可控。
+
+#### COUNT 查询（Scheme C 三路径，D3=A）
+
+`pagination.total` 通过独立 COUNT 查询获得，按 `content_type` 分支：
+
+##### `content_type=ocr` → `count_search_ocr()`
+
+```sql
+SELECT COUNT(DISTINCT frames.id)
+FROM frames
+INNER JOIN ocr_text ON frames.id = ocr_text.frame_id
+{frame_fts_join}
+{ocr_fts_join}
+WHERE 1=1
+    {frame_fts_condition}
+    {ocr_fts_condition}
+    AND (? IS NULL OR frames.timestamp >= ?)
+    AND (? IS NULL OR frames.timestamp <= ?)
+    AND (? IS NULL OR ocr_text.text_length >= ?)
+    AND (? IS NULL OR ocr_text.text_length <= ?)
+```
+
+##### `content_type=accessibility` → `count_search_accessibility()`
+
+```sql
+SELECT COUNT(*)
+FROM accessibility a
+{accessibility_fts_join}
+WHERE 1=1
+    AND (? IS NULL OR a.app_name = ?)
+    AND (? IS NULL OR a.window_name = ?)
+    AND (? IS NULL OR a.focused = ?)
+    AND (? IS NULL OR a.timestamp >= ?)
+    AND (? IS NULL OR a.timestamp <= ?)
+    {accessibility_fts_condition}
+```
+
+`accessibility_fts_join` / `accessibility_fts_condition` 路由规则同 `search_accessibility()`（browser_url 走 FTS MATCH）。
+
+##### `content_type=all` → SUM
+
+```python
+total = count_search_ocr(params) + count_search_accessibility(params)
+```
+
+**性能兜底**：`idx_frames_timestamp` 和 `idx_accessibility_timestamp` B-tree 索引覆盖主过滤维度；100k 行级别 COUNT 预期 < 50ms（TBD-03 待实现后 benchmark 验证）。
+
+**P1 不实现搜索缓存**（D2=A），COUNT 每次实时计算。P2 引入 LRU 缓存时 COUNT 结果一并缓存。
+
+### 3.0.4 screenpipe 对齐映射
+
+| screenpipe 字段 | v3 字段 | 表 | 对齐 |
+|----------------|---------|-----|------|
+| `frames.id` (auto-int) | `frames.id` (auto-int) | frames | 100% |
+| `frames.timestamp` | `frames.timestamp` | frames | 100% |
+| `frames.app_name` | `frames.app_name` | frames | 100% |
+| `frames.window_name` | `frames.window_name` | frames | 100% |
+| `frames.browser_url` | `frames.browser_url` | frames | 100% |
+| `frames.focused` | `frames.focused` | frames | 100% |
+| `frames.device_name` | `frames.device_name` | frames | 100% |
+| `frames.snapshot_path` | `frames.snapshot_path` | frames | 100% |
+| `frames.capture_trigger` | `frames.capture_trigger` | frames | 100% |
+| `frames.accessibility_text` | `frames.accessibility_text` | frames | 100% |
+| `frames.text_source` | `frames.text_source` | frames | 100% |
+| `frames.content_hash` | `frames.content_hash` | frames | 100% |
+| `frames.simhash` | `frames.simhash` | frames | 100% |
+| `ocr_text.frame_id` | `ocr_text.frame_id` | ocr_text | 100% |
+| `ocr_text.text` | `ocr_text.text` | ocr_text | 100% |
+| `ocr_text.text_json` | `ocr_text.text_json` | ocr_text | 100% |
+| `ocr_text.ocr_engine` | `ocr_text.ocr_engine` | ocr_text | 100% |
+| `ocr_text.text_length` | `ocr_text.text_length` | ocr_text | 100% |
+| `ocr_text.app_name` | `ocr_text.app_name` | ocr_text | 100% |
+| `ocr_text.window_name` | `ocr_text.window_name` | ocr_text | 100% |
+| `frames_fts` 6 indexed 列（name/browser_url/app_name/window_name/focused/accessibility_text） | `frames_fts` 5 indexed 列（去掉 `name`） | FTS | 有意偏离：v3 无视频 chunk，`frames.name` 不建；且 UPDATE trigger 采用 clear-safe `DELETE+INSERT`，保证字段清空后无陈旧索引命中 |
+| `ocr_text_fts` 3 indexed 列 | `ocr_text_fts` 3 indexed 列 | FTS | 列级 100%；UPDATE trigger 增强为 clear-safe `DELETE+条件 INSERT`（字段清空后删除旧索引） |
+| `accessibility.id` | `accessibility.id` | accessibility | 100% |
+| `accessibility.timestamp` | `accessibility.timestamp` | accessibility | 100% |
+| `accessibility.app_name` | `accessibility.app_name` | accessibility | 100% |
+| `accessibility.window_name` | `accessibility.window_name` | accessibility | 100% |
+| `accessibility.text_content` | `accessibility.text_content` | accessibility | 100% |
+| `accessibility.browser_url` | `accessibility.browser_url` | accessibility | 100% |
+| *(无)* | `accessibility.frame_id` | accessibility | v3 增强（方案 3，screenpipe 用 ±1s 时间窗口 JOIN） |
+| *(无)* | `accessibility.focused` | accessibility | v3 P0 修复（screenpipe 无此列，导致 focused→force OCR limitation） |
+| `accessibility_fts` 3 indexed 列 | `accessibility_fts` 4 indexed 列（+browser_url） | FTS | v3 增强（screenpipe 3 列；v3 加 browser_url 确保 API 语义一致） |
+| `ocr_text_embeddings` | `ocr_text_embeddings` | embeddings | P2+ 可选（P1 不建） |
+| `frames.video_chunk_id` | *(不适用)* | — | v3 无视频录制 |
+| `frames.name` (= video file path) | *(不适用)* | — | v3 无视频 chunk；screenpipe 全栈暴露但零实际消费者使用（TBD-02 核查结论） |
+| `frames.sync_id/machine_id` | *(Post-P3)* | — | v3 当前单 Host |
+
+### 3.0.5 v3 追加字段（非 screenpipe 对齐，Edge-Centric 必需）
+
+| 字段 | 表 | 用途 |
+|------|-----|------|
+| `capture_id` | frames | UUID v7 幂等去重键（Host→Edge 传输） |
+| `image_size_bytes` | frames | 传输与存储管理 |
+| `ingested_at` | frames | 入库时间戳（TTS 测量用） |
+| `status` | frames | 处理队列状态机（PENDING→PROCESSING→COMPLETED/FAILED） |
+| `error_message` | frames | 处理失败原因 |
+| `retry_count` | frames | 重试计数 |
+| `processed_at` | frames | 处理完成时间 |
+| `chat_messages` 全表 | — | v3 Chat 一等能力（screenpipe 无等价表） |
+
+### 3.0.6 Host 上传 Payload
+
+```python
+class CapturePayload(BaseModel):
+    """Host → Edge 上传的单条 capture 数据。"""
+    capture_id: str                    # UUID v7, Host 生成
+    timestamp: float                   # UNIX epoch 秒
+    app_name: Optional[str] = None
+    window_name: Optional[str] = None
+    browser_url: Optional[str] = None
+    device_name: str = ""
+    focused: Optional[bool] = True
+    capture_trigger: Optional[str] = None  # "idle" | "app_switch" | "manual" | "click" (P1); P2+: "window_focus" | "typing_pause" | "scroll_stop" | "clipboard" | "visual_change"
+    accessibility_text: Optional[str] = None
+    content_hash: Optional[str] = None    # sha256 hex，用于 Edge 去重
+    simhash: Optional[int] = None         # 感知哈希，用于近似重复检测
+    # image_data: 通过 multipart/form-data 的 file 字段传输
+```
+
+**字段验证规则：**
+
+| 字段 | 类型约束 | 必填 | 验证规则 |
+|------|----------|------|---------|
+| `capture_id` | string | ✅ | UUID v7 格式；重复时返回 `HTTP 200 + status=already_exists`（幂等成功） |
+| `timestamp` | float | ✅ | UNIX epoch 秒；不得早于当前时间 30 天，不得晚于当前时间 60 秒 |
+| `device_name` | string | ✅ | 非空，最长 128 字符 |
+| `app_name` | string｜null | ❌ | 最长 256 字符 |
+| `window_name` | string｜null | ❌ | 最长 512 字符 |
+| `browser_url` | string｜null | ❌ | 若非 null 则必须为合法 URL；最长 2048 字符 |
+| `capture_trigger` | string｜null | ❌ | P1 枚举：`"idle"` / `"app_switch"` / `"manual"` / `"click"`；P2+ 追加：`"window_focus"` / `"typing_pause"` / `"scroll_stop"` / `"clipboard"` / `"visual_change"`；`window_focus` 按 screenpipe `capture_window_focus` 语义对齐（默认关闭，高频时按需开启）；其他值→ `INVALID_PARAMS` |
+| `content_hash` | string｜null | ❌ | 若非 null 则必须为 `sha256:` 前缀 + 64 位十六进制 |
+| `simhash` | int｜null | ❌ | 若非 null 则必须为非负 64 位整数 |
+| `image_data` | multipart file | ✅ | JPEG（`image/jpeg`）主契约；兼容模式可接收 PNG/WebP，但入库前统一转码为 JPEG；最大 10MB；缺失→ `INVALID_PARAMS` |
+
+**图片格式语义（P1）**：
+- 主采集/主读取链路统一 JPEG：`POST /v1/ingest` 主契约 `image/jpeg`，`frames.snapshot_path` 持久化为 JPEG，`GET /v1/frames/:frame_id` 返回 `image/jpeg`。
+- 若启用兼容输入并接收 PNG/WebP，Edge 在入库前统一转码为 JPEG，不改变读取契约。
+
+**幂等语义：**
+- `capture_id` 重复时，Edge 不重新处理，直接返回 `HTTP 200` + `{"status": "already_exists", ...}`（可附 `request_id`；不返回错误 `code`）。
+- `content_hash` 相同但 `capture_id` 不同时，Edge **仍处理**（不跨 capture_id 去重）。
+
+### 3.0.7 Migration 策略（Q3）
+
+#### 机制：手写 SQL + `schema_migrations` 跟踪表
+
+v3 不引入 Alembic（无 SQLAlchemy ORM 依赖），使用标准库 `sqlite3` + 手写迁移文件，风格对齐 screenpipe 的 sqlx migrate 命名规范。
+
+```sql
+-- 启动时自动创建，记录已执行的迁移
+CREATE TABLE IF NOT EXISTS schema_migrations (
+    version     TEXT PRIMARY KEY,        -- YYYYMMDDHHMMSS，对齐 screenpipe 迁移文件命名
+    description TEXT NOT NULL,
+    applied_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+);
+```
+
+#### 迁移文件规范
+
+```
+openrecall/server/database/migrations/
+├── 20260227000001_initial_schema.sql    -- P1 完整初始表结构（本文件 §3.0.3 所有 DDL）
+└── 20260227000002_add_embeddings.sql    -- P2+，新增 ocr_text_embeddings 表
+```
+
+- 文件名：`YYYYMMDDHHMMSS_描述.sql`，纯 UP migration（不写 DOWN）
+- 每个文件只做一件事，原子操作
+- 已执行的迁移文件**不得修改**（通过 `schema_migrations.version` 检测）
+
+#### 启动时执行逻辑（伪代码）
+
+```python
+def run_migrations(conn: sqlite3.Connection, migrations_dir: Path) -> None:
+    conn.execute(CREATE_SCHEMA_MIGRATIONS_SQL)
+    applied = {row[0] for row in conn.execute("SELECT version FROM schema_migrations")}
+    for sql_file in sorted(migrations_dir.glob("*.sql")):
+        version = sql_file.stem.split("_")[0]
+        if version not in applied:
+            conn.executescript(sql_file.read_text())
+            conn.execute(
+                "INSERT INTO schema_migrations(version, description) VALUES (?, ?)",
+                (version, sql_file.stem)
+            )
+    conn.commit()
+```
+
+#### P1→P2 已知迁移
+
+| 版本 | 文件 | 内容 |
+|------|------|------|
+| 20260227000001 | `initial_schema.sql` | P1 全量 DDL（frames/ocr_text/accessibility/frames_fts/ocr_text_fts/accessibility_fts/chat_messages） |
+| P2+ 时确定 | `add_embeddings.sql` | 新增 `ocr_text_embeddings` 表 |

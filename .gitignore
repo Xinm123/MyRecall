@@ -11,3 +11,4 @@ reports
 .vscode
 .aider*
 .worktrees
+.DS_Store
