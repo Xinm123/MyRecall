@@ -1,83 +1,33 @@
-# MyRecall-v3 待决问题（必须拍板）
+# MyRecall-v3 待决问题（仅未决）
 
-- 日期：2026-02-26
-- 说明：以下问题若不拍板，会直接阻塞实现。
+- 版本：v1.0
+- 日期：2026-03-03
+- 说明：本文件仅保留未决问题；已决项统一维护于 [`decisions.md`](./decisions.md)。
+
+## 编号规则
+
+- **ID 格式**：`OQ-XXX`，连续编号（从头开始，不重复使用）
+- **级别定义**：
+  - `P1`：必须在当前 Phase 完成拍板，否则阻塞阶段验收
+  - `P2`：可在后续 Phase 拍板，不阻塞当前阶段
+- **编号原则**：新增问题时使用当前最大编号 + 1，保持连续性
+
+## 当前未决项
 
 | ID | 级别 | 问题 | 选项 | 建议 | 依据 | 风险 | 截止 |
 |---|---|---|---|---|---|---|---|
-| OQ-001 | P0 | "对齐 screenpipe" 的语义是行为对齐还是实现对齐？ | A 行为对齐（推荐）/ B 实现对齐 | A（已决） | 你的 Edge-Centric 要求与 screenpipe 单机拓扑冲突 | 不拍板会导致方案反复摇摆 | 2026-03-01 |
-| OQ-002 | P0 | Chat API 形态 | A（修订）请求简单 JSON + 响应 SSE 透传 Pi 原生事件 / ~~原 A OpenAI-compatible~~ / B 自定义协议 | A 修订版（已决） | DA-7=A 确定 Pi Sidecar 后，Pi 有 11 种事件类型，OpenAI format 仅能无损映射 1 种；透传 Pi 原生事件避免有损翻译；行业趋势（AG-UI Protocol）验证 agent 场景用自定义事件协议；Chat UI 绿地开发无存量兼容需求 | 若未来需支持第三方 OpenAI-compatible 客户端（不在 P1-P3 范围），需额外适配层 | 2026-03-03 |
-| OQ-003 | P0 | Search 策略（vision-only） | A 完全对齐 screenpipe（FTS+元数据过滤，舍弃 hybrid）/ B 保留 MyRecall hybrid | A（已决，覆盖原003） | 你明确要求“search 完全和 screenpipe 对齐，舍弃 hybrid” | 语义召回能力可能下降 | 2026-03-05 |
-| OQ-004 | P1 | Host 是否采集 accessibility 文本 | A 采集（推荐）/ B 不采集 | A（已决） | 可对齐 screenpipe paired capture，降低 Edge OCR 压力 | A 需处理平台差异 | 2026-03-08 |
-| OQ-005 | P1 | Edge 默认模型策略 | A 本地与云端都支持，按配置切换（P1 不做自动 fallback，推荐）/ B cloud-first 固定 | A（修订后已决） | 与 screenpipe 的 provider 配置切换能力对齐，且不破坏 Edge-Centric | 若 provider 故障将直接返回 timeout/error，需保证错误可见性与恢复流程 | 2026-03-10 |
-| OQ-006 | P1 | 传输安全级别（LAN） | A token + TLS 可选（P1）/ B mTLS 强制（P2+） | A->B（已决） | 当前同 LAN，先保证可用性，再在 P2+ 强制 mTLS | 若迟迟不进入 B 阶段，存在长期内网信任风险 | 2026-03-12 |
-| OQ-007 | P1 | 页面/UI 在 P1~P3 的部署位置 | A 继续部署在 Edge（推荐）/ B 迁移到 Host | A（已决） | 先保障 Edge 主链路与 Chat 能力收敛，避免并行改造 UI 拖慢节奏 | Edge 计算与 UI 资源争用风险上升 | 2026-03-14 |
-| OQ-008 | P1 | 功能开发阶段策略 | A 功能集中在 P1 完成，P2/P3 功能冻结（推荐）/ B 功能按阶段渐进到 P3 | A（已决） | 你明确要求 P2/P3 只做部署与稳定性，不再做功能开发 | P1 范围膨胀导致延期风险上升 | 2026-03-16 |
-| OQ-009 | P1 | Phase 1 执行方式 | A 拆分为串行子阶段并逐段验收（推荐）/ B 继续单阶段并行实现后统一验收 | A（已决） | 你明确要求“串行实现、分别验收”，并要求将原 P1-S2 再拆分为“采集/处理”，同时 Chat 再拆分、E2E 验收独立为最后阶段 | 串行化可能降低局部并行效率 | 2026-03-18 |
-| OQ-010 | P1 | 验收记录要求 | A 每个阶段/子阶段都必须有 Markdown 详细验收记录（推荐）/ B 仅关键阶段记录 | A（已决） | 你明确要求“每个阶段（子阶段）验收都要用 Markdown 详细记录” | 文档维护成本上升 | 2026-03-19 |
-| OQ-011 | P1 | Gate 指标策略 | A 数值阈值适度放宽 + 功能完成度/完善度 Gate 强化（推荐）/ B 维持原严格数值为主 | A（已决） | 你明确要求“数值可宽松一些，但增加功能是否完成/完善的指标和 Gate” | 若功能口径不清会引入主观判定风险 | 2026-03-20 |
-| OQ-012 | P1 | UI Gate 粒度 | A 最小可用 Gate（推荐）/ B 完整 UI 契约测试 | A（已决） | 你已明确选择 A，优先保障 P1 交付节奏，同时补齐 UI 可用性验收 | 可能遗漏复杂交互缺陷，需在 P2/P3 重点监控稳定性 | 2026-03-21 |
-| OQ-013 | P1 | Chat 引用覆盖率策略与统计口径 | A screenpipe 对齐软约束（分阶段目标 + non-blocking，推荐）/ B 分阶段硬门槛 | A（已决） | 你已明确选择 A：取消 citation hard gate，保留分阶段目标用于质量观测与回归 | 若无配套观测与整改机制，引用质量可能长期下滑 | 2026-03-22 |
-| OQ-014 | P0 | 是否删除 fusion_text/caption/keywords | A 删除，完全对齐 screenpipe 索引时零 AI（推荐）/ B 保留 | A（已决） | screenpipe 索引时不做 AI 预计算，Chat grounding 查询时实时推理 | — | 2026-02-27 |
-| OQ-015 | P1 | embedding 是否进入线上 search 主路径 | A 仅离线实验表（推荐）/ B 线上 hybrid | A（已决） | 完全对齐 screenpipe，控制 P1 复杂度 | — | 2026-02-27 |
-| OQ-016 | P1 | v2 数据迁移 | A v3 全新起点不迁移（推荐）/ B 迁移 | A（已决） | 简化 P1 启动 | — | 2026-02-27 |
-| OQ-017 | P0 | 数据模型 schema 对齐策略 | A 主路径对齐 + 差异显式（推荐）/ B 自定义 | A（已决） | P1 对齐 `frames`/`ocr_text`/`frames_fts`/`ocr_text_fts`；`ocr_text_embeddings` 为 P2+ 可选实验表（同名保留，P1 不建） | — | 2026-02-27 |
-| OQ-018 | P0 | ocr_text 关系 + text_source 位置 | A ocr_text 1:1 / B 1:N / ~~A~~ → C Scheme C 分表写入（已决） | C（已决，覆盖 A） | Scheme C：AX 成功 → accessibility 表（无 ocr_text 行）；OCR fallback → ocr_text 表（无 accessibility 行）；text_source 仍在 frames 表。证据：paired_capture.rs:153-154, db.rs:1538 | — | 2026-03-02 |
-| OQ-019 | P0 | P1 ingest 协议复杂度 | A 单次幂等上传 + queue/status 端点（推荐）/ B 4 端点全量 / C 折中 | A（已决） | P1 本机双进程，4 端点解决 P1 不存在的问题；session/chunk/commit/checkpoint 推迟 P2 | P2 LAN 场景需新增分片协议 | 2026-02-27 |
-| OQ-020 | P0 | API 契约定义（P1 端点完整 schema） | A 按 020A 落盘（推荐）/ B 留白 | A（已决） | P1-S4 Gate 必须有完整接口约束 | — | 2026-02-27 |
-| OQ-021 | P0 | `ocr_text` 表 `app_name`/`window_name` 补齐策略 | A 补齐列 + 接受 drift（推荐）/ B 触发器 JOIN frames | A（已决） | 对齐 screenpipe 历史 migration；B 引入不必要子查询耦合 | 与 frames 列潜在 drift（P1 内无修正场景，接受） | 2026-02-27 |
-| OQ-022 | P0 | Search SQL JOIN 策略 | A INNER JOIN 单路径 / ~~A~~ → C 三路径分发（已决） | C（已决，覆盖 A） | Scheme C 下 search 拆为 search_ocr()（INNER JOIN ocr_text）+ search_accessibility()（accessibility 表 + accessibility_fts）+ search_all()（并行合并 by timestamp DESC）；content_type 参数路由 | — | 2026-03-02 |
-| OQ-023 | P1 | Migration 策略 | A 手写 SQL + `schema_migrations` 表（推荐）/ B Alembic / C PRAGMA user_version | A（已决） | 零额外依赖；对齐 screenpipe sqlx migrate 命名规范 | — | 2026-02-27 |
-| OQ-024 | P0 | API 命名空间冻结 | A /v1/* 统一 + /api/* 仅用于 v2（推荐）| A（已决） | 对外 HTTP 契约统一 `/v1/*`；`/api/*` 仅用于 v2 历史描述，不纳入 P1~P3 Gate 与客户端默认调用路径 | — | 2026-02-26 |
-| OQ-025 | P0 | accessibility 表架构（Scheme C） | A P0 建表 + focused 修复 + frame_id 方案 3（推荐，已决）/ B 对齐 screenpipe 不加 focused / C P1+ 延迟建表 | A（已决） | (1) accessibility 表 P0 建，paired_capture 按 text_source 分表写入；(2) 新增 focused 列修复 screenpipe 的 focused→force OCR 限制（db.rs:1870-1872）；(3) frame_id DEFAULT NULL 精确关联 frames（paired_capture 填入，未来独立 walker 留 NULL） | DDL 复杂度+1（多一张表+FTS+triggers）；P0 范围略增 | 2026-03-02 |
-| OQ-026 | P1 | P1 Search UI 分页模式 | A 加载更多（对齐 screenpipe，推荐）/ B 跳页（需加 offset 上限约束） | A（已决） | screenpipe `search-modal.tsx` 纯"加载更多"（`hasMoreOcr/loadMoreOcr`），offset 步长=limit，实际不超过几百；跳页模式下 `search_all()` 过量拉取内存风险不可控（offset=10000 时各路径拉 10020 行）；P2+ keyset cursor 可彻底替代 | 若未来需跳页，需补 `offset max` 约束并在 `search_all()` 加运行时 reject | 2026-03-02 |
+| OQ-027 | P1 | 是否在 P2 启动 keyset cursor 分页替代 `offset`（降低 `search_all` 过量拉取） | A. 继续 offset；B. P2 引入 keyset（`before_timestamp`）；C. P3 再评估 | B | `content_type=all` 当前为 `limit+offset` 过量拉取；规模增长后内存成本升高 | 若继续 offset，长窗口查询可能恶化 | 2026-04-10 |
+| OQ-028 | P1 | 是否在 P1-S7 后启动 DA-8B（结构化 citation 后处理） | A. 保持 DA-8A；B. 启动 DA-8B；C. P2 再评估 | 取决于 S7 覆盖率结果（默认 B） | gate_baseline 对引用覆盖率仅 soft KPI；若长期低于 92% 需收敛质量 | 引用可点击但结构化检索追踪能力不足 | 2026-03-22 |
+| OQ-029 | P2 | P2 是否引入 Power Profile（动态采样频率） | A. 不引入；B. 引入并重定义 SLO；C. 仅实验不入主线 | A（当前） | `gate_baseline.md` 已声明若引入必须重定义 TTS/丢失率阈值 | 未重定义口径会导致 Gate 判定失真 | 2026-04-15 |
+| OQ-030 | P2 | accessibility 独立 walker（非 paired_capture）是否进入 P2 范围 | A. 不进入；B. 进入并补性能评估；C. Post-P3 | A（当前） | DEC-025A 已支持 schema，但 P1 目标是 paired_capture 闭环 | 提前引入会扩大 P2 范围，冲击功能冻结策略 | 2026-04-20 |
 
-## 需实验清单
+## 需实验 / 需查证（未形成拍板）
 
-1. AX-first 是否显著提升检索质量（需实验）。
-2. 事件驱动捕获在多显示器下的 CPU 上限（需实验）。
-3. Debian 端 OCR/VL 组合在 24h soak 中的稳定性（需查证）。
+1. AX-first 在多应用场景下对检索召回质量的净收益区间。
+2. 多显示器高频事件触发下 Host CPU 上限与误触发率。
+3. Debian 上 RapidOCR 与候选本地 VL 模型组合的长期稳定性。
 
-## 已拍板结论（2026-02-26）
+## 维护规则
 
-1. OQ-001 = A：按“行为/能力对齐”执行，不追求与 screenpipe 的部署拓扑一致。
-2. OQ-002 = A（修订）：Chat 请求为简单 JSON，响应为 SSE 透传 Pi 原生事件（不做 OpenAI format 翻译）。Tool 以 Pi SKILL.md 格式定义。
-3. OQ-003 = A（覆盖）：Search 完全对齐 screenpipe（vision-only），线上仅保留 FTS+过滤，舍弃 hybrid。
-4. OQ-004 = A：Host 采集 accessibility 文本（仅采集，不做推理），Edge 继续 AX-first + OCR-fallback。
-5. OQ-005 = A（修订）：Edge 支持本地与云端模型，按配置切换；P1 不做自动 fallback，对齐 screenpipe 的 provider 选择能力。
-6. OQ-006 = A->B：P1 使用 token + TLS 可选，P2+ 升级为 mTLS 强制。
-7. OQ-007 = A：P1~P3 页面继续在 Edge，Host 不负责 UI；UI 迁移到 Host 仅作为 Post-P3 可选项。
-8. OQ-008 = A：功能开发集中在 P1 完成；P2/P3 功能冻结，仅做部署与稳定性。
-9. OQ-009 = A：Phase 1 按 P1-S1~S7 串行推进，S2/S3 分别为采集/处理，Chat 拆为 S5/S6，S7 为独立端到端验收阶段。
-10. OQ-010 = A：每个阶段/子阶段验收都必须有 Markdown 详细记录，并作为 Gate 输入。
-11. OQ-011 = A：Gate 采用双轨策略：数值阈值适度放宽，功能完成度/完善度指标强化。
-12. OQ-012 = A：UI Gate 采用“最小可用集”，在 P1 按子阶段强化 UI 可用性/可解释性验收，不做 UI 重构。
-13. OQ-013 = A：引用覆盖率采用 soft KPI（P1-S5>=85%，P1-S7/P2/P3>=92%，Stretch 95%），不作为 Gate Fail 条件；DA-8=A 口径为 deep link（默认 `myrecall://frame`，缺少 `frame_id` 时回退 `myrecall://timeline`）可解析且可回溯，DA-8=B 结构化 citations 为可选增强；统一口径以 `gate_baseline.md` 为准。
-
-### 已拍板结论（2026-02-27）
-
-14. OQ-014 = A：删除 fusion_text/caption/keywords 索引时预计算，完全对齐 screenpipe vision-only 处理链路（索引时零 AI 调用，Chat grounding 由 LLM 查询时实时推理）。
-15. OQ-015 = A：embedding 保留为离线实验表 `ocr_text_embeddings`（对齐 screenpipe），不进入线上 search 主路径。
-16. OQ-016 = A：v3 全新数据起点，不做 v2 数据迁移。
-17. OQ-017 = A：数据模型采用“主路径对齐 + 差异显式”策略：P1 对齐 `frames`/`ocr_text`/`frames_fts`/`ocr_text_fts` 的表名与核心字段；`ocr_text_embeddings` 为 P2+ 可选实验表（同名保留，P1 不建）；仅追加 Edge-Centric 必需字段（`capture_id`/`status`/`retry_count` 等）与 `chat_messages` 表。
-18. OQ-018 = C（覆盖 A）：Scheme C 分表写入 — AX 成功帧写入 `accessibility` 表（无 `ocr_text` 行），OCR fallback 帧写入 `ocr_text` 表（无 `accessibility` 行）；`text_source` 仍在 `frames` 表。
-
-### 已拍板结论（2026-02-27，续）
-
-19. OQ-019 = A：P1 ingest 协议采用单次幂等上传（`POST /v1/ingest`）+ 队列状态端点（`GET /v1/ingest/queue/status`）。重复 `capture_id` 返回 `200 OK + "status": "already_exists"`（幂等语义，X 选项）。`GET /v1/ingest/queue/status` 返回 pending/processing/completed/failed 计数，供 Host client 决策与 P1-S1 Gate 验收（Y 选项）。session/chunk/commit/checkpoint 4 端点推迟到 P2 LAN 弱网场景实现，不破坏 P1 契约。
-
-20. OQ-020 = A：API 契约定义（P1 端点完整 schema，020A）：`/v1/search` 合并 `/v1/search/keyword`（P1 无 embedding，拆分无意义）；search response 同时返回 `file_path`（Edge 本地路径，对齐 screenpipe）和 `frame_url`（`/v1/frames/:id`，P2+ 跨机器可用）；`GET /v1/frames/:frame_id` 返回图像二进制；`GET /v1/frames/:frame_id/metadata` 返回 JSON；统一错误响应增加 `code`（SNAKE_CASE）和 `request_id`（UUID v4），不对齐 screenpipe（v3 更严谨）；Chat tool schema 已由 DA-3/DA-7 决定（Pi SKILL.md 格式）。
-
-21. OQ-021 = A：`ocr_text` 表新增 `app_name`/`window_name` 两列（对齐 screenpipe 历史 migration 20240716/20240815）。写入时从 `CapturePayload` 取值，与 `frames` 同源。接受与 `frames` 列潜在 drift（P1 内无 frames 修正场景，对齐 screenpipe 行为）。
-
-22. ~~OQ-022 = A~~（已被 2026-03-02 的 OQ-022 = C 覆盖，保留为历史记录）：Search SQL 主路径使用 `frames INNER JOIN ocr_text`（无条件）；`frames_fts`/`ocr_text_fts` 按需追加 JOIN；不使用 LEFT JOIN（对齐 screenpipe 性能注释 db.rs line 3133）；INNER JOIN 自然排除未处理帧，语义正确。
-
-23. OQ-023 = A：Migration 策略采用手写 SQL + `schema_migrations` 跟踪表，零额外依赖；文件命名 `YYYYMMDDHHMMSS_描述.sql` 对齐 screenpipe；P1 全量 DDL 放入 `20260227000001_initial_schema.sql`；`ocr_text_embeddings` 表推迟至 P2+ migration 新增；已执行迁移不得修改。
-
-24. OQ-024 = A：API 命名空间冻结：v3 对外 HTTP 契约统一 `/v1/*`；`/api/*` 仅用于 v2 历史描述，不纳入 P1~P3 Gate 与客户端默认调用路径。
-
-### 已拍板结论（2026-03-02）
-
-25. OQ-022 = C（覆盖 A）：Search SQL 拆为三路径 — search_ocr()（INNER JOIN ocr_text，content_type=ocr）、search_accessibility()（accessibility + accessibility_fts，content_type=accessibility）、search_all()（并行合并 by timestamp DESC，content_type=all 默认）。v3 不做 screenpipe 的 focused/browser_url → force content_type=ocr 降级。
-26. OQ-025 = A：accessibility 表 P0 建表（Scheme C），含 focused 列（P0 修复 screenpipe 限制）+ frame_id DEFAULT NULL（方案 3，paired_capture 精确关联）。DDL 对齐 screenpipe migration 20250202000000 并增强。
-27. OQ-026 = A：P1 Search UI 采用"加载更多"分页模式（对齐 screenpipe `search-modal.tsx`），offset 单调递增步长=limit，实际不超过几百。`search_all()` 过量拉取内存可控前提成立；P2+ 可升级为 keyset cursor 分页彻底消除过量拉取。
+- 任何问题一旦拍板，必须迁移到 `decisions.md` 并从本文件移除。
+- 本文件禁止追加“已决结论”长清单。

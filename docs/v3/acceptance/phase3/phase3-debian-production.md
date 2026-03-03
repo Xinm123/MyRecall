@@ -6,6 +6,14 @@
 - 版本/提交：TBD
 - 状态：`Planned`
 
+## 0. 规范引用 IDs
+
+- 决策：DEC-006A, DEC-008A, DEC-010A
+- 数据：DB-001
+- API：API-100, API-200, API-500
+- Gate：GATE-CITATION-001
+- 链接：`decisions.md` / `data_model.md` / `api_contract.md` / `gate_baseline.md`
+
 ## 1. 范围与目标
 
 - 范围：Debian 生产形态部署与运维闭环验证，功能冻结（不新增业务功能）。

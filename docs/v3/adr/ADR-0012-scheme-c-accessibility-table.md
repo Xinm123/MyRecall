@@ -1,5 +1,6 @@
 # ADR-0012 Scheme C：accessibility 表分表写入 + focused P0 修复
 
+- 版本：v1.0
 - 状态：Accepted
 - 日期：2026-03-02
 - 覆盖：018A（部分）、022A（部分）

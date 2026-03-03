@@ -1,5 +1,6 @@
 # ADR-0001 Edge-Centric 职责边界
 
+- 版本：v1.0
 - 状态：Accepted
 - 日期：2026-02-26
 

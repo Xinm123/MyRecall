@@ -1,5 +1,6 @@
 # ADR-0005 Search 完全对齐 screenpipe（vision-only）
 
+- 版本：v1.0
 - 状态：Accepted
 - 日期：2026-02-26
 

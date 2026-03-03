@@ -1,5 +1,6 @@
 # ADR-0004 Chat RAG 编排放在 Edge（Pi Sidecar 架构）
 
+- 版本：v1.1
 - 状态：Accepted（修订）
 - 日期：2026-02-26（初版）；2026-03-01（修订：DA-2/DA-7/DA-8/DA-9 决策落地）
 

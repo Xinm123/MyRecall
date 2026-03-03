@@ -1,5 +1,6 @@
 # ADR-0011 Phase 1 UI Gate 采用最小可用集
 
+- 版本：v1.0
 - 状态：Accepted
 - 日期：2026-02-26
 
