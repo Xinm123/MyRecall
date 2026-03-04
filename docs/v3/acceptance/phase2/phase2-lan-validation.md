@@ -35,11 +35,11 @@
 
 ### 2.1 指标口径与样本说明（必填）
 
-- 口径基线版本（默认 `MyRecall/docs/v3/gate_baseline.md`）：v1.1
+- 口径基线版本（默认 `MyRecall/docs/v3/gate_baseline.md`）：v1.3
 - 指标样本数：
   - Capture（丢失率/重放一致性）：>= 200 captures（建议 >= 1000）
   - Search：>= 200 queries
-  - Chat 首 token：>= 100 requests
+  - Chat 请求成功率：>= 100 requests
   - Citation Coverage（Soft KPI）：>= 100 个问答样本
 - 统计时间窗：
   - 主窗：连续 24h soak

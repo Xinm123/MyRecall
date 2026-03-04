@@ -3,6 +3,8 @@ status: draft
 owner: pyw
 last_updated: 2026-03-03
 depends_on:
+  - open_questions.md
+references:
   - spec.md
   - gate_baseline.md
 ---

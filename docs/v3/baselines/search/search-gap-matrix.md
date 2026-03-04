@@ -3,6 +3,7 @@
 > 生成日期：2026-03-02
 > 比较对象：screenpipe（仅屏幕链路）↔ MyRecall-v3（设计 + 实现）
 > 决策记录：D1=B, D2=A, D3=A, TBD-01=A, TBD-02=关闭, D4=Scheme C（025A）
+> 证据编号映射：`E-01..E-11/E-25` 来自 `screenpipe-search-fact-baseline-screen-only.md`；`E-12..E-17` 来自 `myrecall-v3-search-current-baseline.md`。
 
 ## 1. 设计层差异（v3 spec vs screenpipe）
 
@@ -12,9 +13,9 @@
 | #    | 维度                     | screenpipe                                | v3 设计                             | 对齐      | 证据           | 处置              |
 | ---- | ---------------------- | ----------------------------------------- | --------------------------------- | ------- | ------------ | --------------- |
 | G-01 | content_type 参数        | 有（all/ocr/audio/input/accessibility）      | 有（all/ocr/accessibility，025A）       | 100% 对齐  | [E-01][E-25] | Scheme C 引入三路径分发，content_type 参数已对齐 |
-| G-02 | frame_name 参数          | 有（零实际使用）                                  | 无                                 | 有意忽略    | [E-20][E-21] | TBD-02 已关闭，安全忽略 |
+| G-02 | frame_name 参数          | 有（零实际使用）                                  | 无                                 | 有意忽略    | [E-01][E-13] | TBD-02 已关闭，安全忽略 |
 | G-03 | /search/keyword 独立端点   | 有                                         | 合并入 /v1/search                    | 有意合并    | [E-03][E-13] | P1 不暴露独立端点      |
-| G-04 | browser_url 匹配语义       | FTS token 序列匹配                            | ~~前缀匹配~~ → FTS token 序列（TBD-01=A） | 100%    | [E-18][E-19] | spec 措辞已修正      |
+| G-04 | browser_url 匹配语义       | FTS token 序列匹配                            | ~~前缀匹配~~ → FTS token 序列（TBD-01=A） | 100%    | [E-01][E-13] | spec 措辞已修正      |
 | G-05 | FTS query sanitization | sanitize_fts5_query + expand_search_query | ~~未规定~~ → P1 两个都实现（D1=B）          | 100%    | [E-08]       | data-model.md §3.0.3（FTS 查询规范化） |
 | G-06 | COUNT 查询               | 独立 count_search_results()                 | ~~未规定~~ → 独立 COUNT（D3=A）          | 100%    | [E-09]       | data-model.md §3.0.3（COUNT 查询） |
 | G-07 | 搜索缓存                   | LRU cache（全参数哈希）                          | P1 不实现（D2=A），P2 补                 | P2 对齐   | [E-02]       | 无阻塞             |

@@ -1,17 +1,18 @@
 ---
 status: draft
 owner: pyw
-last_updated: 2026-03-03
+last_updated: 2026-03-04
 depends_on:
-  - spec.md
   - gate_baseline.md
   - open_questions.md
+references:
+  - spec.md
 ---
 
 # MyRecall-v3 路线图（Edge-Centric, vision-only）
 
 - 版本：Draft v0.1
-- 日期：2026-02-26
+- 首版日期：2026-02-26
 - 节奏原则：每阶段都可独立验收；Edge 必须从 Day 1 参与。
 
 ## 0. 已锁定决策
@@ -47,12 +48,12 @@ depends_on:
     - 高频事件抑制链路（对齐 screenpipe）：共享去抖（`min_capture_interval_ms`，默认 200ms）+ 内容去重（非 `idle/manual`）+ 有界通道 lag 折叠
     - Timeline 可见 capture 上传中/已入队状态
   - Gate：
-    - 切窗场景 95% capture 在 3 秒内入 Edge 队列
-    - 每分钟 300 次事件压测下 Host CPU < 25%，丢包率 < 0.3%
-    - 事件触发清单（idle/app_switch/manual/click）覆盖率 >= 95%
+    - 入队时延 Gate：压测窗口（5 分钟）`enqueue_latency_p95 <= 3s`（`eligible_events >= 200`）
+    - 每分钟 300 次事件压测下丢包率 < 0.3%
+    - 触发覆盖 Gate：`trigger_coverage = covered_trigger_types / 4 = 100%`（`idle/app_switch/manual/click` 四类均需命中；每类样本 >= 20）
     - 去抖 Gate：同 monitor 连续 `app_switch/click` 入库间隔 < `min_capture_interval_ms`（200ms）的违规数 = 0
-    - 去重 Gate：重复内容压测下可观测到 dedup skip，且 30s 保底写入持续成立（避免 timeline 空洞）
-    - 背压 Gate：触发通道 lag 时发生折叠降级（collapse）而非无界堆积；处理链路不出现持续性 backlog 失控
+    - 去重 Gate：重复内容压测窗口（5 分钟）满足 `dedup_skip_rate = dedup_skipped / dedup_eligible >= 95%`（`dedup_eligible >= 500`），且 `inter_write_gap_sec` 满足 `P99 <= 30s` 与 `max <= 45s`
+    - 背压 Gate：过载注入窗口（5 分钟）满足 `collapse_trigger_count >= 1`、`queue_saturation_ratio <= 10%`（`queue_depth >= 0.9 * queue_capacity` 采样占比）且 `overflow_drop_count = 0`
     - 新 capture 在 timeline 可见性通过率 >= 95%
 - P1-S3（处理，2026-03-09 ~ 2026-03-11）
   - 交付：
@@ -74,12 +75,13 @@ depends_on:
     - 返回结构包含 frame/citation 关键字段，`type` 字段区分 `OCR`/`UI`
     - Search 页过滤项与 API 参数 1:1 映射，结果可回溯到 frame/citation
   - Gate：
-    - 精确词查询不低于对齐基线
     - Search P95 <= 1.8s（标准时间窗）
     - `/v1/search` 过滤参数契约完成率 = 100%（含 `content_type`）
     - Search SQL 三路径分发一致性 = 100%（search_ocr：INNER JOIN ocr_text；search_accessibility：accessibility + FTS；search_all：并行合并）
     - `focused` 过滤在 `search_accessibility()` 正确性 = 100%（不降级为 OCR-only）
-    - 检索结果引用字段（capture_id/frame_id/timestamp）完整率 = 100%
+    - OCR 检索结果引用字段完整率 = 100%（`frame_id`/`timestamp`，Hard Gate）
+    - UI 检索结果引用字段完整率 = 100%（`id`/`timestamp`，Hard Gate）
+    - 观测 KPI（non-blocking）：OCR 检索结果 `capture_id` 覆盖率目标 >= 99%（未达标需提交整改动作）
     - Search UI 过滤项契约映射完成率 = 100%
     - 检索结果点击回溯成功率 >= 95%
 - P1-S5（Chat-1 Grounding 与引用，2026-03-14 ~ 2026-03-16）
@@ -99,10 +101,11 @@ depends_on:
     - Provider/model 路由（通过 Pi `--provider`/`--model` + `models.json` 配置，UI 配置页面切换）
     - Pi 事件流式输出（SSE 透传 Pi 原生 11 种事件类型）
     - PiManager watchdog（idle timeout、crash auto-restart、orphan cleanup）
-    - Provider timeout 处理（>15s first-token → abort → timeout error）；P1 不做 auto-fallback（DA-5，对齐 screenpipe）
+    - Provider timeout 处理（180s 请求 watchdog → timeout error；不做 auto-fallback；超时不强制 abort，保留用户手动中断）
     - UI 可见 provider/model badge + timeout/error notification + Pi 健康状态
   - Gate：
-    - Chat 首 token P95 <= 3.5s
+    - Chat 请求成功率 >= 98%（timeout/error 计入失败；用户主动 abort 不计入样本）
+    - 观测 KPI（non-blocking）：Chat 首 token P95 <= 3.5s
     - Provider 切换可重复通过
     - 路由切换场景覆盖率 = 100%（provider 切换 + timeout 错误，不含 auto-fallback）
     - 流式输出协议一致性用例通过率 = 100%
@@ -114,7 +117,7 @@ depends_on:
     - UI 关键路径回归报告（timeline -> search -> chat -> citation -> frame）
   - Gate：
     - TTS P95 <= 12s
-    - S1~S6 回归全通过
+    - S1~S6 的 Hard Gate/SLO Gate 回归全通过（Soft KPI 仅记录偏差与整改动作）
     - P1 功能清单完成率 = 100%
     - P1 验收记录完整率 = 100%
     - UI 关键路径脚本通过率 = 100%

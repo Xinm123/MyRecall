@@ -129,14 +129,15 @@ tests/
 | S6-2 | Watchdog | `chat/manager.py`（扩展） | ~80 | 5 min idle timeout → 优雅关闭 Pi 进程；crash auto-restart（max 3 in 60s，超限则报告 fatal）；orphan cleanup（启动时读取 `{pi_workdir}/manager.pid`，验证 cmdline 匹配后 kill 该 PID；不使用 `pkill -f` 以避免误杀其他实例的 Pi 进程） |
 | S6-3 | Error event 处理 | `chat/protocol.py` + `chat/manager.py`（扩展） | ~60 | `response.success=false` → SSE error event frame；Pi crash（stdout EOF）→ SSE interrupt frame + 错误描述；Manager 日志记录错误上下文 |
 | S6-4 | Streaming 协议测试 | `tests/test_chat_protocol.py` | ~150 | Event ordering 验证（message_start → message_update* → message_end）；嵌套验证（turn_start 包含 agent_start/end）；termination 验证（response 事件必须是最后一个）；error frame 格式验证 |
-| S6-5 | Provider timeout | `chat/manager.py`（扩展） | ~40 | First-token timeout >15s → abort 当前请求 → 返回 timeout error event；**不做自动 fallback**（DA-5，对齐 screenpipe）；日志记录 timeout 上下文 |
+| S6-5 | Provider timeout | `chat/manager.py`（扩展） | ~40 | 请求 watchdog 180s → timeout error event；**不做自动 fallback**（DA-5，对齐 screenpipe）；超时不强制 abort（保留手动中断）；日志记录 timeout 上下文 |
 | S6-6 | UI 路由状态 | `templates/chat.html`（扩展） | ~70 | Provider/model badge 显示当前配置；error/timeout notification（toast 或 inline 消息）；Pi 进程健康状态指示器（connected/disconnected/error） |
 
 **P1-S6 小计：~500 行**
 
 ### S6 验收对照
 
-- Chat 首 token P95 <= 3.5s
+- Chat 请求成功率 >= 98%（timeout/error 计入失败；用户主动 abort 不计入样本）
+- 观测 KPI（non-blocking）：Chat 首 token P95 <= 3.5s
 - 路由切换在故障注入下可重复通过
 - 路由切换场景覆盖率 = 100%（注意：P1 不含 auto-fallback 场景，覆盖 provider 切换 + timeout 错误）
 - 流式输出协议一致性用例通过率 = 100%
@@ -152,7 +153,7 @@ tests/
 | S7-2 | Citation 覆盖率评估 | 评估报告（非代码） | — | 在 grounding 问题集（>= 80 条）上统计引用覆盖率；评估 DA-8=A（提示词驱动）的实际效果 |
 | S7-3 | DA-8 B 阶段决策 | ADR 更新或新建 | — | 根据 S7-2 评估结果决定：是否需要结构化 citation 后处理（DA-8 B 阶段）；若需要，产出实现方案 |
 | S7-4 | S1-S6 回归 | 回归报告 | — | 逐项确认 S1~S6 Gate 结果仍为 Pass |
-| S7-5 | 性能基线 | 性能报告 | — | TTS P95、Chat first-token P95、Search P95 基线数据 |
+| S7-5 | 性能基线 | 性能报告 | — | TTS P95、Search P95、Chat first-token P95（观测）基线数据 |
 
 **P1-S7 小计：~200 行（代码），其余为评估/报告**
 

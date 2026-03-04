@@ -2,7 +2,8 @@
 status: active
 owner: pyw
 last_updated: 2026-03-03
-depends_on:
+depends_on: []
+references:
   - spec.md
   - roadmap.md
 ---

@@ -28,7 +28,8 @@ Frontend → POST /v1/chat {message, session_id, images?} → Edge Python Manage
 
 - **请求**：简单 JSON `{message, session_id, images?}`（不采用 OpenAI-compatible request format）。
 - **响应**：HTTP SSE 透传 Pi 原生事件，不做 OpenAI format 翻译。
-- **Pi 原生事件类型**（11 种）：`message_update`（text delta）、`tool_execution_start/update/end`、`agent_start/end`、`turn_start/end`、`message_start/end`、`response`（success/error）。
+- **Pi 顶层事件类型**（核心 11 种）：`message_update`、`tool_execution_start/update/end`、`agent_start/end`、`turn_start/end`、`message_start/end`、`response`（success/error）。
+- **事件分层约定**：`message_update` 内层的 `assistantMessageEvent.type` 子事件（如 `text_delta`、`thinking_start`、`thinking_delta`、`thinking_end`、`content_block_delta`）单独解析，不与顶层事件枚举混用；运行时若出现未知扩展顶层事件，按前向兼容处理（透传 + 记录）。
 - **内层协议**（Manager ↔ Pi）：Pi stdin/stdout JSON Lines（对齐 screenpipe `pi.rs`）。
 - **外层协议**（前端 ↔ Edge）：HTTP SSE（拓扑适配层，因 MyRecall 前后端跨进程通信，screenpipe 为 Tauri IPC 直连）。
 

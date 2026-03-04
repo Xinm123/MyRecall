@@ -1,15 +1,17 @@
 ---
 status: active
 owner: pyw
-last_updated: 2026-03-03
+last_updated: 2026-03-04
 depends_on:
+  - open_questions.md
+references:
   - spec.md
   - roadmap.md
 ---
 
 # MyRecall-v3 Gate 指标口径基线（SSOT）
 
-- 版本：v1.1
+- 版本：v1.3
 - 生效日期：2026-02-26
 - 适用范围：`spec.md`、`roadmap.md`、`adr/`、`acceptance/`
 
@@ -36,6 +38,74 @@ depends_on:
 
 - 说明：Chat 引用覆盖率不参与 Gate Pass/Fail 判定；若低于目标，必须在验收记录中给出整改动作与回归计划。
 
+## 3.1 Search 引用字段完整率（P1-S4）
+
+- 目的：统一 `/v1/search` 在 `OCR`/`UI` 两类结果下的引用字段验收口径，避免将类型化结果误判为统一字段模型。
+- 判定类型：
+  - `OCR 引用字段完整率`：**Hard Gate**
+  - `UI 引用字段完整率`：**Hard Gate**
+  - `OCR capture_id 覆盖率`：**Soft KPI**（non-blocking）
+- 阈值（P1-S4）：
+  - OCR 引用字段完整率 = 100%
+  - UI 引用字段完整率 = 100%
+  - OCR capture_id 覆盖率目标 >= 99%（未达标需提交整改动作，不触发 Gate Fail）
+
+定义：
+
+1. `OCR 引用字段完整率`（Hard Gate）
+- 公式：`ocr_ref_completeness = (OCR 结果中 frame_id 与 timestamp 同时非空的条数 / OCR 结果总条数) * 100%`
+
+2. `UI 引用字段完整率`（Hard Gate）
+- 公式：`ui_ref_completeness = (UI 结果中 id 与 timestamp 同时非空的条数 / UI 结果总条数) * 100%`
+
+3. `OCR capture_id 覆盖率`（Soft KPI）
+- 公式：`ocr_capture_id_coverage = (OCR 结果中 capture_id 非空的条数 / OCR 结果总条数) * 100%`
+- 说明：`capture_id` 为 v3 增强可选字段，不属于 Search 对齐硬门槛；该指标仅用于质量观测与回归。
+
+## 3.2 Capture 去重与背压口径（P1-S2）
+
+- 目的：将 P1-S2 的去重/背压 Gate 从描述性判定收敛为自动化可计算指标。
+- 统一压测窗口：5 分钟（重复内容压测与过载注入均使用该窗口）。
+
+判定类型与阈值（P1-S2）：
+
+1. `enqueue_latency_p95`（Hard Gate）
+- 公式：`enqueue_latency_sec = edge_enqueued_ts - event_ts`，按样本分布计算 P95。
+- 阈值：`P95(enqueue_latency_sec) <= 3s`
+- 最小样本：`eligible_events >= 200`
+
+2. `trigger_coverage`（Hard Gate）
+- 公式：`trigger_coverage = covered_trigger_types / 4`（目标触发类型固定为 `idle/app_switch/manual/click`）。
+- 阈值：`= 100%`
+- 最小样本：四类触发均命中，且每类样本 `>= 20`
+
+3. `dedup_skip_rate`（Hard Gate）
+- 公式：`dedup_skip_rate = (dedup_skipped / dedup_eligible) * 100%`
+- 阈值：`>= 95%`
+- 最小样本：`dedup_eligible >= 500`
+
+4. `inter_write_gap_sec`（Hard Gate）
+- 公式：相邻两次成功写入时间差（秒）构成样本分布。
+- 阈值：`P99 <= 30s` 且 `max <= 45s`
+- 最小样本：成功写入样本 `>= 100`
+
+5. `queue_saturation_ratio`（Hard Gate）
+- 公式：`queue_saturation_ratio = (queue_depth >= 0.9 * queue_capacity 的采样数 / 总采样数) * 100%`
+- 阈值：`<= 10%`
+- 最小样本：队列深度采样点 `>= 300`
+
+6. `collapse_trigger_count`（Hard Gate）
+- 公式：过载注入窗口内 collapse 触发次数计数。
+- 阈值：`>= 1`
+
+7. `overflow_drop_count`（Hard Gate）
+- 公式：过载注入窗口内因通道溢出导致丢弃的 capture 数。
+- 阈值：`= 0`
+
+8. `Host CPU`（Soft KPI，non-blocking）
+- 说明：CPU 使用率仅用于趋势观测与容量评估，不作为跨设备 Gate 判定条件。
+- 记录要求：验收报告需附硬件基线（机型/芯片/核心数）与负载背景（后台任务、显示器配置）。
+
 ## 4. 指标定义（统一公式）
 
 1. `Citation Coverage`（DA-8A 默认口径）
@@ -53,14 +123,20 @@ depends_on:
 - 终点：Edge API 返回最后一个字节。
 - 标准时间窗：查询窗口 <= 24h（超大时间窗单独统计，不纳入 Gate）。
 
-4. `Chat 首 token P95`
+4. `Chat 请求成功率`（P1-S6 主 Gate）
+- 公式：`chat_success_rate = (成功请求数 / 总请求数) * 100%`
+- 成功判定：请求在 180s 内完成并返回成功响应（流式完成或等价成功终止事件）。
+- 失败判定：timeout（180s）、provider error、Pi crash、协议错误等导致请求未成功完成。
+- 计数规则：timeout 必须计入分母且记为失败，不得剔除；用户主动 abort 不计入样本。
+
+5. `Chat 首 token P95`（观测 KPI，non-blocking）
 - 起点：Edge Chat API 收到请求。
 - 终点：流式通道发出第一个 token。
 
-5. `Capture 丢失率`
+6. `Capture 丢失率`
    - 公式：`loss_rate = (应到达 capture 数 - 成功 commit capture 数) / 应到达 capture 数`
 
-6. **频率假设与 Power Profile 备注**
+7. **频率假设与 Power Profile 备注**
    - P1 所有 SLO 均基于固定捕获频率假设（由 `OPENRECALL_CAPTURE_INTERVAL` 配置）。
    - screenpipe v0.3.160 引入 Power Profile（Performance/Balanced/Saver，`power/profile.rs`），动态调整捕获间隔。MyRecall-v3 P1 不实现此能力。
    - **若 P2+ 引入 Power Profile，TTS P95 与 Capture 丢失率的 SLO 阈值须按最坏情况（Saver 模式）重新定义。**
@@ -72,7 +148,8 @@ depends_on:
 - 最小样本数（低于该值不得做有效判定）：
   - TTS：>= 200 captures
   - Search：>= 200 queries
-  - Chat 首 token：>= 100 requests
+  - Chat 请求成功率：>= 100 requests
+  - Chat 首 token（观测，可选）：>= 100 requests（若输出该指标）
   - Citation Coverage（Soft KPI）：
     - P1-S5：>= 80 个问答样本
     - P1-S7 / Phase2 / Phase3：>= 100 个问答样本
