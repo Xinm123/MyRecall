@@ -608,6 +608,17 @@ total = count_search_ocr(params) + count_search_accessibility(params)
 
 ### 3.0.6 Host 上传 Payload
 
+#### Capture 时序参数契约（配置层，不入 Payload）
+
+| 参数 | 单位 | P1 默认 | 语义 | 兼容规则 |
+|---|---|---:|---|---|
+| `min_capture_interval_ms` | ms | 200 | 全触发共享最小间隔去抖 | — |
+| `idle_capture_interval_ms` | ms | 30000 | 无事件时触发 `idle` fallback 的最大空窗 | — |
+| `OPENRECALL_CAPTURE_INTERVAL` | s | legacy | 兼容输入，不作为 P1 主触发机制定义 | 仅当未显式设置 `idle_capture_interval_ms` 时，映射为 `idle_capture_interval_ms = OPENRECALL_CAPTURE_INTERVAL * 1000` |
+
+- 优先级：`idle_capture_interval_ms`（显式） > `OPENRECALL_CAPTURE_INTERVAL` 映射 > `idle_capture_interval_ms` 默认值 `30000`。
+- 对齐说明：参数名、单位与默认值对齐 screenpipe 运行时代码口径（`idle_capture_interval_ms=30000`）。
+
 ```python
 class CapturePayload(BaseModel):
     """Host → Edge 上传的单条 capture 数据。"""

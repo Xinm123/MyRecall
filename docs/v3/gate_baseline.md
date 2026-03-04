@@ -11,8 +11,8 @@ references:
 
 # MyRecall-v3 Gate 指标口径基线（SSOT）
 
-- 版本：v1.3
-- 生效日期：2026-02-26
+- 版本：v1.4
+- 生效日期：2026-03-04
 - 适用范围：`spec.md`、`roadmap.md`、`adr/`、`acceptance/`
 
 ## 1. 口径优先级
@@ -144,10 +144,19 @@ references:
 6. `Capture 丢失率`
    - 公式：`loss_rate = (应到达 capture 数 - 成功 commit capture 数) / 应到达 capture 数`
 
-7. **频率假设与 Power Profile 备注**
-   - P1 所有 SLO 均基于固定捕获频率假设（由 `OPENRECALL_CAPTURE_INTERVAL` 配置）。
+7. **运行机制与压测假设（P1）**
+   - 运行机制（SSOT）：Capture 采用事件驱动触发（`idle/app_switch/manual/click`），其中 `idle` 为 timeout fallback 事件。
+   - 压测假设（仅用于可比性）：部分 Gate 使用固定事件注入速率（如 `300 events/min`）作为测试条件，不代表生产运行机制为固定频率轮询。
+   - 参数口径：
+
+| 参数 | 单位 | P1 默认 | 分类 | 说明 |
+|---|---|---:|---|---|
+| `min_capture_interval_ms` | ms | 200 | 主参数 | 全触发共享最小间隔去抖 |
+| `idle_capture_interval_ms` | ms | 30000 | 主参数 | 无事件时触发 `idle` fallback 的最大空窗 |
+| `OPENRECALL_CAPTURE_INTERVAL` | s | legacy | 兼容参数 | 不作为 P1 主触发机制；仅当未显式设置 `idle_capture_interval_ms` 时映射为 `idle_capture_interval_ms = OPENRECALL_CAPTURE_INTERVAL * 1000` |
+
    - screenpipe v0.3.160 引入 Power Profile（Performance/Balanced/Saver，`power/profile.rs`），动态调整捕获间隔。MyRecall-v3 P1 不实现此能力。
-   - **若 P2+ 引入 Power Profile，TTS P95 与 Capture 丢失率的 SLO 阈值须按最坏情况（Saver 模式）重新定义。**
+   - **若 P2+ 引入 Power Profile，TTS P95 与 Capture 丢失率的 SLO 阈值须按各 profile（至少覆盖 Saver 最坏情况）重新定义。**
 
 ## 5. 统计与采样规则
 

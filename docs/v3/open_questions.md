@@ -1,7 +1,7 @@
 ---
 status: active
 owner: pyw
-last_updated: 2026-03-03
+last_updated: 2026-03-04
 depends_on: []
 references:
   - spec.md
@@ -41,6 +41,7 @@ references:
 | OQ-024 | P0 | API 命名空间冻结 | A /v1/* 统一 + /api/* 渐进废弃（推荐）| A（已决，2026-03-04 补充） | 对外 HTTP 契约统一 `/v1/*`；`/api/*` P1-S1 返回 301 重定向至 `/v1/*` + `[DEPRECATED]` 日志，P1-S4 返回 410 Gone 完全废弃；不纳入客户端默认调用路径 | — | 2026-02-26 |
 | OQ-025 | P0 | accessibility 表架构（Scheme C） | A P0 建表 + focused 修复 + frame_id 方案 3（推荐，已决）/ B 对齐 screenpipe 不加 focused / C P1+ 延迟建表 | A（已决） | (1) accessibility 表 P0 建，paired_capture 按 text_source 分表写入；(2) 新增 focused 列修复 screenpipe 的 focused→force OCR 限制（db.rs:1870-1872）；(3) frame_id DEFAULT NULL 精确关联 frames（paired_capture 填入，未来独立 walker 留 NULL） | DDL 复杂度+1（多一张表+FTS+triggers）；P0 范围略增 | 2026-03-02 |
 | OQ-026 | P1 | P1 Search UI 分页模式 | A 加载更多（对齐 screenpipe，推荐）/ B 跳页（需加 offset 上限约束） | A（已决） | screenpipe `search-modal.tsx` 纯"加载更多"（`hasMoreOcr/loadMoreOcr`），offset 步长=limit，实际不超过几百；跳页模式下 `search_all()` 过量拉取内存风险不可控（offset=10000 时各路径拉 10020 行）；P2+ keyset cursor 可彻底替代 | 若未来需跳页，需补 `offset max` 约束并在 `search_all()` 加运行时 reject | 2026-03-02 |
+| OQ-027 | P1 | Capture 运行机制与频率口径 | A 事件驱动主机制 + 固定注入压测口径（推荐）/ B 全局固定频率假设 | A（已决，2026-03-04 补充） | 对齐 `spec.md`/`roadmap.md`/`acceptance/phase1/p1-s2.md`，消除“事件驱动 vs 固定频率”文本冲突 | 若 P2+ 引入 Power Profile，TTS 与丢失率阈值需按 profile 重新标定 | 2026-03-04 |
 
 ## 需实验清单
 
@@ -95,3 +96,7 @@ references:
 25. OQ-022 = C（覆盖 A）：Search SQL 拆为三路径 — search_ocr()（INNER JOIN ocr_text，content_type=ocr）、search_accessibility()（accessibility + accessibility_fts，content_type=accessibility）、search_all()（并行合并 by timestamp DESC，content_type=all 默认）。v3 不做 screenpipe 的 focused/browser_url → force content_type=ocr 降级。
 26. OQ-025 = A：accessibility 表 P0 建表（Scheme C），含 focused 列（P0 修复 screenpipe 限制）+ frame_id DEFAULT NULL（方案 3，paired_capture 精确关联）。DDL 对齐 screenpipe migration 20250202000000 并增强。
 27. OQ-026 = A：P1 Search UI 采用"加载更多"分页模式（对齐 screenpipe `search-modal.tsx`），offset 单调递增步长=limit，实际不超过几百。`search_all()` 过量拉取内存可控前提成立；P2+ 可升级为 keyset cursor 分页彻底消除过量拉取。
+
+### 已拍板结论（2026-03-04）
+
+28. OQ-027 = A（2026-03-04 补充）：Capture 运行机制定义为“事件驱动触发（`idle/app_switch/manual/click`）+ `idle` timeout fallback + `min_capture_interval_ms` 去抖 + dedup/背压保护”；`300 events/min` 属于固定注入压测条件（用于可比性），不代表生产固定频率轮询；`OPENRECALL_CAPTURE_INTERVAL` 不作为 P1 主触发机制定义；若 P2+ 引入 Power Profile，`TTS P95` 与 `Capture 丢失率` 阈值须按各 profile（至少覆盖 Saver 最坏情况）重新标定。

@@ -35,7 +35,7 @@
 
 ### 2.1 指标口径与样本说明（必填）
 
-- 口径基线版本（默认 `MyRecall/docs/v3/gate_baseline.md`）：v1.3
+- 口径基线版本（默认 `MyRecall/docs/v3/gate_baseline.md`）：v1.4
 - 指标样本数：
   - Capture（丢失率/重放一致性）：>= 200 captures（建议 >= 1000）
   - Search：>= 200 queries
