@@ -36,8 +36,7 @@ Frontend → POST /v1/chat {message, session_id, images?} → Edge Python Manage
 ### 工具格式：SKILL.md（DA-3）
 
 - Tool 以 Pi SKILL.md 文件格式定义（对齐 screenpipe）。
-- P1-S5 最小集：`myrecall-search` Skill（对标 screenpipe `screenpipe-search`）。
-- `frame_lookup` 和 `time_range_expansion` 按需在 P1-S7 后拆分为独立 Skill。
+- P1-S5 最小集：`myrecall-search` Skill（对标 screenpipe `screenpipe-search`），统一包含搜索、时间范围渐进扩展、帧详情获取等能力。
 
 ### 模型路由（DA-5）
 
@@ -51,6 +50,8 @@ Frontend → POST /v1/chat {message, session_id, images?} → Edge Python Manage
   - OCR 结果：`myrecall://frame/{frame_id}`
   - UI 结果：优先 `myrecall://frame/{accessibility.frame_id}`（v3 改进，外键精确关联）
   - 无 frame_id 时回退 `myrecall://timeline?timestamp=ISO8601`（仅未来独立 walker 场景，P1 不触发）
+- deep link 导航解析：点击 `myrecall://frame/{id}` 后，通过 `GET /v1/frames/:frame_id/metadata`（timestamp resolver，最小稳定契约）解析 timestamp 并在 `/timeline` 定位（对齐 screenpipe `/frames/{id}/metadata` 语义）。
+- 帧上下文（URL/文本）获取：通过 `GET /v1/frames/:frame_id/context`（020B）获取（对齐 screenpipe `/frames/{id}/context`；P1 仅 text/urls，P2+ 扩展 nodes）。
 - P1-S7 评估点：根据引用覆盖率观测数据决定是否启动 B 阶段（结构化 citation 后处理）。
 - 若 B 阶段启动：在 Manager 层对 Pi 回答做后处理，提取并校验 `frame_id/timestamp`（可选 `capture_id`）写入 `citations` 字段。
 

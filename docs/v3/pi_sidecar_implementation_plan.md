@@ -115,7 +115,7 @@ tests/
 
 ### S5 验收对照
 
-- Chat 工具能力清单完成率 = 100%（search/frame lookup/time range expansion 均通过 myrecall-search Skill 覆盖）
+- Chat 工具能力清单完成率 = 100%（通过 myrecall-search Skill 覆盖）
 - Chat 引用点击回溯成功率 >= 95%（通过 Skill 规则要求 Pi 输出 `myrecall://` 深链并禁止伪造 ID/时间戳；UI 可点击回溯）
 - 观测 KPI：Chat 引用覆盖率目标 >= 85%（non-blocking）
 

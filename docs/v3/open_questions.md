@@ -81,7 +81,7 @@ references:
 
 19. OQ-019 = A：P1 ingest 协议采用单次幂等上传（`POST /v1/ingest`）+ 队列状态端点（`GET /v1/ingest/queue/status`）。重复 `capture_id` 返回 `200 OK + "status": "already_exists"`（幂等语义，X 选项）。`GET /v1/ingest/queue/status` 返回 pending/processing/completed/failed 计数，供 Host client 决策与 P1-S1 Gate 验收（Y 选项）。session/chunk/commit/checkpoint 4 端点推迟到 P2 LAN 弱网场景实现，不破坏 P1 契约。
 
-20. OQ-020 = A：API 契约定义（P1 端点完整 schema，020A）：`/v1/search` 合并 `/v1/search/keyword`（P1 无 embedding，拆分无意义）；search response 同时返回 `file_path`（Edge 本地路径，对齐 screenpipe）和 `frame_url`（`/v1/frames/:id`，P2+ 跨机器可用）；`GET /v1/frames/:frame_id` 返回图像二进制；`GET /v1/frames/:frame_id/metadata` 返回 JSON；统一错误响应增加 `code`（SNAKE_CASE）和 `request_id`（UUID v4），不对齐 screenpipe（v3 更严谨）；Chat tool schema 已由 DA-3/DA-7 决定（Pi SKILL.md 格式）。
+20. OQ-020 = A：API 契约定义（P1 端点完整 schema，020A/020B）：`/v1/search` 合并 `/v1/search/keyword`（P1 无 embedding，拆分无意义）；search response 同时返回 `file_path`（Edge 本地路径，对齐 screenpipe）和 `frame_url`（`/v1/frames/:id`，P2+ 跨机器可用）；`GET /v1/frames/:frame_id` 返回图像二进制；`GET /v1/frames/:frame_id/metadata` 返回 JSON（最小稳定契约为 `{frame_id,timestamp}`，扩展字段 best-effort）；新增 `GET /v1/frames/:frame_id/context`（020B）用于 text/urls（P2+ 扩展 nodes）；统一错误响应增加 `code`（SNAKE_CASE）和 `request_id`（UUID v4），不对齐 screenpipe（v3 更严谨）；Chat tool schema 已由 DA-3/DA-7 决定（Pi SKILL.md 格式）。
 
 21. OQ-021 = A：`ocr_text` 表新增 `app_name`/`window_name` 两列（对齐 screenpipe 历史 migration 20240716/20240815）。写入时从 `CapturePayload` 取值，与 `frames` 同源。接受与 `frames` 列潜在 drift（P1 内无 frames 修正场景，对齐 screenpipe 行为）。
 

@@ -147,6 +147,35 @@ flowchart LR
 - 去抖校验：同 monitor 连续 `app_switch/click` 入库间隔 < `min_capture_interval_ms` 的违规数应为 0。
 - 去重校验：重复内容压测中应观测到 dedup skip，且 30s 保底写入仍成立（timeline 不空洞）。
 
+### 4.2.1 Monitor 动态监测（与 screenpipe 对齐）
+
+> 本节补充说明 device_name 的运行时监测机制。
+
+### screenpipe 怎么做
+- Monitor Watcher：每 5 秒轮询一次 monitor 列表（`monitor_watcher.rs`）
+- 监测内容：
+  - 新增 monitor → 自动启动对应 monitor 的录制
+  - 断开 monitor → 自动停止录制
+  - 重新连接 → 恢复录制
+- 识别方式：OS 级别 monitor id（CGDirectDisplayID / xcap Monitor.id）
+- 限制：不对历史数据做回溯验证
+
+### MyRecall-v3 方案
+- Host 端实现类似的 monitor 监测机制：
+  - 使用 mss 库定期枚举显示器
+  - 检测到 monitor 变化时调整采集任务
+  - device_name 生成规则见 [data-model.md §3.0.6](data-model.md#306-host-上传-payload)
+- 对齐方式：
+  - 使用 OS 级别 monitor id（通过 mss + ctypes 获取）
+  - 格式与 screenpipe 一致：`monitor_{id}`
+- 限制说明：
+  - OS 级别 monitor id 稳定性依赖操作系统
+  - 历史数据的 device_name 不做回溯验证（screenpipe 亦如此）
+
+### 对齐结论
+- 对齐级别：完全对齐（运行时监测机制 + 识别方式 + 格式）
+- 差异：无（v3 Host 端实现与 screenpipe 等效的监测逻辑）
+
 ### 4.3 Vision processing（与 screenpipe 对齐，Scheme C）
 
 ### screenpipe 怎么做
@@ -269,7 +298,7 @@ paired_capture 处理一帧:
         "window_name": "GitHub - main",
         "browser_url": "https://github.com",
         "focused": true,
-        "device_name": "MacBook-Pro",
+        "device_name": "monitor_0",
         "tags": []
       }
     },
@@ -285,7 +314,7 @@ paired_capture 处理一帧:
         "window_name": "spec.md — MyRecall",
         "browser_url": null,
         "focused": true,
-        "device_name": "MacBook-Pro",
+        "device_name": "monitor_0",
         "tags": []
       }
     }
@@ -331,12 +360,12 @@ paired_capture 处理一帧:
   - 内层协议（Manager ↔ Pi）：Pi stdin/stdout JSON Lines（对齐 screenpipe `pi.rs` RPC 模式）。
   - 外层协议（前端 ↔ Edge）：HTTP SSE（拓扑适配，per Decision 001A）。
   - 请求：简单 JSON `{message, session_id, images?}`；响应：SSE 透传 Pi 顶层事件（核心 11 种：`message_update`、`tool_execution_start`、`tool_execution_update`、`tool_execution_end`、`agent_start`、`agent_end`、`turn_start`、`turn_end`、`message_start`、`message_end`、`response`），不做 OpenAI format 翻译。`message_update` 内层的 `assistantMessageEvent.type` 子事件（如 `text_delta`、`thinking_start`、`thinking_delta`、`thinking_end`、`content_block_delta`）单独解析，不与顶层事件枚举混用；未知扩展顶层事件按前向兼容处理（记录并忽略或降级展示）。
-  - 工具以 Pi SKILL.md 格式定义（对齐 screenpipe），P1-S5 最小集为 `myrecall-search` Skill（对标 `screenpipe-search`），`frame_lookup` 和 `time_range_expansion` 按需在 P1-S7 后拆分。
+  - 工具以 Pi SKILL.md 格式定义（对齐 screenpipe），P1-S5 最小集为 `myrecall-search` Skill（对标 `screenpipe-search`），统一包含搜索、时间范围渐进扩展、帧详情获取等能力。
   - 软约束引用（DA-8=A）：系统提示与 `myrecall-search` Skill 显式要求输出可解析 deep link：
     - OCR 结果：使用 `myrecall://frame/{frame_id}`（frame_id 始终有值）
     - UI 结果：优先使用 `myrecall://frame/{accessibility.frame_id}`（v3 改进，通过外键精确关联）
     - 当 `accessibility.frame_id` 为 NULL 时回退 `myrecall://timeline?timestamp=ISO8601`（仅未来独立 walker 场景，P1 不触发）
-    - UI 落点规则：不新增独立 `/frame/:id` 页面；`myrecall://frame/{id}` 在前端统一落到 `/timeline`，并通过 `GET /v1/frames/:frame_id/metadata` 解析 `timestamp` 后定位。
+  - UI 落点规则：不新增独立 `/frame/:id` 页面；`myrecall://frame/{id}` 在前端统一落到 `/timeline`，并通过 `GET /v1/frames/:frame_id/metadata`（timestamp resolver，最小稳定契约）解析 `timestamp` 后定位。
     - `frame_id`/`timestamp` 必须直接拷贝自检索结果，禁止伪造。P1-S5 不做结构化 citation（`chat_messages.citations` 留空），评估是否在 P1-S7 增加 DA-8B。
   - 模型路由：通过 Pi `--provider`/`--model` 启动参数 + `models.json` 配置控制（对齐 screenpipe）。P1 不做自动 fallback chain（对齐 screenpipe）。
 - P1~P3：chat UI 与会话输入输出由 Edge 页面承载；Host 不负责 UI 与推理。
@@ -481,7 +510,8 @@ P2+ 升级为 mTLS 强制（006A->B）。
 | `/v1/search` | GET | FTS5 搜索 | 高对齐（020A） |
 | `/v1/chat` | POST | Chat 请求（JSON）+ SSE 事件流响应 | 高对齐（DA-2/DA-7） |
 | `/v1/frames/:frame_id` | GET | 图像二进制 | 高对齐（020A） |
-| `/v1/frames/:frame_id/metadata` | GET | 帧 JSON 元数据 | 部分对齐（020A） |
+| `/v1/frames/:frame_id/metadata` | GET | 深链导航元数据（timestamp resolver） | 高对齐（020A） |
+| `/v1/frames/:frame_id/context` | GET | 帧上下文（text/urls；P2+ 扩展 nodes） | 对齐（020B） |
 | `/v1/health` | GET | 服务健康检查 | 高对齐 |
 
 ### `POST /v1/chat` 契约（DA-2/DA-7，P1-S5）
@@ -531,9 +561,22 @@ data: {"type":"response","success":true}
 
 ### `GET /v1/frames/:frame_id/metadata` 契约（020A）
 
-用途：deep link 导航解析（`myrecall://frame/{frame_id}` -> `timestamp` -> `/timeline` 定位）。
+用途：deep link 导航解析（`myrecall://frame/{frame_id}` -> `timestamp` -> `/timeline` 定位）。对齐 screenpipe：该端点的最小稳定契约仅用于 frame_id -> timestamp 解析。
 
-**Response 200 OK：**
+**Response 200 OK（最小稳定契约）：**
+
+```json
+{
+  "frame_id": 123,
+  "timestamp": "2026-02-26T10:00:00Z"
+}
+```
+
+**扩展字段（P1，best-effort，非稳定契约）：**
+- 服务端可以在 200 OK 中附带额外字段（便于调试/观测/演进），但客户端必须忽略未知字段。
+- 任何“上下文/URL/结构化元素”能力不得依赖 `/metadata` 的扩展字段，统一走 `/v1/frames/:frame_id/context`。
+
+**Response 200 OK（含扩展字段示例，非稳定）：**
 
 ```json
 {
@@ -543,7 +586,7 @@ data: {"type":"response","success":true}
   "window_name": "GitHub - main",
   "browser_url": "https://github.com",
   "focused": true,
-  "device_name": "MacBook-Pro",
+  "device_name": "monitor_0",
   "ocr_text": "提取的文字",
   "file_path": "/data/screenshots/abc.jpg",
   "capture_trigger": "app_switch",
@@ -555,6 +598,30 @@ data: {"type":"response","success":true}
 **字段说明：**
 - `status`：`"pending"` / `"processing"` / `"completed"` / `"failed"`
 - `capture_trigger`：P1 为 `"idle"` / `"app_switch"` / `"manual"` / `"click"`；P2+ 追加 `"window_focus"` / `"typing_pause"` / `"scroll_stop"` / `"clipboard"` / `"visual_change"`；其中 `window_focus` 若启用需与 screenpipe `capture_window_focus` 语义对齐（默认关闭）；对应 CapturePayload（[data-model.md §3.0.6](data-model.md#306-host-上传-payload)）
+
+### `GET /v1/frames/:frame_id/context` 契约（020B）
+
+用途：获取某一帧的“可读上下文”，用于 URL 提取与后续更细粒度 UI grounding。对齐 screenpipe：a11y 优先，OCR fallback。
+
+**Response 200 OK（P1）：**
+
+```json
+{
+  "frame_id": 123,
+  "text": "AX/OCR 文字（可为空）",
+  "urls": ["https://github.com"],
+  "text_source": "accessibility"
+}
+```
+
+**字段说明：**
+- `text`：a11y 成功时为 accessibility 文本；否则为 OCR 文本（或为 null）
+- `urls`：仅包含从内容中提取的 URL（a11y link/文本 regex，去重）；不强制并入 `browser_url`
+- `text_source`：`"accessibility"` / `"ocr"`
+- `browser_url`：页面主 URL 若需展示，使用 search/metadata 路径中的独立字段，不与 `urls` 语义混用
+
+**P2+ 扩展点（对齐 screenpipe `/frames/{id}/context` 完整语义）：**
+- 增加 `nodes`（role/text/depth/bounds）需要先引入 accessibility tree 存储（数据模型与采集链路扩展）
 
 ### `GET /v1/health` 契约（对齐 screenpipe `HealthCheckResponse` 子集）
 

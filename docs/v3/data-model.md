@@ -46,7 +46,7 @@ CREATE TABLE frames (
     window_name           TEXT DEFAULT NULL,
     browser_url           TEXT DEFAULT NULL,
     focused               BOOLEAN DEFAULT NULL,
-    device_name           TEXT NOT NULL DEFAULT '',
+    device_name           TEXT NOT NULL DEFAULT 'monitor_0',
     snapshot_path         TEXT DEFAULT NULL,       -- JPEG 快照路径（主链路，推荐 .jpg）
     capture_trigger       TEXT DEFAULT NULL,       -- 'idle'|'app_switch'|'manual'|'click' (P1); P2+: 'window_focus'|'typing_pause'|'scroll_stop'|'clipboard'|'visual_change'
     accessibility_text    TEXT DEFAULT NULL,
@@ -627,7 +627,7 @@ class CapturePayload(BaseModel):
     app_name: Optional[str] = None
     window_name: Optional[str] = None
     browser_url: Optional[str] = None
-    device_name: str = ""
+    device_name: str = "monitor_0"  # 屏幕标识，格式: monitor_{id}
     focused: Optional[bool] = True
     capture_trigger: Optional[str] = None  # "idle" | "app_switch" | "manual" | "click" (P1); P2+: "window_focus" | "typing_pause" | "scroll_stop" | "clipboard" | "visual_change"
     accessibility_text: Optional[str] = None
@@ -642,7 +642,7 @@ class CapturePayload(BaseModel):
 |------|----------|------|---------|
 | `capture_id` | string | ✅ | UUID v7 格式；重复时返回 `HTTP 200 + status=already_exists`（幂等成功） |
 | `timestamp` | float | ✅ | UNIX epoch 秒；不得早于当前时间 30 天，不得晚于当前时间 60 秒 |
-| `device_name` | string | ✅ | 非空，最长 128 字符 |
+| `device_name` | string | ✅ | 非空，最长 128 字符，格式: `monitor_{id}`，与 screenpipe vision-only 对齐 |
 | `app_name` | string｜null | ❌ | 最长 256 字符 |
 | `window_name` | string｜null | ❌ | 最长 512 字符 |
 | `browser_url` | string｜null | ❌ | 若非 null 则必须为合法 URL；最长 2048 字符 |
@@ -658,6 +658,33 @@ class CapturePayload(BaseModel):
 **幂等语义：**
 - `capture_id` 重复时，Edge 不重新处理，直接返回 `HTTP 200` + `{"status": "already_exists", ...}`（可附 `request_id`；不返回错误 `code`）。
 - `content_hash` 相同但 `capture_id` 不同时，Edge **仍处理**（不跨 capture_id 去重）。
+
+**device_name 字段说明**：
+
+| 字段 | 说明 |
+|------|------|
+| 格式 | `monitor_{id}` |
+| 语义 | 屏幕标识，对齐 screenpipe vision-only 场景 |
+
+**取值规则**：
+
+| 平台 | id 来源 | 示例 |
+|------|---------|------|
+| macOS | CGDirectDisplayID | `monitor_1`, `monitor_2` |
+| Windows | unique_id (mss) | `monitor_MONITOR\0...` (取前16字符) |
+| Linux | 坐标组合 (left_top) | `monitor_0_0`, `monitor_1920_0` |
+
+**实现说明**：
+- Host 端通过 `mss` 库 + ctypes 获取 OS 级别 monitor id
+- macOS: 调用 `CGGetActiveDisplayList` 获取 CGDirectDisplayID
+- Windows: 使用 mss 返回的 `unique_id` 字段
+- Linux: 使用 monitor 坐标组合作为唯一标识
+- Fallback: 若无法获取 OS 级别 id，则使用数组索引 (`monitor_0`, `monitor_1`)
+
+**与 screenpipe 对齐**：
+- 格式完全一致：`monitor_{id}`
+- 语义完全一致：标识显示器
+- vision-only 场景 100% 对齐
 
 ### 3.0.7 Migration 策略（Q3）
 

@@ -106,7 +106,7 @@ references:
       - 无 frame_id 时回退 `myrecall://timeline?timestamp=ISO8601`（仅未来独立 walker 场景，P1 不触发）
       - `frame_id`/`timestamp` 必须来自检索结果且禁止伪造（DA-8=A）
   - Gate：
-    - Chat 工具能力清单（search/frame lookup/time range expansion via myrecall-search SKILL.md）完成率 = 100%
+    - Chat 工具能力清单（via myrecall-search SKILL.md）完成率 = 100%
     - Chat 引用点击回溯成功率 >= 95%
     - 观测 KPI（non-blocking）：Chat 引用覆盖率目标 >= 85%，未达标需提交整改动作
 - P1-S6（Chat-2 路由与流式，2026-03-22 ~ 2026-03-23）

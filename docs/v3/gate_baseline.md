@@ -115,7 +115,8 @@ references:
   - OCR 结果：回答中包含可解析 deep link `myrecall://frame/{frame_id}`
   - UI 结果：回答中包含可解析 deep link `myrecall://frame/{accessibility.frame_id}`（v3 改进，外键精确关联）
   - 无 frame_id 时回退 `myrecall://timeline?timestamp=ISO8601`（仅未来独立 walker 场景，P1 不触发）
-  - UI 落点：点击 `myrecall://frame/{id}` 后统一落到 `/timeline`，通过 `GET /v1/frames/:frame_id/metadata` 解析 timestamp 定位
+- UI 落点：点击 `myrecall://frame/{id}` 后统一落到 `/timeline`，通过 `GET /v1/frames/:frame_id/metadata`（timestamp resolver，最小稳定契约）解析 timestamp 定位
+- 说明：`GET /v1/frames/:frame_id/context` 为可选增强（URL/上下文提取），不作为 P1 Gate 前置条件
   - `frame_id`/`timestamp` 必须来自真实检索结果，不得伪造。
 - 结构化增强（DA-8B，可选）：在 DA-8A 基础上，`chat_messages.citations` 可写入结构化引用（`frame_id`/`timestamp`，可选 `capture_id`）；未启用 DA-8B 前，不作为 Gate 前置条件。
 
