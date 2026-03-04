@@ -38,7 +38,7 @@ references:
 | OQ-021 | P0 | `ocr_text` 表 `app_name`/`window_name` 补齐策略 | A 补齐列 + 接受 drift（推荐）/ B 触发器 JOIN frames | A（已决） | 对齐 screenpipe 历史 migration；B 引入不必要子查询耦合 | 与 frames 列潜在 drift（P1 内无修正场景，接受） | 2026-02-27 |
 | OQ-022 | P0 | Search SQL JOIN 策略 | A INNER JOIN 单路径 / ~~A~~ → C 三路径分发（已决） | C（已决，覆盖 A） | Scheme C 下 search 拆为 search_ocr()（INNER JOIN ocr_text）+ search_accessibility()（accessibility 表 + accessibility_fts）+ search_all()（并行合并 by timestamp DESC）；content_type 参数路由 | — | 2026-03-02 |
 | OQ-023 | P1 | Migration 策略 | A 手写 SQL + `schema_migrations` 表（推荐）/ B Alembic / C PRAGMA user_version | A（已决） | 零额外依赖；对齐 screenpipe sqlx migrate 命名规范 | — | 2026-02-27 |
-| OQ-024 | P0 | API 命名空间冻结 | A /v1/* 统一 + /api/* 仅用于 v2（推荐）| A（已决） | 对外 HTTP 契约统一 `/v1/*`；`/api/*` 仅用于 v2 历史描述，不纳入 P1~P3 Gate 与客户端默认调用路径 | — | 2026-02-26 |
+| OQ-024 | P0 | API 命名空间冻结 | A /v1/* 统一 + /api/* 渐进废弃（推荐）| A（已决，2026-03-04 补充） | 对外 HTTP 契约统一 `/v1/*`；`/api/*` P1-S1 返回 301 重定向至 `/v1/*` + `[DEPRECATED]` 日志，P1-S4 返回 410 Gone 完全废弃；不纳入客户端默认调用路径 | — | 2026-02-26 |
 | OQ-025 | P0 | accessibility 表架构（Scheme C） | A P0 建表 + focused 修复 + frame_id 方案 3（推荐，已决）/ B 对齐 screenpipe 不加 focused / C P1+ 延迟建表 | A（已决） | (1) accessibility 表 P0 建，paired_capture 按 text_source 分表写入；(2) 新增 focused 列修复 screenpipe 的 focused→force OCR 限制（db.rs:1870-1872）；(3) frame_id DEFAULT NULL 精确关联 frames（paired_capture 填入，未来独立 walker 留 NULL） | DDL 复杂度+1（多一张表+FTS+triggers）；P0 范围略增 | 2026-03-02 |
 | OQ-026 | P1 | P1 Search UI 分页模式 | A 加载更多（对齐 screenpipe，推荐）/ B 跳页（需加 offset 上限约束） | A（已决） | screenpipe `search-modal.tsx` 纯"加载更多"（`hasMoreOcr/loadMoreOcr`），offset 步长=limit，实际不超过几百；跳页模式下 `search_all()` 过量拉取内存风险不可控（offset=10000 时各路径拉 10020 行）；P2+ keyset cursor 可彻底替代 | 若未来需跳页，需补 `offset max` 约束并在 `search_all()` 加运行时 reject | 2026-03-02 |
 
@@ -62,7 +62,11 @@ references:
 10. OQ-010 = A：每个阶段/子阶段验收都必须有 Markdown 详细记录，并作为 Gate 输入。
 11. OQ-011 = A：Gate 采用双轨策略：数值阈值适度放宽，功能完成度/完善度指标强化。
 12. OQ-012 = A：UI Gate 采用“最小可用集”，在 P1 按子阶段强化 UI 可用性/可解释性验收，不做 UI 重构。
-13. OQ-013 = A：引用覆盖率采用 soft KPI（P1-S5>=85%，P1-S7/P2/P3>=92%，Stretch 95%），不作为 Gate Fail 条件；DA-8=A 口径为 deep link（默认 `myrecall://frame`，缺少 `frame_id` 时回退 `myrecall://timeline`）可解析且可回溯，DA-8=B 结构化 citations 为可选增强；统一口径以 `gate_baseline.md` 为准。
+13. OQ-013 = A：引用覆盖率采用 soft KPI（P1-S5>=85%，P1-S7/P2/P3>=92%，Stretch 95%），不作为 Gate Fail 条件；DA-8=A 口径为 deep link：
+   - OCR 结果：`myrecall://frame/{frame_id}`
+   - UI 结果：优先 `myrecall://frame/{accessibility.frame_id}`（v3 改进，外键精确关联），无 frame_id 时回退 `myrecall://timeline?timestamp=...`
+   - P1 阶段正常 paired_capture 路径下 UI 结果 frame_id 应为非 NULL（paired_capture 写入），此回退仅未来独立 walker 场景触发
+   - DA-8=B 结构化 citations 为可选增强；统一口径以 `gate_baseline.md` 为准。
 
 ### 已拍板结论（2026-02-27）
 
@@ -84,7 +88,7 @@ references:
 
 23. OQ-023 = A：Migration 策略采用手写 SQL + `schema_migrations` 跟踪表，零额外依赖；文件命名 `YYYYMMDDHHMMSS_描述.sql` 对齐 screenpipe；P1 全量 DDL 放入 `20260227000001_initial_schema.sql`；`ocr_text_embeddings` 表推迟至 P2+ migration 新增；已执行迁移不得修改。
 
-24. OQ-024 = A：API 命名空间冻结：v3 对外 HTTP 契约统一 `/v1/*`；`/api/*` 仅用于 v2 历史描述，不纳入 P1~P3 Gate 与客户端默认调用路径。
+24. OQ-024 = A（2026-03-04 补充）：API 命名空间冻结：v3 对外 HTTP 契约统一 `/v1/*`；`/api/*` P1-S1 返回 301 重定向至 `/v1/*` + `[DEPRECATED]` 日志，P1-S4 返回 410 Gone 完全废弃；不纳入客户端默认调用路径。
 
 ### 已拍板结论（2026-03-02）
 

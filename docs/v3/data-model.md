@@ -242,6 +242,8 @@ CREATE TABLE accessibility (
     FOREIGN KEY (frame_id) REFERENCES frames(id) ON DELETE SET NULL
 );
 
+-- P1 阶段约束：正常 paired_capture 路径写入的 accessibility 行，frame_id 应为非 NULL，并通过外键精确关联截图；该约束在 P2+ 引入独立 walker 后失效。
+
 -- B-tree 索引（对齐 screenpipe migration lines 22-27 + v3 追加）
 CREATE INDEX idx_accessibility_timestamp  ON accessibility(timestamp);
 CREATE INDEX idx_accessibility_app_name   ON accessibility(app_name);

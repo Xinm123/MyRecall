@@ -38,9 +38,18 @@ references:
     - 同机断网恢复后可自动重传，且重复上传不重复入库
     - ingest 队列可观测（pending/processing/completed/failed）完整
     - 图片格式契约一致性通过：`/v1/ingest` 主契约 `image/jpeg`，`/v1/frames/:frame_id` 返回 `image/jpeg`；兼容输入若启用，需验证入库前转码为 JPEG
-    - 对外 API 命名空间一致性通过：验收脚本仅调用 `/v1/*`，旧 `/api/*` 路径不得返回业务成功（2xx）
+    - 对外 API 命名空间一致性通过：验收脚本主流程仅调用 `/v1/*`；旧 `/api/*` 路径仅用于废弃回归检查，且返回 301 重定向至 `/v1/*` + 记录 `[DEPRECATED]` 日志
     - UI 基线路由可达率 = 100%
     - UI 健康态/错误态展示检查通过率 = 100%
+
+## 1.1 API 命名空间迁移策略
+
+| 阶段 | /api/* 行为 |
+|------|-------------|
+| P1-S1 | 301 重定向 → /v1/* + [DEPRECATED] 日志 |
+| P1-S2~S3 | 持续监控，逐步修改前端/测试/Client 走 /v1/* |
+| P1-S4 | 410 Gone 完全废弃 |
+
 - P1-S2（采集，2026-03-06 ~ 2026-03-08）
   - 交付：
     - Host 事件驱动 capture（app switch/click/idle）+ manual trigger + idle fallback（P1 触发枚举：`idle/app_switch/manual/click`；`window_focus` 不纳入 P1）
@@ -55,19 +64,19 @@ references:
     - 去重 Gate：重复内容压测窗口（5 分钟）满足 `dedup_skip_rate = dedup_skipped / dedup_eligible >= 95%`（`dedup_eligible >= 500`），且 `inter_write_gap_sec` 满足 `P99 <= 30s` 与 `max <= 45s`
     - 背压 Gate：过载注入窗口（5 分钟）满足 `collapse_trigger_count >= 1`、`queue_saturation_ratio <= 10%`（`queue_depth >= 0.9 * queue_capacity` 采样占比）且 `overflow_drop_count = 0`
     - 新 capture 在 timeline 可见性通过率 >= 95%
-- P1-S3（处理，2026-03-09 ~ 2026-03-11）
+- P1-S3（处理，2026-03-12 ~ 2026-03-15）
   - 交付：
     - Edge AX-first + OCR-fallback（含 `ocr_preferred_apps` 初版）
     - Scheme C 分表写入：AX 成功 → `accessibility` 表（含 `focused`/`frame_id`）；OCR fallback → `ocr_text` 表
     - AX/OCR 决策记录到 `frames.text_source`
     - 索引时零 AI 增强：不生成 `caption/keywords/fusion_text`，不写入 `ocr_text_embeddings`
-    - Frame 详情可见处理来源（AX/OCR fallback）与处理时间戳
+    - Frame 详情可见处理来源（AX/OCR fallback）与处理时间戳（在 `/timeline` 内呈现，不新增 `/frame/:id` 页面）
   - Gate：
     - AX 成功帧写入 `accessibility` 表的正确率 = 100%
     - AX-first/OCR-fallback 决策日志可追溯率 >= 95%
     - 索引时零 AI 增强检查通过率 = 100%（禁用字段/写入路径回归为 0）
     - 处理来源字段 UI 展示完整率 = 100%
-- P1-S4（检索能力，2026-03-12 ~ 2026-03-13）
+- P1-S4（检索能力，2026-03-16 ~ 2026-03-18）
   - 交付：
     - `/v1/search`（含 keyword 检索语义，FTS+过滤完整能力）
     - Scheme C 三路径分发：`search_ocr()`、`search_accessibility()`、`search_all()`，由 `content_type` 参数路由
@@ -75,28 +84,32 @@ references:
     - 返回结构包含 frame/citation 关键字段，`type` 字段区分 `OCR`/`UI`
     - Search 页过滤项与 API 参数 1:1 映射，结果可回溯到 frame/citation
   - Gate：
-    - Search P95 <= 1.8s（标准时间窗）
+    - 观测 KPI：Search P95 记录实际分布（P1 阶段暂不设硬性阈值，参考 screenpipe 5s 问题阈值，在 P1-S7 前确定目标）
     - `/v1/search` 过滤参数契约完成率 = 100%（含 `content_type`）
     - Search SQL 三路径分发一致性 = 100%（search_ocr：INNER JOIN ocr_text；search_accessibility：accessibility + FTS；search_all：并行合并）
     - `focused` 过滤在 `search_accessibility()` 正确性 = 100%（不降级为 OCR-only）
     - OCR 检索结果引用字段完整率 = 100%（`frame_id`/`timestamp`，Hard Gate）
-    - UI 检索结果引用字段完整率 = 100%（`id`/`timestamp`，Hard Gate）
+    - UI 检索结果引用字段完整率 = 100%（`frame_id`/`timestamp`，Hard Gate，P1 阶段 accessibility.frame_id 非 NULL）
     - 观测 KPI（non-blocking）：OCR 检索结果 `capture_id` 覆盖率目标 >= 99%（未达标需提交整改动作）
     - Search UI 过滤项契约映射完成率 = 100%
     - 检索结果点击回溯成功率 >= 95%
-- P1-S5（Chat-1 Grounding 与引用，2026-03-14 ~ 2026-03-16）
+- P1-S5（Chat-1 Grounding 与引用，2026-03-19 ~ 2026-03-21）
   - 交付：
     - Pi Sidecar 基础能力：PiProcess（subprocess wrapper）、PiManager（singleton 进程管理）、protocol.py（Pi JSON Lines ↔ SSE 桥接）
     - `myrecall-search` SKILL.md（tool-driven retrieval，对标 screenpipe `screenpipe-search`）
     - `/v1/chat` SSE streaming endpoint（Flask + threading，DP-1=A）
     - `chat_messages` 持久化（session history injection，DP-3=A）
     - Chat UI minimal（Alpine.js + EventSource）
-    - 引用通过提示词与 Skill 显式要求输出 deep link：默认 `myrecall://frame/{frame_id}`；当结果缺少 `frame_id` 时回退为 `myrecall://timeline?timestamp=ISO8601`。`frame_id`/`timestamp` 必须来自检索结果且禁止伪造（DA-8=A）
+    - 引用通过提示词与 Skill 显式要求输出 deep link：
+      - OCR 结果：`myrecall://frame/{frame_id}`（点击后统一落到 `/timeline` 定位对应帧）
+      - UI 结果：优先 `myrecall://frame/{accessibility.frame_id}`（v3 改进，外键精确关联；点击后统一落到 `/timeline`）
+      - 无 frame_id 时回退 `myrecall://timeline?timestamp=ISO8601`（仅未来独立 walker 场景，P1 不触发）
+      - `frame_id`/`timestamp` 必须来自检索结果且禁止伪造（DA-8=A）
   - Gate：
     - Chat 工具能力清单（search/frame lookup/time range expansion via myrecall-search SKILL.md）完成率 = 100%
     - Chat 引用点击回溯成功率 >= 95%
     - 观测 KPI（non-blocking）：Chat 引用覆盖率目标 >= 85%，未达标需提交整改动作
-- P1-S6（Chat-2 路由与流式，2026-03-17 ~ 2026-03-18）
+- P1-S6（Chat-2 路由与流式，2026-03-22 ~ 2026-03-23）
   - 交付：
     - Provider/model 路由（通过 Pi `--provider`/`--model` + `models.json` 配置，UI 配置页面切换）
     - Pi 事件流式输出（SSE 透传 Pi 原生 11 种事件类型）
@@ -110,7 +123,7 @@ references:
     - 路由切换场景覆盖率 = 100%（provider 切换 + timeout 错误，不含 auto-fallback）
     - 流式输出协议一致性用例通过率 = 100%
     - 路由与 timeout 状态可见场景覆盖率 = 100%
-- P1-S7（端到端验收，2026-03-19 ~ 2026-03-20）
+- P1-S7（端到端验收，2026-03-24 ~ 2026-03-25）
   - 交付：
     - 端到端故障注入与回归报告（仅验收，不新增功能）
     - P1 功能冻结清单（进入 P2/P3 的基线）

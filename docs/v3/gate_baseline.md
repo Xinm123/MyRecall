@@ -56,7 +56,8 @@ references:
 - 公式：`ocr_ref_completeness = (OCR 结果中 frame_id 与 timestamp 同时非空的条数 / OCR 结果总条数) * 100%`
 
 2. `UI 引用字段完整率`（Hard Gate）
-- 公式：`ui_ref_completeness = (UI 结果中 id 与 timestamp 同时非空的条数 / UI 结果总条数) * 100%`
+- 公式：`ui_ref_completeness = (UI 结果中 frame_id 与 timestamp 同时非空的条数 / UI 结果总条数) * 100%`
+- 说明：P1 阶段正常 paired_capture 路径下 accessibility.frame_id 应为非 NULL（由 paired_capture 写入）
 
 3. `OCR capture_id 覆盖率`（Soft KPI）
 - 公式：`ocr_capture_id_coverage = (OCR 结果中 capture_id 非空的条数 / OCR 结果总条数) * 100%`
@@ -110,18 +111,25 @@ references:
 
 1. `Citation Coverage`（DA-8A 默认口径）
 - 公式：`coverage = (有有效引用的回答数 / 应当提供引用的回答总数) * 100%`
-- 有效引用（DA-8A）：回答中包含可解析 deep link（`myrecall://frame/{frame_id}` 或 `myrecall://timeline?timestamp=ISO8601`），且能回溯到真实 frame/timeline；`frame_id`/`timestamp` 必须来自真实检索结果，不得伪造。
+- 有效引用（DA-8A）：
+  - OCR 结果：回答中包含可解析 deep link `myrecall://frame/{frame_id}`
+  - UI 结果：回答中包含可解析 deep link `myrecall://frame/{accessibility.frame_id}`（v3 改进，外键精确关联）
+  - 无 frame_id 时回退 `myrecall://timeline?timestamp=ISO8601`（仅未来独立 walker 场景，P1 不触发）
+  - UI 落点：点击 `myrecall://frame/{id}` 后统一落到 `/timeline`，通过 `GET /v1/frames/:frame_id/metadata` 解析 timestamp 定位
+  - `frame_id`/`timestamp` 必须来自真实检索结果，不得伪造。
 - 结构化增强（DA-8B，可选）：在 DA-8A 基础上，`chat_messages.citations` 可写入结构化引用（`frame_id`/`timestamp`，可选 `capture_id`）；未启用 DA-8B 前，不作为 Gate 前置条件。
 
 2. `TTS P95`（Time-to-Searchable）
 - 起点：Host 侧 capture 事件时间戳。
 - 终点：该 capture 首次可被 `GET /v1/search` 查询返回的时间点。
 
-3. `Search P95`
+3. `Search P95`（P1 阶段记录实际值，暂不设硬性阈值）
 - 统计范围：`GET /v1/search`（含 keyword 检索语义）。
 - 起点：Edge API 收到请求。
 - 终点：Edge API 返回最后一个字节。
-- 标准时间窗：查询窗口 <= 24h（超大时间窗单独统计，不纳入 Gate）。
+- 标准时间窗：查询窗口 <= 24h（超大时间窗单独统计，不纳入统计）。
+- P1 阶段策略：记录实际 P95 分布，暂不设硬性阈值。
+- 阈值确定：参考 screenpipe `timeline_performance_test.rs`（5s 以上被视为问题），在 P1-S7 前根据实测数据确定最终目标。
 
 4. `Chat 请求成功率`（P1-S6 主 Gate）
 - 公式：`chat_success_rate = (成功请求数 / 总请求数) * 100%`

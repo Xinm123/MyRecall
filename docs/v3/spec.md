@@ -224,7 +224,7 @@ paired_capture 处理一帧:
 
 #### API 命名空间冻结（P0-01）
 - MyRecall-v3 对外 HTTP 契约统一使用 `/v1/*`。
-- `/api/*` 仅用于描述 v2 历史路径，不属于 v3 对外接口，不纳入 P1~P3 Gate。
+- `/api/*` 为 v2 历史路径：P1-S1~P1-S3 返回 301 重定向至 `/v1/*` + `[DEPRECATED]` 日志；自 P1-S4 起返回 410 Gone 完全废弃。
 - 兼容 alias（如存在）必须标记为 legacy，且不得作为文档、SDK、验收脚本默认入口。
 
 #### `GET /v1/search` — 完整契约
@@ -295,11 +295,11 @@ paired_capture 处理一帧:
 
 **字段说明：**
 - `file_path`：Edge 本地磁盘绝对路径（对齐 screenpipe；P1 WebUI/Chat 均在 Edge 侧可直接使用）
-- `frame_url`：`/v1/frames/:frame_id` 相对路径（P2+ 跨机器时可替代 `file_path`）；`type=UI` 且 `frame_id` 为 NULL 时返回 `null`
+- `frame_url`：`/v1/frames/:frame_id` 相对路径（P2+ 跨机器时可替代 `file_path`）；`type=OCR` 时 frame_id 始终有值；`type=UI` 时 frame_id 来源于 `accessibility.frame_id`（v3 改进，外键精确关联），当为 NULL 时返回 `null`
 - `type`：`"OCR"`（来自 `search_ocr()` 路径）或 `"UI"`（来自 `search_accessibility()` 路径）；对齐 screenpipe `ContentType::OCR` / `ContentType::Accessibility`。P2+ 预留 `"Audio"`
-- `type=OCR` 的引用锚点字段为 `frame_id` + `timestamp`（P1-S4 Hard Gate 口径）；`type=UI` 的引用锚点字段为 `id` + `timestamp`（P1-S4 Hard Gate 口径）
+- `type=OCR` 的引用锚点字段为 `frame_id` + `timestamp`（P1-S4 Hard Gate 口径）；`type=UI` 的引用锚点字段为 `frame_id` + `timestamp`（P1-S4 Hard Gate 口径）
 - `content_type=ocr` 时 response 只含 `type=OCR`；`content_type=accessibility` 时只含 `type=UI`；`content_type=all` 时混合
-- `type=UI` 的 `content.text` 来源于 `accessibility.text_content`；`content.id` 为 `accessibility.id`（非 `frame_id`）；`file_path`/`frame_url`/`device_name` 通过 LEFT JOIN frames 获取（`frame_id` 为 NULL 时这些字段为 null）
+- `type=UI` 的 `content.text` 来源于 `accessibility.text_content`；`content.frame_id` 为 `accessibility.frame_id`（v3 改进，通过外键精确关联截图，避免 screenpipe 的 ±1s 时间窗口模糊匹配）；当 `accessibility.frame_id` 为 NULL 时，`frame_url` 返回 `null`；`file_path`/`frame_url`/`device_name` 通过 LEFT JOIN frames 获取
 - `capture_id`：v3 增强可选字段（可由 `frames.capture_id` 回传），用于观测与回归；不作为 Search 对齐硬门槛
 - `include_frames=true` 时 `content` 中追加 `"frame": "<base64>"` 字段；P1 不实现，始终为 null
 
@@ -327,7 +327,12 @@ paired_capture 处理一帧:
   - 外层协议（前端 ↔ Edge）：HTTP SSE（拓扑适配，per Decision 001A）。
   - 请求：简单 JSON `{message, session_id, images?}`；响应：SSE 透传 Pi 顶层事件（核心 11 种：`message_update`、`tool_execution_start`、`tool_execution_update`、`tool_execution_end`、`agent_start`、`agent_end`、`turn_start`、`turn_end`、`message_start`、`message_end`、`response`），不做 OpenAI format 翻译。`message_update` 内层的 `assistantMessageEvent.type` 子事件（如 `text_delta`、`thinking_start`、`thinking_delta`、`thinking_end`、`content_block_delta`）单独解析，不与顶层事件枚举混用；未知扩展顶层事件按前向兼容处理（记录并忽略或降级展示）。
   - 工具以 Pi SKILL.md 格式定义（对齐 screenpipe），P1-S5 最小集为 `myrecall-search` Skill（对标 `screenpipe-search`），`frame_lookup` 和 `time_range_expansion` 按需在 P1-S7 后拆分。
-  - 软约束引用（DA-8=A）：系统提示与 `myrecall-search` Skill 显式要求输出可解析 deep link：默认使用 `myrecall://frame/{frame_id}`；当结果缺少 `frame_id` 时回退为 `myrecall://timeline?timestamp=ISO8601`。`frame_id`/`timestamp` 必须直接拷贝自检索结果，禁止伪造。P1-S5 不做结构化 citation（`chat_messages.citations` 留空），评估是否在 P1-S7 增加 DA-8B。
+  - 软约束引用（DA-8=A）：系统提示与 `myrecall-search` Skill 显式要求输出可解析 deep link：
+    - OCR 结果：使用 `myrecall://frame/{frame_id}`（frame_id 始终有值）
+    - UI 结果：优先使用 `myrecall://frame/{accessibility.frame_id}`（v3 改进，通过外键精确关联）
+    - 当 `accessibility.frame_id` 为 NULL 时回退 `myrecall://timeline?timestamp=ISO8601`（仅未来独立 walker 场景，P1 不触发）
+    - UI 落点规则：不新增独立 `/frame/:id` 页面；`myrecall://frame/{id}` 在前端统一落到 `/timeline`，并通过 `GET /v1/frames/:frame_id/metadata` 解析 `timestamp` 后定位。
+    - `frame_id`/`timestamp` 必须直接拷贝自检索结果，禁止伪造。P1-S5 不做结构化 citation（`chat_messages.citations` 留空），评估是否在 P1-S7 增加 DA-8B。
   - 模型路由：通过 Pi `--provider`/`--model` 启动参数 + `models.json` 配置控制（对齐 screenpipe）。P1 不做自动 fallback chain（对齐 screenpipe）。
 - P1~P3：chat UI 与会话输入输出由 Edge 页面承载；Host 不负责 UI 与推理。
 - 上述 Chat 能力要求在 P1 达成；P2/P3 不新增 Chat 功能，仅做稳定性与性能治理。
@@ -520,6 +525,8 @@ data: {"type":"response","success":true}
 - `404`：`{"error": "frame not found", "code": "NOT_FOUND", "request_id": "uuid"}`
 
 ### `GET /v1/frames/:frame_id/metadata` 契约（020A）
+
+用途：deep link 导航解析（`myrecall://frame/{frame_id}` -> `timestamp` -> `/timeline` 定位）。
 
 **Response 200 OK：**
 

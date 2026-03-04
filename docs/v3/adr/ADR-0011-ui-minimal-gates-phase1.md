@@ -10,6 +10,7 @@
 
 ## Decision
 - 采用 `012A`：P1 引入“最小可用 UI Gate”，覆盖可用性、可解释性、可恢复性，不引入 UI 架构或视觉重构。
+- P1 不新增独立 frame 页面路由（不引入 `/frame/:id`）；frame 回溯统一落在 `/timeline` 视图内完成（通过 `frame_id -> metadata.timestamp -> timeline` 定位）。
 - 子阶段 UI Gate 基线：
   - P1-S1：`/`、`/search`、`/timeline` 路由可达，健康态/错误态可见。
   - P1-S2：timeline 可见 capture 上传中/入队状态。

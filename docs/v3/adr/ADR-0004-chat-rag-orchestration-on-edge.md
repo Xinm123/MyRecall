@@ -47,16 +47,31 @@ Frontend → POST /v1/chat {message, session_id, images?} → Edge Python Manage
 
 ### Citation 策略（DA-8=A→B 渐进）
 
-- P1-S5：不做结构化 citation 解析（`chat_messages.citations` 字段留空）；通过提示词与 Skill 规则要求 Pi 输出可解析 deep link（默认 `myrecall://frame/{frame_id}`，缺少 `frame_id` 时回退 `myrecall://timeline?timestamp=ISO8601`）。
+- P1-S5：不做结构化 citation 解析（`chat_messages.citations` 字段留空）；通过提示词与 Skill 规则要求 Pi 输出可解析 deep link：
+  - OCR 结果：`myrecall://frame/{frame_id}`
+  - UI 结果：优先 `myrecall://frame/{accessibility.frame_id}`（v3 改进，外键精确关联）
+  - 无 frame_id 时回退 `myrecall://timeline?timestamp=ISO8601`（仅未来独立 walker 场景，P1 不触发）
 - P1-S7 评估点：根据引用覆盖率观测数据决定是否启动 B 阶段（结构化 citation 后处理）。
 - 若 B 阶段启动：在 Manager 层对 Pi 回答做后处理，提取并校验 `frame_id/timestamp`（可选 `capture_id`）写入 `citations` 字段。
 
 ### 运行时依赖（DA-9=C）
 
-- Edge 需安装 bun 运行时 + Pi binary（`bun add -g @mariozechner/pi-coding-agent@<pinned-version>` 或等效方式）。
-- Python Manager 负责检测 bun/Pi 可用性并在缺失时给出安装引导。
+**bundled bun 策略（对齐 screenpipe）：**
+- Edge 捆绑 bun 二进制（与可执行文件同目录），确保 Pi 始终可运行
+- bun 查找顺序：1) 捆绑 bun → 2) ~/.bun/bin/bun → 3) 系统路径
+- Pi 通过 `bun add -g @mariozechner/pi-coding-agent@<pinned-version>` 安装
 
-## screenpipe 参考与对齐
+**自动安装与检测：**
+- Python Manager 启动时自动检测 bun/Pi 可用性
+- 缺失时尝试自动安装（`install_pi.sh` 或内置安装逻辑）
+- 安装失败时记录错误但继续运行，Chat API 返回可用性状态
+
+**P1-S5 Gate 前置验证：**
+- bun --version 可执行
+- pi --version 可执行
+- /v1/chat 返回非 503
+
+**对齐 screenpipe：**
 
 - screenpipe 做法：Tauri app 内嵌 Pi agent（`pi.rs` 1799 行），通过 stdin/stdout JSON Lines 与 Pi RPC 通信，前端通过 Tauri IPC 接收事件。
 - 对齐结论：能力/行为完全对齐（RPC 协议、SKILL.md 工具格式、model routing）；拓扑适配为 HTTP SSE 替代 Tauri IPC（per Decision 001A "行为对齐不做拓扑对齐"）。
