@@ -297,6 +297,7 @@ paired_capture 处理一帧:
 #### API 命名空间冻结（P0-01）
 - MyRecall-v3 对外 HTTP 契约统一使用 `/v1/*`。
 - `/api/*` 为 v2 历史路径：P1-S1~P1-S3 返回 301 重定向至 `/v1/*` + `[DEPRECATED]` 日志；自 P1-S4 起返回 410 Gone 完全废弃。
+  - 重要澄清（P1 Gate scope）：legacy `/api/*` 渐进废弃的验收口径只覆盖 4 个端点：`POST /api/upload`、`GET /api/search`、`GET /api/queue/status`、`GET /api/health`（其余 `/api/*` 行为不纳入 P1 Gate 口径）。完整范围以 `docs/v3/http_contract_ledger.md` §4.0 与各阶段验收文档为准。
 - 兼容 alias（如存在）必须标记为 legacy，且不得作为文档、SDK、验收脚本默认入口。
 
 #### `GET /v1/search` — 完整契约
@@ -444,9 +445,14 @@ Fields:
 Response:
   201 Created  → {"capture_id": "...", "frame_id": 123, "status": "queued", "request_id": "uuid-v4"}
   200 OK       → {"capture_id": "...", "frame_id": 123, "status": "already_exists", "request_id": "uuid-v4"}
-  400          → {"error": "...", "code": "INVALID_PAYLOAD"}
-  413          → {"error": "image too large", "code": "PAYLOAD_TOO_LARGE"}
-  503          → {"error": "queue full", "code": "QUEUE_FULL", "retry_after": 30}
+  400          → {"error": "invalid ingest payload", "code": "INVALID_PARAMS", "request_id": "uuid-v4"}
+  413          → {"error": "image too large", "code": "PAYLOAD_TOO_LARGE", "request_id": "uuid-v4"}
+  503          → {"error": "queue full", "code": "QUEUE_FULL", "retry_after": 30, "request_id": "uuid-v4"}
+  500          → {"error": "internal error", "code": "INTERNAL_ERROR", "request_id": "uuid-v4"}
+
+语义约束（P1-S1，SSOT）：
+- 400/413/503：Edge MUST NOT 创建/修改任何 `frames` 行（因此也 MUST NOT 影响 queue/status 计数）。
+- 201/200：表示该 capture 已被 Edge “接受为幂等成功”（新建或重复），Host 可安全删除对应 spool 项。
 
 GET /v1/ingest/queue/status
 Response:
@@ -458,19 +464,22 @@ Response:
     "failed": 2,
     "processing_mode": "noop",
     "capacity": 200,
-    "oldest_pending_timestamp": "2026-02-26T10:00:00Z"
+    "oldest_pending_ingested_at": "2026-02-26T10:00:00Z"
   }
   字段说明：
-  - pending：等待 Edge 处理管线执行的帧数（P1-S1 为 noop/轻量处理；P1-S3+ 启用 AX-first/OCR-fallback）
-  - processing：当前正在执行 Edge 处理管线的帧数（P1-S1 为 noop/轻量处理；P1-S3+ 启用 AX-first/OCR-fallback）
-  - completed：本次进程启动后累计处理完成并成功入库的帧数（重启清零）
-  - failed：本次进程启动后累计处理失败的帧数（重启清零）
+  - pending：DB 中 `frames.status='pending'` 的行数（实时）。
+  - processing：DB 中 `frames.status='processing'` 的行数（实时）。在 `processing_mode=noop` 下该值允许长期为 0（瞬态不可观测不视为异常）。
+  - completed：DB 中 `frames.status='completed'` 的行数（实时）。
+  - failed：DB 中 `frames.status='failed'` 的行数（实时）。
   - processing_mode：处理模式（SSOT）。
     - noop：P1-S1 固定值；仅驱动队列状态机流转与可观测性闭环，不做 AX/OCR/Embedding 等任何推理路径。
     - ax_ocr：P1-S3+ 可用；启用 AX-first + OCR-fallback 管线与 Scheme C 分表写入。
   - capacity：队列最大容量（固定配置值）；pending >= capacity 时 ingest 返回 503 QUEUE_FULL
-  - oldest_pending_timestamp：最早一条 pending 帧的 timestamp（UTC ISO8601）；null 表示队列为空；
+  - oldest_pending_ingested_at：最早一条 pending 帧的 `frames.ingested_at`（UTC ISO8601）；null 表示队列为空；
     Host 可用此字段判断队列是否卡死（如超过 5 分钟未推进则告警）
+
+计数一致性约束（P1-S1，SSOT）：
+- `GET /v1/ingest/queue/status` 的四个计数 MUST 与 DB 中对应 status 的行数一致（不允许使用“进程启动后累计计数器”替代）。
 ```
 
 #### P1-S1 处理语义：QueueDriver（noop）
@@ -479,7 +488,8 @@ P1-S1 的 "processing" 定义为 noop/轻量处理，其目标仅是驱动状态
 本阶段不引入 AX-first/OCR-fallback 与任何模型/推理路径（P1-S3 才启用）。
 
 - Edge MUST 启动一个后台 QueueDriver（worker），用于异步推进状态：
-  pending -> processing -> completed
+  pending -> completed
+  （允许实现上经过 processing，但 Gate/脚本不得依赖 processing 的可观测性）
 - Edge MUST 在 `/v1/ingest/queue/status` 响应中返回 `processing_mode` 字段：
   `"noop"` | `"ax_ocr"`。
   P1-S1 固定为 `"noop"`；P1-S3+ 允许为 `"ax_ocr"`。

@@ -91,6 +91,7 @@ references:
 23. OQ-023 = A：Migration 策略采用手写 SQL + `schema_migrations` 跟踪表，零额外依赖；文件命名 `YYYYMMDDHHMMSS_描述.sql` 对齐 screenpipe；P1 全量 DDL 放入 `20260227000001_initial_schema.sql`；`ocr_text_embeddings` 表推迟至 P2+ migration 新增；已执行迁移不得修改。
 
 24. OQ-024 = A（2026-03-04 补充）：API 命名空间冻结：v3 对外 HTTP 契约统一 `/v1/*`；`/api/*` P1-S1 返回 301 重定向至 `/v1/*` + `[DEPRECATED]` 日志，P1-S4 返回 410 Gone 完全废弃；不纳入客户端默认调用路径。
+   - 重要澄清（P1 Gate scope）：legacy `/api/*` 渐进废弃的验收口径以 `docs/v3/http_contract_ledger.md` §4.0 为准，仅覆盖 `POST /api/upload`、`GET /api/search`、`GET /api/queue/status`、`GET /api/health`（其余 `/api/*` 行为不纳入 P1 Gate 口径）。
 
 ### 已拍板结论（2026-03-02）
 

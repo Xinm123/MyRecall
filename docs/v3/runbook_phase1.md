@@ -100,7 +100,14 @@ curl -sS "http://localhost:${OPENRECALL_PORT:-8083}/v1/health"
 
 3) Legacy namespace behavior (transitional):
 
-P1-S1 ~ P1-S3 expects `/api/*` legacy endpoints to return `301` to `/v1/*` plus `[DEPRECATED]` logs.
+P1-S1 ~ P1-S3 expects the following legacy endpoints to return `301` to their `/v1/*` replacements plus `[DEPRECATED]` logs (P1 Gate scope):
+
+- `POST /api/upload`  -> `POST /v1/ingest`
+- `GET  /api/search`  -> `GET  /v1/search`
+- `GET  /api/queue/status` -> `GET  /v1/ingest/queue/status`
+- `GET  /api/health`  -> `GET  /v1/health`
+
+Note: other `/api/*` routes (if any) are out of P1 Gate scope; do not implement a catch-all `/api/*` redirect.
 
 ```bash
 curl -i "http://localhost:${OPENRECALL_PORT:-8083}/api/health"
@@ -124,8 +131,8 @@ Recommended (simple, reproducible): stop Edge process temporarily
 5) Verify Host uploader automatically resumes and drains the spool until all buffered captures are accepted.
 
 Note:
-- Restarting Edge resets any in-memory counters defined as "since process start" (e.g. `/v1/ingest/queue/status` `completed`/`failed`).
-  When using this injection method, validate outcomes using DB evidence and/or windowed deltas in the acceptance record.
+- Queue/status 计数口径以 DB 实时状态为准（SSOT：`docs/v3/spec.md` §4.7），Edge 重启不应改变计数语义。
+- 若你在断连窗口中同时切换了 Edge data dir（导致 SQLite DB 变化/清空），则计数会随 DB 一并变化；此时应以“同一 DB 实例”的证据完成验收。
 
 ## 7. Restart Policy Across P1-S1 ~ P1-S7
 
@@ -169,8 +176,8 @@ Procedure (per substage boundary):
 4) Re-run sanity checks (Section 6) before starting the next substage.
 
 Caveats:
-- Some server-side counters are defined as "since process start" and reset on restart (e.g. `/v1/ingest/queue/status` `completed`/`failed`).
-  In strict isolation mode, prefer DB-backed queries / windowed deltas for acceptance metrics.
+- Queue/status 计数口径以 DB 实时状态为准（SSOT：`docs/v3/spec.md` §4.7）。
+- Strict isolation mode 下如果每个子阶段使用新的 data dir（新的 SQLite DB），则计数会从空 DB 开始；如果复用同一 data dir，则计数会在子阶段间延续。
 
 Restart Edge when:
 - Edge API contract changes
