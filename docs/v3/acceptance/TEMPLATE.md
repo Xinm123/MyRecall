@@ -12,6 +12,15 @@
 - 目标：
 - 对应 Gate 条件：
 
+### 1.1 HTTP 契约 delta（本阶段，scope=对外 HTTP）
+
+- SSOT：`MyRecall/docs/v3/http_contract_ledger.md`
+- 要求：必须列出本阶段相对上一阶段的 HTTP 契约变化（ADD/DEPRECATE/REMOVE/CHANGE/RETAIN）。未列出的 baseline 默认视为 `RETAIN`。
+
+| 类型 | 接口 | 变化/说明 | SSOT |
+|---|---|---|---|
+| ADD/DEPRECATE/REMOVE/CHANGE/RETAIN | METHOD `/v1/...` or legacy `/api/...` (see `http_contract_ledger.md`) | ... | `spec.md`/`roadmap.md`/`open_questions.md` |
+
 ## 2. 环境与输入
 
 - 运行环境：
@@ -45,7 +54,7 @@
 
 - 功能清单完成率（目标 100%）：
 - API/Schema 契约完成率（目标 100%）：
-- API 命名空间一致性（验收脚本主流程仅 `/v1/*`；旧 `/api/*` 仅用于废弃回归检查并按阶段策略验证 301/410，目标 100%）：
+- API 命名空间一致性（验收脚本主流程仅 `/v1/*`；旧 `/api/*` 仅对以下 legacy 端点做废弃回归检查：`POST /api/upload`、`GET /api/search`、`GET /api/queue/status`、`GET /api/health`；并按阶段策略验证 301/410，目标 100%）：
 - 关键功能用例通过率（目标 >= 95%）：
 
 ### 4.3 完善度指标（强制）

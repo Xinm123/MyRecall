@@ -31,6 +31,38 @@
 | G-17 | accessibility.frame_id    | 无（±1s time window LEFT JOIN frames）         | frame_id DEFAULT NULL 精确关联          | v3 改进    | [E-25]       | paired_capture 填入，独立 walker 留 NULL |
 
 
+## 1.5 排序策略对齐声明
+
+> 本节明确声明 v3 设计与 screenpipe 在排序策略上的对齐情况，作为设计层共识的单一事实来源。
+
+### 排序逻辑对照
+
+| 场景 | screenpipe | v3 设计 | 对齐状态 |
+|------|-----------|---------|---------|
+| `content_type=ocr`, q 空 | `ORDER BY timestamp DESC` | `ORDER BY frames.timestamp DESC` | ✅ 100% |
+| `content_type=ocr`, q 非空 | `ORDER BY ocr_text_fts.rank, timestamp DESC` | `ORDER BY ocr_text_fts.rank, frames.timestamp DESC` | ✅ 100% |
+| `content_type=accessibility`, q 空 | `ORDER BY timestamp DESC` | `ORDER BY accessibility.timestamp DESC` | ✅ 100% |
+| `content_type=accessibility`, q 非空 | `ORDER BY accessibility_fts.rank, timestamp DESC` | `ORDER BY accessibility_fts.rank, a.timestamp DESC` | ✅ 100% |
+| `content_type=all`, 任意 q | 先分别按 rank 排序，合并后**仅按 timestamp DESC**（丢弃各自 rank） | 同 screenpipe：`merged = sorted(..., key=timestamp, reverse=True)` | ✅ 100% |
+
+**关键发现**：v3 与 screenpipe 在 `content_type=all` 时均**丢弃 BM25 rank，仅按 timestamp 排序**。这是有意对齐，非遗漏。P2+ 可评估是否需要跨路径 rank 融合。
+
+### 证据
+
+- v3: `data-model.md` §3.0.3 路由规则（第 346-349, 437-442, 468-473 行）
+- screenpipe: `db.rs:2026-2041` 全局排序逻辑
+
+### 整体对齐状态
+
+| 维度 | 对齐率 |
+|------|--------|
+| API 参数 | ~92%（G-01..G-17 汇总） |
+| 排序策略 | 100% |
+| FTS 规范化 | 100%（D1=B） |
+| DB Schema | 100%（Scheme C 适配后） |
+
+---
+
 ## 2. 实现层差异（当前代码 vs v3 spec）
 
 对齐判定：**不能对齐（~8%）**

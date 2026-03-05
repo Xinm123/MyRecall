@@ -84,6 +84,10 @@ references:
 - 公式：`dedup_skip_rate = (dedup_skipped / dedup_eligible) * 100%`
 - 阈值：`>= 95%`
 - 最小样本：`dedup_eligible >= 500`
+- **实现要求**（P1-S2 验收前需完成）：
+  - `dedup_eligible`：非 `idle/manual` 触发且距上次写入 < 30s 的事件计数
+  - `dedup_skipped`：`content_hash` 匹配导致跳过写入的计数
+  - 需实现：Edge /v1/ingest 逻辑中维护 per-device 状态（last_content_hash, last_write_time）
 
 4. `inter_write_gap_sec`（Hard Gate）
 - 公式：相邻两次成功写入时间差（秒）构成样本分布。

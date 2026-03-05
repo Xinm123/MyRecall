@@ -33,19 +33,21 @@ Notes:
 Default `pytest` excludes markers: `e2e`, `perf`, `security`, `model`, `manual`.
 (`pytest.ini` uses `--strict-markers` and marker filtering in `addopts`.)
 
+Note: Legacy test files are archived in `tests/archive/` and excluded from default runs.
+
 ```bash
 # Run default suite
 pytest
 
 # Run one test file
-pytest tests/test_phase5_buffer.py
+pytest tests/test_<module>.py
 
 # Run one class or one test function
-pytest tests/test_phase5_buffer.py::TestLocalBuffer
-pytest tests/test_phase5_buffer.py::TestLocalBuffer::test_enqueue_creates_files
+pytest tests/test_<module>.py::TestClass
+pytest tests/test_<module>.py::TestClass::test_function
 
 # Run tests by substring
-pytest -k "test_enqueue_creates_files"
+pytest -k "test_function_name"
 
 # Marker-based runs
 pytest -m unit

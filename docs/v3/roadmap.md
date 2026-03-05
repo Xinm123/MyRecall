@@ -37,8 +37,8 @@ references:
 - 执行规则：P1-S1 -> P1-S2 -> P1-S3 -> P1-S4 -> P1-S5 -> P1-S6 -> P1-S7 串行推进；每阶段必须先通过验收 Gate。
 - P1-S1（基础链路，2026-03-02 ~ 2026-03-05）
   - 交付：
-    - Host spool + uploader（幂等、可续传）
-    - Edge ingest + queue + processing pipeline 骨架
+    - Host spool + uploader（磁盘持久化，复用 v2 LocalBuffer，幂等、可续传）
+    - Edge ingest + queue + frame 持久化（JPEG）+ 状态机骨架（不含 AX/OCR）
     - 图片格式主契约统一（主采集/主读取链路 JPEG）
     - Edge 继续承载现有 Flask 页面（`/`、`/search`、`/timeline`）
     - UI 基线可用（路由可达 + 基础健康态/错误态可见）
@@ -54,7 +54,11 @@ references:
   - 交付：
     - Host 事件驱动 capture（app switch/click/idle）+ manual trigger + idle fallback（P1 触发枚举：`idle/app_switch/manual/click`；`window_focus` 不纳入 P1）
     - Host 采集 accessibility 文本并上传
-    - 高频事件抑制链路（对齐 screenpipe）：共享去抖（`min_capture_interval_ms`，默认 200ms）+ 内容去重（非 `idle/manual`）+ 有界通道 lag 折叠
+- 高频事件抑制链路（对齐 screenpipe）：
+  - 共享去抖（`min_capture_interval_ms`，默认 200ms）✅ 已对齐
+  - **幂等去重（capture_id）：待实现**
+  - **内容去重（content_hash）：待实现**（非 idle/manual + 30s 保底）
+  - 有界通道 lag 折叠
     - Timeline 可见 capture 上传中/已入队状态
   - Gate：
     - 入队时延 Gate：压测窗口（5 分钟）`enqueue_latency_p95 <= 3s`（`eligible_events >= 200`）

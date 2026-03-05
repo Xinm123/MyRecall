@@ -135,8 +135,43 @@ flowchart LR
 - 已拍板（OQ-004=A）：Host 采集 accessibility 文本并随 capture 上传；Host 不做 OCR/embedding 推理。
 - 事件风暴抑制（对齐 screenpipe）：
   - 全触发共享最小间隔去抖（`min_capture_interval_ms`，默认 200ms）；
-  - 非 `idle/manual` 触发启用内容去重（accessibility hash 相同则跳过写入），并保留 30s 强制落盘保底；
+  - 非 `idle/manual` 触发启用内容去重（`content_hash` 相同则跳过写入），并保留 30s 强制落盘保底；
   - 触发通道有界，lag 时折叠为一次兜底触发，避免高频事件拖垮处理链路。
+
+**内容去重实现（对齐 screenpipe event_driven_capture.rs）**：
+```
+# Edge /v1/ingest 伪代码（待实现）
+def handle_ingest(payload):
+    # 1. capture_id 幂等（待实现：DB UNIQUE 约束 + INSERT OR IGNORE）
+    if _exists_capture_id(payload.capture_id):
+        return {"status": "already_exists"}
+    
+    # 2. 内容去重（待实现：非 idle/manual + 30s 保底）
+    device = payload.device_name
+    if payload.capture_trigger not in ('idle', 'manual'):
+        last_hash = _get_last_content_hash(device)
+        last_write = _get_last_write_time(device)
+        
+        # 30s 强制写入保底
+        if (now - last_write).total_seconds() < 30:
+            if payload.content_hash and payload.content_hash == last_hash:
+                _record_dedup_skip()  # 计数器
+                return {"status": "dedup_skipped", "capture_id": payload.capture_id}
+    
+    # 3. 写入 DB
+    _insert_frame(payload)
+    _set_last_content_hash(device, payload.content_hash)
+    _set_last_write_time(device, now)
+    return {"status": "created"}
+```
+
+**关键参数对齐**：
+| 参数 | screenpipe | MyRecall v3 P1 |
+|------|-----------|----------------|
+| `min_capture_interval_ms` | 200 | 200 |
+| `idle_capture_interval_ms` | 30000 | 30000 |
+| dedup 保底写入窗口 | 30s | 30s |
+| dedup 排除触发 | idle, manual | idle, manual |
 
 ### 对齐结论
 - 对齐级别：高度对齐（P1 即达到行为对齐）。
@@ -439,6 +474,13 @@ Response:
 **去重机制**：`frames.capture_id` UNIQUE 约束（DB 层），Edge 收到重复 capture_id 时 INSERT OR IGNORE，返回 200。
 
 **图片格式口径（P1）**：主采集/主读取链路统一 JPEG。`frames.snapshot_path` 指向 JPEG 文件（推荐 `.jpg`），`GET /v1/frames/:frame_id` 固定返回 `Content-Type: image/jpeg`。
+
+**Host spool 实现**：
+- 复用 v2 `LocalBuffer` 实现（`openrecall/client/buffer.py`）
+- spool 路径：`~/MRC/spool`
+- 持久化策略：磁盘文件（`.webp` + `.json`），原子写入
+- 进程重启/断电/断网恢复后自动续传
+- 幂等依赖 Edge `/v1/ingest` 的 `capture_id` + DB UNIQUE 约束
 
 **Client 重试策略（P1）**：
 - exponential backoff：1s → 2s → 4s → 8s → 上限 60s
