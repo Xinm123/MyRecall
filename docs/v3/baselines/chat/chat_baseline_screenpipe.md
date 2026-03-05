@@ -3,7 +3,7 @@
 - 版本：v1.2
 - 日期：2026-03-03
 - 适用范围：Chat 功能架构评审，为 MyRecall-v3 Chat 对齐/不对齐分析提供 screenpipe 侧事实基线
-- 核查方法：直接阅读 screenpipe 源码（`/Users/pyw/old/screenpipe/`），所有结论附文件路径 + 行为描述
+- 核查方法：直接阅读 screenpipe 源码（`_ref/screenpipe/`），所有结论附文件路径 + 行为描述
 - 原则：无法确认的内容标注"🟡 待验证"，禁止臆断
 
 ---

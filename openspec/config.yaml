@@ -1,6 +1,6 @@
 schema: spec-driven
 context: |
-  Project: MyRecall-v3 (Edge-centric, vision-only). Reference repo: /Users/pyw/old/screenpipe
+  Project: MyRecall-v3 (Edge-centric, vision-only). Reference repo: _ref/screenpipe
   Current substage: P1-S1 (基础链路)
   SSOT documents (MUST read before writing any artifact; do not invent behavior):
   - docs/v3/spec.md (key: §4.7 ingest/queue + Host spool; §4.8.1 UI health; §4.9 endpoints)
@@ -9,28 +9,18 @@ context: |
   - docs/v3/runbook_phase1.md (run/verify commands; legacy /api/* note)
   - docs/v3/acceptance/phase1/p1-s1.md (acceptance steps 1-10; evidence expectations)
   - docs/v3/data-model.md (DDL + status fields; DB is counter source)
-  Docs policy:
-  - Any edits under docs/v3 require explicit user confirmation before applying patches.
-  - Do not paste API keys/secrets into docs or acceptance records.
   Phase 1 topology (SSOT: docs/v3/runbook_phase1.md):
-  - Host=openrecall/client -> Edge=openrecall/server
-  - Edge is the only HTTP server (single inbound port; default OPENRECALL_PORT=8083)
   - Start via wrappers: ./run_server.sh --debug and ./run_client.sh --debug
   Scope invariants:
   - Vision-only for P1-P3 (no audio).
   - P1-S1 processing_mode=noop (details in SSOT: docs/v3/spec.md §4.7).
-  - Legacy /api/* scope and 301/410 rules are SSOT: docs/v3/http_contract_ledger.md §4 (do not restate).
+  - Legacy /api/* scope and 301/410 rules are SSOT: docs/v3/http_contract_ledger.md §4.
   P1-S1 non-goals (MUST list in proposal):
   - /v1/search availability (P1-S4+)
   - /v1/chat availability (P1-S5+)
   - AX-first/OCR-fallback processing (P1-S3+)
   - Event-driven capture on Host (P1-S2)
   - TLS/mTLS enforcement (P2+)
-  Acceptance scope reminder (P1-S1):
-  - Host spool new-write JPEG requirement IS IN SCOPE for P1-S1 acceptance (SSOT: docs/v3/spec.md §4.7 + docs/v3/acceptance/phase1/p1-s1.md step 9). Do not treat it as non-goal.
-  Anchor strings below are frozen for P1-S1 scope.
-  Sources: docs/v3/spec.md §4.7/§4.8.1/§4.9; docs/v3/gate_baseline.md §3.3; docs/v3/acceptance/phase1/p1-s1.md.
-  If a new anchor is needed, propose a docs/v3 patch first (wait for user approval).
   ASCII Anchors (literal-match; do not translate/paraphrase):
   - MRV3 processing_mode=noop
   - MRV3 frame_failed reason=
@@ -44,38 +34,22 @@ context: |
   - healthy
   - unreachable
   - degraded
-  Gate Copy Anchors (CN; literal-match where SSOT says "必须包含"):
+  Gate Copy Anchors (CN):
   - 服务健康/队列正常
   - Edge 不可达
 rules:
   proposal:
-    - Output language: Chinese. Keep all ASCII Anchors exactly literal.
-    - Follow proposal template sections: Why / What Changes / Capabilities / Impact.
-    - Add a short section: "Acceptance Scope (P1-S1)" (high-level only; do not duplicate SSOT step-by-step evidence).
-    - Must include "Non-Goals (P1-S1)" using the non-goals listed in project context (no invented scope).
-    - Capabilities naming guidance (kebab-case; keep small): ingest, queue-observability, frame-serving, health-endpoint, legacy-deprecation, ui-health-gate.
-    - Do not edit docs/v3 in artifacts; if SSOT needs change, describe the proposed patch and wait for user approval.
+    - "Output language: Chinese. Keep all ASCII Anchors exactly literal."
+    - Always include a "Non-goals" section
+    - "Capabilities naming guidance (kebab-case; keep small): ingest, queue-observability, frame-serving, health-endpoint, legacy-deprecation, ui-health-gate."
   specs:
-    - Output language: Chinese. Keep all ASCII Anchors exactly literal.
-    - Do not copy full SSOT contracts; instead: each Requirement must be self-contained + testable, then cite SSOT sections for full details.
-    - Use the spec template rigorously: ADDED/MODIFIED/REMOVED requirements; each includes at least one Scenario with explicit WHEN/THEN.
+    - "Output language: Chinese. Keep all ASCII Anchors exactly literal."
     - Classify changes from the external contract perspective (/v1 and legacy behavior) rather than current code state (/api existing).
-    - For legacy namespace behavior, reference docs/v3/http_contract_ledger.md rules; do not restate the full mapping table.
-    - If a requirement implies changing SSOT, present it as a docs/v3 patch proposal (no silent divergence).
   design:
-    - Output language: Chinese. Keep all ASCII Anchors exactly literal.
-    - Design must be codebase-grounded: reference existing entry points under openrecall/server and openrecall/client, and propose concrete file/module layout for new /v1 endpoints and legacy 301 handling.
-    - Explicitly describe how P1-S1 enforces noop mode (no model/provider preload; what is gated, where the literal log anchors are emitted).
+    - "Output language: Chinese. Keep all ASCII Anchors exactly literal."
+    - "Design must be codebase-grounded: reference existing entry points under openrecall/server and openrecall/client, and propose concrete file/module layout for new /v1 endpoints and legacy 301 handling."
     - For each key decision, if screenpipe has a comparable pattern, cite the screenpipe file path + what is aligned vs intentionally different.
-    - Do not edit docs/v3 in artifacts; if SSOT needs change, describe the proposed patch and wait for user approval.
   tasks:
-    - Output language: Chinese. Keep all ASCII Anchors exactly literal.
-    - tasks.md must be split into two top-level sections:
-      - "## Implementation Tasks" (code changes only)
-      - "## Acceptance Verification (P1-S1)" (verification actions; must map 1:1 to docs/v3/acceptance/phase1/p1-s1.md steps 1-10)
-    - Every implementation task must be atomic (target: finish + verify in < 30 minutes) and include:
-      - expected result
-      - concrete verification (curl/log literal-match/DOM anchor check; pytest scope if applicable)
-    - Acceptance Verification step 9 must cover BOTH:
-      - GET /v1/frames/:frame_id response header Content-Type: image/jpeg
-    - Ensure tasks include safeguards for literal-match anchors (log lines, DOM selectors, 301+Location behavior).
+    - "Output language: Chinese. Keep all ASCII Anchors exactly literal."
+    - 'tasks.md must be split into two top-level sections: "## Implementation Tasks" (code changes only) and "## Acceptance Verification (P1-S1)" (verification actions)'
+    - 'Every implementation task must be atomic (target: finish + verify in < 30 minutes)'

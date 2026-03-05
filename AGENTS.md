@@ -8,6 +8,7 @@ Use it as the operational source of truth for commands and coding conventions.
 - OpenRecall is a privacy-first local memory system (screenshot capture + AI + search).
 - Architecture is split into `openrecall/client` and `openrecall/server`.
 - Main entry points are module runs (`python -m openrecall.*`) and wrapper scripts.
+- Reference repo: `_ref/screenpipe`.
 
 ## Build / Run Commands
 

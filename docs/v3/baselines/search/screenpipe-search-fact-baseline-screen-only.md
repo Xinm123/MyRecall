@@ -1,7 +1,7 @@
 # screenpipe Search 事实基线（仅屏幕链路）
 
 > 生成日期：2026-03-02
-> 数据来源：screenpipe 代码库（/Users/pyw/old/screenpipe），截至 2026-03 在库版本
+> 数据来源：screenpipe 代码库（`_ref/screenpipe`），截至 2026-03 在库版本
 > 链路标记：仅屏幕（不含 audio/speaker）
 
 ## 1. API 层

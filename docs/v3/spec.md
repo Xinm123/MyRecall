@@ -28,7 +28,7 @@ depends_on:
 
 > **引用规则**：跨文档引用使用相对路径 + heading slug，例如 `[data-model.md#303-ddledge-sqlite](data-model.md#303-ddledge-sqlite)`。禁止引用行号。
 > **依赖规则**：front matter 的 `depends_on` 仅用于自动化拓扑依赖（必须可 DAG 排序）；文档互引请使用 `references` 字段，不得用互相 `depends_on` 表达。
-> **参考基准**：本文档中所有 screenpipe 代码引用（如 `db.rs:1850-2054`、`paired_capture.rs`）均基于本地路径 `~/old/screenpipe`；审计/复现时以此路径为准。
+> **参考基准**：本文档中所有 screenpipe 代码引用（如 `db.rs:1850-2054`、`paired_capture.rs`）均基于仓库内路径 `_ref/screenpipe`；审计/复现时以此路径为准。
 
 ## 1. 先把矛盾讲清楚（必须取舍）
 
@@ -92,7 +92,7 @@ flowchart LR
 
 ## 4. 决策点逐项评审（含 screenpipe 对齐）
 
-> **screenpipe 参考位置**：`~/old/screenpipe`。本节所有代码引用、行号标注均基于该路径。
+> **screenpipe 参考位置**：`_ref/screenpipe`。本节所有代码引用、行号标注均基于该路径。
 
 ### 4.1 使用场景与 non-goals
 
