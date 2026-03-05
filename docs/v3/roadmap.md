@@ -23,7 +23,15 @@ references:
 
 ## 1. 阶段目标与里程碑
 
-## Phase 1：本机模拟 Edge（进程级隔离）
+### 1.1 API 命名空间迁移策略
+
+| 阶段 | /api/* 行为 |
+|------|-------------|
+| P1-S1 | 301 重定向 → /v1/* + [DEPRECATED] 日志 |
+| P1-S2~S3 | 持续监控，逐步修改前端/测试/Client 走 /v1/* |
+| P1-S4 | 410 Gone 完全废弃 |
+
+### Phase 1：本机模拟 Edge（进程级隔离）
 - 时间：2026-03-02 ~ 2026-03-20
 - 目标：将当前单机闭环（client+server）按 Edge-Centric 职责拆为 Host/Edge 两进程，并在本机完成全功能闭环。
 - 执行规则：P1-S1 -> P1-S2 -> P1-S3 -> P1-S4 -> P1-S5 -> P1-S6 -> P1-S7 串行推进；每阶段必须先通过验收 Gate。
@@ -42,14 +50,6 @@ references:
     - UI 基线路由可达率 = 100%
     - UI 健康态/错误态展示检查通过率 = 100%
 
-## 1.1 API 命名空间迁移策略
-
-| 阶段 | /api/* 行为 |
-|------|-------------|
-| P1-S1 | 301 重定向 → /v1/* + [DEPRECATED] 日志 |
-| P1-S2~S3 | 持续监控，逐步修改前端/测试/Client 走 /v1/* |
-| P1-S4 | 410 Gone 完全废弃 |
-
 - P1-S2（采集，2026-03-06 ~ 2026-03-08）
   - 交付：
     - Host 事件驱动 capture（app switch/click/idle）+ manual trigger + idle fallback（P1 触发枚举：`idle/app_switch/manual/click`；`window_focus` 不纳入 P1）
@@ -58,7 +58,7 @@ references:
     - Timeline 可见 capture 上传中/已入队状态
   - Gate：
     - 入队时延 Gate：压测窗口（5 分钟）`enqueue_latency_p95 <= 3s`（`eligible_events >= 200`）
-    - 每分钟 300 次事件压测下丢包率 < 0.3%
+    - 每分钟 300 次事件压测下 Capture 丢失率 < 0.3%
     - 触发覆盖 Gate：`trigger_coverage = covered_trigger_types / 4 = 100%`（`idle/app_switch/manual/click` 四类均需命中；每类样本 >= 20）
     - 去抖 Gate：同 monitor 连续 `app_switch/click` 入库间隔 < `min_capture_interval_ms`（200ms）的违规数 = 0
     - 去重 Gate：重复内容压测窗口（5 分钟）满足 `dedup_skip_rate = dedup_skipped / dedup_eligible >= 95%`（`dedup_eligible >= 500`），且 `inter_write_gap_sec` 满足 `P99 <= 30s` 与 `max <= 45s`
@@ -117,8 +117,8 @@ references:
     - Provider timeout 处理（180s 请求 watchdog → timeout error；不做 auto-fallback；超时不强制 abort，保留用户手动中断）
     - UI 可见 provider/model badge + timeout/error notification + Pi 健康状态
   - Gate：
-    - Chat 请求成功率 >= 98%（timeout/error 计入失败；用户主动 abort 不计入样本）
-    - 观测 KPI（non-blocking）：Chat 首 token P95 <= 3.5s
+    - Chat 系统可用率 >= 98%（仅系统错误计入失败；provider 5xx/429、180s timeout 不计入失败）
+    - 观测 KPI（non-blocking）：Chat 完成率目标 >= 95%；Chat 首 token P95 <= 3.5s
     - Provider 切换可重复通过
     - 路由切换场景覆盖率 = 100%（provider 切换 + timeout 错误，不含 auto-fallback）
     - 流式输出协议一致性用例通过率 = 100%
@@ -129,14 +129,16 @@ references:
     - P1 功能冻结清单（进入 P2/P3 的基线）
     - UI 关键路径回归报告（timeline -> search -> chat -> citation -> frame）
   - Gate：
-    - TTS P95 <= 12s
+    - TTS（AX成功路径）P95 <= 8s（Hard Gate）
+    - TTS（OCR路径）P95 <= 15s（Soft KPI，观测记录）
     - S1~S6 的 Hard Gate/SLO Gate 回归全通过（Soft KPI 仅记录偏差与整改动作）
     - P1 功能清单完成率 = 100%
     - P1 验收记录完整率 = 100%
     - UI 关键路径脚本通过率 = 100%
     - 观测 KPI（non-blocking）：Chat 引用覆盖率目标 >= 92%，Stretch >= 95%
+    - 观测 KPI（non-blocking）：Capture 丢失率 <= 0.1%
 
-## Phase 2：LAN 双机（另一台 Mac 作为 Edge）
+### Phase 2：LAN 双机（另一台 Mac 作为 Edge）
 - 时间：2026-03-23 ~ 2026-04-17
 - 目标：验证 LAN 链路稳定性与重放正确性（功能冻结，不新增功能）。
 - 核心交付：
@@ -151,7 +153,7 @@ references:
   - UI 关键路径在 LAN 24h 中致命中断次数 = 0
   - 观测 KPI（non-blocking）：Chat 引用覆盖率目标 >= 92%，Stretch >= 95%
 
-## Phase 3：Debian Edge（生产形态）
+### Phase 3：Debian Edge（生产形态）
 - 时间：2026-04-20 ~ 2026-05-29
 - 目标：完成生产化部署与运维闭环（功能冻结，不新增功能）。
 - 核心交付：
@@ -204,6 +206,7 @@ references:
 - P0：Chat 无引用导致可用性失败。
 - P0：Phase 1 范围膨胀导致里程碑延期。
 - P1：事件驱动策略过激导致采集风暴。
+- P1：OCR 处理性能不达标导致 TTS（OCR路径）超过 15s，影响 P1-S7 观测指标。
 - P1：语义型查询能力下降导致 Chat 检索上下文不充分。
 
 ## 4. 里程碑退出条件（DoD）

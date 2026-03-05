@@ -39,7 +39,7 @@
 - 指标样本数：
   - Capture（丢失率/重放一致性）：>= 200 captures（建议 >= 1000）
   - Search：>= 200 queries
-  - Chat 请求成功率：>= 100 requests
+  - Chat 系统可用率：>= 100 requests
   - Citation Coverage（Soft KPI）：>= 100 个问答样本
 - 统计时间窗：
   - 主窗：连续 24h soak

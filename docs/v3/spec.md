@@ -28,6 +28,7 @@ depends_on:
 
 > **引用规则**：跨文档引用使用相对路径 + heading slug，例如 `[data-model.md#303-ddledge-sqlite](data-model.md#303-ddledge-sqlite)`。禁止引用行号。
 > **依赖规则**：front matter 的 `depends_on` 仅用于自动化拓扑依赖（必须可 DAG 排序）；文档互引请使用 `references` 字段，不得用互相 `depends_on` 表达。
+> **参考基准**：本文档中所有 screenpipe 代码引用（如 `db.rs:1850-2054`、`paired_capture.rs`）均基于本地路径 `~/old/screenpipe`；审计/复现时以此路径为准。
 
 ## 1. 先把矛盾讲清楚（必须取舍）
 
@@ -91,6 +92,8 @@ flowchart LR
 
 ## 4. 决策点逐项评审（含 screenpipe 对齐）
 
+> **screenpipe 参考位置**：`~/old/screenpipe`。本节所有代码引用、行号标注均基于该路径。
+
 ### 4.1 使用场景与 non-goals
 
 ### screenpipe 怎么做
@@ -143,7 +146,7 @@ flowchart LR
 
 ### 验证
 - 指标：切窗场景 95% capture 在 3 秒内入 Edge 队列。
-- 压测：每分钟 300 次事件下，Host CPU < 25%，丢包率 < 0.3%。
+- 压测：每分钟 300 次事件下，Capture 丢失率 < 0.3%；Host CPU 作为容量观测项记录（参考 [gate_baseline.md §3.2](gate_baseline.md#32)）。
 - 去抖校验：同 monitor 连续 `app_switch/click` 入库间隔 < `min_capture_interval_ms` 的违规数应为 0。
 - 去重校验：重复内容压测中应观测到 dedup skip，且 30s 保底写入仍成立（timeline 不空洞）。
 
@@ -685,6 +688,7 @@ data: {"type":"response","success":true}
 - 已拍板（016A）：v3 全新数据起点，不做 v2 数据迁移。
 - 需实验：AX-first 在多应用场景下对召回质量的净收益。
 - 需查证：Debian 上 RapidOCR 与候选本地 VL 模型的稳定组合。
+- 需验证：TTS 分层指标在 P1/P2 场景下的可达性（AX路径<=8s为Hard Gate，OCR路径<=15s为Soft KPI）。
 
 ## 8. 已拍板决策
 

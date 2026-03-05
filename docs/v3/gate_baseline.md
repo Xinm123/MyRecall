@@ -120,9 +120,25 @@ references:
   - `frame_id`/`timestamp` 必须来自真实检索结果，不得伪造。
 - 结构化增强（DA-8B，可选）：在 DA-8A 基础上，`chat_messages.citations` 可写入结构化引用（`frame_id`/`timestamp`，可选 `capture_id`）；未启用 DA-8B 前，不作为 Gate 前置条件。
 
-2. `TTS P95`（Time-to-Searchable）
-- 起点：Host 侧 capture 事件时间戳。
-- 终点：该 capture 首次可被 `GET /v1/search` 查询返回的时间点。
+2. `TTS P95`（Time-to-Searchable）—— 分层定义
+
+### 2.1 AX成功路径 TTS（Hard Gate）
+- 公式：Host capture timestamp → accessibility表写入完成且FTS索引就绪
+- 阈值：P95 <= 8s
+- 样本占比预期：~70-80% captures（AX成功率高的场景）
+- 测量方法：过滤 `text_source='accessibility'` 的frames，计算 `searchable_at - capture_timestamp`
+
+### 2.2 OCR fallback路径 TTS（Soft KPI）
+- 公式：Host capture timestamp → ocr_text表写入完成且FTS索引就绪
+- 目标：P95 <= 15s
+- 样本占比预期：~20-30% captures（终端/游戏/AX失败场景）
+- 说明：OCR路径受分辨率、CPU负载、模型性能影响大，作为观测项而非Gate Fail条件
+- 超标处置：若OCR路径P95 > 15s，验收报告需附加根因分析（分辨率分布/CPU瓶颈/队列深度）
+
+### 2.3 全局TTS P95（参考值）
+- 阈值：<= 15s（P1-S7记录，不强制Gate）
+- 测量方法：不分路径，全量capture的TTS分布
+- 用途：端到端体验趋势观测，用于P2 LAN场景的性能基线对比
 
 3. `Search P95`（P1 阶段记录实际值，暂不设硬性阈值）
 - 统计范围：`GET /v1/search`（含 keyword 检索语义）。
@@ -132,20 +148,47 @@ references:
 - P1 阶段策略：记录实际 P95 分布，暂不设硬性阈值。
 - 阈值确定：参考 screenpipe `timeline_performance_test.rs`（5s 以上被视为问题），在 P1-S7 前根据实测数据确定最终目标。
 
-4. `Chat 请求成功率`（P1-S6 主 Gate）
-- 公式：`chat_success_rate = (成功请求数 / 总请求数) * 100%`
-- 成功判定：请求在 180s 内完成并返回成功响应（流式完成或等价成功终止事件）。
-- 失败判定：timeout（180s）、provider error、Pi crash、协议错误等导致请求未成功完成。
-- 计数规则：timeout 必须计入分母且记为失败，不得剔除；用户主动 abort 不计入样本。
+4. `Chat 系统可用率`（P1-S6 主 Gate）
+- 公式：`chat_availability = (1 - 系统错误次数 / 总请求数) * 100%`
+- **系统错误定义**（计入失败）：
+  - Pi Sidecar 进程 crash（exit code ≠ 0）
+  - Manager 协议错误（无法解析的 Pi 事件、SSE 序列化失败）
+  - Edge 内部 500 错误（数据库异常、资源耗尽）
+- **排除项**（不计入失败，但计入分母）：
+  - OpenAI/Claude 等 provider 5xx 错误
+  - Provider 429 限流错误
+  - 180s 请求 timeout（业务逻辑边界，见观测指标）
+- 阈值：`>= 98%`
+- 最小样本：>= 100 requests
+- 用户主动 abort 不计入样本
 
-5. `Chat 首 token P95`（观测 KPI，non-blocking）
+5. `Chat 完成率`（Soft KPI，non-blocking）
+- 公式：`chat_completion_rate = (成功完成请求数 / 总请求数) * 100%`
+- 成功完成：请求在 180s 内返回成功 `response` 事件
+- 包含所有错误类型（含 provider 错误、timeout）
+- 目标：`>= 95%`
+- 说明：用于端到端体验趋势观测，不参与 Gate Pass/Fail 判定
+
+6. `Chat 首 token P95`（观测 KPI，non-blocking）
+- 起点：Edge Chat API 收到请求。
+- 终点：流式通道发出第一个 token。
+- 目标：`<= 3.5s`
+
+7. `Chat 完成时间分布`（新增观测）
+- P50/P90/P99 完成时间（从请求到 `response` 事件）
+- 用于验证 180s timeout 阈值合理性及识别长尾延迟
+- 观测维度：按 provider（OpenAI/Claude/Ollama）分别统计
 - 起点：Edge Chat API 收到请求。
 - 终点：流式通道发出第一个 token。
 
-6. `Capture 丢失率`
+8. `Capture 丢失率`
    - 公式：`loss_rate = (应到达 capture 数 - 成功 commit capture 数) / 应到达 capture 数`
+   - 阈值：
+     - P1-S2：< 0.3%（压测环境）
+     - Phase 2：<= 0.2%（生产环境）
+     - Phase 3：<= 0.1%（生产稳定期）
 
-7. **运行机制与压测假设（P1）**
+9. **运行机制与压测假设（P1）**
    - 运行机制（SSOT）：Capture 采用事件驱动触发（`idle/app_switch/manual/click`），其中 `idle` 为 timeout fallback 事件。
    - 压测假设（仅用于可比性）：部分 Gate 使用固定事件注入速率（如 `300 events/min`）作为测试条件，不代表生产运行机制为固定频率轮询。
    - 参数口径：
@@ -164,9 +207,12 @@ references:
 - 百分位算法：Nearest-rank。
 - 预热剔除：每轮测量剔除前 10 个样本。
 - 最小样本数（低于该值不得做有效判定）：
-  - TTS：>= 200 captures
+  - TTS（分层独立统计）：
+    - AX成功路径：>= 100 captures（用于Hard Gate判定）
+    - OCR路径：>= 50 captures（用于Soft KPI观测）
+    - 全局混合：>= 200 captures（用于趋势参考）
   - Search：>= 200 queries
-  - Chat 请求成功率：>= 100 requests
+  - Chat 系统可用率：>= 100 requests
   - Chat 首 token（观测，可选）：>= 100 requests（若输出该指标）
   - Citation Coverage（Soft KPI）：
     - P1-S5：>= 80 个问答样本

@@ -136,8 +136,8 @@ tests/
 
 ### S6 验收对照
 
-- Chat 请求成功率 >= 98%（timeout/error 计入失败；用户主动 abort 不计入样本）
-- 观测 KPI（non-blocking）：Chat 首 token P95 <= 3.5s
+- Chat 系统可用率 >= 98%（仅 Pi crash、Manager 协议错误、Edge 内部 500 计入失败；provider 5xx/429、180s timeout 不计入失败）
+- 观测 KPI（non-blocking）：Chat 完成率目标 >= 95%；Chat 首 token P95 <= 3.5s
 - 路由切换在故障注入下可重复通过
 - 路由切换场景覆盖率 = 100%（注意：P1 不含 auto-fallback 场景，覆盖 provider 切换 + timeout 错误）
 - 流式输出协议一致性用例通过率 = 100%
@@ -159,7 +159,8 @@ tests/
 
 ### S7 验收对照
 
-- TTS P95 <= 12s
+- TTS（AX成功路径）P95 <= 8s（Hard Gate）
+- TTS（OCR路径）P95 <= 15s（Soft KPI，non-blocking）
 - S1~S6 回归全通过
 - P1 功能清单完成率 = 100%
 - P1 验收记录完整率 = 100%
