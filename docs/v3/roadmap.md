@@ -37,7 +37,7 @@ references:
 - 执行规则：P1-S1 -> P1-S2 -> P1-S3 -> P1-S4 -> P1-S5 -> P1-S6 -> P1-S7 串行推进；每阶段必须先通过验收 Gate。
 - P1-S1（基础链路，2026-03-02 ~ 2026-03-05）
   - 交付：
-    - Host spool + uploader（磁盘持久化，复用 v2 LocalBuffer，幂等、可续传）
+    - Host spool + uploader（磁盘持久化；spool 落盘 JPEG（`.jpg`/`.jpeg` + `.json`，原子写入）；兼容读取历史 `.webp` 仅用于 drain；幂等、可续传）
     - Edge ingest + queue + frame 持久化（JPEG）+ 状态机骨架（不含 AX/OCR）
     - 图片格式主契约统一（主采集/主读取链路 JPEG）
     - Edge 继续承载现有 Flask 页面（`/`、`/search`、`/timeline`）

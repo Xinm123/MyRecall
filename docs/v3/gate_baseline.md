@@ -111,6 +111,47 @@ references:
 - 说明：CPU 使用率仅用于趋势观测与容量评估，不作为跨设备 Gate 判定条件。
 - 记录要求：验收报告需附硬件基线（机型/芯片/核心数）与负载背景（后台任务、显示器配置）。
 
+## 3.3 UI 健康态/错误态展示通过率（P1-S1）
+
+- 目的：将 P1-S1 的 UI 健康态/错误态从描述性要求收敛为可脚本化判定，避免主观评审。
+- 判定类型：**Hard Gate**（任一页面未达标即阶段 Fail）。
+
+### 3.3.1 默认时序参数（SSOT）
+
+以下参数为 P1-S1 Gate 判定口径的一部分（实现可配置，但验收必须以本节为准）：
+
+- `poll_interval_ms = 5000`
+- `request_timeout_ms = 2000`
+- `unreachable_grace_ms = 5000`
+
+### 3.3.2 可验证锚点（Hard Requirement）
+
+- 三个页面 `/`、`/search`、`/timeline` 首屏必须存在稳定 DOM 选择器：`#mr-health`
+- `#mr-health` 必须暴露：`data-state="healthy|unreachable|degraded"`
+- Gate 判定以 `#mr-health` 与 `data-state` 为准（文案用于人类可解释性，不作为唯一判定依据）。
+
+### 3.3.3 通过率定义
+
+- 页面集合：`P = {"/", "/search", "/timeline"}`，`|P| = 3`
+- `ui_health_state_pass_rate = (pass_pages / 3) * 100%`
+- Hard Gate 阈值：`ui_health_state_pass_rate = 100%`
+
+### 3.3.4 页面通过条件（P1-S1）
+
+对任一页面 `p in P`，满足以下全部条件则 `p` 通过：
+
+1) **健康态可见**：`#mr-health[data-state="healthy"]` 可见，且页面文案包含 `服务健康/队列正常`。
+
+2) **UNREACHABLE 可见（禁止刷新页面）**：
+- 在页面完成首屏渲染后（不刷新页面），制造浏览器侧对 `GET /v1/health` 的请求失败/超时（例如停止 Edge 进程，或 DevTools 对 `/v1/health` 启用 request blocking）。
+- 该页面必须在 **15 秒内**进入 `#mr-health[data-state="unreachable"]`，且页面文案包含 `Edge 不可达`。
+
+3) **自动恢复（禁止刷新页面）**：
+- 恢复 `GET /v1/health` 可达（例如启动 Edge 进程，或解除 request blocking）。
+- 该页面必须在 **10 秒内**自动回到 `#mr-health[data-state="healthy"]`，且页面文案包含 `服务健康/队列正常`。
+
+说明：15s/10s 为可操作的验收时间窗，覆盖 `unreachable_grace_ms + poll_interval_ms + request_timeout_ms` 的最坏情况并预留抖动余量。
+
 ## 4. 指标定义（统一公式）
 
 1. `Citation Coverage`（DA-8A 默认口径）

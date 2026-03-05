@@ -110,6 +110,23 @@ Expected:
 - HTTP status `301`
 - `Location: /v1/health`
 
+## 6.1 Fault Injection: Host -> Edge disconnect (P1-S1)
+
+P1-S1 acceptance requires a full disconnect window (e.g. 3 minutes) while Host continues to
+produce captures into the local spool/buffer.
+
+Recommended (simple, reproducible): stop Edge process temporarily
+
+1) Keep Host running.
+2) Stop Edge (Ctrl+C) and keep it down for 3 minutes.
+3) During this window, continue generating captures on Host (they must remain on disk in the spool).
+4) Start Edge again.
+5) Verify Host uploader automatically resumes and drains the spool until all buffered captures are accepted.
+
+Note:
+- Restarting Edge resets any in-memory counters defined as "since process start" (e.g. `/v1/ingest/queue/status` `completed`/`failed`).
+  When using this injection method, validate outcomes using DB evidence and/or windowed deltas in the acceptance record.
+
 ## 7. Restart Policy Across P1-S1 ~ P1-S7
 
 Phase 1 has two supported execution modes.

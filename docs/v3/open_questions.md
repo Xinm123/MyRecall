@@ -104,6 +104,6 @@ references:
 
 ### 已拍板结论（2026-03-05）
 
-29. OQ-028 = A：Host spool 采用磁盘持久化，复用 v2 `LocalBuffer` 实现（`openrecall/client/buffer.py`），不使用内存队列。理由：进程重启/断电/断网场景下内存方案会丢数据，与 P1-S1 "断网恢复可自动重传" Gate 不兼容。
+29. OQ-028 = A：Host spool 采用磁盘持久化，不使用内存队列。spool 落盘为 JPEG（`.jpg`/`.jpeg` + `.json`，原子写入）；兼容读取历史（`.webp` + `.json`）仅用于 drain 清空，新写入不再产生 `.webp`。理由：进程重启/断电/断网场景下内存方案会丢数据，与 P1-S1 "断网恢复可自动重传" Gate 不兼容。
 
 > **补充（2026-03-05）**：capture_id 幂等与 content_hash 内容去重逻辑均需在 Edge /v1/ingest 中实现（对齐 screenpipe event_driven_capture.rs），P1-S2 验收前需完成。

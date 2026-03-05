@@ -456,18 +456,54 @@ Response:
     "processing": 1,
     "completed": 1023,
     "failed": 2,
+    "processing_mode": "noop",
     "capacity": 200,
     "oldest_pending_timestamp": "2026-02-26T10:00:00Z"
   }
   字段说明：
-  - pending：等待 OCR 处理的帧数
-  - processing：当前正在 OCR 处理的帧数
-  - completed：本次进程启动后累计成功入库帧数（重启清零）
-  - failed：本次进程启动后累计失败帧数（重启清零）
+  - pending：等待 Edge 处理管线执行的帧数（P1-S1 为 noop/轻量处理；P1-S3+ 启用 AX-first/OCR-fallback）
+  - processing：当前正在执行 Edge 处理管线的帧数（P1-S1 为 noop/轻量处理；P1-S3+ 启用 AX-first/OCR-fallback）
+  - completed：本次进程启动后累计处理完成并成功入库的帧数（重启清零）
+  - failed：本次进程启动后累计处理失败的帧数（重启清零）
+  - processing_mode：处理模式（SSOT）。
+    - noop：P1-S1 固定值；仅驱动队列状态机流转与可观测性闭环，不做 AX/OCR/Embedding 等任何推理路径。
+    - ax_ocr：P1-S3+ 可用；启用 AX-first + OCR-fallback 管线与 Scheme C 分表写入。
   - capacity：队列最大容量（固定配置值）；pending >= capacity 时 ingest 返回 503 QUEUE_FULL
   - oldest_pending_timestamp：最早一条 pending 帧的 timestamp（UTC ISO8601）；null 表示队列为空；
     Host 可用此字段判断队列是否卡死（如超过 5 分钟未推进则告警）
 ```
+
+#### P1-S1 处理语义：QueueDriver（noop）
+
+P1-S1 的 "processing" 定义为 noop/轻量处理，其目标仅是驱动状态机流转与可观测性闭环。
+本阶段不引入 AX-first/OCR-fallback 与任何模型/推理路径（P1-S3 才启用）。
+
+- Edge MUST 启动一个后台 QueueDriver（worker），用于异步推进状态：
+  pending -> processing -> completed
+- Edge MUST 在 `/v1/ingest/queue/status` 响应中返回 `processing_mode` 字段：
+  `"noop"` | `"ax_ocr"`。
+  P1-S1 固定为 `"noop"`；P1-S3+ 允许为 `"ax_ocr"`。
+
+当 `processing_mode="noop"` 时：
+
+- Edge MUST NOT：初始化/加载任何 OCR/embedding/vision provider 或模型（包括启动期 preload）。
+- Edge MUST NOT：写入任何 AI 衍生产物（如 caption/keywords/fusion_text/embedding 等）。
+- Edge MUST：`failed` 仅允许由 ingest 基础错误触发（例如 payload 校验、幂等冲突、落盘/IO、队列满/背压、DB 写入失败）。
+  不允许因 AI provider 初始化失败或模型加载失败导致 `failed`。
+
+**可验证日志锚点（P1-S1 Gate，SSOT）**：
+- Edge 在启动完成（HTTP server ready）后，必须输出且仅输出一次：`MRV3 processing_mode=noop`
+- Gate/脚本判定以该行的字面匹配为准；不接受其他“等价表述”。
+
+**持久化语义（P1-S1 Gate，SSOT）**：
+- Edge MUST：在 `noop` 下仍创建 `frames` 行并持久化 snapshot JPEG（用于 `/v1/frames/:frame_id` 主读取链路与幂等去重验证）。
+- Edge MUST NOT：写入任何 AI/文本处理产物字段/表（AX/OCR/embedding 等均在 P1-S3+）。
+
+**失败原因分类（P1-S1 Gate，SSOT）**：
+- 任一事件导致 `/v1/ingest/queue/status.failed` 计数增加时，Edge MUST 输出一条结构化日志：
+  - `MRV3 frame_failed reason=<REASON> request_id=<uuid-v4> capture_id=<uuid-v7> frame_id=<int_optional>`
+- `<REASON>`（P1-S1 允许枚举）：`DB_WRITE_FAILED|IO_ERROR|STATE_MACHINE_ERROR`
+- 禁止出现任何 AI/OCR/provider/model 相关失败原因（如 `AI_INIT_FAILED|MODEL_LOAD_FAILED|OCR_INIT_FAILED` 等）。
 
 **幂等语义**：重复 `capture_id` 返回 `200 OK` + `"status": "already_exists"`，客户端无需区分新建/重复，直接删除 buffer 项。
 
@@ -476,9 +512,9 @@ Response:
 **图片格式口径（P1）**：主采集/主读取链路统一 JPEG。`frames.snapshot_path` 指向 JPEG 文件（推荐 `.jpg`），`GET /v1/frames/:frame_id` 固定返回 `Content-Type: image/jpeg`。
 
 **Host spool 实现**：
-- 复用 v2 `LocalBuffer` 实现（`openrecall/client/buffer.py`）
 - spool 路径：`~/MRC/spool`
-- 持久化策略：磁盘文件（`.webp` + `.json`），原子写入
+- 持久化策略：磁盘文件（`.jpg`/`.jpeg` + `.json`），原子写入（`.tmp -> rename`）
+- 兼容读取：若 spool 中存在历史遗留的（`.webp` + `.json`）项，仅用于 drain 清空；新写入不再产生 `.webp`
 - 进程重启/断电/断网恢复后自动续传
 - 幂等依赖 Edge `/v1/ingest` 的 `capture_id` + DB UNIQUE 约束
 
@@ -544,6 +580,42 @@ P2+ 升级为 mTLS 强制（006A->B）。
 - 每个 P1 子阶段验收文档必须包含 UI 证据（截图/录屏 + 步骤 + 结论）。
 - UI 关键路径通过率与异常可见性指标纳入阶段 Gate。
 
+### 4.8.1 UI 健康态/错误态：最小实现标准（P1-S1 Gate）
+
+> 目的：将“健康态/错误态可见 + 自动恢复”收敛为可脚本化、可截图取证的 UI 契约，避免主观判定。
+
+**适用页面（P1-S1）：**
+- `/`、`/search`、`/timeline` 首屏必须可见“服务状态”组件（不得要求点击展开才能看到）。
+
+**数据源（SSOT）：**
+- `GET /v1/health`（见 §4.9 `GET /v1/health` 契约）。
+- P1-S1 最小实现使用前端轮询；允许未来演进为 WS/SSE 推送，但不得改变本节的“状态判定口径”与“可验证锚点”。
+
+**刷新与防抖（P1-S1 默认值，作为验收口径的一部分）：**
+- 参数 SSOT：`gate_baseline.md` §3.3.1。
+
+**状态判定（P1-S1 Gate 口径，WebUI 视角）：**
+- `healthy`
+  - 条件：浏览器可成功请求 `/v1/health` 且 `status == "ok"` 且 `queue.failed == 0`
+  - UI 文案要求：必须包含 `服务健康/队列正常`
+- `unreachable`
+  - 条件：浏览器请求 `/v1/health` 失败或超时，且连续持续时间 >= `unreachable_grace_ms`
+  - UI 文案要求：必须包含 `Edge 不可达`
+- `degraded`
+  - 条件：浏览器可成功请求 `/v1/health`，但 `status != "ok"` 或 `queue.failed > 0` 或 `frame_status != "ok"`
+  - UI 文案要求：必须为明确错误提示（例如“服务异常/队列异常”）；建议附带 queue 计数（pending/processing/failed）便于定位
+
+**自动恢复：**
+- 从 `unreachable` / `degraded` 状态，只要任意一次后续刷新满足 `healthy`，UI 必须在不刷新页面的情况下自动回到 `healthy`。
+
+**可验证锚点（用于 Gate 100%）：**
+- 每个页面必须存在稳定 DOM 选择器：`id="mr-health"`
+- 必须暴露稳定状态字段：`data-state="healthy|unreachable|degraded"`
+- Gate 脚本以 `#mr-health` 与 `data-state` 判定为准；文案用于人类可解释性，但不作为唯一判定依据。
+
+**“Edge 不可达”的验收前提：**
+- 指的是：页面已完成首屏渲染后（不刷新页面），浏览器侧对 `/v1/health` 不可达/超时应被 UI 明确展示；不要求在 Edge 无法提供页面（首屏无法加载）的前提下展示“错误态 UI”。
+
 ### 4.9 API 契约总览（P1 端点完整清单）
 
 ### 端点清单
@@ -552,11 +624,11 @@ P2+ 升级为 mTLS 强制（006A->B）。
 |------|------|------|----------------|
 | `/v1/ingest` | POST | 单帧幂等上传 | 概念对齐（019A） |
 | `/v1/ingest/queue/status` | GET | 队列状态 | 概念对齐 |
-| `/v1/search` | GET | FTS5 搜索 | 高对齐（020A） |
-| `/v1/chat` | POST | Chat 请求（JSON）+ SSE 事件流响应 | 高对齐（DA-2/DA-7） |
+| `/v1/search` | GET | FTS5 搜索（P1-S4+） | 高对齐（020A） |
+| `/v1/chat` | POST | Chat 请求（JSON）+ SSE 事件流响应（P1-S5+） | 高对齐（DA-2/DA-7） |
 | `/v1/frames/:frame_id` | GET | 图像二进制 | 高对齐（020A） |
-| `/v1/frames/:frame_id/metadata` | GET | 深链导航元数据（timestamp resolver） | 高对齐（020A） |
-| `/v1/frames/:frame_id/context` | GET | 帧上下文（text/urls；P2+ 扩展 nodes） | 对齐（020B） |
+| `/v1/frames/:frame_id/metadata` | GET | 深链导航元数据（timestamp resolver，P1-S5+） | 高对齐（020A） |
+| `/v1/frames/:frame_id/context` | GET | 帧上下文（text/urls；P1-S5+，P2+ 扩展 nodes） | 对齐（020B） |
 | `/v1/health` | GET | 服务健康检查 | 高对齐 |
 
 ### `POST /v1/chat` 契约（DA-2/DA-7，P1-S5）

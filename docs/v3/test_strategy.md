@@ -61,7 +61,7 @@ tests/
 
 ### P1-S1（基础链路）
 - `test_ingest_api.py` — 幂等上传、队列状态
-- `test_frames_api.py` — 图像获取、metadata
+- `test_frames_api.py` — 图像获取（`GET /v1/frames/:frame_id`，`Content-Type: image/jpeg`）
 - `test_health_api.py` — 健康检查
 
 ### P1-S2（采集）
@@ -78,6 +78,7 @@ tests/
 - `test_chat_manager.py` — Pi 进程管理
 - `test_chat_protocol.py` — 事件流协议
 - `test_chat_persistence.py` — 会话持久化
+- `test_frames_api.py` — deep link resolver（`GET /v1/frames/:frame_id/metadata`，最小稳定契约 `{frame_id,timestamp}`）
 
 ### P1-S7（验收）
 - `test_chat_e2e.py` — E2E 场景覆盖 >= 30

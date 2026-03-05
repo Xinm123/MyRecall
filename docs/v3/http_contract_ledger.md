@@ -109,7 +109,7 @@ SSOT：`roadmap.md` §1.1；`spec.md` §4.5（命名空间冻结）；`open_ques
 | 类型 | Contract-ID | 接口 | 变化/说明 | SSOT |
 |---|---|---|---|---|
 | ADD | C-API-INGEST-001 | POST `/v1/ingest` | P1 首次必须可用；幂等语义起效 | `spec.md` §4.7 |
-| ADD | C-API-INGEST-002 | GET `/v1/ingest/queue/status` | 队列可观测性对外可用 | `spec.md` §4.7 |
+| ADD | C-API-INGEST-002 | GET `/v1/ingest/queue/status` | 队列可观测性对外可用；响应 MUST 包含 `processing_mode`（P1-S1 固定 `noop`） | `spec.md` §4.7 |
 | ADD | C-API-FRAME-001 | GET `/v1/frames/:frame_id` | 主读取链路 JPEG 对外可用 | `spec.md` §4.9 |
 | ADD | C-API-HEALTH-001 | GET `/v1/health` | 健康检查对外可用 | `spec.md` §4.9 |
 | DEPRECATE | C-NS-API-001 | `POST /api/upload`; `GET /api/search`; `GET /api/queue/status`; `GET /api/health` | P1-S1~S3：统一 301 → 对应 `/v1/*` + `[DEPRECATED]` 日志（仅废弃回归检查） | `roadmap.md` §1.1 |

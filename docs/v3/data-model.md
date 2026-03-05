@@ -59,7 +59,7 @@ CREATE TABLE frames (
     image_size_bytes      INTEGER,
     ingested_at           TEXT NOT NULL
                           DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
-    status                TEXT NOT NULL DEFAULT 'pending',  -- 'pending'|'processing'|'completed'|'failed'
+    status                TEXT NOT NULL DEFAULT 'pending',  -- 处理管线生命周期：'pending'|'processing'|'completed'|'failed'（P1-S1 的 processing 为 noop/轻量处理；P1-S3+ 启用 AX-first/OCR-fallback）
     error_message         TEXT,
     retry_count           INTEGER DEFAULT 0,
     processed_at          TEXT
