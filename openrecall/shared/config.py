@@ -223,6 +223,18 @@ class Settings(BaseSettings):
         description="Embedding vector dimension (must match model output)",
     )
 
+    # v3 Ingestion Configuration
+    processing_mode: str = Field(
+        default="noop",
+        alias="OPENRECALL_PROCESSING_MODE",
+        description="Processing mode for frame ingestion (noop for P1-S1)",
+    )
+    queue_capacity: int = Field(
+        default=200,
+        alias="OPENRECALL_QUEUE_CAPACITY",
+        description="Maximum number of pending frames in the queue",
+    )
+
     # Reranker Configuration
     reranker_mode: str = Field(
         default="api",
@@ -325,8 +337,13 @@ class Settings(BaseSettings):
 
     @property
     def db_path(self) -> Path:
-        """Path to the SQLite database file."""
-        return self.server_data_dir / "db" / "recall.db"
+        """Path to the SQLite database file (v3: edge.db)."""
+        return self.server_data_dir / "db" / "edge.db"
+
+    @property
+    def frames_dir(self) -> Path:
+        """Directory for storing frame snapshots."""
+        return self.server_data_dir / "frames"
 
     @property
     def lancedb_path(self) -> Path:
@@ -342,6 +359,11 @@ class Settings(BaseSettings):
     def buffer_path(self) -> Path:
         """Directory for local buffering when server is unavailable."""
         return self.client_data_dir / "buffer"
+
+    @property
+    def spool_path(self) -> Path:
+        """Directory for spooling captures before upload."""
+        return self.client_data_dir / "spool"
 
     @property
     def model_cache_path(self) -> Path:
@@ -360,7 +382,9 @@ class Settings(BaseSettings):
             self.screenshots_path,
             self.client_screenshots_path,
             self.buffer_path,
+            self.spool_path,
             self.db_path.parent,
+            self.frames_dir,
             self.lancedb_path,
             self.model_cache_path,
             self.cache_path,

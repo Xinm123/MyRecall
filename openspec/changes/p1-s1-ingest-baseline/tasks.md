@@ -2,10 +2,10 @@
 
 ### 1. 数据模型与迁移基础设施
 
-- [ ] 1.1 新增 `openrecall/server/database/migrations/` 目录，创建 `20260227000001_initial_schema.sql`，包含 `schema_migrations` 表与 `docs/v3/data-model.md` §3.0.3 定义的 P1 全量 DDL（`frames/ocr_text/accessibility/frames_fts/ocr_text_fts/accessibility_fts/chat_messages`，含 `capture_id UNIQUE`、`status`、`ingested_at`、索引；SSOT: §3.0.3 + §3.0.7）
-- [ ] 1.2 新增 `openrecall/server/database/migrations_runner.py`，实现启动时迁移执行逻辑：读取 `schema_migrations` 表、按版本号排序执行未应用的 `.sql` 文件、记录已执行版本（SSOT: `docs/v3/data-model.md` §3.0.7 伪代码）
-- [ ] 1.3 在 `openrecall/shared/config.py` 中新增 v3 配置项：`db_path` 指向 `${OPENRECALL_SERVER_DATA_DIR}/db/edge.db`（不允许指向 `recall.db`）、`frames_dir` 指向 `${OPENRECALL_SERVER_DATA_DIR}/frames/`、`OPENRECALL_PROCESSING_MODE`（P1-S1 默认 `noop`）、`queue_capacity`（env: `OPENRECALL_QUEUE_CAPACITY`，默认 `200`）
-- [ ] 1.4 确保 `edge.db` 父目录与 `frames/` 目录在启动时自动创建
+- [x] 1.1 新增 `openrecall/server/database/migrations/` 目录，创建 `20260227000001_initial_schema.sql`，包含 `schema_migrations` 表与 `docs/v3/data-model.md` §3.0.3 定义的 P1 全量 DDL（`frames/ocr_text/accessibility/frames_fts/ocr_text_fts/accessibility_fts/chat_messages`，含 `capture_id UNIQUE`、`status`、`ingested_at`、索引；SSOT: §3.0.3 + §3.0.7）
+- [x] 1.2 新增 `openrecall/server/database/migrations_runner.py`，实现启动时迁移执行逻辑：读取 `schema_migrations` 表、按版本号排序执行未应用的 `.sql` 文件、记录已执行版本（SSOT: `docs/v3/data-model.md` §3.0.7 伪代码）
+- [x] 1.3 在 `openrecall/shared/config.py` 中新增 v3 配置项：`db_path` 指向 `${OPENRECALL_SERVER_DATA_DIR}/db/edge.db`（不允许指向 `recall.db`）、`frames_dir` 指向 `${OPENRECALL_SERVER_DATA_DIR}/frames/`、`OPENRECALL_PROCESSING_MODE`（P1-S1 默认 `noop`）、`queue_capacity`（env: `OPENRECALL_QUEUE_CAPACITY`，默认 `200`）
+- [x] 1.4 确保 `edge.db` 父目录与 `frames/` 目录在启动时自动创建
 
 ### 2. v3 数据存储层
 
