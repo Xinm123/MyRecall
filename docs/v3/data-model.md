@@ -599,7 +599,7 @@ total = count_search_ocr(params) + count_search_accessibility(params)
 |------|-----|------|
 | `capture_id` | frames | UUID v7 幂等去重键（Host→Edge 传输） |
 | `image_size_bytes` | frames | 传输与存储管理 |
-| `ingested_at` | frames | 入库时间戳（TTS 测量用） |
+| `ingested_at` | frames | 入库时间戳（Edge receipt time）：用于 TTS 测量、`GET /v1/health` 的 stale 判定、以及 `oldest_pending_ingested_at` 观测口径 |
 | `status` | frames | 处理队列状态机（PENDING→PROCESSING→COMPLETED/FAILED） |
 | `error_message` | frames | 处理失败原因 |
 | `retry_count` | frames | 重试计数 |

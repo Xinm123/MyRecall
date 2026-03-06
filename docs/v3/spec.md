@@ -606,14 +606,15 @@ P2+ 升级为 mTLS 强制（006A->B）。
 
 **状态判定（P1-S1 Gate 口径，WebUI 视角）：**
 - `healthy`
-  - 条件：浏览器可成功请求 `/v1/health` 且 `status == "ok"` 且 `queue.failed == 0`
+  - 条件：浏览器可成功请求 `/v1/health` 且 `status == "ok"` 且 `frame_status == "ok"` 且 `queue.failed == 0`
   - UI 文案要求：必须包含 `服务健康/队列正常`
 - `unreachable`
   - 条件：浏览器请求 `/v1/health` 失败或超时，且连续持续时间 >= `unreachable_grace_ms`
   - UI 文案要求：必须包含 `Edge 不可达`
 - `degraded`
   - 条件：浏览器可成功请求 `/v1/health`，但 `status != "ok"` 或 `queue.failed > 0` 或 `frame_status != "ok"`
-  - UI 文案要求：必须为明确错误提示（例如“服务异常/队列异常”）；建议附带 queue 计数（pending/processing/failed）便于定位
+  - UI 文案要求：必须为明确错误提示（例如“服务异常/队列异常/等待首帧”）；建议附带 queue 计数（pending/processing/failed）便于定位
+  - 空库口径（P1-S1）：当 `last_frame_timestamp == null` 时，`frame_status="stale"` 且 `status="degraded"`，UI 应显示 degraded（等待首帧），而非 unreachable
 
 **自动恢复：**
 - 从 `unreachable` / `degraded` 状态，只要任意一次后续刷新满足 `healthy`，UI 必须在不刷新页面的情况下自动回到 `healthy`。
@@ -770,7 +771,10 @@ data: {"type":"response","success":true}
 
 **字段说明：**
 - `status`：`"ok"` / `"degraded"` / `"error"`
-- `frame_status`：`"ok"` / `"stale"`（超过 5 分钟无新帧）/ `"error"`
+- `last_frame_timestamp`：最新一条帧的 capture 时间（来自 `frames.timestamp`，即 `SELECT MAX(timestamp) FROM frames`，UTC ISO8601）；当 `frames` 为空时返回 `null`；不用于 stale 判定
+- `frame_status`：`"ok"` / `"stale"`（超过 5 分钟无新帧入库；判定基于 `frames.ingested_at`，即 `now_utc - SELECT MAX(ingested_at) FROM frames`）/ `"error"`
+- P1-S1 判定约束：`status="ok"` 当且仅当 `queue.failed == 0` 且 `frame_status == "ok"`；否则 `status="degraded"`
+- 空库判定约束：当 `frames` 为空（`last_frame_timestamp=null`）时，`frame_status="stale"`，并据上条规则返回 `status="degraded"`
 
 ### 统一错误响应格式（020A，不对齐 screenpipe）
 
