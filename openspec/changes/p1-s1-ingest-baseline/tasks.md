@@ -17,12 +17,12 @@
 
 ### 3. v1 Blueprint 与 POST /v1/ingest 端点
 
-- [ ] 3.1 新增 `openrecall/server/api_v1.py`，定义 `v1_bp = Blueprint("v1", __name__, url_prefix="/v1")`
-- [ ] 3.2 在 `openrecall/server/app.py` 中注册 `v1_bp`（`app.register_blueprint(v1_bp)`），不改动现有 `api_bp` 注册
-- [ ] 3.3 实现 `POST /v1/ingest`：解析 multipart（`capture_id` + `metadata` JSON + `file` 二进制）、校验必填字段与格式（`capture_id` UUID v7、`file` 存在且 MIME 必须为 `image/jpeg`、大小 <= 10MB）、校验失败返回 `400 INVALID_PARAMS` 或 `413 PAYLOAD_TOO_LARGE`
-- [ ] 3.4 实现 `POST /v1/ingest` 背压检查：`pending >= capacity` 时返回 `503 QUEUE_FULL` + `retry_after`；确保 400/413/503 不创建/修改任何 `frames` 行
-- [ ] 3.5 实现 `POST /v1/ingest` 成功路径：持久化 JPEG 到 `frames/` 目录、调用 `FramesStore.insert_frame()`、新建返回 `201 Created` + `{"capture_id", "frame_id", "status": "queued", "request_id"}`、幂等返回 `200 OK` + `{"capture_id", "frame_id", "status": "already_exists", "request_id"}`；2xx 响应不包含 `code` 字段
-- [ ] 3.6 实现统一错误响应辅助函数：`make_error_response(error_msg, code, status_code, request_id=None, **extra)` -> JSON + 对应 HTTP 状态码，自动生成 `request_id`（UUID v4）
+- [x] 3.1 新增 `openrecall/server/api_v1.py`，定义 `v1_bp = Blueprint("v1", __name__, url_prefix="/v1")`
+- [x] 3.2 在 `openrecall/server/app.py` 中注册 `v1_bp`（`app.register_blueprint(v1_bp)`），不改动现有 `api_bp` 注册
+- [x] 3.3 实现 `POST /v1/ingest`：解析 multipart（`capture_id` + `metadata` JSON + `file` 二进制）、校验必填字段与格式（`capture_id` UUID v7、`file` 存在且 MIME 必须为 `image/jpeg`、大小 <= 10MB）、校验失败返回 `400 INVALID_PARAMS` 或 `413 PAYLOAD_TOO_LARGE`
+- [x] 3.4 实现 `POST /v1/ingest` 背压检查：`pending >= capacity` 时返回 `503 QUEUE_FULL` + `retry_after`；确保 400/413/503 不创建/修改任何 `frames` 行
+- [x] 3.5 实现 `POST /v1/ingest` 成功路径：持久化 JPEG 到 `frames/` 目录、调用 `FramesStore.insert_frame()`、新建返回 `201 Created` + `{"capture_id", "frame_id", "status": "queued", "request_id"}`、幂等返回 `200 OK` + `{"capture_id", "frame_id", "status": "already_exists", "request_id"}`；2xx 响应不包含 `code` 字段
+- [x] 3.6 实现统一错误响应辅助函数：`make_error_response(error_msg, code, status_code, request_id=None, **extra)` -> JSON + 对应 HTTP 状态码，自动生成 `request_id`（UUID v4）
 
 ### 4. GET /v1/ingest/queue/status 端点
 

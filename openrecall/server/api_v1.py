@@ -1,0 +1,497 @@
+"""v3 API Blueprint: /v1/* endpoints for P1-S1 ingest baseline.
+
+This module defines the v1_bp Blueprint and implements:
+  - POST /v1/ingest          — idempotent single-frame upload
+  - GET  /v1/ingest/queue/status — live queue counters
+  - GET  /v1/frames/<frame_id>   — serve frame JPEG
+  - GET  /v1/health              — health check
+
+SSOT: docs/v3/spec.md §4.7, §4.8.1, §4.9; docs/v3/http_contract_ledger.md
+"""
+
+import json
+import logging
+import uuid
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Optional
+
+from flask import Blueprint, jsonify, request, send_file
+
+from openrecall.server.database.frames_store import FramesStore
+from openrecall.shared.config import settings
+
+logger = logging.getLogger(__name__)
+
+v1_bp = Blueprint("v1", __name__, url_prefix="/v1")
+
+# Module-level store instance (shared across requests in the same process)
+_frames_store: Optional[FramesStore] = None
+
+# Constants for validation
+_MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024  # 10 MB
+_ALLOWED_MIME_TYPE = "image/jpeg"
+
+
+def _get_frames_store() -> FramesStore:
+    """Lazily initialize the FramesStore singleton."""
+    global _frames_store
+    if _frames_store is None:
+        _frames_store = FramesStore()
+    return _frames_store
+
+
+# ---------------------------------------------------------------------------
+# Error response helper
+# ---------------------------------------------------------------------------
+
+
+def make_error_response(
+    error_msg: str,
+    code: str,
+    status_code: int,
+    request_id: Optional[str] = None,
+    **extra,
+):
+    """Build a uniform JSON error response.
+
+    Args:
+        error_msg: Human-readable error description.
+        code: Machine-readable error code (e.g. ``INVALID_PARAMS``).
+        status_code: HTTP status code to use.
+        request_id: Optional UUID v4; auto-generated when omitted.
+        **extra: Additional key-value pairs to merge into the response body.
+
+    Returns:
+        A (flask.Response, int) tuple suitable for returning from a route.
+    """
+    if request_id is None:
+        request_id = str(uuid.uuid4())
+
+    body: dict[str, object] = {
+        "error": error_msg,
+        "code": code,
+        "request_id": request_id,
+    }
+    body.update(extra)
+    return jsonify(body), status_code
+
+
+# ---------------------------------------------------------------------------
+# POST /v1/ingest
+# ---------------------------------------------------------------------------
+
+
+@v1_bp.route("/ingest", methods=["POST"])
+def ingest():
+    """Idempotent single-frame ingest endpoint.
+
+    Multipart fields:
+        capture_id  – UUID v7 string (required)
+        metadata    – JSON string (required, may be ``{}``)
+        file        – JPEG binary (required, <= 10 MB)
+
+    Success:
+        201 Created       → new frame   {"capture_id", "frame_id", "status": "queued",       "request_id"}
+        200 OK            → duplicate   {"capture_id", "frame_id", "status": "already_exists","request_id"}
+
+    Errors (no DB writes on 400/413/503):
+        400 INVALID_PARAMS     — missing / malformed fields
+        413 PAYLOAD_TOO_LARGE  — file > 10 MB
+        503 QUEUE_FULL         — pending >= capacity
+        500 INTERNAL_ERROR     — unexpected server failure
+    """
+    request_id = str(uuid.uuid4())
+
+    # ------------------------------------------------------------------
+    # Step 1: Parse multipart fields
+    # ------------------------------------------------------------------
+    capture_id_raw = request.form.get("capture_id", "").strip()
+    metadata_raw = request.form.get("metadata", "").strip()
+    file_storage = request.files.get("file")
+
+    # ------------------------------------------------------------------
+    # Step 2: Validate required fields and formats
+    # ------------------------------------------------------------------
+
+    # capture_id must be present
+    if not capture_id_raw:
+        return make_error_response(
+            "capture_id is required",
+            "INVALID_PARAMS",
+            400,
+            request_id=request_id,
+        )
+
+    # capture_id format: UUID (UUID v7 is compatible with the standard UUID format)
+    try:
+        uuid.UUID(capture_id_raw)
+    except ValueError:
+        return make_error_response(
+            f"capture_id must be a valid UUID, got: {capture_id_raw!r}",
+            "INVALID_PARAMS",
+            400,
+            request_id=request_id,
+        )
+
+    # file must be present
+    if file_storage is None or file_storage.filename == "":
+        return make_error_response(
+            "file is required",
+            "INVALID_PARAMS",
+            400,
+            request_id=request_id,
+        )
+
+    # MIME type must be image/jpeg
+    content_type = file_storage.content_type or ""
+    # Strip parameters, e.g. "image/jpeg; charset=..."
+    mime_type = content_type.split(";")[0].strip().lower()
+    if mime_type != _ALLOWED_MIME_TYPE:
+        return make_error_response(
+            f"file must be image/jpeg, got: {content_type!r}",
+            "INVALID_PARAMS",
+            400,
+            request_id=request_id,
+        )
+
+    # Read file bytes (needed for size check and persistence)
+    file_bytes = file_storage.read()
+
+    # Size check — must come AFTER reading; 413 must not write to DB
+    if len(file_bytes) > _MAX_FILE_SIZE_BYTES:
+        return make_error_response(
+            f"file exceeds maximum size of {_MAX_FILE_SIZE_BYTES // (1024 * 1024)} MB",
+            "PAYLOAD_TOO_LARGE",
+            413,
+            request_id=request_id,
+        )
+
+    # metadata JSON parse (optional fields; empty string → {})
+    metadata: dict[str, object] = {}
+    if metadata_raw:
+        try:
+            metadata = json.loads(metadata_raw)
+            if not isinstance(metadata, dict):
+                raise ValueError("metadata must be a JSON object")
+        except (json.JSONDecodeError, ValueError) as exc:
+            return make_error_response(
+                f"metadata must be valid JSON: {exc}",
+                "INVALID_PARAMS",
+                400,
+                request_id=request_id,
+            )
+
+    # ------------------------------------------------------------------
+    # Step 3: Back-pressure check (503) — no DB writes before this point
+    # ------------------------------------------------------------------
+    store = _get_frames_store()
+    capacity = settings.queue_capacity
+    try:
+        pending = store.get_pending_count()
+    except Exception as exc:
+        logger.exception("ingest: get_pending_count failed: %s", exc)
+        return make_error_response(
+            "Failed to query queue status",
+            "INTERNAL_ERROR",
+            500,
+            request_id=request_id,
+        )
+
+    if pending >= capacity:
+        return make_error_response(
+            "Queue is full, retry later",
+            "QUEUE_FULL",
+            503,
+            request_id=request_id,
+            retry_after=30,
+        )
+
+    # ------------------------------------------------------------------
+    # Step 4: Persist JPEG to frames/ directory
+    # ------------------------------------------------------------------
+    frames_dir = settings.frames_dir
+    frames_dir.mkdir(parents=True, exist_ok=True)
+
+    # Use capture_id as filename base for traceability
+    snapshot_filename = f"{capture_id_raw}.jpg"
+    snapshot_path = frames_dir / snapshot_filename
+
+    try:
+        # Atomic write: write to .tmp then rename
+        tmp_path = snapshot_path.with_suffix(".jpg.tmp")
+        tmp_path.write_bytes(file_bytes)
+        tmp_path.rename(snapshot_path)
+    except OSError as exc:
+        logger.exception(
+            "ingest: failed to persist JPEG capture_id=%s: %s", capture_id_raw, exc
+        )
+        return make_error_response(
+            "Failed to persist frame image",
+            "INTERNAL_ERROR",
+            500,
+            request_id=request_id,
+        )
+
+    # Enrich metadata with known fields
+    metadata.setdefault("image_size_bytes", len(file_bytes))
+
+    # ------------------------------------------------------------------
+    # Step 5: DB insert (idempotent)
+    # ------------------------------------------------------------------
+    try:
+        frame_id, is_new = store.insert_frame(
+            capture_id=capture_id_raw,
+            metadata=metadata,
+            snapshot_path=str(snapshot_path),
+        )
+    except Exception as exc:
+        logger.exception(
+            "ingest: insert_frame failed capture_id=%s: %s", capture_id_raw, exc
+        )
+        # Best-effort cleanup of persisted file if DB write failed for a new capture
+        try:
+            if snapshot_path.exists():
+                snapshot_path.unlink(missing_ok=True)
+        except OSError:
+            pass
+        return make_error_response(
+            "Failed to store frame metadata",
+            "INTERNAL_ERROR",
+            500,
+            request_id=request_id,
+        )
+
+    # ------------------------------------------------------------------
+    # Step 6: Build success response (2xx — no "code" field)
+    # ------------------------------------------------------------------
+    if is_new:
+        logger.info(
+            "ingest: 201 Created capture_id=%s frame_id=%d request_id=%s",
+            capture_id_raw,
+            frame_id,
+            request_id,
+        )
+        return (
+            jsonify(
+                {
+                    "capture_id": capture_id_raw,
+                    "frame_id": frame_id,
+                    "status": "queued",
+                    "request_id": request_id,
+                }
+            ),
+            201,
+        )
+    else:
+        logger.debug(
+            "ingest: 200 already_exists capture_id=%s frame_id=%d request_id=%s",
+            capture_id_raw,
+            frame_id,
+            request_id,
+        )
+        return (
+            jsonify(
+                {
+                    "capture_id": capture_id_raw,
+                    "frame_id": frame_id,
+                    "status": "already_exists",
+                    "request_id": request_id,
+                }
+            ),
+            200,
+        )
+
+
+# ---------------------------------------------------------------------------
+# GET /v1/ingest/queue/status
+# ---------------------------------------------------------------------------
+
+
+@v1_bp.route("/ingest/queue/status", methods=["GET"])
+def queue_status():
+    """Return live queue counters from DB.
+
+    Response:
+        {
+            "pending":                  <int>,
+            "processing":               <int>,
+            "completed":                <int>,
+            "failed":                   <int>,
+            "processing_mode":          "noop",
+            "capacity":                 <int>,
+            "oldest_pending_ingested_at": <ISO8601 string | null>
+        }
+    """
+    store = _get_frames_store()
+    try:
+        counts = store.get_queue_counts()
+        oldest = store.get_oldest_pending_ingested_at()
+    except Exception as exc:
+        logger.exception("queue_status: DB query failed: %s", exc)
+        request_id = str(uuid.uuid4())
+        return make_error_response(
+            "Failed to query queue status",
+            "INTERNAL_ERROR",
+            500,
+            request_id=request_id,
+        )
+
+    return jsonify(
+        {
+            "pending": counts.get("pending", 0),
+            "processing": counts.get("processing", 0),
+            "completed": counts.get("completed", 0),
+            "failed": counts.get("failed", 0),
+            "processing_mode": settings.processing_mode,
+            "capacity": settings.queue_capacity,
+            "oldest_pending_ingested_at": oldest,
+        }
+    )
+
+
+# ---------------------------------------------------------------------------
+# GET /v1/frames/<frame_id>
+# ---------------------------------------------------------------------------
+
+
+@v1_bp.route("/frames/<int:frame_id>", methods=["GET"])
+def get_frame(frame_id: int):
+    """Serve the JPEG snapshot for a frame.
+
+    Returns:
+        200 image/jpeg  — JPEG binary
+        404 NOT_FOUND   — frame_id not in DB, or snapshot file missing
+    """
+    request_id = str(uuid.uuid4())
+    store = _get_frames_store()
+
+    frame = store.get_frame(frame_id)
+    if frame is None:
+        return make_error_response(
+            "frame not found",
+            "NOT_FOUND",
+            404,
+            request_id=request_id,
+        )
+
+    snapshot_path = frame.snapshot_path
+    if not snapshot_path:
+        logger.error(
+            "get_frame: snapshot_path is empty for frame_id=%d (IO_ERROR)",
+            frame_id,
+        )
+        return make_error_response(
+            "frame snapshot path not set",
+            "NOT_FOUND",
+            404,
+            request_id=request_id,
+        )
+
+    path = Path(snapshot_path)
+    if not path.exists():
+        logger.error(
+            "get_frame: snapshot file missing frame_id=%d path=%s (IO_ERROR)",
+            frame_id,
+            snapshot_path,
+        )
+        # Read-only path: must NOT call mark_failed() or any write operation
+        return make_error_response(
+            "frame snapshot file not found on disk",
+            "NOT_FOUND",
+            404,
+            request_id=request_id,
+        )
+
+    return send_file(str(path), mimetype="image/jpeg")
+
+
+# ---------------------------------------------------------------------------
+# GET /v1/health
+# ---------------------------------------------------------------------------
+
+
+@v1_bp.route("/health", methods=["GET"])
+def health():
+    """Health check endpoint.
+
+    Response fields (subset of screenpipe HealthCheckResponse):
+        status              — "ok" | "degraded"  (P1-S1: never "error")
+        last_frame_timestamp    — ISO8601 string | null
+        last_frame_ingested_at  — ISO8601 string | null
+        frame_status        — "ok" | "stale"
+        message             — human-readable description
+        queue               — { pending, processing, failed }
+    """
+    store = _get_frames_store()
+    try:
+        last_frame_ts = store.get_last_frame_timestamp()
+        last_ingested_at = store.get_last_frame_ingested_at()
+        counts = store.get_queue_counts()
+    except Exception as exc:
+        logger.exception("health: DB query failed: %s", exc)
+        request_id = str(uuid.uuid4())
+        return make_error_response(
+            "Failed to query health data",
+            "INTERNAL_ERROR",
+            500,
+            request_id=request_id,
+        )
+
+    # frame_status: stale if no ingested frame yet, or last ingested >= 5 min ago
+    _STALE_THRESHOLD_SECONDS = 5 * 60
+    if last_ingested_at is None:
+        frame_status = "stale"
+    else:
+        try:
+            # Normalize: SQLite CURRENT_TIMESTAMP format is "YYYY-MM-DD HH:MM:SS"
+            # Try ISO8601 with/without 'T' separator
+            ts_str = last_ingested_at.replace(" ", "T")
+            if (
+                not ts_str.endswith("Z")
+                and "+" not in ts_str
+                and "-" not in ts_str[10:]
+            ):
+                ts_str += "+00:00"
+            last_dt = datetime.fromisoformat(ts_str)
+            if last_dt.tzinfo is None:
+                last_dt = last_dt.replace(tzinfo=timezone.utc)
+            now = datetime.now(tz=timezone.utc)
+            age_seconds = (now - last_dt).total_seconds()
+            frame_status = "stale" if age_seconds >= _STALE_THRESHOLD_SECONDS else "ok"
+        except (ValueError, TypeError) as exc:
+            logger.warning(
+                "health: could not parse last_ingested_at=%r: %s; treating as stale",
+                last_ingested_at,
+                exc,
+            )
+            frame_status = "stale"
+
+    failed_count = counts.get("failed", 0)
+    # P1-S1: status is only "ok" or "degraded"
+    if failed_count > 0 or frame_status != "ok":
+        overall_status = "degraded"
+    else:
+        overall_status = "ok"
+
+    if overall_status == "ok":
+        message = "服务健康/队列正常"
+    elif last_frame_ts is None and frame_status == "stale" and failed_count == 0:
+        message = "等待首帧"
+    else:
+        message = "degraded"
+
+    return jsonify(
+        {
+            "status": overall_status,
+            "last_frame_timestamp": last_frame_ts,
+            "last_frame_ingested_at": last_ingested_at,
+            "frame_status": frame_status,
+            "message": message,
+            "queue": {
+                "pending": counts.get("pending", 0),
+                "processing": counts.get("processing", 0),
+                "failed": failed_count,
+            },
+        }
+    )
