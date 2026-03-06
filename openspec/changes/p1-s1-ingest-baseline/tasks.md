@@ -26,22 +26,22 @@
 
 ### 4. GET /v1/ingest/queue/status 端点
 
-- [ ] 4.1 在 `api_v1.py` 中实现 `GET /v1/ingest/queue/status`：调用 `FramesStore.get_queue_counts()` 返回 `{"pending", "processing", "completed", "failed", "processing_mode": "noop", "capacity", "oldest_pending_ingested_at"}`
+- [x] 4.1 在 `api_v1.py` 中实现 `GET /v1/ingest/queue/status`：调用 `FramesStore.get_queue_counts()` 返回 `{"pending", "processing", "completed", "failed", "processing_mode": "noop", "capacity", "oldest_pending_ingested_at"}`
 
 ### 5. GET /v1/frames/:frame_id 端点
 
-- [ ] 5.1 在 `api_v1.py` 中实现 `GET /v1/frames/<int:frame_id>`：查询 `FramesStore.get_frame(frame_id)`，找到则 `send_file(snapshot_path, mimetype='image/jpeg')`，未找到返回 `404 NOT_FOUND`
-- [ ] 5.2 处理 `snapshot_path` 文件不存在的边界情况：记录 `error` 级别日志（`IO_ERROR` 仅作为 reason 枚举值），并返回错误；该 GET 读路径不得调用 `mark_failed()` 或其他写操作，且不得改变 queue `pending/processing/completed/failed` 计数
+- [x] 5.1 在 `api_v1.py` 中实现 `GET /v1/frames/<int:frame_id>`：查询 `FramesStore.get_frame(frame_id)`，找到则 `send_file(snapshot_path, mimetype='image/jpeg')`，未找到返回 `404 NOT_FOUND`
+- [x] 5.2 处理 `snapshot_path` 文件不存在的边界情况：记录 `error` 级别日志（`IO_ERROR` 仅作为 reason 枚举值），并返回错误；该 GET 读路径不得调用 `mark_failed()` 或其他写操作，且不得改变 queue `pending/processing/completed/failed` 计数
 
 ### 6. GET /v1/health 端点
 
-- [ ] 6.1 在 `api_v1.py` 中实现 `GET /v1/health`：查询 `FramesStore` 获取 `last_frame_timestamp`（`MAX(timestamp)`）、`last_frame_ingested_at`（`MAX(ingested_at)`）与 queue 计数（`pending/processing/failed`）；当 `last_frame_ingested_at == null` 时 `frame_status="stale"`；否则按 `last_frame_ingested_at` 距当前时间是否 >= 5 分钟判定 `stale/ok`；计算 `status`（`failed > 0` 或 `frame_status != "ok"` 则 `degraded`，否则 `ok`），返回完整 `HealthCheckResponse` JSON
+- [x] 6.1 在 `api_v1.py` 中实现 `GET /v1/health`：查询 `FramesStore` 获取 `last_frame_timestamp`（`MAX(timestamp)`）、`last_frame_ingested_at`（`MAX(ingested_at)`）与 queue 计数（`pending/processing/failed`）；当 `last_frame_ingested_at == null` 时 `frame_status="stale"`；否则按 `last_frame_ingested_at` 距当前时间是否 >= 5 分钟判定 `stale/ok`；计算 `status`（`failed > 0` 或 `frame_status != "ok"` 则 `degraded`，否则 `ok`），返回完整 `HealthCheckResponse` JSON
 
 ### 7. QueueDriver（noop）
 
-- [ ] 7.1 新增 `openrecall/server/queue_driver.py`，实现 `NoopQueueDriver`：后台线程/定时器，轮询 `status='pending'` 的帧并推进为 `completed`（允许经过 `processing` 中间态）
-- [ ] 7.2 实现失败处理与日志锚点：当状态推进失败时，调用 `FramesStore.mark_failed()` 并输出 `MRV3 frame_failed reason=<REASON> request_id=<uuid-v4> capture_id=<uuid-v7> frame_id=<int>`，`REASON` 仅限 `DB_WRITE_FAILED` / `IO_ERROR` / `STATE_MACHINE_ERROR`
-- [ ] 7.3 在 `openrecall/server/__main__.py` 中集成：当 `processing_mode=noop` 时跳过 `preload_ai_models()` 和 `ProcessingWorker`，启动 `NoopQueueDriver`，且在 HTTP server ready 后输出且仅输出一次 `MRV3 processing_mode=noop`
+- [x] 7.1 新增 `openrecall/server/queue_driver.py`，实现 `NoopQueueDriver`：后台线程/定时器，轮询 `status='pending'` 的帧并推进为 `completed`（允许经过 `processing` 中间态）
+- [x] 7.2 实现失败处理与日志锚点：当状态推进失败时，调用 `FramesStore.mark_failed()` 并输出 `MRV3 frame_failed reason=<REASON> request_id=<uuid-v4> capture_id=<uuid-v7> frame_id=<int>`，`REASON` 仅限 `DB_WRITE_FAILED` / `IO_ERROR` / `STATE_MACHINE_ERROR`
+- [x] 7.3 在 `openrecall/server/__main__.py` 中集成：当 `processing_mode=noop` 时跳过 `preload_ai_models()` 和 `ProcessingWorker`，启动 `NoopQueueDriver`，且在 HTTP server ready 后输出且仅输出一次 `MRV3 processing_mode=noop`
 
 ### 8. Legacy /api/* 301 重定向
 

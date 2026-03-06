@@ -1,14 +1,6 @@
 """OpenRecall Server entry point.
 
 Launch with: python -m openrecall.server
-
-The server handles:
-- REST API for screenshot uploads
-- OCR processing
-- AI-powered image analysis (Qwen3-VL)
-- Embedding generation (Qwen3-Embedding)
-- Database storage and semantic search
-- Background task processing worker
 """
 
 import atexit
@@ -85,10 +77,15 @@ def preload_ai_models():
         logger.warning("⚠️ Some models failed to load. Check logs above.")
 
 
-def main():
-    """Start the OpenRecall server."""
-    # Database initialized on app import
+def _start_noop_mode():
+    from openrecall.server.queue_driver import NoopQueueDriver
 
+    driver = NoopQueueDriver()
+    driver.start()
+    return driver
+
+
+def main():
     logger.info("=" * 50)
     logger.info("OpenRecall Server Starting")
     logger.info("=" * 50)
@@ -101,30 +98,21 @@ def main():
     logger.info(f"API URL: http://{settings.host}:{settings.port}/api")
     logger.info(f"Web UI: http://{settings.host}:{settings.port}")
     logger.info(f"Device: {settings.device}")
-    logger.info(f"Processing: LIFO threshold = {settings.processing_lifo_threshold}")
-
-    # Log OCR Provider Info
-    ocr_provider = (settings.ocr_provider or settings.ai_provider).strip().lower()
-    logger.info(f"OCR Provider: {ocr_provider}")
-    if ocr_provider == "rapidocr":
-        use_local = settings.ocr_rapid_use_local
-        use_gpu = settings.ocr_rapid_use_gpu
-        logger.info(f"  - Mode: {'Local Models' if use_local else 'Auto-Download'}")
-        logger.info(f"  - GPU: {'Enabled' if use_gpu else 'Disabled (CPU)'}")
-        if use_local:
-            logger.info(f"  - Model Dir: {settings.ocr_rapid_model_dir}")
+    logger.info(f"Processing mode: {settings.processing_mode}")
 
     logger.info("=" * 50)
 
-    # Preload AI models to avoid first-request timeout
-    preload_ai_models()
+    processing_mode = settings.processing_mode.strip().lower()
+    worker = None
 
-    # Start background processing worker AFTER preloading models
-    from openrecall.server.app import init_background_worker
+    if processing_mode == "noop":
+        worker = _start_noop_mode()
+    else:
+        preload_ai_models()
+        from openrecall.server.app import init_background_worker
 
-    init_background_worker(app)
+        init_background_worker(app)
 
-    # Flag to prevent duplicate signal handling
     _shutting_down = False
 
     def shutdown_handler(signum, frame):
@@ -136,9 +124,12 @@ def main():
         logger.info("")
         logger.info("Received shutdown signal, stopping server...")
 
-        # Stop worker gracefully if it was initialized
         try:
-            if hasattr(app, "worker") and app.worker:
+            if worker is not None:
+                logger.info("Stopping queue driver...")
+                worker.stop()
+                logger.info("Queue driver stopped")
+            elif hasattr(app, "worker") and app.worker:
                 logger.info("Stopping background worker...")
                 app.worker.stop()
                 app.worker.join(timeout=5)
@@ -149,19 +140,22 @@ def main():
         logger.info("Server shutdown complete")
         sys.exit(0)
 
-    # Register shutdown handlers
     signal.signal(signal.SIGINT, shutdown_handler)
     signal.signal(signal.SIGTERM, shutdown_handler)
     atexit.register(
-        lambda: app.worker.stop() if hasattr(app, "worker") and app.worker else None
+        lambda: worker.stop()
+        if worker is not None
+        else (app.worker.stop() if hasattr(app, "worker") and app.worker else None)
     )
 
-    # Start the Flask server
+    if processing_mode == "noop":
+        logger.info("MRV3 processing_mode=noop")
+
     try:
         app.run(
             host=settings.host,
             port=settings.port,
-            debug=settings.debug,  # Enable Flask debug mode based on config
+            debug=settings.debug,
             use_reloader=False,
             threaded=True,
         )
