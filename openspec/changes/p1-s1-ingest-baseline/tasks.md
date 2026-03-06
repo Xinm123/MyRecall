@@ -9,11 +9,11 @@
 
 ### 2. v3 数据存储层
 
-- [ ] 2.1 新增 `openrecall/server/database/frames_store.py`，实现 `FramesStore` 类：`insert_frame(capture_id, metadata, snapshot_path) -> (frame_id, is_new)`（INSERT OR IGNORE + 幂等判定）、`get_frame(frame_id) -> Frame | None`、`get_frame_by_capture_id(capture_id) -> Frame | None`
-- [ ] 2.2 在 `FramesStore` 中实现队列计数方法：`get_queue_counts() -> dict`（实时 `SELECT COUNT(*) ... GROUP BY status`）、`get_oldest_pending_ingested_at() -> str | None`、`get_pending_count() -> int`（用于 503 背压判定）
-- [ ] 2.3 在 `FramesStore` 中实现状态推进方法：`advance_frame_status(frame_id, from_status, to_status)`、`mark_failed(frame_id, reason, request_id, capture_id)`
-- [ ] 2.4 在 `FramesStore` 中实现 health 查询方法：`get_last_frame_timestamp() -> str | None`（`SELECT MAX(timestamp) FROM frames`）
-- [ ] 2.5 在 `FramesStore` 中实现 health 查询方法：`get_last_frame_ingested_at() -> str | None`（`SELECT MAX(ingested_at) FROM frames`）
+- [x] 2.1 新增 `openrecall/server/database/frames_store.py`，实现 `FramesStore` 类：`insert_frame(capture_id, metadata, snapshot_path) -> (frame_id, is_new)`（INSERT OR IGNORE + 幂等判定）、`get_frame(frame_id) -> Frame | None`、`get_frame_by_capture_id(capture_id) -> Frame | None`
+- [x] 2.2 在 `FramesStore` 中实现队列计数方法：`get_queue_counts() -> dict`（实时 `SELECT COUNT(*) ... GROUP BY status`）、`get_oldest_pending_ingested_at() -> str | None`、`get_pending_count() -> int`（用于 503 背压判定）
+- [x] 2.3 在 `FramesStore` 中实现状态推进方法：`advance_frame_status(frame_id, from_status, to_status)`、`mark_failed(frame_id, reason, request_id, capture_id)`
+- [x] 2.4 在 `FramesStore` 中实现 health 查询方法：`get_last_frame_timestamp() -> str | None`（`SELECT MAX(timestamp) FROM frames`）
+- [x] 2.5 在 `FramesStore` 中实现 health 查询方法：`get_last_frame_ingested_at() -> str | None`（`SELECT MAX(ingested_at) FROM frames`）
 
 ### 3. v1 Blueprint 与 POST /v1/ingest 端点
 
