@@ -45,8 +45,8 @@
 
 ### 8. Legacy /api/* 301 重定向
 
-- [ ] 8.1 在现有 `openrecall/server/api.py`（legacy Blueprint）中对 4 个 Gate scope 端点新增/覆盖路由：`POST /api/upload` -> 301 `/v1/ingest`、`GET /api/search` -> 301 `/v1/search`、`GET /api/queue/status` -> 301 `/v1/ingest/queue/status`、`GET /api/health` -> 301 `/v1/health`
-- [ ] 8.2 每次 301 响应 MUST 包含 `Location` 头，且记录 `[DEPRECATED]` 日志行（格式：`/api/{endpoint} -> /v1/{endpoint}`）
+- [x] 8.1 在现有 `openrecall/server/api.py`（legacy Blueprint）中对 4 个 Gate scope 端点新增/覆盖路由：`POST /api/upload` -> 301 `/v1/ingest`、`GET /api/search` -> 301 `/v1/search`、`GET /api/queue/status` -> 301 `/v1/ingest/queue/status`、`GET /api/health` -> 301 `/v1/health`
+- [x] 8.2 每次 301 响应 MUST 包含 `Location` 头，且记录 `[DEPRECATED]` 日志行（格式：`/api/{endpoint} -> /v1/{endpoint}`）
 
 ### 9. WebUI #mr-health 健康组件
 

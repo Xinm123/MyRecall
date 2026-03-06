@@ -11,7 +11,7 @@ import json
 from pathlib import Path
 
 import numpy as np
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, jsonify, request, redirect
 from PIL import Image
 
 from openrecall.server.database import SQLStore
@@ -22,6 +22,40 @@ from openrecall.server.search.engine import SearchEngine
 logger = logging.getLogger(__name__)
 
 api_bp = Blueprint("api", __name__, url_prefix="/api")
+
+# ---------------------------------------------------------------------------
+# Legacy /api/* -> /v1/* redirects (Section 8)
+# ---------------------------------------------------------------------------
+
+
+@api_bp.route("/upload", methods=["POST"])
+def redirect_upload():
+    logger.info("[DEPRECATED] /api/upload -> /v1/ingest")
+
+    return redirect("/v1/ingest", code=301)
+
+
+@api_bp.route("/search", methods=["GET"])
+def redirect_search():
+    logger.info("[DEPRECATED] /api/search -> /v1/search")
+
+    return redirect("/v1/search", code=301)
+
+
+@api_bp.route("/queue/status", methods=["GET"])
+def redirect_queue_status():
+    logger.info("[DEPRECATED] /api/queue/status -> /v1/ingest/queue/status")
+
+    return redirect("/v1/ingest/queue/status", code=301)
+
+
+@api_bp.route("/health", methods=["GET"])
+def redirect_health():
+    logger.info("[DEPRECATED] /api/health -> /v1/health")
+
+    return redirect("/v1/health", code=301)
+
+
 sql_store = SQLStore()
 search_engine = SearchEngine()
 
@@ -29,11 +63,11 @@ search_engine = SearchEngine()
 @api_bp.route("/search", methods=["GET"])
 def search_api():
     """Hybrid Search Endpoint.
-    
+
     Query Params:
         q: Search query string
         limit: Max results (default 50)
-        
+
     Returns:
         JSON list of SemanticSnapshot objects.
     """
@@ -42,23 +76,23 @@ def search_api():
         limit = int(request.args.get("limit", 50))
     except ValueError:
         limit = 50
-        
+
     if not q:
         return jsonify([]), 200
-        
+
     try:
         results = search_engine.search(q, limit=limit)
-        
+
         # Serialize results to JSON
         serialized = []
         for snap in results:
             item = snap.model_dump()
-            # Flatten some fields for easier UI consumption if needed, 
-            # or just return the nested structure. 
+            # Flatten some fields for easier UI consumption if needed,
+            # or just return the nested structure.
             # User asked for: caption, scene_tag, app_name, timestamp, image_path
             # These are in: content.caption, content.scene_tag, context.app_name...
             # I will return the full object + flattened convenience fields.
-            
+
             flat = {
                 "id": snap.id,
                 "timestamp": snap.context.timestamp,
@@ -67,10 +101,10 @@ def search_api():
                 "caption": snap.content.caption,
                 "scene_tag": snap.content.scene_tag,
                 "image_path": snap.image_path,
-                "full_data": item
+                "full_data": item,
             }
             serialized.append(flat)
-            
+
         return jsonify(serialized), 200
     except Exception as e:
         logger.exception("Search error")
@@ -80,7 +114,7 @@ def search_api():
 @api_bp.route("/health", methods=["GET"])
 def health():
     """Health check endpoint.
-    
+
     Returns:
         JSON response with status "ok" and HTTP 200.
     """
@@ -138,23 +172,25 @@ def memories_recent():
 @api_bp.route("/queue/status", methods=["GET"])
 def queue_status():
     """Get current processing queue status (debug endpoint).
-    
+
     Returns:
         JSON with queue statistics and processing mode.
     """
     try:
         import sqlite3
-        
+
         pending = sql_store.get_pending_count()
-        
+
         # Get count by status
         with sqlite3.connect(str(settings.db_path)) as conn:
             cursor = conn.cursor()
             cursor.execute("SELECT status, COUNT(*) FROM entries GROUP BY status")
             status_counts = dict(cursor.fetchall())
-        
-        processing_mode = "LIFO" if pending > settings.processing_lifo_threshold else "FIFO"
-        
+
+        processing_mode = (
+            "LIFO" if pending > settings.processing_lifo_threshold else "FIFO"
+        )
+
         response = {
             "queue": {
                 "pending": pending,
@@ -171,9 +207,9 @@ def queue_status():
                 "device": settings.device,
                 "reranker_mode": settings.reranker_mode,
                 "reranker_model": settings.reranker_model,
-            }
+            },
         }
-        
+
         return jsonify(response), 200
     except Exception as e:
         logger.exception("Error getting queue status")
@@ -183,41 +219,41 @@ def queue_status():
 @api_bp.route("/upload", methods=["POST"])
 def upload():
     """Fast screenshot ingestion endpoint (Fire-and-Forget).
-    
+
     Accepts multipart/form-data:
     - file: Image file (PNG)
     - metadata: JSON string with timestamp, app_name, window_title
-    
+
     Returns:
         HTTP 202 Accepted with task ID.
     """
     start_time = time.perf_counter()
-    
-    if 'file' not in request.files:
+
+    if "file" not in request.files:
         return jsonify({"status": "error", "message": "No file part"}), 400
-        
-    file = request.files['file']
-    if file.filename == '':
+
+    file = request.files["file"]
+    if file.filename == "":
         return jsonify({"status": "error", "message": "No selected file"}), 400
-        
-    metadata_str = request.form.get('metadata')
+
+    metadata_str = request.form.get("metadata")
     if not metadata_str:
         return jsonify({"status": "error", "message": "No metadata provided"}), 400
-    
+
     try:
         metadata = json.loads(metadata_str)
         timestamp = int(metadata.get("timestamp", 0))
         active_app = str(metadata.get("app_name", "Unknown"))
         active_window = str(metadata.get("window_title", "Unknown"))
-        
+
         if settings.debug:
             logger.debug(f"📥 Upload request: app={active_app}, timestamp={timestamp}")
-        
+
         # Save image to disk (Streaming)
         image_filename = f"{timestamp}.png"
         image_path = settings.screenshots_path / image_filename
         file.save(str(image_path))
-        
+
         # Fast ingestion: Insert PENDING entry (no processing)
         task_id = sql_store.insert_pending_entry(
             timestamp=timestamp,
@@ -225,40 +261,48 @@ def upload():
             title=active_window,
             image_path=str(image_path),
         )
-        
+
         elapsed_ms = (time.perf_counter() - start_time) * 1000
-        
+
         if task_id:
             # Get current queue status for debug info
             pending_count = sql_store.get_pending_count() if settings.debug else 0
-            
+
             if settings.debug:
-                logger.debug(f"✅ HTTP 202 Accepted | task_id={task_id} | {elapsed_ms:.1f}ms | queue={pending_count}")
+                logger.debug(
+                    f"✅ HTTP 202 Accepted | task_id={task_id} | {elapsed_ms:.1f}ms | queue={pending_count}"
+                )
             else:
-                logger.debug(f"Ingestion complete: {elapsed_ms:.1f}ms (task_id={task_id})")
-            
+                logger.debug(
+                    f"Ingestion complete: {elapsed_ms:.1f}ms (task_id={task_id})"
+                )
+
             response_data = {
                 "status": "accepted",
                 "task_id": task_id,
                 "message": "Queued for processing",
-                "elapsed_ms": round(elapsed_ms, 1)
+                "elapsed_ms": round(elapsed_ms, 1),
             }
-            
+
             # Add queue info in debug mode
             if settings.debug:
                 response_data["debug"] = {
                     "queue_size": pending_count,
-                    "processing_mode": "LIFO" if pending_count > settings.processing_lifo_threshold else "FIFO"
+                    "processing_mode": "LIFO"
+                    if pending_count > settings.processing_lifo_threshold
+                    else "FIFO",
                 }
-            
+
             return jsonify(response_data), 202  # HTTP 202 Accepted
         else:
             logger.warning(f"⚠️  Duplicate timestamp rejected: {timestamp}")
-            return jsonify({
-                "status": "error",
-                "message": "Failed to insert entry (possibly duplicate)"
-            }), 409  # Conflict
-            
+            return jsonify(
+                {
+                    "status": "error",
+                    "message": "Failed to insert entry (possibly duplicate)",
+                }
+            ), 409  # Conflict
+
     except Exception as e:
         logger.exception("Upload ingestion error")
         return jsonify({"status": "error", "message": str(e)}), 500
@@ -267,7 +311,7 @@ def upload():
 @api_bp.route("/config", methods=["GET"])
 def get_config():
     """Get current runtime configuration.
-    
+
     Returns:
         JSON with all runtime settings plus client_online status.
         client_online is True if heartbeat was within last 15 seconds.
@@ -276,14 +320,14 @@ def get_config():
         config = runtime_settings.to_dict()
         client_online = (time.time() - runtime_settings.last_heartbeat) < 15
         config["client_online"] = client_online
-    
+
     return jsonify(config), 200
 
 
 @api_bp.route("/config", methods=["POST"])
 def update_config():
     """Update runtime configuration.
-    
+
     Accepts JSON payload with any subset of runtime settings:
     {
         "recording_enabled": bool,
@@ -291,55 +335,63 @@ def update_config():
         "ai_processing_enabled": bool,
         "ui_show_ai": bool
     }
-    
+
     Returns:
         JSON with updated configuration.
     """
     data = request.get_json()
-    
+
     if not data or not isinstance(data, dict):
         return jsonify({"status": "error", "message": "Invalid JSON payload"}), 400
-    
+
     valid_fields = {
         "recording_enabled",
         "upload_enabled",
         "ai_processing_enabled",
-        "ui_show_ai"
+        "ui_show_ai",
     }
-    
+
     try:
         with runtime_settings._lock:
             for field, value in data.items():
                 if field not in valid_fields:
-                    return jsonify({
-                        "status": "error",
-                        "message": f"Unknown field: {field}"
-                    }), 400
-                
+                    return jsonify(
+                        {"status": "error", "message": f"Unknown field: {field}"}
+                    ), 400
+
                 if not isinstance(value, bool):
-                    return jsonify({
-                        "status": "error",
-                        "message": f"Field {field} must be boolean"
-                    }), 400
-                
+                    return jsonify(
+                        {"status": "error", "message": f"Field {field} must be boolean"}
+                    ), 400
+
                 # Special handling for ai_processing_enabled:
-                if field == "ai_processing_enabled" and not value and getattr(runtime_settings, field):
-                    logger.info("AI processing disabled: Will stop picking up new tasks")
+                if (
+                    field == "ai_processing_enabled"
+                    and not value
+                    and getattr(runtime_settings, field)
+                ):
+                    logger.info(
+                        "AI processing disabled: Will stop picking up new tasks"
+                    )
                     sql_store.cancel_processing_tasks()
                     runtime_settings.ai_processing_version += 1
-                if field == "ai_processing_enabled" and value and not getattr(runtime_settings, field):
+                if (
+                    field == "ai_processing_enabled"
+                    and value
+                    and not getattr(runtime_settings, field)
+                ):
                     runtime_settings.ai_processing_version += 1
 
                 setattr(runtime_settings, field, value)
                 runtime_settings.notify_change()
-            
+
             # Return updated config
             config = runtime_settings.to_dict()
             client_online = (time.time() - runtime_settings.last_heartbeat) < 15
             config["client_online"] = client_online
-        
+
         return jsonify(config), 200
-    
+
     except Exception as e:
         logger.exception("Error updating config")
         return jsonify({"status": "error", "message": str(e)}), 500
@@ -348,10 +400,10 @@ def update_config():
 @api_bp.route("/heartbeat", methods=["POST"])
 def heartbeat():
     """Register client heartbeat.
-    
+
     Updates the last_heartbeat timestamp and returns current config.
     Called by client to signal it's alive and online.
-    
+
     Returns:
         JSON with status "ok" and current configuration.
     """
@@ -361,9 +413,9 @@ def heartbeat():
             config = runtime_settings.to_dict()
             client_online = (time.time() - runtime_settings.last_heartbeat) < 15
             config["client_online"] = client_online
-        
+
         return jsonify({"status": "ok", "config": config}), 200
-    
+
     except Exception as e:
         logger.exception("Error processing heartbeat")
         return jsonify({"status": "error", "message": str(e)}), 500
