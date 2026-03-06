@@ -73,6 +73,58 @@
       min-width: 180px;
     }
     
+    /* Health Indicator */
+    .health-indicator {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      border-radius: 12px;
+      font-size: 12px;
+      font-weight: 500;
+      transition: all 0.3s ease;
+      margin-left: 12px;
+    }
+    
+    .health-indicator[data-state="healthy"] {
+      background-color: rgba(26, 127, 55, 0.1);
+      color: #1a7f37;
+    }
+    
+    .health-indicator[data-state="degraded"] {
+      background-color: rgba(191, 133, 10, 0.1);
+      color: #bf8706;
+    }
+    
+    .health-indicator[data-state="unreachable"] {
+      background-color: rgba(191, 38, 0, 0.1);
+      color: #bf2600;
+    }
+    
+    .health-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      animation: pulse 2s infinite;
+    }
+    
+    .health-indicator[data-state="healthy"] .health-dot {
+      background-color: #2ecc71;
+    }
+    
+    .health-indicator[data-state="degraded"] .health-dot {
+      background-color: #f5a623;
+    }
+    
+    .health-indicator[data-state="unreachable"] .health-dot {
+      background-color: #ff4d4f;
+    }
+    
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+    
     .toolbar-nav-btn {
       background: transparent;
       border: none;
@@ -344,9 +396,13 @@
 </head>
 <body>
   <header>
-    <!-- Left Group: Title -->
+    <!-- Left Group: Title + Health Indicator -->
     <div class="toolbar-left-group">
       <span class="toolbar-title">MyRecall</span>
+      <div id="mr-health" class="health-indicator" data-state="degraded">
+        <span class="health-dot"></span>
+        <span class="health-text">等待首帧</span>
+      </div>
     </div>
     
     <!-- Spacer -->
@@ -548,6 +604,108 @@
       currentView = 'search';
     }
     document.documentElement.setAttribute('data-current-view', currentView);
+    
+    // Health Polling Component
+    (function() {
+      const HEALTH_ENDPOINT = '/v1/health';
+      const POLL_INTERVAL_MS = 5000;
+      const REQUEST_TIMEOUT_MS = 2000;
+      const UNREACHABLE_GRACE_MS = 5000;
+      
+      let healthComponent = document.getElementById('mr-health');
+      let consecutiveFailures = 0;
+      let failureStartTime = null;
+      let pollerId = null;
+      
+      function updateHealthState(state, message) {
+        healthComponent.setAttribute('data-state', state);
+        healthComponent.querySelector('.health-text').textContent = message;
+      }
+      
+      function determineState(data) {
+        if (!data) {
+          return null;
+        }
+        
+        const status = data.status;
+        const frameStatus = data.frame_status;
+        const failed = data.queue ? data.queue.failed : 0;
+        const lastFrameTimestamp = data.last_frame_timestamp;
+        
+        // Healthy: status == "ok" and queue.failed == 0
+        if (status === 'ok' && failed === 0) {
+          return { state: 'healthy', message: '服务健康/队列正常' };
+        }
+        
+        // Waiting for first frame: last_frame_timestamp == null and frame_status == "stale" and status == "degraded" and failed == 0
+        if (lastFrameTimestamp === null && frameStatus === 'stale' && status === 'degraded' && failed === 0) {
+          return { state: 'degraded', message: '等待首帧' };
+        }
+        
+        // Degraded: request succeeded but status != "ok" or queue.failed > 0 or frame_status != "ok"
+        if (status !== 'ok' || failed > 0 || frameStatus !== 'ok') {
+          if (failed > 0) {
+            return { state: 'degraded', message: '队列异常' };
+          }
+          if (frameStatus === 'stale') {
+            return { state: 'degraded', message: '数据延迟' };
+          }
+          return { state: 'degraded', message: '服务异常' };
+        }
+        
+        return { state: 'degraded', message: '服务降级' };
+      }
+      
+      function checkHealth() {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+        
+        fetch(HEALTH_ENDPOINT, {
+          signal: controller.signal,
+          cache: 'no-cache'
+        })
+        .then(response => {
+          clearTimeout(timeoutId);
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+          }
+          return response.json();
+        })
+        .then(data => {
+          clearTimeout(timeoutId);
+          consecutiveFailures = 0;
+          failureStartTime = null;
+          
+          const result = determineState(data);
+          if (result) {
+            updateHealthState(result.state, result.message);
+          }
+        })
+        .catch(error => {
+          clearTimeout(timeoutId);
+          consecutiveFailures++;
+          
+          if (consecutiveFailures === 1) {
+            failureStartTime = Date.now();
+          }
+          
+          const timeSinceFirstFailure = failureStartTime ? Date.now() - failureStartTime : 0;
+          
+          if (timeSinceFirstFailure >= UNREACHABLE_GRACE_MS) {
+            updateHealthState('unreachable', 'Edge 不可达');
+          }
+        });
+      }
+      
+      function startPolling() {
+        checkHealth();
+        pollerId = setInterval(checkHealth, POLL_INTERVAL_MS);
+      }
+      
+      if (healthComponent) {
+        startPolling();
+      }
+    })();
   </script>
   
   {% block extra_body %}{% endblock %}

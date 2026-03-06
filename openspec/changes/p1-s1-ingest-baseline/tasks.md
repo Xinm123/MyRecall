@@ -50,10 +50,10 @@
 
 ### 9. WebUI #mr-health 健康组件
 
-- [ ] 9.1 在 `openrecall/server/templates/layout.html` 中注入 `#mr-health` 组件：首屏可见，暴露 `data-state="healthy|unreachable|degraded"` 属性
-- [ ] 9.2 实现 JS 轮询逻辑：`poll_interval_ms=5000`、`request_timeout_ms=2000`、`unreachable_grace_ms=5000`；根据 `/v1/health` 响应更新 `data-state` 与文案
-- [ ] 9.3 实现状态判定：`healthy`（`status=="ok"` 且 `queue.failed==0`，文案包含 `服务健康/队列正常`）、`unreachable`（请求失败/超时持续 >= `unreachable_grace_ms`，文案包含 `Edge 不可达`）、`degraded`（请求成功但 `status!="ok"` 或 `queue.failed>0` 或 `frame_status!="ok"`）；其中“启动后尚未首帧”（`last_frame_timestamp==null` 且 `frame_status=="stale"` 且 `status=="degraded"` 且 `queue.failed==0`）必须显示 `data-state="degraded"` 且文案包含 `等待首帧`（不得显示 `Edge 不可达`）
-- [ ] 9.4 实现自动恢复：从 `unreachable`/`degraded` 状态，任意一次轮询满足 `healthy` 条件后自动切换 `data-state="healthy"`，全程不刷新页面
+- [x] 9.1 在 `openrecall/server/templates/layout.html` 中注入 `#mr-health` 组件：首屏可见，暴露 `data-state="healthy|unreachable|degraded"` 属性
+- [x] 9.2 实现 JS 轮询逻辑：`poll_interval_ms=5000`、`request_timeout_ms=2000`、`unreachable_grace_ms=5000`；根据 `/v1/health` 响应更新 `data-state` 与文案
+- [x] 9.3 实现状态判定：`healthy`（`status=="ok"` 且 `queue.failed==0`，文案包含 `服务健康/队列正常`）、`unreachable`（请求失败/超时持续 >= `unreachable_grace_ms`，文案包含 `Edge 不可达`）、`degraded`（请求成功但 `status!="ok"` 或 `queue.failed>0` 或 `frame_status!="ok"`）；其中"启动后尚未首帧"（`last_frame_timestamp==null` 且 `frame_status=="stale"` 且 `status=="degraded"` 且 `queue.failed==0`）必须显示 `data-state="degraded"` 且文案包含 `等待首帧`（不得显示 `Edge 不可达`）
+- [x] 9.4 实现自动恢复：从 `unreachable`/`degraded` 状态，任意一次轮询满足 `healthy` 条件后自动切换 `data-state="healthy"`，全程不刷新页面
 
 ### 10. Host spool 与 Uploader（v3 链路）
 
