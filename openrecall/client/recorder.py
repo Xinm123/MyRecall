@@ -19,6 +19,7 @@ from PIL import Image
 from openrecall.shared.config import settings
 from openrecall.client.buffer import LocalBuffer, get_buffer
 from openrecall.client.consumer import UploaderConsumer
+from openrecall.client.v3_uploader import SpoolUploader
 from openrecall.shared.utils import (
     get_active_app_name,
     get_active_window_title,
@@ -77,7 +78,11 @@ def is_similar(
     if settings.disable_similarity_filter:
         return False
     similarity: float = compute_similarity(img1, img2)
-    threshold = similarity_threshold if similarity_threshold is not None else settings.similarity_threshold
+    threshold = (
+        similarity_threshold
+        if similarity_threshold is not None
+        else settings.similarity_threshold
+    )
     return similarity >= threshold
 
 
@@ -137,24 +142,24 @@ def compute_similarity(img1: np.ndarray, img2: np.ndarray) -> float:
 
 class ScreenRecorder:
     """Producer: captures screenshots and enqueues to local buffer.
-    
+
     Manages the consumer thread lifecycle and provides graceful shutdown.
     """
-    
+
     def __init__(
         self,
         buffer: Optional[LocalBuffer] = None,
         consumer: Optional[UploaderConsumer] = None,
     ):
         """Initialize the recorder.
-        
+
         Args:
             buffer: LocalBuffer instance. Defaults to global singleton.
             consumer: UploaderConsumer instance. Creates new if not provided.
         """
         self.buffer = buffer or get_buffer()
         self._stop_requested = False
-        
+
         # Phase 8.2: Runtime configuration state
         self.recording_enabled = True
         self.upload_enabled = True
@@ -165,15 +170,18 @@ class ScreenRecorder:
             buffer=self.buffer,
             should_upload=lambda: self.upload_enabled,
         )
-    
+        self._spool_uploader = SpoolUploader()
+
     def start(self) -> None:
         """Start the consumer thread."""
         if not self.consumer.is_alive():
             self.consumer.start()
-    
+        if not self._spool_uploader.is_alive():
+            self._spool_uploader.start()
+
     def _send_heartbeat(self) -> None:
         """Send heartbeat to server and sync runtime configuration.
-        
+
         Phase 8.2: Periodically registers client activity and fetches current
         runtime settings (recording_enabled, upload_enabled, etc.) from server.
         """
@@ -202,28 +210,33 @@ class ScreenRecorder:
             logger.warning(f"Heartbeat failed (network): {e}")
         except Exception as e:
             logger.warning(f"Heartbeat failed: {e}")
-    
+
     def stop(self) -> None:
         """Stop the recorder and consumer thread gracefully."""
         self._stop_requested = True
         self.consumer.stop()
+        self._spool_uploader.stop()
         if self.consumer.is_alive():
-            self.consumer.join(timeout=2.0)  # Wait up to 2s for clean exit
-    
+            self.consumer.join(timeout=2.0)
+        if self._spool_uploader.is_alive():
+            self._spool_uploader.join(timeout=2.0)
+
     def run_capture_loop(self) -> None:
         """Main capture loop. Runs until stop() is called.
-        
+
         Captures screenshots, detects changes, and enqueues to buffer.
         Blocks only on disk I/O, never on network.
         """
         os.environ["TOKENIZERS_PARALLELISM"] = "false"
-        
+
         # Start the consumer thread
         self.start()
-        
+
         logger.info("🎥 Recorder started (Producer-Consumer mode)")
-        logger.info(f"   Monitors: {'Primary only' if settings.primary_monitor_only else 'All'}")
-        
+        logger.info(
+            f"   Monitors: {'Primary only' if settings.primary_monitor_only else 'All'}"
+        )
+
         last_screenshots: List[np.ndarray] = take_screenshots()
         logger.info(f"   Tracking {len(last_screenshots)} monitor(s)")
 
@@ -233,13 +246,13 @@ class ScreenRecorder:
             if current_time - self.last_heartbeat_time > 5:
                 self._send_heartbeat()
                 self.last_heartbeat_time = current_time
-            
+
             # Phase 8.2: Rule 1 - Stop recording if recording_enabled=False
             if not self.recording_enabled:
                 logger.info("⏸️  Recording paused (recording_enabled=False)")
                 time.sleep(1)
                 continue
-            
+
             if not is_user_active():
                 if settings.debug:
                     logger.debug("User inactive, skipping capture cycle")
@@ -292,18 +305,23 @@ class ScreenRecorder:
                         timestamp = int(time.time())
 
                         if settings.client_save_local_screenshots:
-                            filepath = settings.client_screenshots_path / f"{timestamp}.webp"
+                            filepath = (
+                                settings.client_screenshots_path / f"{timestamp}.webp"
+                            )
                             image.save(str(filepath), format="webp", lossless=True)
 
                         metadata = {
                             "timestamp": timestamp,
                             "active_app": get_active_app_name() or "Unknown App",
-                            "active_window": get_active_window_title() or "Unknown Title",
+                            "active_window": get_active_window_title()
+                            or "Unknown Title",
                         }
 
                         self.buffer.enqueue(image, metadata)
                         if not self.upload_enabled:
-                            logger.debug("Upload disabled: buffered locally (will upload when enabled)")
+                            logger.debug(
+                                "Upload disabled: buffered locally (will upload when enabled)"
+                            )
                     except Exception:
                         logger.exception("Failed to persist buffered screenshot")
 
@@ -336,7 +354,7 @@ def get_recorder() -> ScreenRecorder:
 
 def record_screenshots_thread() -> None:
     """Legacy function for backwards compatibility.
-    
+
     Wraps the new ScreenRecorder class.
     """
     recorder = get_recorder()

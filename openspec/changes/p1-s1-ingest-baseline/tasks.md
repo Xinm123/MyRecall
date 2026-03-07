@@ -57,10 +57,10 @@
 
 ### 10. Host spool 与 Uploader（v3 链路）
 
-- [ ] 10.1 在 `openrecall/shared/config.py` 中新增 `spool_path = client_data_dir / "spool"`，确保目录启动时自动创建
-- [ ] 10.2 新增/改造 spool 写入模块：输出 `.jpg` + `.json`（原子写入 `.tmp` -> `rename`），`capture_id` 使用 UUID v7；保留对旧 `.webp` 项的 drain 兼容（仅清空，不新建）
-- [ ] 10.3 新增 `upload_capture()` 函数：multipart 发往 `POST /v1/ingest`；`201`/`200 already_exists` 时删除 spool 项；`503` 时遵守 `retry_after`；网络失败时 exponential backoff（`1s -> 2s -> 4s -> 8s ...` 上限 `60s`）
-- [ ] 10.4 实现进程重启后自动续传：启动时扫描 spool 目录中残留的 `.jpg` + `.json` 项并加入上传队列
+- [x] 10.1 在 `openrecall/shared/config.py` 中新增 `spool_path = client_data_dir / "spool"`，确保目录启动时自动创建
+- [x] 10.2 新增/改造 spool 写入模块：输出 `.jpg` + `.json`（原子写入 `.tmp` -> `rename`），`capture_id` 使用 UUID v7；保留对旧 `.webp` 项的 drain 兼容（仅清空，不新建）
+- [x] 10.3 新增 `upload_capture()` 函数：multipart 发往 `POST /v1/ingest`；`201`/`200 already_exists` 时删除 spool 项；`503` 时遵守 `retry_after`；网络失败时 exponential backoff（`1s -> 2s -> 4s -> 8s ...` 上限 `60s`）
+- [x] 10.4 实现进程重启后自动续传：启动时扫描 spool 目录中残留的 `.jpg` + `.json` 项并加入上传队列
 
 ## Acceptance Verification (P1-S1)
 
