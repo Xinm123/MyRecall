@@ -11,12 +11,14 @@ from openrecall.shared.config import settings
 from openrecall.server.api import api_bp, search_engine
 from openrecall.server.api_v1 import v1_bp
 from openrecall.server.database import SQLStore
+from openrecall.server.database.frames_store import FramesStore
 from openrecall.shared.utils import human_readable_time, timestamp_to_human_readable
 
 logger = logging.getLogger(__name__)
 
 # Initialize Store
 sql_store = SQLStore()
+frames_store = FramesStore()
 
 app = Flask(__name__)
 
@@ -46,31 +48,18 @@ def inject_settings():
 @app.route("/")
 def index():
     """Grid view - default landing page."""
-    entries = sql_store.get_all_entries_with_status()
-    # Sort by timestamp descending (newest first)
-    entries.sort(key=lambda x: x.timestamp, reverse=True)
+    entries = frames_store.get_recent_memories(limit=500)
 
     # Calculate counts
     stats = {
-        "completed": sum(1 for e in entries if e.status == "COMPLETED"),
-        "pending": sum(1 for e in entries if e.status == "PENDING"),
-        "processing": sum(1 for e in entries if e.status == "PROCESSING"),
+        "completed": sum(1 for e in entries if e.get("status") == "COMPLETED"),
+        "pending": sum(
+            1 for e in entries if e.get("status") in {"PENDING", "CANCELLED"}
+        ),
+        "processing": sum(1 for e in entries if e.get("status") == "PROCESSING"),
     }
 
-    serialized_entries = [
-        {
-            "id": entry.id,
-            "timestamp": entry.timestamp,
-            "app": entry.app,
-            "title": entry.title,
-            "description": entry.description,
-            "status": entry.status,
-            "filename": f"{entry.timestamp}.png",
-            "app_name": entry.app,
-            "window_title": entry.title,
-        }
-        for entry in entries
-    ]
+    serialized_entries = entries
 
     return render_template("index.html", entries=serialized_entries, stats=stats)
 
@@ -78,8 +67,8 @@ def index():
 @app.route("/timeline")
 def timeline():
     """Timeline slider view - preserved from original."""
-    timestamps = sql_store.get_timestamps()
-    return render_template("timeline.html", timestamps=timestamps)
+    timeline_frames = frames_store.get_timeline_frames(limit=5000)
+    return render_template("timeline.html", timeline_frames=timeline_frames)
 
 
 @app.route("/search")

@@ -27,7 +27,7 @@ references:
 
 | 阶段 | /api/* 行为 |
 |------|-------------|
-| P1-S1 | 301 重定向 → /v1/* + [DEPRECATED] 日志 |
+| P1-S1 | `POST /api/upload`=308，其他 legacy GET=301 → /v1/* + [DEPRECATED] 日志 |
 | P1-S2~S3 | 持续监控，逐步修改前端/测试/Client 走 /v1/* |
 | P1-S4 | 410 Gone 完全废弃 |
 
@@ -46,7 +46,7 @@ references:
     - 同机断网恢复后可自动重传，且重复上传不重复入库
     - ingest 队列可观测（pending/processing/completed/failed）完整
     - 图片格式契约一致性通过：`/v1/ingest` 主契约 `image/jpeg`，`/v1/frames/:frame_id` 返回 `image/jpeg`；兼容输入若启用，需验证入库前转码为 JPEG
-    - 对外 API 命名空间一致性通过：验收脚本主流程仅调用 `/v1/*`；旧 `/api/*` 路径仅用于废弃回归检查，且返回 301 重定向至 `/v1/*` + 记录 `[DEPRECATED]` 日志
+    - 对外 API 命名空间一致性通过：验收脚本主流程仅调用 `/v1/*`；旧 `/api/*` 路径仅用于废弃回归检查，且按规则重定向（`POST /api/upload`=308，其余 legacy GET=301）至 `/v1/*` + 记录 `[DEPRECATED]` 日志
     - UI 基线路由可达率 = 100%
     - UI 健康态/错误态展示检查通过率 = 100%
 

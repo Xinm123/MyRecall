@@ -7,6 +7,7 @@ Provides health check and screenshot upload functionality.
 import time
 import json
 import io
+import urllib.parse
 from typing import Optional
 
 import numpy as np
@@ -14,51 +15,50 @@ import requests
 from PIL import Image
 
 from openrecall.shared.config import settings
+from openrecall.shared.utils import _build_request_kwargs
 
 
 class HTTPUploader:
     """HTTP client for uploading screenshots to the OpenRecall server.
-    
+
     Attributes:
         api_url: Base URL for the API endpoints.
         timeout: Request timeout in seconds.
     """
-    
+
     def __init__(self, api_url: Optional[str] = None, timeout: Optional[int] = None):
         """Initialize the uploader.
-        
+
         Args:
             api_url: Override the default API URL from settings.
             timeout: Request timeout in seconds. Defaults to settings.upload_timeout.
         """
         self.api_url = api_url or settings.api_url
         self.timeout = timeout or settings.upload_timeout
-    
+
     def health_check(self) -> bool:
         """Check if the server is healthy.
-        
+
         Returns:
             True if server responds with status "ok", False otherwise.
         """
         try:
-            response = requests.get(
-                f"{self.api_url}/health",
-                timeout=self.timeout
-            )
+            url = f"{self.api_url}/health"
+            response = requests.get(url, **_build_request_kwargs(url, self.timeout))
             if response.status_code == 200:
                 data = response.json()
                 return data.get("status") == "ok"
             return False
         except requests.RequestException:
             return False
-    
+
     def wait_for_server(self, max_retries: int = 10, retry_delay: float = 1.0) -> bool:
         """Wait for the server to become available.
-        
+
         Args:
             max_retries: Maximum number of retry attempts.
             retry_delay: Delay between retries in seconds.
-            
+
         Returns:
             True if server became available, False if max retries exceeded.
         """
@@ -68,7 +68,7 @@ class HTTPUploader:
             if attempt < max_retries - 1:
                 time.sleep(retry_delay)
         return False
-    
+
     def upload_screenshot(
         self,
         image: np.ndarray,
@@ -77,13 +77,13 @@ class HTTPUploader:
         active_window: str,
     ) -> bool:
         """Upload a screenshot to the server.
-        
+
         Args:
             image: Screenshot as numpy array (RGB).
             timestamp: Unix timestamp when screenshot was taken.
             active_app: Name of the active application.
             active_window: Title of the active window.
-            
+
         Returns:
             True if upload succeeded, False otherwise.
         """
@@ -91,7 +91,7 @@ class HTTPUploader:
             # Convert numpy array to PNG bytes
             img_pil = Image.fromarray(image)
             img_byte_arr = io.BytesIO()
-            img_pil.save(img_byte_arr, format='PNG')
+            img_pil.save(img_byte_arr, format="PNG")
             img_byte_arr.seek(0)
 
             metadata = {
@@ -99,21 +99,21 @@ class HTTPUploader:
                 "app_name": active_app,
                 "window_title": active_window,
             }
-            
+
             response = requests.post(
                 f"{self.api_url}/upload",
                 files={"file": ("screenshot.png", img_byte_arr, "image/png")},
                 data={"metadata": json.dumps(metadata)},
-                timeout=self.timeout
+                **_build_request_kwargs(f"{self.api_url}/upload", self.timeout),
             )
-            
+
             # Accept both 200 (old sync) and 202 (new async) as success
             if response.status_code in (200, 202):
                 return True
             else:
                 print(f"Upload failed: {response.status_code} - {response.text}")
                 return False
-                
+
         except requests.RequestException as e:
             print(f"Upload error: {e}")
             return False
@@ -125,7 +125,7 @@ _uploader: Optional[HTTPUploader] = None
 
 def get_uploader() -> HTTPUploader:
     """Get or create the global HTTPUploader instance.
-    
+
     Returns:
         The global HTTPUploader instance.
     """

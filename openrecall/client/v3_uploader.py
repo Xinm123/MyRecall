@@ -4,13 +4,14 @@ import json
 import logging
 import threading
 import time
-from pathlib import Path
+import urllib.parse
 from typing import Optional
 
 import requests
 
 from openrecall.client.spool import SpoolItem, SpoolQueue, get_spool
 from openrecall.shared.config import settings
+from openrecall.shared.utils import _build_request_kwargs
 
 logger = logging.getLogger(__name__)
 
@@ -54,9 +55,16 @@ def upload_capture(item: SpoolItem, spool: Optional[SpoolQueue] = None) -> bool:
                 "capture_id": item.capture_id,
                 "metadata": json.dumps(item.metadata),
             }
-            response = requests.post(url, files=files, data=data, timeout=_INGEST_TIMEOUT)
+            response = requests.post(
+                url,
+                files=files,
+                data=data,
+                **_build_request_kwargs(url, _INGEST_TIMEOUT),
+            )
     except requests.RequestException as exc:
-        logger.warning("v3_uploader: network error capture_id=%s: %s", item.capture_id, exc)
+        logger.warning(
+            "v3_uploader: network error capture_id=%s: %s", item.capture_id, exc
+        )
         return False
 
     if response.status_code in (200, 201):

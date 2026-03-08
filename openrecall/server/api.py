@@ -15,6 +15,7 @@ from flask import Blueprint, jsonify, request, redirect
 from PIL import Image
 
 from openrecall.server.database import SQLStore
+from openrecall.server.database.frames_store import FramesStore
 from openrecall.server.config_runtime import runtime_settings
 from openrecall.shared.config import settings
 from openrecall.server.search.engine import SearchEngine
@@ -32,7 +33,7 @@ api_bp = Blueprint("api", __name__, url_prefix="/api")
 def redirect_upload():
     logger.info("[DEPRECATED] /api/upload -> /v1/ingest")
 
-    return redirect("/v1/ingest", code=301)
+    return redirect("/v1/ingest", code=308)
 
 
 @api_bp.route("/search", methods=["GET"])
@@ -57,6 +58,7 @@ def redirect_health():
 
 
 sql_store = SQLStore()
+frames_store = FramesStore()
 search_engine = SearchEngine()
 
 
@@ -125,20 +127,7 @@ def health():
 def memories_latest():
     since_str = (request.args.get("since") or "0").strip()
     try:
-        since = float(since_str)
-    except ValueError:
-        return (
-            jsonify(
-                {
-                    "status": "error",
-                    "message": "Query parameter 'since' must be a float",
-                }
-            ),
-            400,
-        )
-
-    try:
-        memories = sql_store.get_memories_since(since)
+        memories = frames_store.get_memories_since(since_str)
         return jsonify(memories), 200
     except Exception as e:
         logger.exception("Error fetching latest memories")
@@ -162,7 +151,7 @@ def memories_recent():
         )
 
     try:
-        memories = sql_store.get_recent_memories(limit=limit)
+        memories = frames_store.get_recent_memories(limit=limit)
         return jsonify(memories), 200
     except Exception as e:
         logger.exception("Error fetching recent memories")
@@ -277,7 +266,7 @@ def upload():
                     f"Ingestion complete: {elapsed_ms:.1f}ms (task_id={task_id})"
                 )
 
-            response_data = {
+            response_data: dict[str, object] = {
                 "status": "accepted",
                 "task_id": task_id,
                 "message": "Queued for processing",

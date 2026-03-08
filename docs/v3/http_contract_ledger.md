@@ -90,15 +90,15 @@ SSOT：`roadmap.md` §1.1；`spec.md` §4.5（命名空间冻结）；`open_ques
 ### 4.1 规则
 
 - 对外契约只允许 `/v1/*` 作为默认入口；`/api/*` 只用于“废弃回归检查”。
-- P1-S1..P1-S3：上述 4 个 legacy 端点必须返回 `301` 且 `Location` 指向对应的 `/v1/*`（并记录 `[DEPRECATED]` 日志）。
+- P1-S1..P1-S3：上述 4 个 legacy 端点按规则返回重定向并携带 `Location`：`POST /api/upload` 返回 `308`，其余 3 个 GET 端点返回 `301`（并记录 `[DEPRECATED]` 日志）。
 - P1-S4 起：上述 4 个 legacy 端点必须返回 `410 Gone`（完全废弃）；建议使用统一错误格式返回（SSOT：`spec.md` §4.9）。
 
 说明：除上述端点外的 `/api/*` 行为不纳入 P1 Gate 口径；不得作为客户端默认调用路径。
 
 ### 4.2 重要澄清（避免阶段矛盾）
 
-- P1-S1..S3 的 `301` 仅表达“命名空间迁移提示”，不等价于“目标端点当期已完成实现”。
-- Gate 的验收应按子阶段定义执行：例如 P1-S1 只要求 301 + 日志，不要求 `/v1/search` 在 P1-S1 可用。
+- P1-S1..S3 的 legacy 重定向（POST=308, GET=301）仅表达“命名空间迁移提示”，不等价于“目标端点当期已完成实现”。
+- Gate 的验收应按子阶段定义执行：例如 P1-S1 只要求约定重定向 + 日志，不要求 `/v1/search` 在 P1-S1 可用。
 
 ## 5. Phase 1 substage deltas（HTTP-only）
 
@@ -112,7 +112,7 @@ SSOT：`roadmap.md` §1.1；`spec.md` §4.5（命名空间冻结）；`open_ques
 | ADD | C-API-INGEST-002 | GET `/v1/ingest/queue/status` | 队列可观测性对外可用；响应 MUST 包含 `processing_mode`（P1-S1 固定 `noop`） | `spec.md` §4.7 |
 | ADD | C-API-FRAME-001 | GET `/v1/frames/:frame_id` | 主读取链路 JPEG 对外可用 | `spec.md` §4.9 |
 | ADD | C-API-HEALTH-001 | GET `/v1/health` | 健康检查对外可用 | `spec.md` §4.9 |
-| DEPRECATE | C-NS-API-001 | `POST /api/upload`; `GET /api/search`; `GET /api/queue/status`; `GET /api/health` | P1-S1~S3：统一 301 → 对应 `/v1/*` + `[DEPRECATED]` 日志（仅废弃回归检查） | `roadmap.md` §1.1 |
+| DEPRECATE | C-NS-API-001 | `POST /api/upload`; `GET /api/search`; `GET /api/queue/status`; `GET /api/health` | P1-S1~S3：`POST /api/upload`=308，其余 GET=301 → 对应 `/v1/*` + `[DEPRECATED]` 日志（仅废弃回归检查） | `roadmap.md` §1.1 |
 
 ### P1-S2 delta（采集）
 
@@ -131,7 +131,7 @@ SSOT：`roadmap.md` §1.1；`spec.md` §4.5（命名空间冻结）；`open_ques
 | 类型 | Contract-ID | 接口 | 变化/说明 | SSOT |
 |---|---|---|---|---|
 | ADD | C-API-SEARCH-001 | GET `/v1/search` | Search 对外可用（FTS5+过滤） | `spec.md` §4.5 |
-| REMOVE | C-NS-API-001 | `POST /api/upload`; `GET /api/search`; `GET /api/queue/status`; `GET /api/health` | 从 301 切换为 `410 Gone`（完全废弃） | `roadmap.md` §1.1 |
+| REMOVE | C-NS-API-001 | `POST /api/upload`; `GET /api/search`; `GET /api/queue/status`; `GET /api/health` | 从阶段性重定向（POST=308, GET=301）切换为 `410 Gone`（完全废弃） | `roadmap.md` §1.1 |
 | CHANGE | C-API-SEARCH-002 | GET `/v1/search/keyword` | P1 不提供独立端点：必须返回 `404 Not Found`（避免回归出独立路径） | `acceptance/phase1/p1-s4.md` |
 
 ### P1-S5 delta（Chat-1 Grounding 与引用）

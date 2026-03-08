@@ -1,10 +1,3 @@
-"""Screenshot recorder (Producer) for OpenRecall client.
-
-Captures screenshots, detects changes, and queues them to the local buffer.
-The Consumer thread (UploaderConsumer) handles uploading to server.
-"""
-
-import json
 import logging
 import os
 import time
@@ -17,10 +10,11 @@ import requests
 from PIL import Image
 
 from openrecall.shared.config import settings
-from openrecall.client.buffer import LocalBuffer, get_buffer
 from openrecall.client.consumer import UploaderConsumer
+from openrecall.client.spool import SpoolQueue, get_spool
 from openrecall.client.v3_uploader import SpoolUploader
 from openrecall.shared.utils import (
+    _build_request_kwargs,
     get_active_app_name,
     get_active_window_title,
     is_user_active,
@@ -51,15 +45,15 @@ def mean_structured_similarity_index(
 
     img1_gray: np.ndarray = rgb2gray(img1)
     img2_gray: np.ndarray = rgb2gray(img2)
-    mu1: float = np.mean(img1_gray)
-    mu2: float = np.mean(img2_gray)
-    sigma1_sq = np.var(img1_gray)
-    sigma2_sq = np.var(img2_gray)
-    sigma12 = np.mean((img1_gray - mu1) * (img2_gray - mu2))
+    mu1 = float(np.mean(img1_gray))
+    mu2 = float(np.mean(img2_gray))
+    sigma1_sq = float(np.var(img1_gray))
+    sigma2_sq = float(np.var(img2_gray))
+    sigma12 = float(np.mean((img1_gray - mu1) * (img2_gray - mu2)))
     ssim_index = ((2 * mu1 * mu2 + C1) * (2 * sigma12 + C2)) / (
         (mu1**2 + mu2**2 + C1) * (sigma1_sq + sigma2_sq + C2)
     )
-    return ssim_index
+    return float(ssim_index)
 
 
 def is_similar(
@@ -148,16 +142,13 @@ class ScreenRecorder:
 
     def __init__(
         self,
-        buffer: Optional[LocalBuffer] = None,
         consumer: Optional[UploaderConsumer] = None,
     ):
         """Initialize the recorder.
 
         Args:
-            buffer: LocalBuffer instance. Defaults to global singleton.
             consumer: UploaderConsumer instance. Creates new if not provided.
         """
-        self.buffer = buffer or get_buffer()
         self._stop_requested = False
 
         # Phase 8.2: Runtime configuration state
@@ -166,15 +157,13 @@ class ScreenRecorder:
         self.last_heartbeat_time = 0
         self._no_change_cycles = 0
         self._warned_capture_issue = False
-        self.consumer = consumer or UploaderConsumer(
-            buffer=self.buffer,
-            should_upload=lambda: self.upload_enabled,
-        )
+        self.consumer = consumer
+        self._spool: SpoolQueue = get_spool()
         self._spool_uploader = SpoolUploader()
 
     def start(self) -> None:
         """Start the consumer thread."""
-        if not self.consumer.is_alive():
+        if self.consumer is not None and not self.consumer.is_alive():
             self.consumer.start()
         if not self._spool_uploader.is_alive():
             self._spool_uploader.start()
@@ -187,14 +176,7 @@ class ScreenRecorder:
         """
         try:
             url = f"{settings.api_url.rstrip('/')}/heartbeat"
-            parsed = urllib.parse.urlparse(url)
-            is_loopback = parsed.hostname in {"localhost", "127.0.0.1", "::1"}
-
-            request_kwargs = {"timeout": 2}
-            if is_loopback:
-                request_kwargs["proxies"] = {"http": None, "https": None}
-
-            response = requests.post(url, **request_kwargs)
+            response = requests.post(url, **_build_request_kwargs(url))
             response.raise_for_status()
 
             data = response.json()
@@ -214,9 +196,10 @@ class ScreenRecorder:
     def stop(self) -> None:
         """Stop the recorder and consumer thread gracefully."""
         self._stop_requested = True
-        self.consumer.stop()
+        if self.consumer is not None:
+            self.consumer.stop()
         self._spool_uploader.stop()
-        if self.consumer.is_alive():
+        if self.consumer is not None and self.consumer.is_alive():
             self.consumer.join(timeout=2.0)
         if self._spool_uploader.is_alive():
             self._spool_uploader.join(timeout=2.0)
@@ -317,7 +300,7 @@ class ScreenRecorder:
                             or "Unknown Title",
                         }
 
-                        self.buffer.enqueue(image, metadata)
+                        self._spool.enqueue(image, metadata)
                         if not self.upload_enabled:
                             logger.debug(
                                 "Upload disabled: buffered locally (will upload when enabled)"

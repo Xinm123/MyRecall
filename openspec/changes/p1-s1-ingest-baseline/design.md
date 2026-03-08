@@ -53,8 +53,8 @@ WebUI (Jinja templates)
   - `GET /v1/health`：返回对齐 screenpipe `HealthCheckResponse` 子集的健康信息（含 queue 子集）。
 - 强制 `processing_mode=noop` 并满足可验证日志锚点：启动后输出且仅输出一次 `MRV3 processing_mode=noop`；失败计数增加时输出 `MRV3 frame_failed reason=` 且 reason 仅允许 `DB_WRITE_FAILED|IO_ERROR|STATE_MACHINE_ERROR`。
 - WebUI 三个页面（`/`、`/search`、`/timeline`）首屏可见 `#mr-health`，并按 `data-state` 状态机展示 `healthy`/`unreachable`/`degraded`，满足 Gate 的 15s 不可达与 10s 自动恢复时间窗（不刷新页面）。
-- Legacy namespace（P1-S1~S3）：仅对 Gate scope 的 4 个端点返回 `301` + `Location` 指向对应 `/v1/*`，并记录 `[DEPRECATED]` 日志（不实现 catch-all `/api/*` redirect）。
-  - 澄清：P1-S1~S3 的 301 仅用于“迁移提示/废弃回归检查”，不等价于 replacement 端点在当期已完成实现（例如 `/v1/search` 在 P1-S1 可能为 404，属预期）。
+- Legacy namespace（P1-S1~S3）：仅对 Gate scope 的 4 个端点返回重定向 + `Location` 指向对应 `/v1/*`，并记录 `[DEPRECATED]` 日志（`POST /api/upload`=308，其余 GET=301；不实现 catch-all `/api/*` redirect）。
+  - 澄清：P1-S1~S3 的 legacy 重定向仅用于“迁移提示/废弃回归检查”，不等价于 replacement 端点在当期已完成实现（例如 `/v1/search` 在 P1-S1 可能为 404，属预期）。
 
 **Non-Goals:**
 
@@ -77,19 +77,19 @@ WebUI (Jinja templates)
   - A：把 `/v1/*` 混入 `openrecall/server/api.py`（降低文件数，但会把 legacy 与 v3 语义纠缠）。
   - B（选）：独立 v1 Blueprint（清晰隔离，便于后续 P1-S4/P1-S5 增量）。
 
-2) legacy `/api/*` 处理：严格按 SSOT 返回 301 + `Location` + `[DEPRECATED]`，且不依赖 redirect 作为功能路径
+2) legacy `/api/*` 处理：严格按 SSOT 返回重定向（POST=308, GET=301）+ `Location` + `[DEPRECATED]`，且不依赖 redirect 作为功能路径
 
 - SSOT：`docs/v3/http_contract_ledger.md` §4.0/§4.1；`docs/v3/runbook_phase1.md` §6。
-- 方案：对以下 4 个端点做“显式覆盖”并返回 301：
-  - `POST /api/upload` -> `/v1/ingest`
-  - `GET /api/search` -> `/v1/search`
-  - `GET /api/queue/status` -> `/v1/ingest/queue/status`
-  - `GET /api/health` -> `/v1/health`
+- 方案：对以下 4 个端点做“显式覆盖”并返回重定向：
+  - `POST /api/upload` -> `308` `/v1/ingest`
+  - `GET /api/search` -> `301` `/v1/search`
+  - `GET /api/queue/status` -> `301` `/v1/ingest/queue/status`
+  - `GET /api/health` -> `301` `/v1/health`
 - 记录日志锚点：`[DEPRECATED]` + 旧路径 + 新路径；响应头包含 `Location`。
 - trade-off：
-  - A（选）：严格按 Gate 要求返回 301（即使 POST 客户端可能不自动 follow）。
-  - B：对 POST 使用 307/308 保持方法（更符合 HTTP 语义，但不满足 P1-S1 SSOT）。
-  - 结论：P1-S1 301 仅用于“废弃回归检查”，Host 主路径直接调用 `/v1/*`，因此不受 POST redirect 行为影响。
+  - A（选）：`POST /api/upload` 使用 308（保持方法）+ 其余 GET 保持 301（维持迁移提示语义）。
+  - B：全部保持 301（实现简单，但 POST 在部分客户端会降级为 GET）。
+  - 结论：P1-S1 legacy 重定向仅用于“废弃回归检查”，Host 主路径直接调用 `/v1/*`；同时 `POST /api/upload` 用 308 避免方法降级踩坑。
 - screenpipe 参考：无直接对照（screenpipe 没有 `/api`→`/v1` 迁移历史）。
 
 3) 数据模型与迁移：按 SSOT 建立 v3 P1 初始 schema（`20260227000001_initial_schema.sql`），并在 P1-S1 仅启用 `frames` 业务链路
@@ -178,9 +178,21 @@ WebUI (Jinja templates)
   - 对齐：content dedup/backoff 的精神与边界条件（见 `_ref/screenpipe/crates/screenpipe-server/src/event_driven_capture.rs` 的 dedup + floor）。
   - 差异：screenpipe 同进程直写，不经 LAN 传输；v3 以 Host/Edge 拓扑实现可恢复传输。
 
+10) WebUI（grid/timeline）在 P1-S1 采用“frames 兼容桥接”，避免 `entries` 双写
+
+- 背景：P1-S1 已将 `/v1/*` + `frames` 设为 SSOT；但现有页面（`/`、`/timeline`）仍沿用 legacy 渲染假设（`entries` + `/screenshots/{timestamp}.png`），会导致“ingest 成功但页面无图”。
+- 方案：
+  - `openrecall/server/app.py` 的 `index/timeline` 首屏数据改为读取 `frames`（通过 v3 store 导出 legacy 形状）；
+  - `openrecall/server/api.py` 的 `/api/memories/latest|recent` 改为读取 `frames`（兼容现有前端轮询）；
+  - `openrecall/server/templates/index.html` 与 `timeline.html` 图片 URL 统一为 `/v1/frames/:frame_id`。
+- 约束：不新增 `frames -> entries` 双写，不回退 SSOT；兼容桥接仅用于 P1-S1 的 UI 可见性闭环。
+- trade-off：
+  - A（选）：页面读取源桥接到 `frames`（改动小、风险低、与 SSOT 一致）。
+  - B：引入双写维持 `entries`（实现快但长期易漂移，不选）。
+
 ## Risks / Trade-offs
 
-- 301 对 POST 的行为差异 → Mitigation：P1-S1 不依赖 redirect 作为主路径；Host 直接调用 `/v1/ingest`；301 仅用于“废弃回归检查”。
+- legacy 重定向对 POST 的行为差异 → Mitigation：`POST /api/upload` 使用 308；Host 主路径仍直接调用 `/v1/ingest`；legacy 仅用于“废弃回归检查”。
 - 现有启动逻辑默认 preload 模型与启动 ProcessingWorker（违反 noop） → Mitigation：为 P1-S1 引入明确 processing_mode 开关；noop 时跳过 preload/worker；并强制输出 `MRV3 processing_mode=noop`（一次且仅一次）。
 - 现有 DB 仍包含 legacy `entries`，新增 `frames` 可能带来“双源并存” → Mitigation：P1-S1 明确 `/v1/*` 以 `frames` 为 SSOT；现有页面内容迁移推迟，不做双写；仅在 UI health 组件层与 v1 health 发生耦合。
 - UI 轮询导致 DB 锁竞争（SQLite） → Mitigation：health/queue/status 查询保持短事务、只读、索引友好（按 status GROUP BY/COUNT）；轮询间隔遵守 `poll_interval_ms=5000`。
@@ -189,7 +201,7 @@ WebUI (Jinja templates)
 
 ## Migration Plan
 
-- P1-S1：引入 `schema_migrations` + migrations runner，并应用 `20260227000001_initial_schema.sql`（P1 全量 DDL）；当期仅实现/使用 `frames` 链路（`/v1/ingest`、`/v1/ingest/queue/status`、`/v1/frames/:frame_id`、`/v1/health`）、新增 `#mr-health`、legacy 4 端点返回 301。
+- P1-S1：引入 `schema_migrations` + migrations runner，并应用 `20260227000001_initial_schema.sql`（P1 全量 DDL）；当期仅实现/使用 `frames` 链路（`/v1/ingest`、`/v1/ingest/queue/status`、`/v1/frames/:frame_id`、`/v1/health`）、新增 `#mr-health`、legacy 4 端点按规则重定向（POST=308, GET=301）。
 - P1-S2：补齐 Host 侧 CapturePayload 字段（`capture_trigger` 等）与 per-device 去重状态（last_content_hash, last_write_time）。
 - P1-S3：切换 `processing_mode=ax_ocr`，启用 AX-first/OCR-fallback 写入（Scheme C）与 `ocr_text/accessibility/FTS` 等既有表的读写路径（表已由 `20260227000001_initial_schema.sql` 预置）。
 - P1-S4+：实现 `/v1/search`，逐步迁移 WebUI 的数据展示与交互到 v3 结构。

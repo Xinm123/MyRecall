@@ -4,8 +4,11 @@ Launch with: python -m openrecall.server
 """
 
 import atexit
+import sqlite3
 import signal
 import sys
+from pathlib import Path
+from typing import Optional
 
 from openrecall.shared.config import settings
 from openrecall.shared.logging_config import configure_logging
@@ -13,6 +16,24 @@ from openrecall.shared.logging_config import configure_logging
 logger = configure_logging("openrecall.server")
 
 from openrecall.server.app import app
+from openrecall.server.database.migrations_runner import run_migrations
+
+
+def ensure_v3_schema(
+    db_path: Optional[Path] = None,
+    migrations_dir: Optional[Path] = None,
+) -> None:
+    target_db_path = db_path or settings.db_path
+    target_migrations_dir = migrations_dir or (
+        Path(__file__).resolve().parent / "database" / "migrations"
+    )
+    with sqlite3.connect(str(target_db_path)) as conn:
+        run_migrations(conn, target_migrations_dir)
+    logger.info(
+        "v3 schema migrations ensured: db=%s migrations=%s",
+        target_db_path,
+        target_migrations_dir,
+    )
 
 
 def preload_ai_models():
@@ -102,6 +123,8 @@ def main():
 
     logger.info("=" * 50)
 
+    ensure_v3_schema()
+
     processing_mode = settings.processing_mode.strip().lower()
     worker = None
 
@@ -129,11 +152,13 @@ def main():
                 logger.info("Stopping queue driver...")
                 worker.stop()
                 logger.info("Queue driver stopped")
-            elif hasattr(app, "worker") and app.worker:
-                logger.info("Stopping background worker...")
-                app.worker.stop()
-                app.worker.join(timeout=5)
-                logger.info("Background worker stopped")
+            else:
+                app_worker = getattr(app, "worker", None)
+                if app_worker is not None:
+                    logger.info("Stopping background worker...")
+                    app_worker.stop()
+                    app_worker.join(timeout=5)
+                    logger.info("Background worker stopped")
         except Exception as e:
             logger.warning(f"Error stopping worker: {e}")
 
@@ -142,11 +167,16 @@ def main():
 
     signal.signal(signal.SIGINT, shutdown_handler)
     signal.signal(signal.SIGTERM, shutdown_handler)
-    atexit.register(
-        lambda: worker.stop()
-        if worker is not None
-        else (app.worker.stop() if hasattr(app, "worker") and app.worker else None)
-    )
+
+    def _cleanup_worker() -> None:
+        if worker is not None:
+            worker.stop()
+            return
+        app_worker = getattr(app, "worker", None)
+        if app_worker is not None:
+            app_worker.stop()
+
+    atexit.register(_cleanup_worker)
 
     if processing_mode == "noop":
         logger.info("MRV3 processing_mode=noop")

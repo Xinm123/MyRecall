@@ -34,8 +34,9 @@ def run_migrations(conn: sqlite3.Connection, migrations_dir: Path) -> None:
         if version not in applied:
             conn.executescript(sql_file.read_text())
             conn.execute(
-                "INSERT INTO schema_migrations(version, description) VALUES (?, ?)",
+                "INSERT OR IGNORE INTO schema_migrations(version, description) VALUES (?, ?)",
                 (version, sql_file.stem),
             )
+            applied.add(version)
 
     conn.commit()

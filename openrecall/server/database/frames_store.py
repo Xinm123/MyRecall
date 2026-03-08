@@ -307,3 +307,136 @@ class FramesStore:
         except sqlite3.Error as e:
             logger.error("get_last_frame_ingested_at failed: %s", e)
             return None
+
+    def get_recent_memories(self, limit: int = 500) -> list[dict]:
+        """Retrieve recent frames for the grid view.
+
+        Args:
+            limit: Maximum number of frames to return.
+
+        Returns:
+            List of dicts with frame data formatted for UI consumption.
+        """
+        memories = []
+        normalized_limit = max(1, min(int(limit) if limit else 500, 1000))
+
+        try:
+            with self._connect() as conn:
+                rows = conn.execute(
+                    """
+                    SELECT id, capture_id, timestamp, app_name, window_name,
+                           snapshot_path, status, ingested_at
+                    FROM frames
+                    ORDER BY timestamp DESC
+                    LIMIT ?
+                    """,
+                    (normalized_limit,),
+                ).fetchall()
+
+                for row in rows:
+                    ts = row["timestamp"]
+                    memories.append(
+                        {
+                            "id": row["id"],
+                            "frame_id": row["id"],
+                            "capture_id": row["capture_id"],
+                            "timestamp": ts,
+                            "app": row["app_name"] or "",
+                            "title": row["window_name"] or "",
+                            "status": row["status"] if row["status"] else "pending",
+                            "filename": f"{ts}.png",
+                            "app_name": row["app_name"] or "",
+                            "window_title": row["window_name"] or "",
+                        }
+                    )
+        except sqlite3.Error as e:
+            logger.error("get_recent_memories failed: %s", e)
+        return memories
+
+    def get_timeline_frames(self, limit: int = 5000) -> list[dict]:
+        """Retrieve frames for timeline view.
+
+        Args:
+            limit: Maximum number of frames to return.
+
+        Returns:
+            List of dicts with frame data formatted for timeline view.
+        """
+        frames = []
+        normalized_limit = max(1, min(int(limit) if limit else 5000, 10000))
+
+        try:
+            with self._connect() as conn:
+                rows = conn.execute(
+                    """
+                    SELECT id, capture_id, timestamp, app_name, window_name,
+                           snapshot_path, status, ingested_at
+                    FROM frames
+                    ORDER BY timestamp DESC
+                    LIMIT ?
+                    """,
+                    (normalized_limit,),
+                ).fetchall()
+
+                for row in rows:
+                    ts = row["timestamp"]
+                    frames.append(
+                        {
+                            "id": row["id"],
+                            "frame_id": row["id"],
+                            "capture_id": row["capture_id"],
+                            "timestamp": ts,
+                            "app": row["app_name"] or "",
+                            "title": row["window_name"] or "",
+                            "status": row["status"] if row["status"] else "pending",
+                            "filename": f"{ts}.png",
+                            "app_name": row["app_name"] or "",
+                            "window_title": row["window_name"] or "",
+                        }
+                    )
+        except sqlite3.Error as e:
+            logger.error("get_timeline_frames failed: %s", e)
+        return frames
+
+    def get_memories_since(self, timestamp: str) -> list[dict]:
+        """Retrieve frames with timestamp greater than given value.
+
+        Args:
+            timestamp: Filter for frames with timestamp > this value (ISO8601 string or Unix timestamp string).
+
+        Returns:
+            List of dicts with frame data.
+        """
+        memories = []
+        try:
+            with self._connect() as conn:
+                rows = conn.execute(
+                    """
+                    SELECT id, capture_id, timestamp, app_name, window_name,
+                           snapshot_path, status, ingested_at
+                    FROM frames
+                    WHERE timestamp > ?
+                    ORDER BY timestamp DESC
+                    """,
+                    (timestamp,),
+                ).fetchall()
+
+                for row in rows:
+                    ts = row["timestamp"]
+                    memories.append(
+                        {
+                            "id": row["id"],
+                            "frame_id": row["id"],
+                            "capture_id": row["capture_id"],
+                            "timestamp": ts,
+                            "app": row["app_name"] or "",
+                            "title": row["window_name"] or "",
+                            "status": row["status"] if row["status"] else "pending",
+                            "filename": f"{ts}.png",
+                            "app_name": row["app_name"] or "",
+                            "window_title": row["window_name"] or "",
+                        }
+                    )
+        except sqlite3.Error as e:
+            logger.error("get_memories_since failed: %s", e)
+        return memories

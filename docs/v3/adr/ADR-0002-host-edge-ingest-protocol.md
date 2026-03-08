@@ -5,7 +5,7 @@
 
 ## Context
 - 现有 MyRecall v2 使用单次 `/api/upload`（历史路径），适合同机或轻载，不足以应对频繁断连与重放。
-- v3 对外 API 命名空间冻结为 `/v1/*`；`/api/*` 为 v2 历史路径，P1-S1 返回 301 重定向至 `/v1/*` + `[DEPRECATED]` 日志，P1-S4 返回 410 Gone 完全废弃。
+- v3 对外 API 命名空间冻结为 `/v1/*`；`/api/*` 为 v2 历史路径，P1-S1~S3 按阶段策略重定向（`POST /api/upload`=308，其余 GET=301）至 `/v1/*` + `[DEPRECATED]` 日志，P1-S4 返回 410 Gone 完全废弃。
 
 ## Decision
 - 采用 019A 分阶段协议：

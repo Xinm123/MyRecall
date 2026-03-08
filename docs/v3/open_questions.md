@@ -38,7 +38,7 @@ references:
 | OQ-021 | P0 | `ocr_text` 表 `app_name`/`window_name` 补齐策略 | A 补齐列 + 接受 drift（推荐）/ B 触发器 JOIN frames | A（已决） | 对齐 screenpipe 历史 migration；B 引入不必要子查询耦合 | 与 frames 列潜在 drift（P1 内无修正场景，接受） | 2026-02-27 |
 | OQ-022 | P0 | Search SQL JOIN 策略 | A INNER JOIN 单路径 / ~~A~~ → C 三路径分发（已决） | C（已决，覆盖 A） | Scheme C 下 search 拆为 search_ocr()（INNER JOIN ocr_text）+ search_accessibility()（accessibility 表 + accessibility_fts）+ search_all()（并行合并 by timestamp DESC）；content_type 参数路由 | — | 2026-03-02 |
 | OQ-023 | P1 | Migration 策略 | A 手写 SQL + `schema_migrations` 表（推荐）/ B Alembic / C PRAGMA user_version | A（已决） | 零额外依赖；对齐 screenpipe sqlx migrate 命名规范 | — | 2026-02-27 |
-| OQ-024 | P0 | API 命名空间冻结 | A /v1/* 统一 + /api/* 渐进废弃（推荐）| A（已决，2026-03-04 补充） | 对外 HTTP 契约统一 `/v1/*`；`/api/*` P1-S1 返回 301 重定向至 `/v1/*` + `[DEPRECATED]` 日志，P1-S4 返回 410 Gone 完全废弃；不纳入客户端默认调用路径 | — | 2026-02-26 |
+| OQ-024 | P0 | API 命名空间冻结 | A /v1/* 统一 + /api/* 渐进废弃（推荐）| A（已决，2026-03-04 补充；2026-03-07 更新） | 对外 HTTP 契约统一 `/v1/*`；`/api/*` P1-S1~S3 按阶段策略重定向（`POST /api/upload`=308，其余 GET=301）至 `/v1/*` + `[DEPRECATED]` 日志，P1-S4 返回 410 Gone 完全废弃；不纳入客户端默认调用路径 | — | 2026-02-26 |
 | OQ-025 | P0 | accessibility 表架构（Scheme C） | A P0 建表 + focused 修复 + frame_id 方案 3（推荐，已决）/ B 对齐 screenpipe 不加 focused / C P1+ 延迟建表 | A（已决） | (1) accessibility 表 P0 建，paired_capture 按 text_source 分表写入；(2) 新增 focused 列修复 screenpipe 的 focused→force OCR 限制（db.rs:1870-1872）；(3) frame_id DEFAULT NULL 精确关联 frames（paired_capture 填入，未来独立 walker 留 NULL） | DDL 复杂度+1（多一张表+FTS+triggers）；P0 范围略增 | 2026-03-02 |
 | OQ-026 | P1 | P1 Search UI 分页模式 | A 加载更多（对齐 screenpipe，推荐）/ B 跳页（需加 offset 上限约束） | A（已决） | screenpipe `search-modal.tsx` 纯"加载更多"（`hasMoreOcr/loadMoreOcr`），offset 步长=limit，实际不超过几百；跳页模式下 `search_all()` 过量拉取内存风险不可控（offset=10000 时各路径拉 10020 行）；P2+ keyset cursor 可彻底替代 | 若未来需跳页，需补 `offset max` 约束并在 `search_all()` 加运行时 reject | 2026-03-02 |
 | OQ-027 | P1 | Capture 运行机制与频率口径 | A 事件驱动主机制 + 固定注入压测口径（推荐）/ B 全局固定频率假设 | A（已决，2026-03-04 补充） | 对齐 `spec.md`/`roadmap.md`/`acceptance/phase1/p1-s2.md`，消除"事件驱动 vs 固定频率"文本冲突 | 若 P2+ 引入 Power Profile，TTS 与丢失率阈值需按 profile 重新标定 | 2026-03-04 |
@@ -90,7 +90,7 @@ references:
 
 23. OQ-023 = A：Migration 策略采用手写 SQL + `schema_migrations` 跟踪表，零额外依赖；文件命名 `YYYYMMDDHHMMSS_描述.sql` 对齐 screenpipe；P1 全量 DDL 放入 `20260227000001_initial_schema.sql`；`ocr_text_embeddings` 表推迟至 P2+ migration 新增；已执行迁移不得修改。
 
-24. OQ-024 = A（2026-03-04 补充）：API 命名空间冻结：v3 对外 HTTP 契约统一 `/v1/*`；`/api/*` P1-S1 返回 301 重定向至 `/v1/*` + `[DEPRECATED]` 日志，P1-S4 返回 410 Gone 完全废弃；不纳入客户端默认调用路径。
+24. OQ-024 = A（2026-03-04 补充；2026-03-07 更新）：API 命名空间冻结：v3 对外 HTTP 契约统一 `/v1/*`；`/api/*` P1-S1~S3 按阶段策略重定向（`POST /api/upload`=308，其余 GET=301）至 `/v1/*` + `[DEPRECATED]` 日志，P1-S4 返回 410 Gone 完全废弃；不纳入客户端默认调用路径。
    - 重要澄清（P1 Gate scope）：legacy `/api/*` 渐进废弃的验收口径以 `docs/v3/http_contract_ledger.md` §4.0 为准，仅覆盖 `POST /api/upload`、`GET /api/search`、`GET /api/queue/status`、`GET /api/health`（其余 `/api/*` 行为不纳入 P1 Gate 口径）。
 
 ### 已拍板结论（2026-03-02）

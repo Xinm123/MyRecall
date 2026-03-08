@@ -54,7 +54,7 @@
 
 - 功能清单完成率（目标 100%）：
 - API/Schema 契约完成率（目标 100%）：
-- API 命名空间一致性（验收脚本主流程仅 `/v1/*`；旧 `/api/*` 仅对以下 legacy 端点做废弃回归检查：`POST /api/upload`、`GET /api/search`、`GET /api/queue/status`、`GET /api/health`；并按阶段策略验证 301/410，目标 100%）：
+- API 命名空间一致性（验收脚本主流程仅 `/v1/*`；旧 `/api/*` 仅对以下 legacy 端点做废弃回归检查：`POST /api/upload`、`GET /api/search`、`GET /api/queue/status`、`GET /api/health`；并按阶段策略验证 `308/301/410`，目标 100%）：
 - 关键功能用例通过率（目标 >= 95%）：
 
 ### 4.3 完善度指标（强制）

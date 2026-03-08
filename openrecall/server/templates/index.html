@@ -571,6 +571,10 @@
       },
 
       imageSrc(entry) {
+        const frameId = entry?.frame_id;
+        if (frameId !== undefined && frameId !== null) {
+          return `/v1/frames/${frameId}`;
+        }
         const filename = entry?.filename || `${entry?.timestamp}.png`;
         return `/screenshots/${filename}`;
       },

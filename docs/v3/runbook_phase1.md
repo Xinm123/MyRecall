@@ -100,9 +100,9 @@ curl -sS "http://localhost:${OPENRECALL_PORT:-8083}/v1/health"
 
 3) Legacy namespace behavior (transitional):
 
-P1-S1 ~ P1-S3 expects the following legacy endpoints to return `301` to their `/v1/*` replacements plus `[DEPRECATED]` logs (P1 Gate scope):
+P1-S1 ~ P1-S3 expects the following legacy endpoints to return transitional redirects to their `/v1/*` replacements plus `[DEPRECATED]` logs (P1 Gate scope):
 
-- `POST /api/upload`  -> `POST /v1/ingest`
+- `POST /api/upload`  -> `308` -> `POST /v1/ingest`
 - `GET  /api/search`  -> `GET  /v1/search`
 - `GET  /api/queue/status` -> `GET  /v1/ingest/queue/status`
 - `GET  /api/health`  -> `GET  /v1/health`
@@ -114,7 +114,7 @@ curl -i "http://localhost:${OPENRECALL_PORT:-8083}/api/health"
 ```
 
 Expected:
-- HTTP status `301`
+- HTTP status `301`（GET legacy）或 `308`（`POST /api/upload`）
 - `Location: /v1/health`
 
 ## 6.1 Fault Injection: Host -> Edge disconnect (P1-S1)

@@ -296,7 +296,7 @@ paired_capture 处理一帧:
 
 #### API 命名空间冻结（P0-01）
 - MyRecall-v3 对外 HTTP 契约统一使用 `/v1/*`。
-- `/api/*` 为 v2 历史路径：P1-S1~P1-S3 返回 301 重定向至 `/v1/*` + `[DEPRECATED]` 日志；自 P1-S4 起返回 410 Gone 完全废弃。
+- `/api/*` 为 v2 历史路径：P1-S1~P1-S3 对 `POST /api/upload` 返回 308、对其余 3 个 legacy GET 端点返回 301（均重定向至对应 `/v1/*` 并记录 `[DEPRECATED]` 日志）；自 P1-S4 起返回 410 Gone 完全废弃。
   - 重要澄清（P1 Gate scope）：legacy `/api/*` 渐进废弃的验收口径只覆盖 4 个端点：`POST /api/upload`、`GET /api/search`、`GET /api/queue/status`、`GET /api/health`（其余 `/api/*` 行为不纳入 P1 Gate 口径）。完整范围以 `docs/v3/http_contract_ledger.md` §4.0 与各阶段验收文档为准。
 - 兼容 alias（如存在）必须标记为 legacy，且不得作为文档、SDK、验收脚本默认入口。
 
