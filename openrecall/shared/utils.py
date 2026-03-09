@@ -85,7 +85,7 @@ def human_readable_time(timestamp: int) -> str:
         return f"{diff.seconds // 3600} hours ago"
 
 
-def timestamp_to_human_readable(timestamp: int) -> str:
+def timestamp_to_human_readable(timestamp: Any) -> str:
     """Converts a Unix timestamp into a human-readable absolute date/time string.
 
     Args:
@@ -96,9 +96,20 @@ def timestamp_to_human_readable(timestamp: int) -> str:
         or an empty string if conversion fails.
     """
     try:
-        dt_object = datetime.datetime.fromtimestamp(timestamp)
+        if isinstance(timestamp, str):
+            value = timestamp.strip()
+            if not value:
+                return ""
+            if value.isdigit():
+                dt_object = datetime.datetime.fromtimestamp(int(value))
+                return dt_object.strftime("%Y-%m-%d %H:%M:%S")
+            normalized = value.replace("Z", "+00:00")
+            dt_object = datetime.datetime.fromisoformat(normalized)
+            return dt_object.strftime("%Y-%m-%d %H:%M:%S")
+
+        dt_object = datetime.datetime.fromtimestamp(float(timestamp))
         return dt_object.strftime("%Y-%m-%d %H:%M:%S")
-    except:
+    except Exception:
         return ""
 
 

@@ -41,6 +41,29 @@ def _get_frames_store() -> FramesStore:
     return _frames_store
 
 
+def _parse_utc_timestamp(raw_value: str | None) -> datetime | None:
+    if raw_value is None:
+        return None
+
+    normalized = raw_value.strip().replace(" ", "T")
+    if not normalized:
+        return None
+
+    if normalized.endswith("Z"):
+        normalized = f"{normalized[:-1]}+00:00"
+    elif "+" not in normalized and "-" not in normalized[10:]:
+        normalized = f"{normalized}+00:00"
+
+    try:
+        parsed = datetime.fromisoformat(normalized)
+    except (TypeError, ValueError):
+        return None
+
+    if parsed.tzinfo is None:
+        return parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc)
+
+
 # ---------------------------------------------------------------------------
 # Error response helper
 # ---------------------------------------------------------------------------
@@ -123,12 +146,19 @@ def ingest():
             request_id=request_id,
         )
 
-    # capture_id format: UUID (UUID v7 is compatible with the standard UUID format)
     try:
-        uuid.UUID(capture_id_raw)
+        parsed_capture_id = uuid.UUID(capture_id_raw)
     except ValueError:
         return make_error_response(
-            f"capture_id must be a valid UUID, got: {capture_id_raw!r}",
+            f"capture_id must be a valid UUIDv7, got: {capture_id_raw!r}",
+            "INVALID_PARAMS",
+            400,
+            request_id=request_id,
+        )
+
+    if parsed_capture_id.version != 7 or parsed_capture_id.variant != uuid.RFC_4122:
+        return make_error_response(
+            "capture_id must be UUIDv7",
             "INVALID_PARAMS",
             400,
             request_id=request_id,
@@ -207,54 +237,17 @@ def ingest():
             retry_after=30,
         )
 
-    # ------------------------------------------------------------------
-    # Step 4: Persist JPEG to frames/ directory
-    # ------------------------------------------------------------------
-    frames_dir = settings.frames_dir
-    frames_dir.mkdir(parents=True, exist_ok=True)
-
-    # Use capture_id as filename base for traceability
-    snapshot_filename = f"{capture_id_raw}.jpg"
-    snapshot_path = frames_dir / snapshot_filename
-
-    try:
-        # Atomic write: write to .tmp then rename
-        tmp_path = snapshot_path.with_suffix(".jpg.tmp")
-        tmp_path.write_bytes(file_bytes)
-        tmp_path.rename(snapshot_path)
-    except OSError as exc:
-        logger.exception(
-            "ingest: failed to persist JPEG capture_id=%s: %s", capture_id_raw, exc
-        )
-        return make_error_response(
-            "Failed to persist frame image",
-            "INTERNAL_ERROR",
-            500,
-            request_id=request_id,
-        )
-
-    # Enrich metadata with known fields
     metadata.setdefault("image_size_bytes", len(file_bytes))
 
-    # ------------------------------------------------------------------
-    # Step 5: DB insert (idempotent)
-    # ------------------------------------------------------------------
     try:
-        frame_id, is_new = store.insert_frame(
+        frame_id, is_new = store.claim_frame(
             capture_id=capture_id_raw,
             metadata=metadata,
-            snapshot_path=str(snapshot_path),
         )
     except Exception as exc:
         logger.exception(
-            "ingest: insert_frame failed capture_id=%s: %s", capture_id_raw, exc
+            "ingest: claim_frame failed capture_id=%s: %s", capture_id_raw, exc
         )
-        # Best-effort cleanup of persisted file if DB write failed for a new capture
-        try:
-            if snapshot_path.exists():
-                snapshot_path.unlink(missing_ok=True)
-        except OSError:
-            pass
         return make_error_response(
             "Failed to store frame metadata",
             "INTERNAL_ERROR",
@@ -262,28 +255,7 @@ def ingest():
             request_id=request_id,
         )
 
-    # ------------------------------------------------------------------
-    # Step 6: Build success response (2xx — no "code" field)
-    # ------------------------------------------------------------------
-    if is_new:
-        logger.info(
-            "ingest: 201 Created capture_id=%s frame_id=%d request_id=%s",
-            capture_id_raw,
-            frame_id,
-            request_id,
-        )
-        return (
-            jsonify(
-                {
-                    "capture_id": capture_id_raw,
-                    "frame_id": frame_id,
-                    "status": "queued",
-                    "request_id": request_id,
-                }
-            ),
-            201,
-        )
-    else:
+    if not is_new:
         logger.debug(
             "ingest: 200 already_exists capture_id=%s frame_id=%d request_id=%s",
             capture_id_raw,
@@ -301,6 +273,63 @@ def ingest():
             ),
             200,
         )
+
+    frames_dir = settings.frames_dir
+    frames_dir.mkdir(parents=True, exist_ok=True)
+    snapshot_filename = f"{capture_id_raw}.jpg"
+    snapshot_path = frames_dir / snapshot_filename
+
+    try:
+        tmp_path = snapshot_path.with_suffix(f".jpg.{request_id}.tmp")
+        tmp_path.write_bytes(file_bytes)
+        tmp_path.replace(snapshot_path)
+        finalized = store.finalize_claimed_frame(
+            frame_id=frame_id,
+            capture_id=capture_id_raw,
+            snapshot_path=str(snapshot_path),
+        )
+        if not finalized:
+            raise RuntimeError("failed to finalize claimed frame")
+    except Exception as exc:
+        logger.exception(
+            "ingest: failed to persist/finalize capture_id=%s frame_id=%d: %s",
+            capture_id_raw,
+            frame_id,
+            exc,
+        )
+        try:
+            if snapshot_path.exists():
+                snapshot_path.unlink(missing_ok=True)
+        except OSError:
+            pass
+        store.delete_unfinalized_claim(frame_id=frame_id, capture_id=capture_id_raw)
+        return make_error_response(
+            "Failed to persist frame image",
+            "INTERNAL_ERROR",
+            500,
+            request_id=request_id,
+        )
+
+    # ------------------------------------------------------------------
+    # Step 6: Build success response (2xx — no "code" field)
+    # ------------------------------------------------------------------
+    logger.info(
+        "ingest: 201 Created capture_id=%s frame_id=%d request_id=%s",
+        capture_id_raw,
+        frame_id,
+        request_id,
+    )
+    return (
+        jsonify(
+            {
+                "capture_id": capture_id_raw,
+                "frame_id": frame_id,
+                "status": "queued",
+                "request_id": request_id,
+            }
+        ),
+        201,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -443,29 +472,17 @@ def health():
     if last_ingested_at is None:
         frame_status = "stale"
     else:
-        try:
-            # Normalize: SQLite CURRENT_TIMESTAMP format is "YYYY-MM-DD HH:MM:SS"
-            # Try ISO8601 with/without 'T' separator
-            ts_str = last_ingested_at.replace(" ", "T")
-            if (
-                not ts_str.endswith("Z")
-                and "+" not in ts_str
-                and "-" not in ts_str[10:]
-            ):
-                ts_str += "+00:00"
-            last_dt = datetime.fromisoformat(ts_str)
-            if last_dt.tzinfo is None:
-                last_dt = last_dt.replace(tzinfo=timezone.utc)
+        last_dt = _parse_utc_timestamp(last_ingested_at)
+        if last_dt is None:
+            logger.warning(
+                "health: could not parse last_ingested_at=%r; treating as stale",
+                last_ingested_at,
+            )
+            frame_status = "stale"
+        else:
             now = datetime.now(tz=timezone.utc)
             age_seconds = (now - last_dt).total_seconds()
             frame_status = "stale" if age_seconds >= _STALE_THRESHOLD_SECONDS else "ok"
-        except (ValueError, TypeError) as exc:
-            logger.warning(
-                "health: could not parse last_ingested_at=%r: %s; treating as stale",
-                last_ingested_at,
-                exc,
-            )
-            frame_status = "stale"
 
     failed_count = counts.get("failed", 0)
     # P1-S1: status is only "ok" or "degraded"

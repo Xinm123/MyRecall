@@ -632,8 +632,8 @@
         const failed = data.queue ? data.queue.failed : 0;
         const lastFrameTimestamp = data.last_frame_timestamp;
         
-        // Healthy: status == "ok" and queue.failed == 0
-        if (status === 'ok' && failed === 0) {
+        // Healthy: status == "ok" and frame_status == "ok" and queue.failed == 0
+        if (status === 'ok' && frameStatus === 'ok' && failed === 0) {
           return { state: 'healthy', message: '服务健康/队列正常' };
         }
         

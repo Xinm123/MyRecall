@@ -440,8 +440,36 @@
     return {
       entries: window.initialEntries || [],
       config: window.initialConfig || { show_ai_description: false },
-      lastCheck: 0,
+      lastCheckMs: 0,
       selectedIndex: null,
+
+      parseTimestamp(value) {
+        if (value === null || value === undefined) return null;
+        if (typeof value === 'number' && Number.isFinite(value)) {
+          return new Date(value * 1000);
+        }
+        const raw = String(value).trim();
+        if (!raw) return null;
+        if (/^\d+(\.\d+)?$/.test(raw)) {
+          return new Date(Number(raw) * 1000);
+        }
+        const base = raw.includes(' ') ? raw.replace(' ', 'T') : raw;
+        const hasTimezone = /[zZ]$|[+-]\d{2}:\d{2}$/.test(base);
+        const normalized = base.includes('T') && !hasTimezone ? `${base}Z` : base;
+        const date = new Date(normalized);
+        return Number.isNaN(date.getTime()) ? null : date;
+      },
+
+      syncLastCheckFromEntries(list) {
+        let maxMs = this.lastCheckMs;
+        for (const entry of list) {
+          const date = this.parseTimestamp(entry?.timestamp);
+          if (!date) continue;
+          const ms = date.getTime();
+          if (ms > maxMs) maxMs = ms;
+        }
+        this.lastCheckMs = maxMs;
+      },
 
       get selectedEntry() {
         if (this.selectedIndex === null) return null;
@@ -449,10 +477,7 @@
       },
 
       init() {
-        this.lastCheck = this.entries.reduce((maxTs, entry) => {
-          const ts = Number(entry?.timestamp) || 0;
-          return ts > maxTs ? ts : maxTs;
-        }, 0);
+        this.syncLastCheckFromEntries(this.entries);
 
         window.addEventListener("openrecall-config-changed", () => {
           this.refreshRecent();
@@ -474,7 +499,10 @@
 
       async checkNew() {
         try {
-          const res = await fetch(`/api/memories/latest?since=${this.lastCheck}`);
+          const sinceIso = this.lastCheckMs > 0
+            ? new Date(this.lastCheckMs).toISOString()
+            : '1970-01-01T00:00:00Z';
+          const res = await fetch(`/api/memories/latest?since=${encodeURIComponent(sinceIso)}`);
           if (!res.ok) return;
           const newItems = await res.json();
           if (!Array.isArray(newItems) || newItems.length === 0) return;
@@ -492,12 +520,7 @@
             this.selectedIndex += uniqueItems.length;
           }
           this.entries.unshift(...uniqueItems);
-
-          const maxNewTs = uniqueItems.reduce((maxTs, entry) => {
-            const ts = Number(entry?.timestamp) || 0;
-            return ts > maxTs ? ts : maxTs;
-          }, 0);
-          if (maxNewTs > this.lastCheck) this.lastCheck = maxNewTs;
+          this.syncLastCheckFromEntries(uniqueItems);
         } catch (_e) {
           return;
         }
@@ -542,11 +565,7 @@
             }
           }
 
-          const maxRecentTs = recent.reduce((maxTs, entry) => {
-            const ts = Number(entry?.timestamp) || 0;
-            return ts > maxTs ? ts : maxTs;
-          }, 0);
-          if (maxRecentTs > this.lastCheck) this.lastCheck = maxRecentTs;
+          this.syncLastCheckFromEntries(recent);
         } catch (_e) {
           return;
         }
@@ -564,8 +583,8 @@
       },
 
       formatTime(ts) {
-        const n = Number(ts) || 0;
-        const d = new Date(n * 1000);
+        const d = this.parseTimestamp(ts);
+        if (!d) return 'Invalid timestamp';
         const pad = (v) => String(v).padStart(2, "0");
         return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
       },

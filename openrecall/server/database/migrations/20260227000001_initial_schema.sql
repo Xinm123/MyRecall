@@ -12,9 +12,6 @@ CREATE TABLE IF NOT EXISTS schema_migrations (
     applied_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
 );
 
--- Record this migration
-INSERT INTO schema_migrations (version, description) VALUES ('20260227000001', 'initial_schema');
-
 -- ============================================================================
 -- Table 1: frames (对齐 screenpipe frames，vision-only 子集，SSOT: §3.0.3)
 -- ============================================================================

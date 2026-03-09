@@ -8,7 +8,7 @@ import numpy as np
 from flask import Flask, render_template, request, send_from_directory
 
 from openrecall.shared.config import settings
-from openrecall.server.api import api_bp, search_engine
+from openrecall.server.api import api_bp, get_search_engine
 from openrecall.server.api_v1 import v1_bp
 from openrecall.server.database import SQLStore
 from openrecall.server.database.frames_store import FramesStore
@@ -107,7 +107,7 @@ def search():
 
     # Use the new Hybrid Search Engine
     try:
-        entries = search_engine.search_debug(q, limit=50)
+        entries = get_search_engine().search_debug(q, limit=50)
         return render_template("search.html", entries=entries)
 
     except Exception as e:

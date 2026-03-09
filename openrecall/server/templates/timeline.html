@@ -99,14 +99,15 @@
   slider.addEventListener('input', function() {
     const reversedIndex = timelineFrames.length - 1 - slider.value;
     const frame = timelineFrames[reversedIndex];
-    const timestamp = Number(frame.timestamp);
-    sliderValue.textContent = formatDate24Hour(new Date(timestamp * 1000));
+    const date = new Date(frame.timestamp);
+    sliderValue.textContent = Number.isNaN(date.getTime()) ? 'Invalid timestamp' : formatDate24Hour(date);
     timestampImage.src = `/v1/frames/${frame.frame_id}`;
   });
 
   // Initialize the slider with a default value
   slider.value = timelineFrames.length - 1;
-  sliderValue.textContent = formatDate24Hour(new Date(Number(timelineFrames[0].timestamp) * 1000));
+  const initialDate = new Date(timelineFrames[0].timestamp);
+  sliderValue.textContent = Number.isNaN(initialDate.getTime()) ? 'Invalid timestamp' : formatDate24Hour(initialDate);
   timestampImage.src = `/v1/frames/${timelineFrames[0].frame_id}`;
 </script>
 {% endif %}

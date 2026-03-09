@@ -5,6 +5,7 @@ import logging
 import threading
 import time
 import urllib.parse
+from dataclasses import dataclass
 from typing import Optional
 
 import requests
@@ -20,6 +21,13 @@ _BACKOFF_BASE = 1
 _BACKOFF_MAX = 60
 
 
+@dataclass
+class UploadResult:
+    success: bool
+    retry_after: Optional[int] = None
+    apply_backoff: bool = True
+
+
 def _ingest_url() -> str:
     base = settings.api_url.rstrip("/")
     if base.endswith("/api"):
@@ -27,7 +35,7 @@ def _ingest_url() -> str:
     return f"{base}/v1/ingest"
 
 
-def upload_capture(item: SpoolItem, spool: Optional[SpoolQueue] = None) -> bool:
+def upload_capture(item: SpoolItem, spool: Optional[SpoolQueue] = None) -> UploadResult:
     """Upload one spool item to POST /v1/ingest.
 
     Handles:
@@ -42,7 +50,7 @@ def upload_capture(item: SpoolItem, spool: Optional[SpoolQueue] = None) -> bool:
         spool: SpoolQueue for cleanup on success. Defaults to global singleton.
 
     Returns:
-        True when the item was successfully ingested (and removed from spool).
+        UploadResult with success flag and optional retry hint.
     """
     if spool is None:
         spool = get_spool()
@@ -65,7 +73,7 @@ def upload_capture(item: SpoolItem, spool: Optional[SpoolQueue] = None) -> bool:
         logger.warning(
             "v3_uploader: network error capture_id=%s: %s", item.capture_id, exc
         )
-        return False
+        return UploadResult(success=False, apply_backoff=True)
 
     if response.status_code in (200, 201):
         body = {}
@@ -82,7 +90,7 @@ def upload_capture(item: SpoolItem, spool: Optional[SpoolQueue] = None) -> bool:
             body.get("frame_id"),
         )
         spool.commit(item.capture_id)
-        return True
+        return UploadResult(success=True, apply_backoff=False)
 
     if response.status_code == 503:
         retry_after = 5
@@ -95,8 +103,7 @@ def upload_capture(item: SpoolItem, spool: Optional[SpoolQueue] = None) -> bool:
             item.capture_id,
             retry_after,
         )
-        time.sleep(retry_after)
-        return False
+        return UploadResult(success=False, retry_after=retry_after, apply_backoff=False)
 
     logger.error(
         "v3_uploader: unexpected %d capture_id=%s body=%r",
@@ -104,7 +111,7 @@ def upload_capture(item: SpoolItem, spool: Optional[SpoolQueue] = None) -> bool:
         item.capture_id,
         response.text[:200],
     )
-    return False
+    return UploadResult(success=False, apply_backoff=True)
 
 
 class SpoolUploader(threading.Thread):
@@ -145,11 +152,19 @@ class SpoolUploader(threading.Thread):
                 continue
 
             item = items[0]
-            success = upload_capture(item, spool=self.spool)
+            result = upload_capture(item, spool=self.spool)
 
-            if success:
+            if result.success:
                 self._retry_count = 0
             else:
+                if result.retry_after is not None:
+                    self._retry_count = 0
+                    self._stop_event.wait(timeout=float(result.retry_after))
+                    continue
+
+                if not result.apply_backoff:
+                    continue
+
                 self._retry_count += 1
                 wait = min(_BACKOFF_BASE * (2 ** (self._retry_count - 1)), _BACKOFF_MAX)
                 logger.debug(

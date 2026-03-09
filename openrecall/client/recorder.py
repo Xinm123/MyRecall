@@ -2,6 +2,7 @@ import logging
 import os
 import time
 import urllib.parse
+from datetime import datetime, timezone
 from typing import List, Optional
 
 import mss
@@ -285,11 +286,16 @@ class ScreenRecorder:
 
                     try:
                         image = Image.fromarray(screenshot)
-                        timestamp = int(time.time())
+                        file_tag = int(time.time())
+                        timestamp = (
+                            datetime.now(timezone.utc)
+                            .isoformat(timespec="seconds")
+                            .replace("+00:00", "Z")
+                        )
 
                         if settings.client_save_local_screenshots:
                             filepath = (
-                                settings.client_screenshots_path / f"{timestamp}.webp"
+                                settings.client_screenshots_path / f"{file_tag}.webp"
                             )
                             image.save(str(filepath), format="webp", lossless=True)
 

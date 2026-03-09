@@ -9,13 +9,17 @@ import logging
 import time
 import json
 from pathlib import Path
+from typing import Optional
 
 import numpy as np
 from flask import Blueprint, jsonify, request, redirect
 from PIL import Image
 
 from openrecall.server.database import SQLStore
-from openrecall.server.database.frames_store import FramesStore
+from openrecall.server.database.frames_store import (
+    FramesStore,
+    normalize_timestamp_filter,
+)
 from openrecall.server.config_runtime import runtime_settings
 from openrecall.shared.config import settings
 from openrecall.server.search.engine import SearchEngine
@@ -57,9 +61,33 @@ def redirect_health():
     return redirect("/v1/health", code=301)
 
 
+"""
+NOTE ABOUT LEGACY /api ROUTES
+
+The redirect handlers above and the legacy handlers below intentionally share
+the same route+method pairs. In Flask, matching follows registration order,
+so the redirect handlers defined earlier are currently matched first.
+
+The legacy handlers are retained for reference/rollback only and are not
+expected to serve traffic unless routing order is changed.
+"""
+
+
 sql_store = SQLStore()
 frames_store = FramesStore()
-search_engine = SearchEngine()
+_search_engine: Optional[SearchEngine] = None
+
+
+def get_search_engine() -> SearchEngine:
+    global _search_engine
+
+    if settings.processing_mode.strip().lower() == "noop":
+        raise RuntimeError("Search is disabled in noop mode")
+
+    if _search_engine is None:
+        _search_engine = SearchEngine()
+
+    return _search_engine
 
 
 @api_bp.route("/search", methods=["GET"])
@@ -83,7 +111,7 @@ def search_api():
         return jsonify([]), 200
 
     try:
-        results = search_engine.search(q, limit=limit)
+        results = get_search_engine().search(q, limit=limit)
 
         # Serialize results to JSON
         serialized = []
@@ -108,6 +136,8 @@ def search_api():
             serialized.append(flat)
 
         return jsonify(serialized), 200
+    except RuntimeError as e:
+        return jsonify({"status": "error", "message": str(e)}), 503
     except Exception as e:
         logger.exception("Search error")
         return jsonify({"status": "error", "message": str(e)}), 500
@@ -126,8 +156,19 @@ def health():
 @api_bp.route("/memories/latest", methods=["GET"])
 def memories_latest():
     since_str = (request.args.get("since") or "0").strip()
+    normalized_since = normalize_timestamp_filter(since_str)
+    if normalized_since is None:
+        return (
+            jsonify(
+                {
+                    "status": "error",
+                    "message": "Query parameter 'since' must be a valid timestamp",
+                }
+            ),
+            400,
+        )
     try:
-        memories = frames_store.get_memories_since(since_str)
+        memories = frames_store.get_memories_since(normalized_since)
         return jsonify(memories), 200
     except Exception as e:
         logger.exception("Error fetching latest memories")

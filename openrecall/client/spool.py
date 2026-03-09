@@ -60,15 +60,22 @@ class SpoolQueue:
 
     def enqueue(self, image: Image.Image, metadata: Dict[str, Any]) -> str:
         capture_id = _uuid_v7()
+        jpg_tmp = self.storage_dir / f"{capture_id}.jpg.tmp"
         jpg_path = self.storage_dir / f"{capture_id}.jpg"
         json_tmp = self.storage_dir / f"{capture_id}.json.tmp"
         json_path = self.storage_dir / f"{capture_id}.json"
 
-        image.save(str(jpg_path), format="JPEG", quality=85)
+        image.save(str(jpg_tmp), format="JPEG", quality=85)
+        os.replace(jpg_tmp, jpg_path)
 
         meta = self._serialize_metadata(metadata)
         meta["capture_id"] = capture_id
-        meta.setdefault("timestamp", int(time.time()))
+        meta.setdefault(
+            "timestamp",
+            datetime.now(timezone.utc)
+            .isoformat(timespec="seconds")
+            .replace("+00:00", "Z"),
+        )
         meta.setdefault("ingested_at", datetime.now(timezone.utc).isoformat())
 
         with open(json_tmp, "w", encoding="utf-8") as fh:
@@ -100,17 +107,21 @@ class SpoolQueue:
             except (json.JSONDecodeError, OSError) as exc:
                 logger.error("spool: corrupt metadata %s: %s", json_path, exc)
                 continue
-            items.append(SpoolItem(
-                capture_id=meta.get("capture_id", capture_id),
-                jpg_path=jpg_path,
-                metadata=meta,
-            ))
+            items.append(
+                SpoolItem(
+                    capture_id=meta.get("capture_id", capture_id),
+                    jpg_path=jpg_path,
+                    metadata=meta,
+                )
+            )
         return items
 
     def commit(self, capture_id: str) -> None:
         self._safe_unlink(self.storage_dir / f"{capture_id}.jpg")
         self._safe_unlink(self.storage_dir / f"{capture_id}.json")
-        logger.info("spool: committed capture_id=%s remaining=%d", capture_id, self.count())
+        logger.info(
+            "spool: committed capture_id=%s remaining=%d", capture_id, self.count()
+        )
 
     def count(self) -> int:
         return sum(
