@@ -7,7 +7,16 @@ Edge SHALL 提供 `GET /v1/health` 端点，返回对齐 screenpipe `HealthCheck
 #### Scenario: 正常健康响应
 
 - **WHEN** 服务正常运行且最近 5 分钟内有帧入库
-- **THEN** Edge 返回 `200 OK`，响应体为 `{"status": "ok", "last_frame_timestamp": "<ISO8601>", "frame_status": "ok", "message": "", "queue": {"pending": <int>, "processing": <int>, "failed": <int>}}`
+- **THEN** Edge 返回 `200 OK`，响应体为 `{"status": "ok", "last_frame_timestamp": "<ISO8601>", "frame_status": "ok", "message": "服务健康/队列正常", "queue": {"pending": <int>, "processing": <int>, "failed": <int>}}`
+
+### Requirement: message 字段语义
+
+`message` 字段 SHALL 返回可读健康文案，供 WebUI 直接展示或作为兜底文案使用。P1-S1 推荐文案集合：`服务健康/队列正常`、`等待首帧`、`队列异常`、`数据延迟`、`服务异常`。
+
+#### Scenario: 健康状态返回可读文案
+
+- **WHEN** `status="ok"` 且 `frame_status="ok"` 且 `queue.failed==0`
+- **THEN** `message` 返回 `服务健康/队列正常`
 
 ### Requirement: status 字段语义
 

@@ -63,7 +63,7 @@ WebUI (Jinja templates)
 - AX-first/OCR-fallback 处理（P1-S3+）。
 - Host 事件驱动 capture（P1-S2）。
 - TLS/mTLS 强制（P2+）。
-- 让 v3 `frames` 立即驱动现有页面内容（P1-S1 仅要求页面可达 + 健康状态可见；数据展示迁移在后续阶段完成）。
+- 完整重构 WebUI 交互层（P1-S1 已做最小桥接：`/`/`timeline` 与 `/api/memories/latest|recent` 读取 `frames` 并走 `/v1/frames/:frame_id`；深层交互优化在后续阶段完成）。
 
 ## Decisions
 

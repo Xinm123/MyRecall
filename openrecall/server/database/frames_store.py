@@ -109,8 +109,16 @@ class FramesStore:
     ) -> tuple[object, object, object, object, object, object, object]:
         raw_timestamp = metadata.get("timestamp") or metadata.get("capture_time")
         timestamp = _to_utc_iso8601(raw_timestamp) or ""
-        app_name = metadata.get("app_name") or metadata.get("app")
-        window_name = metadata.get("window_name") or metadata.get("window")
+        app_name = (
+            metadata.get("app_name")
+            or metadata.get("app")
+            or metadata.get("active_app")
+        )
+        window_name = (
+            metadata.get("window_name")
+            or metadata.get("window")
+            or metadata.get("active_window")
+        )
         browser_url = metadata.get("browser_url")
         focused = metadata.get("focused")
         capture_trigger = metadata.get("capture_trigger")
@@ -452,7 +460,7 @@ class FramesStore:
                             "timestamp": ts,
                             "app": row["app_name"] or "",
                             "title": row["window_name"] or "",
-                            "status": row["status"] if row["status"] else "pending",
+                            "status": (row["status"] or "pending").upper(),
                             "filename": f"{ts}.png",
                             "app_name": row["app_name"] or "",
                             "window_title": row["window_name"] or "",
@@ -497,7 +505,7 @@ class FramesStore:
                             "timestamp": ts,
                             "app": row["app_name"] or "",
                             "title": row["window_name"] or "",
-                            "status": row["status"] if row["status"] else "pending",
+                            "status": (row["status"] or "pending").upper(),
                             "filename": f"{ts}.png",
                             "app_name": row["app_name"] or "",
                             "window_title": row["window_name"] or "",
@@ -540,7 +548,7 @@ class FramesStore:
                             "timestamp": ts,
                             "app": row["app_name"] or "",
                             "title": row["window_name"] or "",
-                            "status": row["status"] if row["status"] else "pending",
+                            "status": (row["status"] or "pending").upper(),
                             "filename": f"{ts}.png",
                             "app_name": row["app_name"] or "",
                             "window_title": row["window_name"] or "",

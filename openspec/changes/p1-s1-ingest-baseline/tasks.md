@@ -4,7 +4,7 @@
 
 - [x] 1.1 新增 `openrecall/server/database/migrations/` 目录，创建 `20260227000001_initial_schema.sql`，包含 `schema_migrations` 表与 `docs/v3/data-model.md` §3.0.3 定义的 P1 全量 DDL（`frames/ocr_text/accessibility/frames_fts/ocr_text_fts/accessibility_fts/chat_messages`，含 `capture_id UNIQUE`、`status`、`ingested_at`、索引；SSOT: §3.0.3 + §3.0.7）
 - [x] 1.2 新增 `openrecall/server/database/migrations_runner.py`，实现启动时迁移执行逻辑：读取 `schema_migrations` 表、按版本号排序执行未应用的 `.sql` 文件、记录已执行版本（SSOT: `docs/v3/data-model.md` §3.0.7 伪代码）
-- [x] 1.2a 修复 migration 版本登记冲突：`run_migrations()` 对版本写入使用冲突容忍（`INSERT OR IGNORE`），兼容 SQL 文件内自登记场景，避免 `UNIQUE constraint failed: schema_migrations.version`
+- [x] 1.2a 修复 migration 版本登记与原子性约束：`run_migrations()` 禁止 SQL 文件自写 `schema_migrations`，并由 runner 在事务内执行脚本后统一参数化写入版本记录（失败回滚）；避免 `UNIQUE constraint failed` 与“脚本半成功+版本误登记”风险
 - [x] 1.3 在 `openrecall/shared/config.py` 中新增 v3 配置项：`db_path` 指向 `${OPENRECALL_SERVER_DATA_DIR}/db/edge.db`（不允许指向 `recall.db`）、`frames_dir` 指向 `${OPENRECALL_SERVER_DATA_DIR}/frames/`、`OPENRECALL_PROCESSING_MODE`（P1-S1 默认 `noop`）、`queue_capacity`（env: `OPENRECALL_QUEUE_CAPACITY`，默认 `200`）
 - [x] 1.4 确保 `edge.db` 父目录与 `frames/` 目录在启动时自动创建
 - [x] 1.5 在 `openrecall/server/__main__.py` 启动阶段显式执行 v3 schema bootstrap（`ensure_v3_schema()`），并输出结构化日志锚点 `v3 schema migrations ensured: db=... migrations=...`；保证在 `NoopQueueDriver` 与 `/v1/health` 读路径之前完成迁移
@@ -57,6 +57,7 @@
 - [x] 9.3 实现状态判定：`healthy`（`status=="ok"` 且 `queue.failed==0`，文案包含 `服务健康/队列正常`）、`unreachable`（请求失败/超时持续 >= `unreachable_grace_ms`，文案包含 `Edge 不可达`）、`degraded`（请求成功但 `status!="ok"` 或 `queue.failed>0` 或 `frame_status!="ok"`）；其中"启动后尚未首帧"（`last_frame_timestamp==null` 且 `frame_status=="stale"` 且 `status=="degraded"` 且 `queue.failed==0`）必须显示 `data-state="degraded"` 且文案包含 `等待首帧`（不得显示 `Edge 不可达`）
 - [x] 9.4 实现自动恢复：从 `unreachable`/`degraded` 状态，任意一次轮询满足 `healthy` 条件后自动切换 `data-state="healthy"`，全程不刷新页面
 - [x] 9.5 WebUI 兼容桥接（grid/timeline）：在不引入 `entries` 双写的前提下，将 `index`/`timeline` 与 `/api/memories/latest|recent` 的读取源切换为 `frames`（SSOT），并将图片渲染路径统一为 `/v1/frames/:frame_id`（不再依赖 `/screenshots/{timestamp}.png`）
+- [x] 9.5a WebUI 兼容字段归一化：`frames` 读取桥接中兼容 Host 元数据键 `active_app`/`active_window`，并将返回给 Grid/Timeline 的 `status` 统一为大写（`PENDING|PROCESSING|COMPLETED|FAILED`），避免统计与标题渲染错配
 
 ### 10. Host spool 与 Uploader（v3 链路）
 

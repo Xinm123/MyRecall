@@ -4,6 +4,12 @@
 
 Edge SHALL 提供 `POST /v1/ingest` 端点，接收 `multipart/form-data` 请求，包含 `capture_id`（UUID v7，必填）、`metadata`（JSON，CapturePayload 字段）和 `file`（JPEG 二进制，必填）三个 part。
 
+`metadata` 的窗口/应用字段兼容键如下：
+- app：`app_name` / `app` / `active_app`
+- window：`window_name` / `window` / `active_window`
+
+`metadata.timestamp` 推荐使用 UTC ISO8601；为兼容旧链路，Edge 可接受 Unix 时间戳字符串与 `capture_time` 别名，并在入库前统一标准化为 UTC ISO8601（`Z` 后缀）。
+
 #### Scenario: 新帧上传成功
 
 - **WHEN** Host 发送合法 `POST /v1/ingest` 请求，且 `capture_id` 在 DB 中不存在

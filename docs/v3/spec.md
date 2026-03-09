@@ -140,9 +140,9 @@ flowchart LR
 
 **内容去重实现（对齐 screenpipe event_driven_capture.rs）**：
 ```
-# Edge /v1/ingest 伪代码（待实现）
+# Edge /v1/ingest 伪代码（P1-S1 已实现 capture_id 幂等；content_hash 去重留在 P1-S2+）
 def handle_ingest(payload):
-    # 1. capture_id 幂等（待实现：DB UNIQUE 约束 + INSERT OR IGNORE）
+    # 1. capture_id 幂等（已实现：DB UNIQUE 约束 + DB-first claim/finalize）
     if _exists_capture_id(payload.capture_id):
         return {"status": "already_exists"}
     
@@ -527,6 +527,8 @@ P1-S1 的 "processing" 定义为 noop/轻量处理，其目标仅是驱动状态
 - 兼容读取：若 spool 中存在历史遗留的（`.webp` + `.json`）项，仅用于 drain 清空；新写入不再产生 `.webp`
 - 进程重启/断电/断网恢复后自动续传
 - 幂等依赖 Edge `/v1/ingest` 的 `capture_id` + DB UNIQUE 约束
+- metadata 兼容键：Edge 接受 `app_name/app/active_app` 与 `window_name/window/active_window`，统一写入 `frames.app_name/window_name`
+- WebUI 桥接输出：`/api/memories/latest|recent` 对 `status` 使用大写归一化（`PENDING|PROCESSING|COMPLETED|FAILED`）以避免前端统计口径漂移
 
 **Client 重试策略（P1）**：
 - exponential backoff：1s → 2s → 4s → 8s → 上限 60s
@@ -760,7 +762,7 @@ data: {"type":"response","success":true}
   "status": "ok",
   "last_frame_timestamp": "2026-02-26T10:00:00Z",
   "frame_status": "ok",
-  "message": "",
+  "message": "服务健康/队列正常",
   "queue": {
     "pending": 0,
     "processing": 0,
@@ -773,6 +775,7 @@ data: {"type":"response","success":true}
 - `status`：`"ok"` / `"degraded"` / `"error"`
 - `last_frame_timestamp`：最新一条帧的 capture 时间（来自 `frames.timestamp`，即 `SELECT MAX(timestamp) FROM frames`，UTC ISO8601）；当 `frames` 为空时返回 `null`；不用于 stale 判定
 - `frame_status`：`"ok"` / `"stale"`（超过 5 分钟无新帧入库；判定基于 `frames.ingested_at`，即 `now_utc - SELECT MAX(ingested_at) FROM frames`）/ `"error"`
+- `message`：面向 UI 的可读状态文案（P1-S1 推荐值：`服务健康/队列正常`、`等待首帧`、`队列异常`、`数据延迟`、`服务异常`）
 - P1-S1 判定约束：`status="ok"` 当且仅当 `queue.failed == 0` 且 `frame_status == "ok"`；否则 `status="degraded"`
 - 空库判定约束：当 `frames` 为空（`last_frame_timestamp=null`）时，`frame_status="stale"`，并据上条规则返回 `status="degraded"`
 
