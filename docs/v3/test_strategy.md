@@ -65,8 +65,20 @@ tests/
 - `test_health_api.py` — 健康检查
 
 ### P1-S2（采集）
-- `test_capture_trigger.py` — 事件驱动、去抖、去重
-- `test_host_uploader.py` — 断点续传、重试策略
+- **Gate 校验脚本**（核心，必须）：
+  - `test_p1_s2a_trigger_coverage.py` — SQL 校验 trigger_coverage = 100%
+  - `test_p1_s2a_debounce.py` — SQL 校验去抖违规数 = 0
+  - `test_p1_s2b_content_hash.py` — content_hash 覆盖率 SQL 校验
+  - `test_p1_s2b_ax_timeout.py` — AX 遍历延迟 P95 < 500ms
+- **最小集成测试**（补充）：
+  - 幂等去重逻辑（可单元测）
+  - 队列状态 API
+
+> 注：P1-S2 测试依赖 macOS CGEventTap 真实事件，需本机手动跑，不强制 CI 自动化
+
+> P1-S2a 交付约束（强制）：`test_p1_s2a_trigger_coverage.py` 与 `test_p1_s2a_debounce.py` 属于阶段交付物，不得以“后补测试”方式延后到 P1-S2b。
+
+> Gate 边界说明：上述两个测试文件属于 **P1-S2a Exit Gate 交付物**（决定能否进入 P1-S2b），不是 P1-S2a Entry Gate 的阻塞前置。
 
 ### P1-S3（处理）
 - `test_ax_ocr_pipeline.py` — AX-first/OCR-fallback 决策、分表写入
@@ -86,7 +98,65 @@ tests/
 
 ---
 
-## 5. 标记规范
+## 5. P1-S2 测试策略补充
+
+> **重要说明**：P1-S2（采集）测试依赖 macOS CGEventTap 真实事件和 AX 权限，**无法在 CI 环境自动化**，需本机手动跑。
+
+### 测试策略：「Gate 校验脚本 + 最小集成测试」
+
+| 类型 | 说明 | 运行方式 |
+|------|------|----------|
+| **Gate 校验脚本** | 将验收文档的 SQL 校验封装为 pytest 参数化测试 | 本机手动跑 |
+| **最小集成测试** | 针对可单元测试的模块（去重逻辑、队列 API） | 可 CI |
+
+### 轨道 A（本机 Gate 验收）落地规范
+
+- 适用范围：P1-S2a（CGEventTap）与 P1-S2b（AX 权限）两个子阶段。
+- 脚本入口（统一约定）：
+  - `scripts/acceptance/p1_s2a_local.sh`
+  - `scripts/acceptance/p1_s2b_local.sh`
+- 运行要求：
+  - 必须在 macOS 实机执行（不得在 CI 容器替代）；
+  - 执行前固定时间窗、配置快照、权限状态，避免样本口径漂移；
+  - 每次执行必须产出统一命名的证据包（日志 + 指标汇总 + 健康快照 + UI 截图索引）。
+- 结果判定：
+  - `Gate pytest` 全绿（`0 failed`）+ 文档样本口径满足；
+  - 证据不齐全时不得给出 Gate `Pass`。
+
+### P1-S2 权限故障矩阵（强制）
+
+| 场景 | 前置条件 | 期望状态机 | 期望健康态 | 期望 UI/日志 |
+|------|---------|-----------|-----------|-------------|
+| startup_not_determined | 首次启动，未授权 | `transient_failure` 或引导态 | `degraded` | 显示授权引导，不静默失败 |
+| startup_denied | 启动前已拒绝权限 | `denied_or_revoked` | `degraded` | 明确提示权限缺失 + 设置入口 |
+| revoked_mid_run | 运行中撤销权限 | `granted -> transient_failure -> denied_or_revoked` | `degraded` | 记录权限丢失事件，进入降级 |
+| restored_after_denied | 用户恢复授权 | `denied_or_revoked -> recovering -> granted` | `degraded -> ok` | 恢复提示与自动恢复日志 |
+
+- 参数口径（与文档契约一致）：`REQUIRED_CONSECUTIVE_FAILURES=2`、`REQUIRED_CONSECUTIVE_SUCCESSES=3`、`EMIT_COOLDOWN_SEC=300`、`permission_poll_interval_sec=10`。
+- 自动化边界：TCC 状态切换为手测主路径；状态机与健康接口可通过集成测试验证。
+- 证据要求（每个场景必填）：
+  - Host/Edge 日志片段（含时间戳与权限状态变化）
+  - `/v1/health` 响应快照（至少两次：异常中、恢复后）
+  - UI 状态截图（引导/降级/恢复）
+
+### 需要的测试文件
+
+| 子阶段 | 文件 | 内容 |
+|--------|------|------|
+| S2a | `test_p1_s2a_trigger_coverage.py` | SQL 校验 trigger_coverage = 100% |
+| S2a | `test_p1_s2a_debounce.py` | SQL 校验去抖违规数 = 0 |
+| S2b | `test_p1_s2b_content_hash.py` | content_hash 覆盖率 SQL 校验 |
+| S2b | `test_p1_s2b_ax_timeout.py` | AX 遍历延迟 P95 < 500ms |
+
+### 不需要做的
+
+- ❌ 完整的 CGEventTap 单元测试（难以 mock 真实系统事件）
+- ❌ 完整的 AX 树遍历单元测试（依赖 macOS 环境）
+- ❌ CI 环境自动化（需本机手动跑）
+
+---
+
+## 6. 标记规范
 
 所有 v3 测试使用以下 pytest 标记：
 

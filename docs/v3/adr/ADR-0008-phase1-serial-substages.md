@@ -8,9 +8,10 @@
 - 现状风险：Phase 1 范围已包含全功能闭环，若并行推进后统一验收，失败定位成本高，返工面大。
 
 ## Decision
-- Phase 1 固定拆分为七个串行子阶段：
+- Phase 1 固定拆分为八个串行子阶段（S2 于 2026-03-09 拆分为 S2a + S2b，见 ADR-0013）：
   - P1-S1：基础链路（Host 上传 + Edge ingest/queue + 页面可用）
-  - P1-S2：采集（事件驱动 capture + idle fallback + AX 文本采集）
+  - P1-S2a：事件驱动 capture（事件监听 + 触发标记 + 去抖 + 背压保护）
+  - P1-S2b：AX 文本采集（AX 树遍历 + content_hash + 权限处理）
   - P1-S3：处理（AX-first/OCR-fallback + text_source 记录，索引时零 AI 增强）
   - P1-S4：检索（FTS+过滤 API 与返回契约）
   - P1-S5：Chat-1（grounding 与引用）

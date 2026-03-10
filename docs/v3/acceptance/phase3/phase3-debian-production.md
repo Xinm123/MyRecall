@@ -35,7 +35,7 @@
 
 ### 2.1 指标口径与样本说明（必填）
 
-- 口径基线版本（默认 `MyRecall/docs/v3/gate_baseline.md`）：v1.4
+- 口径基线版本（默认 [../../gate_baseline.md](../../gate_baseline.md)）：v1.4
 - 指标样本数：
   - Capture（稳定性窗口内）：>= 200 captures（建议 >= 5000）
   - Search：>= 200 queries

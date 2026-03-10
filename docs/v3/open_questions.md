@@ -1,7 +1,7 @@
 ---
 status: active
 owner: pyw
-last_updated: 2026-03-04
+last_updated: 2026-03-09
 depends_on: []
 references:
   - spec.md
@@ -41,8 +41,13 @@ references:
 | OQ-024 | P0 | API 命名空间冻结 | A /v1/* 统一 + /api/* 渐进废弃（推荐）| A（已决，2026-03-04 补充；2026-03-07 更新） | 对外 HTTP 契约统一 `/v1/*`；`/api/*` P1-S1~S3 按阶段策略重定向（`POST /api/upload`=308，其余 GET=301）至 `/v1/*` + `[DEPRECATED]` 日志，P1-S4 返回 410 Gone 完全废弃；不纳入客户端默认调用路径 | — | 2026-02-26 |
 | OQ-025 | P0 | accessibility 表架构（Scheme C） | A P0 建表 + focused 修复 + frame_id 方案 3（推荐，已决）/ B 对齐 screenpipe 不加 focused / C P1+ 延迟建表 | A（已决） | (1) accessibility 表 P0 建，paired_capture 按 text_source 分表写入；(2) 新增 focused 列修复 screenpipe 的 focused→force OCR 限制（db.rs:1870-1872）；(3) frame_id DEFAULT NULL 精确关联 frames（paired_capture 填入，未来独立 walker 留 NULL） | DDL 复杂度+1（多一张表+FTS+triggers）；P0 范围略增 | 2026-03-02 |
 | OQ-026 | P1 | P1 Search UI 分页模式 | A 加载更多（对齐 screenpipe，推荐）/ B 跳页（需加 offset 上限约束） | A（已决） | screenpipe `search-modal.tsx` 纯"加载更多"（`hasMoreOcr/loadMoreOcr`），offset 步长=limit，实际不超过几百；跳页模式下 `search_all()` 过量拉取内存风险不可控（offset=10000 时各路径拉 10020 行）；P2+ keyset cursor 可彻底替代 | 若未来需跳页，需补 `offset max` 约束并在 `search_all()` 加运行时 reject | 2026-03-02 |
-| OQ-027 | P1 | Capture 运行机制与频率口径 | A 事件驱动主机制 + 固定注入压测口径（推荐）/ B 全局固定频率假设 | A（已决，2026-03-04 补充） | 对齐 `spec.md`/`roadmap.md`/`acceptance/phase1/p1-s2.md`，消除"事件驱动 vs 固定频率"文本冲突 | 若 P2+ 引入 Power Profile，TTS 与丢失率阈值需按 profile 重新标定 | 2026-03-04 |
+| OQ-027 | P1 | Capture 运行机制与频率口径 | A 事件驱动主机制 + 固定注入压测口径（推荐）/ B 全局固定频率假设 | A（已决，2026-03-04 补充） | 对齐 [spec.md](spec.md)/[roadmap.md](roadmap.md)/`acceptance/phase1/p1-s2a.md`/`acceptance/phase1/p1-s2b.md`，消除"事件驱动 vs 固定频率"文本冲突（`acceptance/phase1/archive/p1-s2.md` 仅历史参考） | 若 P2+ 引入 Power Profile，TTS 与丢失率阈值需按 profile 重新标定 | 2026-03-04 |
 | OQ-028 | P1 | Host spool 持久化策略 | A 磁盘持久化（推荐）/ B 内存队列 | A（已决，2026-03-05） | 进程重启/断电/断网场景下内存方案会丢数据，与 P1-S1 "断网恢复可自动重传" Gate 不兼容 | — | 2026-03-05 |
+| OQ-029 | P1 | P1-S2 是否拆分为事件驱动 (S2a) + AX 采集 (S2b) | A 拆分为 S2a + S2b 串行开发（推荐）/ B 合并为单一 S2 阶段 | A（已决，2026-03-09） | 事件驱动与 AX 采集是两个独立技术栈；`dedup_skip_rate` Gate 依赖 content_hash（需 S2b）；拆分后可独立验收、降低单阶段风险 | P1 阶段 Win/Linux 用户仅能用 idle/manual 触发 | 2026-03-09 |
+| OQ-030 | P1 | P2 频率目标（是否对齐 screenpipe 5Hz） | A 维持 1Hz（推荐）/ B 目标 5Hz / C 数据驱动 | A（已决，2026-03-09） | P1/P2 采用保守频率（1Hz），有意偏离 screenpipe（5Hz）；Python 实现安全余量充足；若未来需要更高频率需重新评估 | 与 screenpipe 频率差异可能影响部分用户预期 | 2026-03-09 |
+| OQ-034 | P1 | `ocr_preferred_apps` P1 初版白名单 | A 终端类最小名单（推荐）/ B 空名单（全量AX优先）/ C 扩大到更多应用 | A（已决，2026-03-09） | 对齐 screenpipe `paired_capture` 终端类 OCR 偏好，优先保证 terminal 场景可读性与框选质量，控制 P1 风险范围 | 名单过宽会抬高 OCR 开销；名单过窄会导致 terminal 场景质量下降 | 2026-03-09 |
+| OQ-035 | P1 | OCR 引擎策略（P1） | A RapidOCR 单引擎（推荐）/ B 多引擎可切换 | A（已决，2026-03-09） | 降低实现与验收复杂度；统一 OCR 指标口径；保持 AX-first + OCR-fallback 主路径不变 | 失去跨引擎对照能力，多语言/极端场景需在 P2+ 再评估 | 2026-03-09 |
+| OQ-036 | P1 | macOS 权限状态机与恢复闭环口径 | A 对齐 screenpipe（2 fail / 3 success / 300s cooldown / 10s poll，推荐）/ B 简化为一次失败即判定 | A（已决，2026-03-09） | 解决 TCC 瞬态抖动导致的误判；保证 denied/revoked/recovered 有一致可观测语义 | 若不收敛，Gate 易出现“服务存活但采集失效”误判 | 2026-03-09 |
 
 ## 需实验清单
 
@@ -68,7 +73,7 @@ references:
    - OCR 结果：`myrecall://frame/{frame_id}`
    - UI 结果：优先 `myrecall://frame/{accessibility.frame_id}`（v3 改进，外键精确关联），无 frame_id 时回退 `myrecall://timeline?timestamp=...`
    - P1 阶段正常 paired_capture 路径下 UI 结果 frame_id 应为非 NULL（paired_capture 写入），此回退仅未来独立 walker 场景触发
-   - DA-8=B 结构化 citations 为可选增强；统一口径以 `gate_baseline.md` 为准。
+   - DA-8=B 结构化 citations 为可选增强；统一口径以 [gate_baseline.md](gate_baseline.md) 为准。
 
 ### 已拍板结论（2026-02-27）
 
@@ -91,7 +96,7 @@ references:
 23. OQ-023 = A：Migration 策略采用手写 SQL + `schema_migrations` 跟踪表，零额外依赖；文件命名 `YYYYMMDDHHMMSS_描述.sql` 对齐 screenpipe；P1 全量 DDL 放入 `20260227000001_initial_schema.sql`；`ocr_text_embeddings` 表推迟至 P2+ migration 新增；已执行迁移不得修改。
 
 24. OQ-024 = A（2026-03-04 补充；2026-03-07 更新）：API 命名空间冻结：v3 对外 HTTP 契约统一 `/v1/*`；`/api/*` P1-S1~S3 按阶段策略重定向（`POST /api/upload`=308，其余 GET=301）至 `/v1/*` + `[DEPRECATED]` 日志，P1-S4 返回 410 Gone 完全废弃；不纳入客户端默认调用路径。
-   - 重要澄清（P1 Gate scope）：legacy `/api/*` 渐进废弃的验收口径以 `docs/v3/http_contract_ledger.md` §4.0 为准，仅覆盖 `POST /api/upload`、`GET /api/search`、`GET /api/queue/status`、`GET /api/health`（其余 `/api/*` 行为不纳入 P1 Gate 口径）。
+- 重要澄清（P1 Gate scope）：legacy `/api/*` 渐进废弃的验收口径以 [http_contract_ledger.md](./http_contract_ledger.md) §4.0 为准，仅覆盖 `POST /api/upload`、`GET /api/search`、`GET /api/queue/status`、`GET /api/health`（其余 `/api/*` 行为不纳入 P1 Gate 口径）。
 
 ### 已拍板结论（2026-03-02）
 
@@ -108,3 +113,45 @@ references:
 29. OQ-028 = A：Host spool 采用磁盘持久化，不使用内存队列。spool 落盘为 JPEG（`.jpg`/`.jpeg` + `.json`，原子写入）；兼容读取历史（`.webp` + `.json`）仅用于 drain 清空，新写入不再产生 `.webp`。理由：进程重启/断电/断网场景下内存方案会丢数据，与 P1-S1 "断网恢复可自动重传" Gate 不兼容。
 
 > **补充（2026-03-05）**：capture_id 幂等与 content_hash 内容去重逻辑均需在 Edge /v1/ingest 中实现（对齐 screenpipe event_driven_capture.rs），P1-S2 验收前需完成。
+
+### 已拍板结论（2026-03-09）
+
+30. OQ-029 = A：P1-S2 拆分为 S2a（事件驱动 capture，Week 1-2）+ S2b（AX 文本采集，Week 3-4），串行开发，独立验收。实现语言为 Python（与现有 codebase 一致，开发周期 3-4 周）。平台策略 macOS-first，Win/Linux 推迟 P2。`dedup_skip_rate` 从 Hard Gate 调整为 Soft KPI（依赖 S2b 的 content_hash）。详见 ADR-0013。
+    - 阶段边界（强制）：P1-S2a 不判定 `content_hash` / `dedup_skip_rate`；上述指标从 P1-S2b（`content_hash` 交付后）开始记录与评审。
+
+31. OQ-030 = A：P2 频率目标维持 1Hz（有意偏离 screenpipe 5Hz）。理由：Python 实现在 1Hz 频率下安全余量充足；若未来需要更高频率需重新评估。
+
+### 已拍板结论（2026-03-09，续）
+
+33. OQ-032 = A：Browser URL 提取完全对齐 screenpipe，包含 Arc Stale URL 检测机制。关键决策：
+    - **问题识别**：AppleScript 有 ~107ms 延迟，期间用户切换 tab 会导致 URL 与截图不匹配（stale URL）
+    - **解决方案**：Arc 专用 title cross-check — 同时获取 title + URL，与 window_title 比对，不匹配时返回 None
+    - **Title 匹配算法**：去除 badge 计数（`(45) WhatsApp` → `WhatsApp`）、大小写不敏感、包含匹配（处理截断）
+    - **设计原则**：Better None than wrong URL
+    - **失败分类统计**：`browser_url_success` / `browser_url_rejected_stale` / `browser_url_failed_all_tiers` / `browser_url_skipped`
+    - 详见 `p1-s2b.md` §1.0 与 ADR-0013 §Browser URL 提取策略
+
+34. OQ-033 = A：AX/OCR 决策契约采用“`ocr_preferred_apps` 优先、其后按归一化 AX 文本非空判定、否则 OCR fallback”的单一口径（P1-S3 SSOT）。
+    - **优先级**：`app_name in ocr_preferred_apps` → `text_source='ocr'`；否则计算 `ax_text_normalized = TRIM(COALESCE(accessibility_text, ''))`。
+    - **判定**：`ax_text_normalized != ''` → `text_source='accessibility'`；否则执行 OCR fallback，成功后 `text_source='ocr'`。
+    - **边界规则**：空白 AX 文本视为空；AX 超时但有非空部分文本仍按 `accessibility`；Electron/Chromium 首次空树不做同帧重试。
+    - **Scheme C 终态约束**：`text_source='accessibility'` 仅对应 `accessibility` 行；`text_source='ocr'` 仅对应 `ocr_text` 行；禁止同帧双写。
+    - **失败语义**：AX 不可用且 OCR 失败时，帧状态必须为 `failed`，不得误标 `accessibility`。
+    - **验收落点**：以 [spec.md](spec.md)（AX/OCR 决策契约）、[data-model.md](data-model.md)（终态不变量）、`acceptance/phase1/p1-s3.md`（边界用例）为执行依据。
+
+35. OQ-034 = A：`ocr_preferred_apps` 采用 P1 初版“终端类最小名单”，匹配规则为 `app_name` 小写后子串包含。
+    - **初版名单**：`wezterm`、`iterm`、`terminal`、`alacritty`、`kitty`、`hyper`、`warp`、`ghostty`。
+    - **决策语义**：命中名单时强制 OCR 路径（即使 AX 非空）；未命中时仍按 OQ-033 的 AX 非空优先规则。
+    - **范围约束（P1）**：不扩展到浏览器/IDE/远程桌面类应用，避免无证据扩大 OCR 开销。
+    - **验收要求**：P1-S3 样本必须覆盖“命中名单且 AX 非空仍走 OCR”场景；若出现误判，先修正规则再扩名单。
+    - **后续演进**：P2+ 才允许基于质量与耗时证据增删名单，变更须更新 [open_questions.md]() 与对应 acceptance 文档。
+
+36. OQ-035 = A：P1 OCR 引擎策略固定为 RapidOCR 单引擎（single-engine policy）。
+    - **语义边界**：保持 AX-first + OCR-fallback 主路径不变；仅将 fallback OCR 引擎固定为 RapidOCR。
+    - **验收口径**：P1 阶段 OCR 指标均按 RapidOCR 路径统计，不做跨引擎归一化/切换对比。
+    - **演进策略**：多引擎切换能力推迟到 P2+，需以质量与运维证据驱动再开放。
+
+37. OQ-036 = A：P1 权限稳定性口径对齐 screenpipe（2 fail / 3 success / 300s cooldown / 10s poll）。
+    - **状态机**：`granted/transient_failure/denied_or_revoked/recovering`。
+    - **语义边界**：`AX empty/timeout` 归数据质量分支（OCR fallback）；`permission denied/revoked` 归能力失效分支（权限降级流）。
+    - **验收要求**：必须覆盖 startup denied / mid-run revoked / restored 三类场景，并在 `/v1/health` 暴露权限状态。

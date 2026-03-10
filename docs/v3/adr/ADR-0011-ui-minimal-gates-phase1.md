@@ -13,7 +13,9 @@
 - P1 不新增独立 frame 页面路由（不引入 `/frame/:id`）；frame 回溯统一落在 `/timeline` 视图内完成（通过 `frame_id -> metadata.timestamp -> timeline` 定位）。
 - 子阶段 UI Gate 基线：
   - P1-S1：`/`、`/search`、`/timeline` 路由可达，健康态/错误态可见。
-  - P1-S2：timeline 可见 capture 上传中/入队状态。
+  - P1-S2a：Grid（`/`）作为状态主视图，必须可见 capture 上传中/入队/完成状态；`/timeline` 仅用于新帧可见与时间定位。
+  - P1-S2a：Grid 端 `pending -> completed` 状态可见收敛 P95 <= 8s（观测与验收记录必填）。
+  - P1-S2b：在保持 S2a 状态口径不变前提下，验证 `/timeline` 新帧可见与时间定位、以及 AX 相关显示的可解释性。
   - P1-S3：frame 详情可见 AX/OCR fallback 来源。
   - P1-S4：search 过滤项与 API 参数契约对齐，结果可回溯。
   - P1-S5：chat 引用可点击并可回溯。
@@ -41,4 +43,4 @@
 - 每个 P1 子阶段验收记录必须包含 UI 检查项与证据（截图/录屏/日志）。
 - UI 关键路径通过率纳入 Gate；未达标不得进入下一子阶段。
 - Phase2/Phase3 增加 UI 稳定性门槛（LAN 24h、Debian 7 天致命中断次数为 0）。
-- P1-S1 “健康态/错误态”的判定规则与证据要求以 `spec.md` §4.8.1 为准（强制 `#mr-health` + `data-state`）。
+- P1-S1 “健康态/错误态”的判定规则与证据要求以 [spec.md](../spec.md) §4.8.1 为准（强制 `#mr-health` + `data-state`）。

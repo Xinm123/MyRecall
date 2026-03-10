@@ -13,12 +13,13 @@ references:
 
 - 版本：v1.4
 - 生效日期：2026-03-04
-- 适用范围：`spec.md`、`roadmap.md`、`adr/`、`acceptance/`
+- 适用范围：[spec.md](spec.md)、[roadmap.md](roadmap.md)、`adr/`、`acceptance/`
 
 ## 1. 口径优先级
 
 - 本文是 Gate 与 SLO 的唯一口径源（Single Source of Truth）。
 - 其他文档若与本文冲突，以本文为准，并在 48 小时内修订冲突文本。
+- 适用边界：本文优先级仅适用于 Gate/SLO 指标口径（公式、样本、时间窗、判定规则）；API 契约与数据模型语义分别以 [spec.md](spec.md) 与 [data-model.md](data-model.md) 为准。
 
 ## 2. 指标类型定义
 
@@ -70,29 +71,35 @@ references:
 
 判定类型与阈值（P1-S2）：
 
-1. `enqueue_latency_p95`（Hard Gate）
-- 公式：`enqueue_latency_sec = edge_enqueued_ts - event_ts`，按样本分布计算 P95。
-- 阈值：`P95(enqueue_latency_sec) <= 3s`
-- 最小样本：`eligible_events >= 200`
+1. `capture_latency_p95`（观测指标，**强制观测记录**）
+- 公式：`capture_latency_ms = (frames.ingested_at - event_ts) * 1000`
+- 事件定义：
+  - `event_ts`：Host 侧触发事件时间（触发源：`idle/app_switch/manual/click`）
+  - `frames.ingested_at`：Edge 侧该 capture 完成 SQLite 持久化的时间点（以 DB commit 成功为准；即原口径中的 `edge_db_persisted_ts`）
+- 边界说明：`capture_latency_p95` 为触发到 Edge DB 持久化完成的端到端延迟，包含 Host->Edge 传输与 ingest 处理；不以 Host spool 落盘作为终点
+- 说明：此指标为**观测指标**，P1-S2a 阶段强制观测并记录数值（建议记录 P50/P90/P95/P99），不参与 Gate Pass/Fail 判定
 
 2. `trigger_coverage`（Hard Gate）
-- 公式：`trigger_coverage = covered_trigger_types / 4`（目标触发类型固定为 `idle/app_switch/manual/click`）。
+- 公式：`trigger_coverage = (covered_trigger_types / 4) × 100%`（目标触发类型固定为 `idle/app_switch/manual/click`）。
 - 阈值：`= 100%`
 - 最小样本：四类触发均命中，且每类样本 `>= 20`
 
-3. `dedup_skip_rate`（Hard Gate）
+3. `dedup_skip_rate`（观测指标）
 - 公式：`dedup_skip_rate = (dedup_skipped / dedup_eligible) * 100%`
-- 阈值：`>= 95%`
-- 最小样本：`dedup_eligible >= 500`
-- **实现要求**（P1-S2 验收前需完成）：
+- 说明：此指标为**观测指标**，仅记录数值用于生产可观测性，不设阈值，不影响 Gate 判定
+- 阶段边界（强制）：P1-S2a 不判定本指标；从 P1-S2b（`content_hash` 交付后）开始记录与评审。
+- 实现要求（验收前需完成）：
   - `dedup_eligible`：非 `idle/manual` 触发且距上次写入 < 30s 的事件计数
   - `dedup_skipped`：`content_hash` 匹配导致跳过写入的计数
   - 需实现：Edge /v1/ingest 逻辑中维护 per-device 状态（last_content_hash, last_write_time）
+  - 纯内存 dedup 场景下，Edge 重启后短时波动为预期；该指标仍为 non-blocking 观测项
 
-4. `inter_write_gap_sec`（Hard Gate）
+4. `inter_write_gap_sec`（Soft KPI + Hard Gate）
 - 公式：相邻两次成功写入时间差（秒）构成样本分布。
-- 阈值：`P99 <= 30s` 且 `max <= 45s`
-- 最小样本：成功写入样本 `>= 100`
+- Hard Gate：按 `device_name` 分桶判定，且每设备 `max <= 45s`（每设备样本 >= 100）
+- Soft KPI（non-blocking）：记录 P50/P90/P99 分布，用于观测与回归，不设硬性阈值
+- 说明：P99 不设硬性阈值（dedup 保底写入场景下 P99 天然接近 30s，无区分度）
+- 窗口有效性：Hard Gate 仅使用无 Edge 重启的连续窗口；窗口内若发生 Edge 重启，标记 `broken_window=true`，该窗口仅用于观测记录，不用于 Hard Gate 判定
 
 5. `queue_saturation_ratio`（Hard Gate）
 - 公式：`queue_saturation_ratio = (queue_depth >= 0.9 * queue_capacity 的采样数 / 总采样数) * 100%`
@@ -107,7 +114,13 @@ references:
 - 公式：过载注入窗口内因通道溢出导致丢弃的 capture 数。
 - 阈值：`= 0`
 
-8. `Host CPU`（Soft KPI，non-blocking）
+8. `ax_walk_timeout_p95`（Hard Gate，P1-S2b）
+- 公式：AX 树遍历单次耗时分布。
+- 阈值：`P95 <= 500ms`（有意偏离 screenpipe 默认 250ms，适配复杂 Electron 应用）。
+- 最小样本：AX 成功帧 `>= 100`。
+- 说明：若超时，需检查是否为 Electron 应用，并考虑提高 walk_timeout 或增加重试逻辑。
+
+9. `Host CPU`（Soft KPI，non-blocking）
 - 说明：CPU 使用率仅用于趋势观测与容量评估，不作为跨设备 Gate 判定条件。
 - 记录要求：验收报告需附硬件基线（机型/芯片/核心数）与负载背景（后台任务、显示器配置）。
 
@@ -177,6 +190,7 @@ references:
 - 公式：Host capture timestamp → ocr_text表写入完成且FTS索引就绪
 - 目标：P95 <= 15s
 - 样本占比预期：~20-30% captures（终端/游戏/AX失败场景）
+- P1 引擎口径：OCR fallback 统一按 RapidOCR 路径统计（不做跨引擎归一化）
 - 说明：OCR路径受分辨率、CPU负载、模型性能影响大，作为观测项而非Gate Fail条件
 - 超标处置：若OCR路径P95 > 15s，验收报告需附加根因分析（分辨率分布/CPU瓶颈/队列深度）
 
@@ -240,7 +254,7 @@ references:
 
 | 参数 | 单位 | P1 默认 | 分类 | 说明 |
 |---|---|---:|---|---|
-| `min_capture_interval_ms` | ms | 200 | 主参数 | 全触发共享最小间隔去抖 |
+| `min_capture_interval_ms` | ms | 1000 | 主参数 | 全触发共享最小间隔去抖；有意偏离 screenpipe Performance 模式（200ms），Python 实现安全起点 |
 | `idle_capture_interval_ms` | ms | 30000 | 主参数 | 无事件时触发 `idle` fallback 的最大空窗 |
 | `OPENRECALL_CAPTURE_INTERVAL` | s | legacy | 兼容参数 | 不作为 P1 主触发机制；仅当未显式设置 `idle_capture_interval_ms` 时映射为 `idle_capture_interval_ms = OPENRECALL_CAPTURE_INTERVAL * 1000` |
 

@@ -86,7 +86,7 @@ let frame_status = if state.vision_disabled {
 
 ### 1.4 MyRecall v3 P1-S1 Divergence: Health Response Subset
 
-**Evidence** (MyRecall: [spec.md §4.9](https://github.com/MyRecall/docs/v3/spec.md#753)):
+**Evidence** (MyRecall: [spec.md §4.9](../spec.md)):
 
 ```json
 {
@@ -199,7 +199,7 @@ match state.db.get_frame(frame_id).await {
 
 ### 2.4 MyRecall v3 Alignment: Frame Serving Contract
 
-**Evidence** (MyRecall: [spec.md §4.9](https://github.com/MyRecall/docs/v3/spec.md#753), [p1-s1.md §1.1](https://github.com/MyRecall/docs/v3/acceptance/phase1/p1-s1.md#11-http-契约-delta本阶段scope对外-http)):
+**Evidence** (MyRecall: [spec.md §4.9](../spec.md), [p1-s1.md §1.1](../acceptance/phase1/p1-s1.md)):
 
 ```
 GET /v1/frames/:frame_id
@@ -221,7 +221,7 @@ Content-Type: image/jpeg
 
 ### 3.1 MyRecall v3 P1-S1 Queue Status Schema
 
-**Evidence** (MyRecall: [spec.md §4.7](https://github.com/MyRecall/docs/v3/spec.md#457), [p1-s1.md §1.1](https://github.com/MyRecall/docs/v3/acceptance/phase1/p1-s1.md#11-http-契约-delta本阶段scope对外-http)):
+**Evidence** (MyRecall: [spec.md §4.7](../spec.md), [p1-s1.md §1.1](../acceptance/phase1/p1-s1.md)):
 
 ```json
 {
@@ -247,7 +247,7 @@ Content-Type: image/jpeg
 
 ### 4.1 MyRecall Ingest Payload Structure
 
-**Evidence** (MyRecall: [data-model.md §3.0.6](https://github.com/MyRecall/docs/v3/data-model.md#306-capturepayload)):
+**Evidence** (MyRecall: [data-model.md §3.0.6](../data-model.md)):
 
 ```json
 {
@@ -266,7 +266,7 @@ Content-Type: image/jpeg
 
 ### 4.2 Idempotency via Capture_ID UNIQUE Constraint
 
-**Evidence** (MyRecall: [spec.md §4.7 Ingest Semantics](https://github.com/MyRecall/docs/v3/spec.md#437), [design.md §Decision 3](https://github.com/MyRecall/openspec/changes/p1-s1-ingest-baseline/design.md#97)):
+**Evidence** (MyRecall: [spec.md §4.7 Ingest Semantics](../spec.md), [design.md §Decision 3](../../openspec/changes/p1-s1-ingest-baseline/design.md#97)):
 
 - `frames.capture_id` has UNIQUE constraint (DB level)
 - Duplicate `capture_id` → `INSERT OR IGNORE` → HTTP 200 + `{"status": "already_exists"}`
@@ -279,7 +279,7 @@ Content-Type: image/jpeg
 
 ### 5.1 MyRecall P1-S1 No-Op Processing Constraint
 
-**Evidence** (MyRecall: [spec.md §4.7 P1-S1 Processing Semantics](https://github.com/MyRecall/docs/v3/spec.md#483), [design.md Goals](https://github.com/MyRecall/openspec/changes/p1-s1-ingest-baseline/design.md#47)):
+**Evidence** (MyRecall: [spec.md §4.7 P1-S1 Processing Semantics](../spec.md), [design.md Goals](../../openspec/changes/p1-s1-ingest-baseline/design.md#47)):
 
 **Edge MUST NOT** (P1-S1):
 - Initialize OCR provider (RapidOCR, Tesseract, etc.)
@@ -388,4 +388,3 @@ Adopt snapshot-only approach; no video-chunk path in P1.
 
 5. **Accessibility Tree Export**:
    - Screenpipe includes optional `accessibility` in health response. MyRecall P1-S1 skips; P1-S3+ to add if needed.
-

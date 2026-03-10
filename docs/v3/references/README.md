@@ -130,12 +130,12 @@ crates/screenpipe-server/src/routes/frames.rs
 
 **Specifications**:
 ```
-docs/v3/spec.md
+../spec.md
   - §4.7: Ingest, queue status, processing semantics
   - §4.8.1: UI health component requirements
   - §4.9: Health endpoint, frames endpoint, error responses
 
-docs/v3/data-model.md
+../data-model.md
   - §3.0.3: frames table DDL (capture_id UNIQUE)
   - §3.0.6: CapturePayload schema
   - §3.0.7: Migration strategy

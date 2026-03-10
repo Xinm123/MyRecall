@@ -1,7 +1,7 @@
 # MyRecall-v3 Search 当前方案基线
 
 > 生成日期：2026-03-02
-> SSOT：docs/v3/spec.md + ADR-0005 + 当前代码库
+> SSOT：[../../spec.md](../../spec.md) + [../../adr/ADR-0005-search-screenpipe-vision-only.md](../../adr/ADR-0005-search-screenpipe-vision-only.md) + 当前代码库
 > 链路标记：仅屏幕
 
 ## 1. 设计层（v3 spec = 目标态）

@@ -90,4 +90,4 @@ Frontend → POST /v1/chat {message, session_id, images?} → Edge Python Manage
   - P1-S5：回答引用覆盖率目标 >= 85%
   - P1-S7 / Phase2 / Phase3：回答引用覆盖率目标 >= 92%
   - Stretch 目标：>= 95%
-- 所有目标与统计口径以 `MyRecall/docs/v3/gate_baseline.md` 为准。
+- 所有目标与统计口径以 [../gate_baseline.md](../gate_baseline.md) 为准。

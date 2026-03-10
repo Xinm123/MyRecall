@@ -112,8 +112,8 @@ GET /v1/frames/:frame_id → Stream from snapshot_path
 
 ### MyRecall (v3)
 
-- **Health spec**: `docs/v3/spec.md` §4.9 (line 753+)
-- **Ingest spec**: `docs/v3/spec.md` §4.7 (line 437+)
+- **Health spec**: [../spec.md](../spec.md) §4.9 (line 753+)
+- **Ingest spec**: [../spec.md](../spec.md) §4.7 (line 437+)
 - **P1-S1 acceptance**: `docs/v3/acceptance/phase1/p1-s1.md` §1.1 (HTTP contract delta)
 - **Design decisions**: `openspec/changes/p1-s1-ingest-baseline/design.md` §Decisions
 
@@ -128,4 +128,3 @@ GET /v1/frames/:frame_id → Stream from snapshot_path
 - [ ] Server log contains exactly once: `MRV3 processing_mode=noop`
 - [ ] No OCR/embedding/vision provider loaded during startup
 - [ ] `GET /v1/ingest/queue/status` counters match DB row counts in real-time
-

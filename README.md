@@ -1,6 +1,6 @@
-# OpenRecall
+# MyRecall v3
 
-Take control of your digital memory with a fully open-source, privacy-first alternative to proprietary solutions like Microsoft's Windows Recall or Rewind.ai.
+Take control of your digital memory with a fully open-source, privacy-first alternative to proprietary solutions like Microsoft's Windows Recall or Rewind.ai. (formerly OpenRecall)
 
 ```
    ____                   ____                  ____   
@@ -8,84 +8,91 @@ Take control of your digital memory with a fully open-source, privacy-first alte
  / / / / __ \/ _ \/ __ \/ /_/ / _ \/ ___/ __ `/ / /    
 / /_/ / /_/ /  __/ / / / _, _/  __/ /__/ /_/ / / /     
 \____/ .___/\___/_/ /_/_/ |_|\___/\___/\__,_/_/_/      
-    /_/                                                                                                                         
+      /_/
 ```
 
-## What is OpenRecall?
+## What is MyRecall?
 
-OpenRecall captures your digital history through automatic screenshots, then uses local AI to analyze and make them searchable. Find anything you've seen on your computer by typing natural language queries, or manually browse through your visual timeline.
+MyRecall v3 captures your digital history through automatic screenshots, then uses local AI to analyze and make them searchable. Find anything you've seen on your computer by typing natural language queries, or manually browse through your visual timeline.
 
 ## Features
 
-- **Privacy-First**: All data stays local. No cloud, no internet required. Your screenshots and AI analysis never leave your device.
-- **Hybrid Search**: Combines semantic vector search (LanceDB) with full-text search (SQLite FTS5) and intelligent reranking.
-- **Local AI Processing**: Run OCR, vision understanding, and embeddings entirely on your local machine. Supports multiple AI providers:
-  - **Local**: Qwen-VL for vision, Qwen-Text-Embeddings for semantic search
+- **Privacy-First**: All data stays local. No cloud, no internet required. Your screenshots never leave your device.
+- **Full-Text Search**: Fast FTS5-based search with metadata filtering (app, window, browser URL, focused state).
+- **Local AI Processing**: Run OCR and vision understanding entirely on your local machine. Supports multiple AI providers:
+  - **Local**: Qwen-VL for vision
   - **Cloud**: OpenAI, DashScope (Qwen), and other OpenAI-compatible APIs
-- **Smart Capture**: MSSIM-based deduplication, idle detection, and configurable capture intervals.
-- **Cross-Platform**: Works on Windows, macOS, and Linux.
+- **Smart Capture**: Event-driven capture (app switches, clicks, idle fallback) with debouncing and content-based deduplication.
+- **Cross-Platform**: Works on Windows, macOS, and Linux (P1: macOS-only for event-driven features).
 - **Runtime Control**: Pause/resume recording and AI processing from the web UI without restarting.
+- **Chat with Context**: AI chat grounded in your visual history with proper citations.
 
 ## Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
-│                         OpenRecall Architecture                      │
+│                         MyRecall v3 Architecture                      │
 ├─────────────────────────────────────────────────────────────────────┤
 │                                                                      │
 │  ┌──────────────┐                              ┌──────────────┐     │
-│  │    Client    │                              │    Server    │     │
+│  │     Host     │                              │      Edge     │     │
 │  │   (~/MRC)    │                              │   (~/MRS)    │     │
 │  │              │                              │              │     │
 │  │  ┌────────┐  │      ┌──────────────┐      │  ┌────────┐  │     │
-│  │  │Recorder │──│────▶│   Buffer      │─────▶│─▶│  API   │  │     │
-│  │  │(Producer)│ │      │ (Disk Queue) │      │  │ Flask  │  │     │
+│  │  │Capture │──│────▶│    Spool      │─────▶│─▶│  Ingest│  │     │
+│  │  │Manager │  │      │ (Disk Queue) │      │  │  API   │  │     │
 │  │  └────────┘  │      └──────────────┘      │  └────────┘  │     │
 │  │       │       │                              │       │      │     │
 │  │  ┌────────┐  │                              │  ┌────────┐  │     │
-│  │  │Uploader│  │                              │  │ Worker │  │     │
-│  │  │Consumer│  │                              │  │(async) │  │     │
+│  │  │  Hash  │  │                              │  │Worker  │  │     │
+│  │  │Compute │  │                              │  │(async) │  │     │
 │  │  └────────┘  │                              │  └────────┘  │     │
 │  │              │                              │       │      │     │
-│  │  buffer/    │      HTTP POST               │  ┌─────┴────┐ │     │
-│  │  *.webp     │────▶ /api/upload             │  │ SQLite   │ │     │
-│  │       multipart/form-data *.json     │    │  │ LanceDB  │ │     │
-│  │              │                              │  │Screenshots│ │     │
+│  │  spool/     │      HTTP POST               │  ┌─────┴────┐ │     │
+│  │  *.jpg      │────▶ /v1/ingest              │  │ SQLite   │ │     │
+│  │       +.json│                              │  │ + FTS5  │ │     │
+│  │              │                              │  │ frames/ │ │     │
 │  └──────────────┘                              │  └─────────┘ │     │
 │                                                └──────────────┘     │
 │                                                                     │
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
-### Client (Producer-Consumer)
+### Host (Capture + Upload)
 
-- **Recorder**: Captures screenshots at configurable intervals using `mss`
-- **Deduplication**: Uses MSSIM to skip similar frames
-- **Buffer**: Local disk queue (`~/MRC/buffer/`) ensures no data loss when server is unavailable
-- **Uploader**: Background consumer that uploads buffered screenshots to the server
+- **Capture**: Event-driven (idle/app_switch/manual/click) with debouncing (1000ms)
+- **Spool**: Local disk queue (`~/MRC/spool/`) for reliability
+- **Uploader**: Background consumer with idempotent retry
+- **Deduplication**: Compute `content_hash` (SHA256) for Edge-side dedup
 
-### Server
+### Edge (Processing + API)
 
-- **Fast Ingestion**: `/api/upload` saves screenshots immediately and returns `202 Accepted`
-- **Processing Worker**: Background thread handles OCR → Vision → Keywords → Embedding
+- **Ingest**: `POST /v1/ingest` (幂等)
+- **Processing**: AX-first + OCR-fallback; 索引时零 AI 增强
 - **Storage**:
-  - `recall.db` (SQLite): Task queue and legacy fields
-  - `fts.db` (SQLite FTS5): Full-text search index
-  - `lancedb/`: Vector embeddings for semantic search
-  - `screenshots/`: PNG image files
+  - `db/edge.db`: frames, accessibility, ocr_text
+  - `fts.db`: FTS5 全文索引
+  - `frames/`: JPEG snapshots
+  - `screenshots/`: Legacy PNG
+- **Search**: FTS + 过滤；Chat 通过 Pi Sidecar
 
 ### Search Pipeline
 
-1. **Query Parser**: Handles time filters (`today`, `yesterday`) and quoted keywords
-2. **Dual Retrieval**: Vector search (LanceDB) + Keyword search (FTS5)
-3. **Fusion**: Linear combination with boost for keyword matches
-4. **Reranking**: Cross-encoder model reorders Top 30 results
+1. **Query Sanitization**: User queries are sanitized for FTS5 MATCH syntax (token wrapping, operator escaping)
+2. **Content-Type Routing**: Searches are routed by `content_type` parameter:
+   - `ocr`: Searches OCR fallback results (`ocr_text_fts` + `frames_fts`)
+   - `accessibility`: Searches AX-collected text (`accessibility_fts` + `accessibility` table)
+   - `all` (default): Parallel search of both paths, merged by timestamp DESC
+3. **Metadata Filtering**: Time range, app_name, window_name, browser_url, focused filters applied via B-tree indexes or FTS
+4. **Sorting & Pagination**: Results ordered by FTS5 rank (when `q` provided) or timestamp DESC; pagination via offset/limit
+
+**Note**: P1 uses pure full-text search (FTS5) without vector embeddings or reranking, in alignment with screenpipe's vision-only design. Vector embeddings are reserved for P2+ experimental use.
 
 ## Quick Start
 
 ### Prerequisites
 
-- Python 3.9+
+- Python 3.11+
 - macOS / Windows / Linux
 
 ### Installation
@@ -101,20 +108,16 @@ pip install -e .
 
 ### Running
 
-**Combined mode** (server + client in one process):
-
-```bash
-python -m openrecall.main
-```
-
 **Separate processes**:
 
 ```bash
-# Terminal 1: Start server
-python -m openrecall.server
+# Run server (Terminal 1)
+./run_server.sh --debug
+```
 
-# Terminal 2: Start client
-python -m openrecall.client
+```bash
+# Run client (Terminal 2)
+./run_client.sh --debug
 ```
 
 Open your browser to: http://localhost:8083
@@ -125,13 +128,13 @@ Configure via environment variables:
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `OPENRECALL_SERVER_DATA_DIR` | `~/MRS` | Server data directory |
-| `OPENRECALL_CLIENT_DATA_DIR` | `~/MRC` | Client data directory |
+| `OPENRECALL_SERVER_DATA_DIR` | `~/MRS` | Edge data directory |
+| `OPENRECALL_CLIENT_DATA_DIR` | `~/MRC` | Host spool directory |
 | `OPENRECALL_PORT` | `8083` | Web server port |
-| `OPENRECALL_CAPTURE_INTERVAL` | `10` | Screenshot interval (seconds) |
+| `OPENRECALL_CAPTURE_INTERVAL` | `10` | Legacy: screenshot interval (seconds), mapped to `idle_capture_interval_ms` if not set |
 | `OPENRECALL_AI_PROVIDER` | `local` | AI provider: `local`, `dashscope`, `openai` |
 | `OPENRECALL_DEVICE` | `cpu` | AI inference device: `cpu`, `cuda`, `mps` |
-| `OPENRECALL_SIMILARITY_THRESHOLD` | `0.98` | MSSIM dedup threshold |
+| `OPENRECALL_SIMILARITY_THRESHOLD` | `0.98` | Legacy MSSIM threshold (v3 uses content_hash; retained for compatibility) |
 
 ### Using Cloud AI
 
@@ -150,22 +153,20 @@ export OPENRECALL_AI_API_BASE=https://api.openai.com/v1
 
 ## Data Storage
 
-Default directories:
-
 ```
-~/MRC/                    # Client data
-  buffer/
-    *.webp               # Buffered screenshots
-    *.json               # Metadata
-  screenshots/           # Optional local copies
+~/MRC/                              # Host spool (OPENRECALL_CLIENT_DATA_DIR)
+  spool/                            # Queued screenshots awaiting upload
+    *.jpg                          # Buffered frames (JPEG)
+    *.json                         # Metadata alongside each frame
+  screenshots/                     # Optional local copies (if enabled)
 
-~/MRS/                    # Server data
-  screenshots/
-    *.png               # Processed screenshots
+~/MRS/                              # Edge data (OPENRECALL_SERVER_DATA_DIR)
+  frames/                          # v3 JPEG snapshots (main storage)
+  screenshots/                     # Legacy PNG screenshots (v2 compatibility)
   db/
-    recall.db           # SQLite (queue + legacy)
-  fts.db                # SQLite FTS5 (full-text index)
-  lancedb/              # Vector database
+    edge.db                        # v3 SQLite (task queue + frames)
+  fts.db                           # SQLite FTS5 (full-text search)
+  lancedb/                         # Vector embeddings (P2+ experimental, not used in P1)
 ```
 
 ## License

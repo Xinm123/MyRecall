@@ -1,7 +1,7 @@
 # MyRecall-v3 验收记录归档
 
 - 规则：每个阶段/子阶段在 Gate 判定前，必须先完成对应 Markdown 验收记录。
-- 目录：`MyRecall/docs/v3/acceptance/`
+- 目录：`./`（本目录）
 - 记录模板：`TEMPLATE.md`
 - 记录要求：除性能数值外，必须填写功能完成度与完善度指标。
 - 强制项：每份验收记录必须包含 `2.1 指标口径与样本说明（必填）`（口径基线版本、指标样本数、统计时间窗、百分位算法四项齐全）。
@@ -12,7 +12,9 @@
 ## 文件清单
 
 - `phase1/p1-s1.md`
-- `phase1/p1-s2.md`
+- `phase1/p1-s2a.md`（事件驱动）
+- `phase1/p1-s2b.md`（AX 采集）
+- `phase1/archive/p1-s2.md`（历史参考，已被 S2a/S2b 取代，不用于当前 Gate 判定）
 - `phase1/p1-s3.md`
 - `phase1/p1-s4.md`
 - `phase1/p1-s5.md`

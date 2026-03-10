@@ -14,12 +14,12 @@
 
 ### 1.1 HTTP 契约 delta（本阶段，scope=对外 HTTP）
 
-- SSOT：`MyRecall/docs/v3/http_contract_ledger.md`
+- SSOT：[../http_contract_ledger.md](../http_contract_ledger.md)
 - 要求：必须列出本阶段相对上一阶段的 HTTP 契约变化（ADD/DEPRECATE/REMOVE/CHANGE/RETAIN）。未列出的 baseline 默认视为 `RETAIN`。
 
 | 类型 | 接口 | 变化/说明 | SSOT |
 |---|---|---|---|
-| ADD/DEPRECATE/REMOVE/CHANGE/RETAIN | METHOD `/v1/...` or legacy `/api/...` (see `http_contract_ledger.md`) | ... | `spec.md`/`roadmap.md`/`open_questions.md` |
+| ADD/DEPRECATE/REMOVE/CHANGE/RETAIN | METHOD `/v1/...` or legacy `/api/...` (see [http_contract_ledger.md](../http_contract_ledger.md)) | ... | [spec.md](../spec.md)/[roadmap.md](../roadmap.md)/[open_questions.md](../open_questions.md) |
 
 ## 2. 环境与输入
 
@@ -29,7 +29,7 @@
 
 ### 2.1 指标口径与样本说明（必填）
 
-- 口径基线版本（默认 `MyRecall/docs/v3/gate_baseline.md`）：
+- 口径基线版本（默认 [../gate_baseline.md](../gate_baseline.md)）：
 - 指标样本数：
 - 统计时间窗：
 - 百分位算法：

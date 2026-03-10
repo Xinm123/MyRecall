@@ -117,6 +117,11 @@ Expected:
 - HTTP status `301`（GET legacy）或 `308`（`POST /api/upload`）
 - `Location: /v1/health`
 
+4) OCR runtime policy (P1-S3+):
+
+- Verify Edge OCR runtime is RapidOCR (`ocr_provider=rapidocr` or equivalent runtime evidence in Edge logs).
+- P1 does not require or validate multi-engine OCR switching.
+
 ## 6.1 Fault Injection: Host -> Edge disconnect (P1-S1)
 
 P1-S1 acceptance requires a full disconnect window (e.g. 3 minutes) while Host continues to
@@ -131,8 +136,9 @@ Recommended (simple, reproducible): stop Edge process temporarily
 5) Verify Host uploader automatically resumes and drains the spool until all buffered captures are accepted.
 
 Note:
-- Queue/status 计数口径以 DB 实时状态为准（SSOT：`docs/v3/spec.md` §4.7），Edge 重启不应改变计数语义。
+- Queue/status 计数口径以 DB 实时状态为准（SSOT：[spec.md](./spec.md) §4.7），Edge 重启不应改变计数语义。
 - 若你在断连窗口中同时切换了 Edge data dir（导致 SQLite DB 变化/清空），则计数会随 DB 一并变化；此时应以“同一 DB 实例”的证据完成验收。
+- S2b 纯内存 dedup 语义：Edge 重启会重置 per-device dedup 运行态（`last_content_hash/last_write_time`）；该现象仅影响 dedup 观测，不改变 DB 事实计数语义。
 
 ## 7. Restart Policy Across P1-S1 ~ P1-S7
 
@@ -176,8 +182,9 @@ Procedure (per substage boundary):
 4) Re-run sanity checks (Section 6) before starting the next substage.
 
 Caveats:
-- Queue/status 计数口径以 DB 实时状态为准（SSOT：`docs/v3/spec.md` §4.7）。
+- Queue/status 计数口径以 DB 实时状态为准（SSOT：[spec.md](./spec.md) §4.7）。
 - Strict isolation mode 下如果每个子阶段使用新的 data dir（新的 SQLite DB），则计数会从空 DB 开始；如果复用同一 data dir，则计数会在子阶段间延续。
+- S2b Hard Gate 采样若跨越 Edge 重启，需标记 `broken_window=true`，并重开新的连续窗口重测。
 
 Restart Edge when:
 - Edge API contract changes
@@ -198,3 +205,33 @@ Restart Host when:
 
 - Phase 1 topology uses "two processes + single Edge port".
 - Do not require Host to expose an inbound port in Phase 1.
+
+## 10. Permission Fault Drill (P1-S2a/S2b)
+
+目标：验证权限拒绝/撤销/恢复场景在运行态可观测、可恢复、可判定。
+
+### 10.1 演练参数（固定）
+
+- `REQUIRED_CONSECUTIVE_FAILURES = 2`
+- `REQUIRED_CONSECUTIVE_SUCCESSES = 3`
+- `EMIT_COOLDOWN_SEC = 300`
+- `permission_poll_interval_sec = 10`
+
+### 10.2 场景步骤
+
+1. `startup_denied`：在系统设置中关闭 Accessibility/Input Monitoring 后启动 Host+Edge。
+2. `revoked_mid_run`：运行中撤销权限，保持进程不重启，观察状态变化。
+3. `restored`：重新授权，确认状态从 `recovering` 回到 `granted`。
+
+### 10.3 判定与证据
+
+- 判定规则：权限失效期间 `/v1/health.status` 不得为 `ok`。
+- 必留证据：
+  - Host/Edge 日志文件（含权限状态变化时间点）
+  - `/v1/health` 快照（异常中 + 恢复后）
+  - UI 状态截图（引导/降级/恢复）
+
+### 10.4 Dev vs Production 说明
+
+- Dev（Terminal）模式允许用于调试，但可能受 Terminal TCC 身份继承影响，不能作为长期稳定性证据。
+- 生产稳定性以固定签名身份运行模型为目标（P2 收敛）。

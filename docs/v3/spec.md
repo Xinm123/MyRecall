@@ -126,15 +126,15 @@ flowchart LR
 ### MyRecall-v3 决策
 - Phase 1：完成事件驱动 capture（app switch/click/idle）+ manual trigger + idle fallback，并补齐 trigger 字段与采集事件总线（触发枚举以 `capture_trigger` P1 契约为准：`idle/app_switch/manual/click`）。`window_focus` 不纳入 P1；若 P2+ 启用，按 screenpipe `capture_window_focus` 语义对齐（默认关闭，高频场景按需开启）。
 - 语义约束（P1）：禁止将固定频率轮询作为主触发机制；固定频率仅可用于 `idle` fallback 或兼容/实验路径。
-- 参数契约（P1，对齐 screenpipe）：
-  - `min_capture_interval_ms`（默认 `200`）：全触发共享最小间隔去抖。
+- 参数契约（P1，有意偏离 screenpipe Performance 模式）：
+  - `min_capture_interval_ms`（默认 `1000`，有意偏离 screenpipe Performance 200ms）：全触发共享最小间隔去抖。
   - `idle_capture_interval_ms`（默认 `30000`）：无事件时触发 `idle` fallback 的最大空窗。
   - 兼容映射：若未显式设置 `idle_capture_interval_ms` 且存在 `OPENRECALL_CAPTURE_INTERVAL`（秒），则按 `idle_capture_interval_ms = OPENRECALL_CAPTURE_INTERVAL * 1000` 解释；该映射仅用于兼容路径。
 - Phase 2/3：capture 功能冻结，不新增采集能力，只做 LAN/Debian 稳定性验证与参数调优。
 - 上传协议改为"幂等 + 可续传"：`capture_id` 唯一、chunk ACK、断点续传。
 - 已拍板（OQ-004=A）：Host 采集 accessibility 文本并随 capture 上传；Host 不做 OCR/embedding 推理。
-- 事件风暴抑制（对齐 screenpipe）：
-  - 全触发共享最小间隔去抖（`min_capture_interval_ms`，默认 200ms）；
+- 事件风暴抑制（有意偏离 screenpipe Performance 模式）：
+  - 全触发共享最小间隔去抖（`min_capture_interval_ms`，默认 1000ms，有意偏离 screenpipe Performance 200ms）；
   - 非 `idle/manual` 触发启用内容去重（`content_hash` 相同则跳过写入），并保留 30s 强制落盘保底；
   - 触发通道有界，lag 时折叠为一次兜底触发，避免高频事件拖垮处理链路。
 
@@ -145,19 +145,20 @@ def handle_ingest(payload):
     # 1. capture_id 幂等（已实现：DB UNIQUE 约束 + DB-first claim/finalize）
     if _exists_capture_id(payload.capture_id):
         return {"status": "already_exists"}
-    
-    # 2. 内容去重（待实现：非 idle/manual + 30s 保底）
+
+    # 2. 内容去重（非 idle/manual + 30s 保底）
+    # 允许跨 capture_id 去重（capture_id 幂等与 content_hash 去重是两层语义）
     device = payload.device_name
     if payload.capture_trigger not in ('idle', 'manual'):
         last_hash = _get_last_content_hash(device)
         last_write = _get_last_write_time(device)
-        
+
         # 30s 强制写入保底
         if (now - last_write).total_seconds() < 30:
-            if payload.content_hash and payload.content_hash == last_hash:
-                _record_dedup_skip()  # 计数器
+            if _is_valid_hash(payload.content_hash) and payload.content_hash == last_hash:
+                _record_dedup_skip(device)  # 计数器
                 return {"status": "dedup_skipped", "capture_id": payload.capture_id}
-    
+
     # 3. 写入 DB
     _insert_frame(payload)
     _set_last_content_hash(device, payload.content_hash)
@@ -165,10 +166,15 @@ def handle_ingest(payload):
     return {"status": "created"}
 ```
 
+**纯内存状态与重启语义（P1-S2b）**：
+- `last_content_hash/last_write_time` 为 per-device 纯内存运行态，不跨 Edge 重启持久化。
+- Edge 重启后 dedup 进入冷启动，重启边界附近允许出现额外写入；该现象为预期行为，不视为缺陷。
+- 30s 保底写入语义始终成立，用于保证 timeline 连续性。
+
 **关键参数对齐**：
 | 参数 | screenpipe | MyRecall v3 P1 |
 |------|-----------|----------------|
-| `min_capture_interval_ms` | 200 | 200 |
+| `min_capture_interval_ms` | 200 | 1000（有意偏离：Python 实现安全起点） |
 | `idle_capture_interval_ms` | 30000 | 30000 |
 | dedup 保底写入窗口 | 30s | 30s |
 | dedup 排除触发 | idle, manual | idle, manual |
@@ -224,10 +230,30 @@ def handle_ingest(payload):
 
 ### MyRecall-v3 决策（Scheme C，025A）
 - Edge 执行"AX-first + OCR-fallback"（与 screenpipe 完全对齐）。
-- 对关键 app 维护 `ocr_preferred_apps`（TBD 初始名单）。
+- P1 OCR fallback 引擎固定为 RapidOCR（single-engine policy），不纳入多引擎切换与对比验收。
+- 对关键 app 维护 `ocr_preferred_apps`（P1 初版见 OQ-034：`wezterm`、`iterm`、`terminal`、`alacritty`、`kitty`、`hyper`、`warp`、`ghostty`）。
 - Edge 仅存储原始 OCR text 与 accessibility text，不做索引时 AI 增强（不生成 caption/keywords/fusion_text，不写入 embedding）。
 - Chat grounding 由 Orchestrator 在查询时将原始文本送入 LLM 实时推理（与 screenpipe Pi agent 模式对齐）。
 - 已拍板（014A）：删除 fusion_text，索引时零 AI 调用，完全对齐 screenpipe vision-only 处理链路。
+
+#### AX/OCR 决策契约（P1-S3 SSOT）
+
+注：P1 阶段第 4 步中的 "OCR fallback" 统一指 RapidOCR 路径。
+
+对每一帧，最终持久化 `frames.text_source` 必须按以下优先级确定：
+
+1. 若 `app_name` 命中 `ocr_preferred_apps`，则该帧必须走 OCR 路径（`text_source='ocr'`）。
+2. 否则，令 `ax_text_normalized = TRIM(COALESCE(accessibility_text, ''))`。
+3. 若 `ax_text_normalized != ''`，则该帧必须归类为 `text_source='accessibility'`。
+4. 否则必须执行 OCR fallback；OCR 成功时归类为 `text_source='ocr'`。
+
+边界条件（P1 强约束）：
+
+- 仅空白字符的 `accessibility_text` 视为“空文本”。
+- AX 文本允许“部分/截断”；只要归一化后非空，仍按 `accessibility` 处理，不因“质量主观判断”改走 OCR。
+- AX 超时时使用超时前已收集文本：非空则 `accessibility`，为空则 OCR fallback。
+- Electron/Chromium 首次遍历空文本场景，不做同帧 AX 重试；该帧走 OCR fallback，后续事件可再次获得 AX 文本。
+- 截图持久化独立于 AX/OCR 结果，任何一侧失败均不得阻塞截图落盘。
 
 #### 写入路径（Scheme C 分表写入）
 
@@ -242,6 +268,23 @@ paired_capture 处理一帧:
                + ocr_text 行 (text=OCR文本, frame_id=frames.id)
                + 无 accessibility 行
 ```
+
+#### AX 降级策略（与 screenpipe 对齐）
+
+| 场景 | 处理方式 |
+|------|----------|
+| **截图** | 始终写入磁盘（永不阻塞） |
+| **AX 树遍历超时** | 500ms 超时保护，超时后继续处理已获取部分 |
+| **AX 返回有文本** | 使用 AX 文本，跳过 OCR |
+| **AX 返回空文本** | 执行 OCR fallback |
+| **AX 完全失败** | 记录错误，尝试 OCR fallback |
+| **text_source 标记** | `accessibility` / `ocr` |
+
+**与 screenpipe 对齐点**：
+- 截图永不阻塞
+- AX-first + OCR-fallback 逻辑完全对齐
+- text_source 字段语义一致
+- terminal 类 app 偏好 OCR
 
 - 处理链产物白名单（P1）：`ocr_text.text`、`ocr_text.text_json`、`frames.text_source`、`accessibility.text_content`。
 - 禁止产物（P1）：`caption`、`keywords`、`fusion_text`、`ocr_text_embeddings` 写入。
@@ -297,7 +340,7 @@ paired_capture 处理一帧:
 #### API 命名空间冻结（P0-01）
 - MyRecall-v3 对外 HTTP 契约统一使用 `/v1/*`。
 - `/api/*` 为 v2 历史路径：P1-S1~P1-S3 对 `POST /api/upload` 返回 308、对其余 3 个 legacy GET 端点返回 301（均重定向至对应 `/v1/*` 并记录 `[DEPRECATED]` 日志）；自 P1-S4 起返回 410 Gone 完全废弃。
-  - 重要澄清（P1 Gate scope）：legacy `/api/*` 渐进废弃的验收口径只覆盖 4 个端点：`POST /api/upload`、`GET /api/search`、`GET /api/queue/status`、`GET /api/health`（其余 `/api/*` 行为不纳入 P1 Gate 口径）。完整范围以 `docs/v3/http_contract_ledger.md` §4.0 与各阶段验收文档为准。
+- 重要澄清（P1 Gate scope）：legacy `/api/*` 渐进废弃的验收口径只覆盖 4 个端点：`POST /api/upload`、`GET /api/search`、`GET /api/queue/status`、`GET /api/health`（其余 `/api/*` 行为不纳入 P1 Gate 口径）。完整范围以 [http_contract_ledger.md](./http_contract_ledger.md) §4.0 与各阶段验收文档为准。
 - 兼容 alias（如存在）必须标记为 legacy，且不得作为文档、SDK、验收脚本默认入口。
 
 #### `GET /v1/search` — 完整契约
@@ -575,7 +618,8 @@ P2+ 升级为 mTLS 强制（006A->B）。
 - 保持 007A：P1~P3 UI 继续在 Edge，不迁移到 Host。
 - 在 P1 强制引入最小 UI Gate，只覆盖可用性与可解释性，不做 UI 重构：
   - 路由可达 + 健康态/错误态可见
-  - timeline 可见 capture/ingest/processing 状态
+  - Grid（`/`）可见 capture/ingest/processing 状态（状态主视图）
+  - timeline（`/timeline`）可见新帧与时间定位（浏览主视图）
   - search 过滤项与 API 参数契约对齐，结果可回溯
   - chat 引用可点击回溯，路由/降级状态可见
   - 端到端关键路径脚本化回归
@@ -604,7 +648,7 @@ P2+ 升级为 mTLS 强制（006A->B）。
 - P1-S1 最小实现使用前端轮询；允许未来演进为 WS/SSE 推送，但不得改变本节的“状态判定口径”与“可验证锚点”。
 
 **刷新与防抖（P1-S1 默认值，作为验收口径的一部分）：**
-- 参数 SSOT：`gate_baseline.md` §3.3.1。
+- 参数 SSOT：[gate_baseline.md](./gate_baseline.md) §3.3.1。
 
 **状态判定（P1-S1 Gate 口径，WebUI 视角）：**
 - `healthy`
@@ -628,6 +672,23 @@ P2+ 升级为 mTLS 强制（006A->B）。
 
 **“Edge 不可达”的验收前提：**
 - 指的是：页面已完成首屏渲染后（不刷新页面），浏览器侧对 `/v1/health` 不可达/超时应被 UI 明确展示；不要求在 Edge 无法提供页面（首屏无法加载）的前提下展示“错误态 UI”。
+
+### 4.8.2 Timeline/Grid 数据源与状态同步口径（P1-S2a+）
+
+> 目的：避免“timeline 可见性”与“状态同步”混用导致 Gate 争议。
+
+**视图职责（强制）：**
+- Grid（`/`）是状态同步主视图：用于判定 `PENDING/PROCESSING/COMPLETED/FAILED` 可见性与收敛。
+- Timeline（`/timeline`）是时间轴浏览主视图：用于判定新帧可见与时间定位正确，不作为状态同步 Gate 主依据。
+
+**数据源口径（P1）：**
+- Grid 动态刷新：`/api/memories/latest|recent`（桥接输出；`status` 大写归一化）。
+- Timeline 首屏数据：服务端从 `frames` 读取时间序列并渲染；帧图片读取统一走 `/v1/frames/:frame_id`。
+
+**状态同步延迟预算（P1-S2a 验收口径）：**
+- 预算组成：QueueDriver 轮询（默认 2s）+ Grid 前端轮询（默认 5s）+ 渲染余量。
+- 验收阈值：Grid 端 `pending -> completed` 状态可见收敛 P95 <= 8s（观测与验收记录必填）。
+- 说明：该阈值用于 UI 同步可验证性，不替代 `capture_latency_p95` 指标定义。
 
 ### 4.9 API 契约总览（P1 端点完整清单）
 
@@ -762,6 +823,9 @@ data: {"type":"response","success":true}
   "status": "ok",
   "last_frame_timestamp": "2026-02-26T10:00:00Z",
   "frame_status": "ok",
+  "capture_permission_status": "granted",
+  "capture_permission_reason": null,
+  "last_permission_check_ts": "2026-02-26T10:00:00Z",
   "message": "服务健康/队列正常",
   "queue": {
     "pending": 0,
@@ -775,9 +839,34 @@ data: {"type":"response","success":true}
 - `status`：`"ok"` / `"degraded"` / `"error"`
 - `last_frame_timestamp`：最新一条帧的 capture 时间（来自 `frames.timestamp`，即 `SELECT MAX(timestamp) FROM frames`，UTC ISO8601）；当 `frames` 为空时返回 `null`；不用于 stale 判定
 - `frame_status`：`"ok"` / `"stale"`（超过 5 分钟无新帧入库；判定基于 `frames.ingested_at`，即 `now_utc - SELECT MAX(ingested_at) FROM frames`）/ `"error"`
+- `capture_permission_status`：`"granted"` / `"transient_failure"` / `"denied_or_revoked"` / `"recovering"`
+- `capture_permission_reason`：权限异常原因（例如 `accessibility_denied`、`input_monitoring_denied`、`tcc_transient_failure`）；正常时为 `null`
+- `last_permission_check_ts`：最近一次权限轮询时间（UTC ISO8601）
 - `message`：面向 UI 的可读状态文案（P1-S1 推荐值：`服务健康/队列正常`、`等待首帧`、`队列异常`、`数据延迟`、`服务异常`）
 - P1-S1 判定约束：`status="ok"` 当且仅当 `queue.failed == 0` 且 `frame_status == "ok"`；否则 `status="degraded"`
 - 空库判定约束：当 `frames` 为空（`last_frame_timestamp=null`）时，`frame_status="stale"`，并据上条规则返回 `status="degraded"`
+- P1-S2a+ 权限判定约束：当 `capture_permission_status in ("denied_or_revoked", "recovering")` 时，`status` 至少为 `"degraded"`（不得返回 `"ok"`）
+
+### Capture Permission State Machine（P1-S2a+）
+
+- 目的：将“权限暂态抖动”与“权限真实丢失”区分，避免 Gate 误判与提示风暴。
+- 状态定义：
+  - `granted`：权限可用，采集能力完整。
+  - `transient_failure`：短时检测失败（未达失效门槛），继续观测。
+  - `denied_or_revoked`：判定为权限被拒绝/撤销，进入受控降级。
+  - `recovering`：用户已恢复授权，等待连续成功确认后回到 `granted`。
+- 参数（强制）：
+  - `REQUIRED_CONSECUTIVE_FAILURES = 2`
+  - `REQUIRED_CONSECUTIVE_SUCCESSES = 3`
+  - `EMIT_COOLDOWN_SEC = 300`
+  - `permission_poll_interval_sec = 10`
+- 状态转移：
+  - `granted -> transient_failure`：单次失败。
+  - `transient_failure -> denied_or_revoked`：连续失败达到阈值（2 次）。
+  - `denied_or_revoked -> recovering`：检测到权限恢复（首次成功）。
+  - `recovering -> granted`：连续成功达到阈值（3 次）。
+- 语义边界：
+  - `accessibility_text` 为空不等于权限丢失；空文本属于数据质量分支（后续 OCR fallback），权限状态仍按权限检测链路判定。
 
 ### 统一错误响应格式（020A，不对齐 screenpipe）
 

@@ -18,7 +18,7 @@
   - P1-S5 目标 >= 85%
   - P1-S7 / Phase2 / Phase3 目标 >= 92%
   - Stretch 目标 >= 95%
-- 所有统计定义与判定口径统一由 `MyRecall/docs/v3/gate_baseline.md` 管理。
+- 所有统计定义与判定口径统一由 [../gate_baseline.md](../gate_baseline.md) 管理。
 
 ## screenpipe 参考与对齐
 - screenpipe 侧重点在“可用能力闭环 + 实际运行稳定性”，并不只以单一延迟数字判断可用性。

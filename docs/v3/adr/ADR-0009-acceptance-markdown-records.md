@@ -11,7 +11,7 @@
 - 对 Phase 与子阶段（P1-S1~S7）实行强制验收记录制度：
   - 每个阶段/子阶段在 Gate 判定前，必须先提交 Markdown 验收记录。
   - 验收记录未提交或内容不完整，视为 Gate 未通过。
-- 记录归档路径统一为：`MyRecall/docs/v3/acceptance/`。
+- 记录归档路径统一为：[../acceptance/](../acceptance/)。
 - 记录必须包含：目标范围、输入版本、测试环境、测试步骤、指标结果、结论（Pass/Fail）、风险与后续动作。
 
 ## screenpipe 参考与对齐

@@ -1,7 +1,7 @@
 ---
 status: draft
 owner: pyw
-last_updated: 2026-03-04
+last_updated: 2026-03-10
 depends_on:
   - gate_baseline.md
   - open_questions.md
@@ -19,7 +19,7 @@ references:
 
 > **SSOT**: [open_questions.md](open_questions.md) — "已拍板结论" 各节
 > 
-> 所有已锁定决策（当前范围：001A–026A）的完整内容以 open_questions.md 为唯一事实源。本节不再重复列举。
+> 所有已锁定决策（当前范围：001A–031A）的完整内容以 open_questions.md 为唯一事实源。本节不再重复列举。
 
 ## 1. 阶段目标与里程碑
 
@@ -34,7 +34,7 @@ references:
 ### Phase 1：本机模拟 Edge（进程级隔离）
 - 时间：2026-03-02 ~ 2026-03-20
 - 目标：将当前单机闭环（client+server）按 Edge-Centric 职责拆为 Host/Edge 两进程，并在本机完成全功能闭环。
-- 执行规则：P1-S1 -> P1-S2 -> P1-S3 -> P1-S4 -> P1-S5 -> P1-S6 -> P1-S7 串行推进；每阶段必须先通过验收 Gate。
+- 执行规则：P1-S1 -> P1-S2a -> P1-S2b -> P1-S3 -> P1-S4 -> P1-S5 -> P1-S6 -> P1-S7 串行推进；每阶段必须先通过验收 Gate。
 - P1-S1（基础链路，2026-03-02 ~ 2026-03-05）
   - 交付：
     - Host spool + uploader（磁盘持久化；spool 落盘 JPEG（`.jpg`/`.jpeg` + `.json`，原子写入）；兼容读取历史 `.webp` 仅用于 drain；幂等、可续传）
@@ -50,27 +50,57 @@ references:
     - UI 基线路由可达率 = 100%
     - UI 健康态/错误态展示检查通过率 = 100%
 
-- P1-S2（采集，2026-03-06 ~ 2026-03-08）
+- P1-S2a（事件驱动，2026-03-06 ~ 2026-03-09）
+  - Entry prerequisites（允许进入 S2a 开发）：
+    - P1-S1 防回归基线通过
+    - S2a 文档口径已冻结（roadmap/acceptance/gate_baseline/open_questions/test_strategy 一致）
+    - `scripts/acceptance/p1_s2a_local.sh` 已存在且可执行（可在 S2a 阶段内补齐完整能力）
   - 交付：
-    - Host 事件驱动 capture（app switch/click/idle）+ manual trigger + idle fallback（P1 触发枚举：`idle/app_switch/manual/click`；`window_focus` 不纳入 P1）
-    - Host 采集 accessibility 文本并上传
-- 高频事件抑制链路（对齐 screenpipe）：
-  - 共享去抖（`min_capture_interval_ms`，默认 200ms）✅ 已对齐
-  - **幂等去重（capture_id）：待实现**
-  - **内容去重（content_hash）：待实现**（非 idle/manual + 30s 保底）
-  - 有界通道 lag 折叠
+    - macOS CGEventTap 事件监听（click, app_switch；typing_pause/scroll_stop 推迟至 P2）
+    - 触发标记（`capture_trigger` 字段赋值，P1 枚举：`idle/app_switch/manual/click`；`window_focus` 不纳入 P1）
+    - 去抖门控（`min_capture_interval_ms=1000`，有意偏离 screenpipe Performance 200ms；Python 安全起点）
+    - idle fallback（集成现有 `is_user_active()`，`idle_capture_interval_ms=30000`）
+    - 背压保护（有界通道 + lag 折叠）
     - Timeline 可见 capture 上传中/已入队状态
-  - Gate：
-    - 入队时延 Gate：压测窗口（5 分钟）`enqueue_latency_p95 <= 3s`（`eligible_events >= 200`）
+    - **性能监控（强制观测记录）**：`capture_latency_p95` 作为端到端采集性能观测基线（non-blocking）
+    - 本机 Gate 验收脚本：`scripts/acceptance/p1_s2a_local.sh`（产出标准证据包）
+    - Gate 校验测试文件（本阶段必须新增并通过）：
+      - `tests/test_p1_s2a_trigger_coverage.py`
+      - `tests/test_p1_s2a_debounce.py`
+  - 平台策略：macOS-first（P1 仅实现 macOS，Windows/Linux 推迟 P2）
+  - 实现语言：Python（详见 ADR-0013）
+  - **频率策略**：P1/P2 维持 1Hz（有意偏离 screenpipe 5Hz），详见 OQ-030
+  - Exit Gate（允许进入 S2b）：
     - 每分钟 300 次事件压测下 Capture 丢失率 < 0.3%
-    - 触发覆盖 Gate：`trigger_coverage = covered_trigger_types / 4 = 100%`（`idle/app_switch/manual/click` 四类均需命中；每类样本 >= 20）
-    - 去抖 Gate：同 monitor 连续 `app_switch/click` 入库间隔 < `min_capture_interval_ms`（200ms）的违规数 = 0
-    - 去重 Gate：重复内容压测窗口（5 分钟）满足 `dedup_skip_rate = dedup_skipped / dedup_eligible >= 95%`（`dedup_eligible >= 500`），且 `inter_write_gap_sec` 满足 `P99 <= 30s` 与 `max <= 45s`
+    - 触发覆盖 Gate：`trigger_coverage = (covered_trigger_types / 4) × 100% = 100%`（`idle/app_switch/manual/click` 四类均需命中；每类样本 >= 20）
+    - 去抖 Gate：同 monitor 连续 `app_switch/click` 入库间隔 < `min_capture_interval_ms`（1000ms，有意偏离）的违规数 = 0
     - 背压 Gate：过载注入窗口（5 分钟）满足 `collapse_trigger_count >= 1`、`queue_saturation_ratio <= 10%`（`queue_depth >= 0.9 * queue_capacity` 采样占比）且 `overflow_drop_count = 0`
-    - 新 capture 在 timeline 可见性通过率 >= 95%
+    - Grid（`/`）新 capture 可见性通过率 >= 95%（状态主视图）
+    - Grid 端 `pending -> completed` 状态可见收敛 P95 <= 8s（观测与验收记录必填）
+    - `/timeline` 仅用于新帧可见与时间定位验证（浏览主视图）
+    - 本机 Gate 验收脚本可执行且证据产物齐全（日志/指标汇总/健康快照/UI 证据索引）
+    - Gate 校验测试文件已落地并通过：`tests/test_p1_s2a_trigger_coverage.py`、`tests/test_p1_s2a_debounce.py`
+
+- P1-S2b（AX 采集，2026-03-10 ~ 2026-03-14）
+  - 交付：
+    - macOS AXUIElement 树遍历
+    - 文本提取（AXValue, AXTitle, AXDescription）
+    - Browser URL 提取（三层 Fallback + Arc Stale URL 检测，详见 p1-s2b.md）
+    - `content_hash` 计算（SHA256，精确匹配，与 screenpipe DefaultHasher 行为一致）
+    - 权限检测与 TCC 引导
+  - 平台策略：macOS-only（P1 仅实现 macOS，Windows/Linux 推迟 P2）
+  - 实现语言：Python（详见 ADR-0013）
+  - 依赖：P1-S2a 的触发机制（AX 采集在事件触发时执行）
+  - Gate：
+    - `content_hash` 覆盖率 >= 90%（AX 成功帧）
+    - AX 树遍历超时 < 500ms（P95）
+    - `inter_write_gap_sec`：Soft KPI（记录 P50/P90/P99）+ Hard Gate（按 `device_name` 分桶，每设备 max <= 45s，样本 >= 100）
+    - 窗口有效性：Hard Gate 仅使用无 Edge 重启的连续窗口；若窗口内重启则标记 `broken_window=true`，该窗口仅用于观测
+    - Browser URL 提取成功率 >= 95%（观测指标）
+
 - P1-S3（处理，2026-03-12 ~ 2026-03-15）
   - 交付：
-    - Edge AX-first + OCR-fallback（含 `ocr_preferred_apps` 初版）
+    - Edge AX-first + RapidOCR fallback（含 `ocr_preferred_apps` 初版）
     - Scheme C 分表写入：AX 成功 → `accessibility` 表（含 `focused`/`frame_id`）；OCR fallback → `ocr_text` 表
     - AX/OCR 决策记录到 `frames.text_source`
     - 索引时零 AI 增强：不生成 `caption/keywords/fusion_text`，不写入 `ocr_text_embeddings`
@@ -78,6 +108,7 @@ references:
   - Gate：
     - AX 成功帧写入 `accessibility` 表的正确率 = 100%
     - AX-first/OCR-fallback 决策日志可追溯率 >= 95%
+    - OCR 路径验收口径固定为 RapidOCR（P1 不做跨引擎归一化）
     - 索引时零 AI 增强检查通过率 = 100%（禁用字段/写入路径回归为 0）
     - 处理来源字段 UI 展示完整率 = 100%
 - P1-S4（检索能力，2026-03-16 ~ 2026-03-18）
@@ -174,8 +205,9 @@ references:
 ## 2. 工作流分解（按链路）
 
 1. Capture
-- P1：完成功能实现（事件驱动 + idle fallback + trigger/capture_id + AX 文本采集）。
-- P2/P3：功能冻结，仅做稳定性压测与参数调优。
+- P1-S2a：事件驱动框架（macOS CGEventTap + 触发标记 + 去抖 + 背压保护）
+- P1-S2b：AX 文本采集 + content_hash 计算
+- P2/P3：Windows/Linux 事件监听 + AX 采集，功能冻结，仅做稳定性压测与参数调优。
 
 2. Processing
 - P1：完成功能实现（AX-first + OCR-fallback；Scheme C 分表写入 — AX→accessibility 表，OCR→ocr_text 表；仅存储原始文本，不做索引时 AI 增强；Embedding 仅离线实验表）。
@@ -196,7 +228,8 @@ references:
 ## 2.1 Phase 1 子阶段映射（串行）
 
 - P1-S1：Host 上传链路 + Edge ingest/queue + 页面保持可用
-- P1-S2：Capture 事件化能力闭环
+- P1-S2a：事件驱动 capture（macOS-only，Python 实现）
+- P1-S2b：AX 文本采集 + content_hash（macOS-only，Python 实现）
 - P1-S3：AX-first/OCR-fallback 处理 + Scheme C 分表写入能力闭环
 - P1-S4：Search（FTS+过滤，三路径分发）能力闭环
 - P1-S5：Chat Grounding 与引用闭环
@@ -212,6 +245,9 @@ references:
 - P1：事件驱动策略过激导致采集风暴。
 - P1：OCR 处理性能不达标导致 TTS（OCR路径）超过 15s，影响 P1-S7 观测指标。
 - P1：语义型查询能力下降导致 Chat 检索上下文不充分。
+- P1：macOS 权限瞬态失败导致 Gate 误判（需用 Python + pyobjc 实现 screenpipe permissions.rs 的瞬态检测逻辑）。
+- P1：权限被拒绝/运行中撤销后未进入受控降级，导致“服务存活但采集不可用”不可观测。
+- P1：Electron 应用 AX 遍历超时（需提高 walk_timeout 至 500ms 并增加首次遍历重试逻辑）。
 
 ## 4. 里程碑退出条件（DoD）
 
@@ -219,7 +255,8 @@ references:
   - 功能验收报告
   - 故障注入报告
   - 性能指标报告
-  - 未决问题转入 `open_questions.md`
+  - 权限异常演练报告（拒绝/撤销/恢复）
+  - 未决问题转入 [open_questions.md](open_questions.md)
 
 ## 4.1 验收记录规范（强制，Markdown）
 
@@ -227,11 +264,12 @@ references:
   - 每个阶段（Phase）与每个子阶段（P1-Sx）在 Gate 判定前，必须先完成对应 Markdown 验收记录。
   - 验收记录未完成，视为 Gate 未通过。
   - 验收记录必须包含：目标范围、输入版本、测试环境、测试步骤、指标结果、结论（Pass/Fail）、风险与后续动作。
-- 归档目录：`MyRecall/docs/v3/acceptance/`
-- 统一模板：`MyRecall/docs/v3/acceptance/TEMPLATE.md`
+- 归档目录：[acceptance/](./acceptance/)
+- 统一模板：[acceptance/TEMPLATE.md](./acceptance/TEMPLATE.md)
 - 文件映射（固定）：
   - `phase1/p1-s1.md`
-  - `phase1/p1-s2.md`
+  - `phase1/p1-s2a.md`
+  - `phase1/p1-s2b.md`
   - `phase1/p1-s3.md`
   - `phase1/p1-s4.md`
   - `phase1/p1-s5.md`
@@ -246,14 +284,25 @@ references:
   - 功能清单完成率（目标：100%）
   - API/Schema 契约完成率（目标：100%）
   - 关键异常与降级场景通过率（目标：>= 95%）
+  - 权限状态机与恢复闭环通过率（目标：100%，至少覆盖 startup denied / mid-run revoked / recovered）
   - 可观测性检查项完成率（目标：100%，至少含日志/指标/错误码）
   - UI 关键路径通过率（按阶段定义，目标：100%）
   - 验收文档完整率（目标：100%）
 
+### 4.4 权限稳定性阶段边界（P1/P2）
+
+- P1 目标：
+  - 建立权限状态机（`granted/transient_failure/denied_or_revoked/recovering`）与参数闭环（2 fail / 3 success / 300s cooldown / 10s poll）。
+  - 明确受控降级与恢复路径，并在 `/v1/health` 暴露权限状态。
+  - Dev（Terminal）模式允许用于开发验证，但不作为长期稳定运行承诺。
+- P2 目标：
+  - 引入固定签名身份的稳定运行模型，降低 TCC 身份漂移风险。
+  - 完成重启/升级/权限撤销后的 soak 验证并固化运行手册。
+
 ## 4.3 指标口径（SSOT）
 
-- Gate/SLO 的公式、样本数、时间窗、百分位算法与判定规则统一使用 `MyRecall/docs/v3/gate_baseline.md`。
-- 本文中的阶段阈值若与 `gate_baseline.md` 不一致，以 `gate_baseline.md` 为准。
+- Gate/SLO 的公式、样本数、时间窗、百分位算法与判定规则统一使用 [gate_baseline.md](./gate_baseline.md)。
+- 本文中的阶段阈值若与 [gate_baseline.md](gate_baseline.md) 不一致，以 [gate_baseline.md](gate_baseline.md) 为准。
 
 ## 5. Post-P3 可选演进（不纳入当前承诺范围）
 

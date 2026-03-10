@@ -257,6 +257,16 @@ CREATE INDEX idx_accessibility_focused    ON accessibility(focused)
 - AX 成功 → `frames` 行（`text_source='accessibility'`）+ `accessibility` 行（`frame_id` = 对应 `frames.id`）+ **无 `ocr_text` 行**
 - AX 失败/OCR fallback → `frames` 行（`text_source='ocr'`）+ `ocr_text` 行 + **无 `accessibility` 行**
 
+**终态不变量（P1-S3 Gate 约束）**：
+- `text_source='accessibility'` 的完成帧必须满足：`accessibility.frame_id = frames.id` 存在，且不存在该 `frame_id` 的 `ocr_text` 行。
+- `text_source='ocr'` 的完成帧必须满足：存在该 `frame_id` 的 `ocr_text` 行，且 paired_capture 路径下不存在对应 `accessibility` 行。
+- 当 AX 不可用且 OCR 失败时，帧状态必须为 `failed`；不得将空/不可用 AX 文本误标为 `text_source='accessibility'`。
+
+**AX 不可用（ax_unusable）定义**：
+- AX 遍历报错；或
+- AX 超时且已收集文本归一化后为空；或
+- AX 成功返回但 `TRIM(COALESCE(accessibility_text, '')) = ''`。
+
 **P0 修复说明**：screenpipe `search_accessibility()` 不接受 `focused` 参数（`db.rs:3408-3416`），`focused`/`browser_url` 存在时强制降级到 `content_type=ocr`（`db.rs:1870-1872`）。在 AX-first 模式下 ~90%+ 帧无 `ocr_text` 行，`search_ocr()` 用 `INNER JOIN ocr_text` 会漏掉这些帧。v3 通过在 `accessibility` 表增加 `focused` 列并让 `search_accessibility()` 支持过滤，修复此限制。
 
 #### Table 9: accessibility_fts（基于 screenpipe + browser_url 增强，FTS 全文检索）
@@ -612,7 +622,7 @@ total = count_search_ocr(params) + count_search_accessibility(params)
 
 | 参数 | 单位 | P1 默认 | 语义 | 兼容规则 |
 |---|---|---:|---|---|
-| `min_capture_interval_ms` | ms | 200 | 全触发共享最小间隔去抖 | — |
+| `min_capture_interval_ms` | ms | 1000 | 全触发共享最小间隔去抖（有意偏离：screenpipe Performance 200ms；P1 采用 Python 安全起点） | — |
 | `idle_capture_interval_ms` | ms | 30000 | 无事件时触发 `idle` fallback 的最大空窗 | — |
 | `OPENRECALL_CAPTURE_INTERVAL` | s | legacy | 兼容输入，不作为 P1 主触发机制定义 | 仅当未显式设置 `idle_capture_interval_ms` 时，映射为 `idle_capture_interval_ms = OPENRECALL_CAPTURE_INTERVAL * 1000` |
 
@@ -657,7 +667,12 @@ class CapturePayload(BaseModel):
 
 **幂等语义：**
 - `capture_id` 重复时，Edge 不重新处理，直接返回 `HTTP 200` + `{"status": "already_exists", ...}`（可附 `request_id`；不返回错误 `code`）。
-- `content_hash` 相同但 `capture_id` 不同时，Edge **仍处理**（不跨 capture_id 去重）。
+- `content_hash` 去重与 `capture_id` 幂等是两层语义：当 dedup 条件满足（非 `idle/manual`、距该设备最近写入 < 30s、hash 有效且匹配）时，即使 `capture_id` 不同也可返回 `dedup_skipped`。
+
+**dedup 运行态约束（P1-S2b）**：
+- `last_content_hash/last_write_time` 为 per-device 纯内存运行态，不写入 `edge.db`。
+- `edge.db` 持久化事实数据（如 `frames`），不持久化 dedup 判定状态。
+- 部署前提：P1 为单 Edge 实例。
 
 **device_name 字段说明**：
 

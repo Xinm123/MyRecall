@@ -1,11 +1,11 @@
 # P1-S1 Spec/OpenSpec Consistency Sweep (Section 5)
 
 Date: 2026-03-09
-Scope: `docs/v3/spec.md` and `openspec/changes/p1-s1-ingest-baseline/*`
+Scope: [../../../spec.md](../../../spec.md) and `openspec/changes/p1-s1-ingest-baseline/*`
 
 ## Checks and Results
 
-1. `docs/v3/spec.md` reflects implemented ingest/health/UI bridge contracts.
+1. [../../../spec.md](../../../spec.md) reflects implemented ingest/health/UI bridge contracts.
    - Evidence:
      - line 143: `P1-S1 已实现 capture_id 幂等`
      - line 530: metadata compatibility keys include `active_app`/`active_window`
