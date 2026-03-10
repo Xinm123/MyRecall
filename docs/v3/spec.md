@@ -125,11 +125,14 @@ flowchart LR
 
 ### MyRecall-v3 决策
 - Phase 1：完成事件驱动 capture（app switch/click/idle）+ manual trigger + idle fallback，并补齐 trigger 字段与采集事件总线（触发枚举以 `capture_trigger` P1 契约为准：`idle/app_switch/manual/click`）。`window_focus` 不纳入 P1；若 P2+ 启用，按 screenpipe `capture_window_focus` 语义对齐（默认关闭，高频场景按需开启）。
+- P1-S2a+ ingest 约束：新上报 capture 的 `capture_trigger` 必填且不得为 `null`；缺失/null/非法值返回 `400 INVALID_PARAMS`。
+- 历史兼容边界：`frames.capture_trigger` 列保留 `NULL` 以承载 P1-S1 历史数据；该兼容仅限存量数据，不适用于 S2a+ 新上报。
 - 语义约束（P1）：禁止将固定频率轮询作为主触发机制；固定频率仅可用于 `idle` fallback 或兼容/实验路径。
 - 参数契约（P1，有意偏离 screenpipe Performance 模式）：
   - `min_capture_interval_ms`（默认 `1000`，有意偏离 screenpipe Performance 200ms）：全触发共享最小间隔去抖。
   - `idle_capture_interval_ms`（默认 `30000`）：无事件时触发 `idle` fallback 的最大空窗。
   - 兼容映射：若未显式设置 `idle_capture_interval_ms` 且存在 `OPENRECALL_CAPTURE_INTERVAL`（秒），则按 `idle_capture_interval_ms = OPENRECALL_CAPTURE_INTERVAL * 1000` 解释；该映射仅用于兼容路径。
+- idle 语义约束（P1-S2a+）：`idle` fallback 必须仅由 `idle_capture_interval_ms` 超时触发，不依赖用户活跃判定。
 - Phase 2/3：capture 功能冻结，不新增采集能力，只做 LAN/Debian 稳定性验证与参数调优。
 - 上传协议改为"幂等 + 可续传"：`capture_id` 唯一、chunk ACK、断点续传。
 - 已拍板（OQ-004=A）：Host 采集 accessibility 文本并随 capture 上传；Host 不做 OCR/embedding 推理。
@@ -482,7 +485,7 @@ Content-Type: multipart/form-data
 
 Fields:
   capture_id  string    UUID v7，Host 生成，必填
-  metadata    JSON      CapturePayload（除 image_data 的所有字段）
+  metadata    JSON      CapturePayload（除 image_data 的所有字段；必须包含 `event_ts` 用于 latency 观测）
   file        binary    JPEG 图像（主契约，`image/jpeg`；兼容模式可接收 PNG/WebP，但入库前统一转码为 JPEG）
 
 Response:
@@ -497,6 +500,10 @@ Response:
 - 400/413/503：Edge MUST NOT 创建/修改任何 `frames` 行（因此也 MUST NOT 影响 queue/status 计数）。
 - 201/200：表示该 capture 已被 Edge “接受为幂等成功”（新建或重复），Host 可安全删除对应 spool 项。
 
+语义约束（P1-S2a+，latency 观测）：
+- `event_ts` 表示 Host 触发时刻（UTC ISO8601），用于 `capture_latency_ms = (frames.ingested_at - event_ts) * 1000`。
+- 若 `event_ts` 缺失、非法或晚于入库时刻（会导致负延迟），Edge MAY 接受该 ingest 请求，但该样本 MUST NOT 进入 `capture_latency_p95` 统计，并 MUST 计入观测异常计数。
+
 GET /v1/ingest/queue/status
 Response:
   200 OK →
@@ -507,7 +514,13 @@ Response:
     "failed": 2,
     "processing_mode": "noop",
     "capacity": 200,
-    "oldest_pending_ingested_at": "2026-02-26T10:00:00Z"
+    "oldest_pending_ingested_at": "2026-02-26T10:00:00Z",
+    "trigger_channel": {
+      "queue_depth": 3,
+      "queue_capacity": 64,
+      "collapse_trigger_count": 12,
+      "overflow_drop_count": 0
+    }
   }
   字段说明：
   - pending：DB 中 `frames.status='pending'` 的行数（实时）。
@@ -520,6 +533,14 @@ Response:
   - capacity：队列最大容量（固定配置值）；pending >= capacity 时 ingest 返回 503 QUEUE_FULL
   - oldest_pending_ingested_at：最早一条 pending 帧的 `frames.ingested_at`（UTC ISO8601）；null 表示队列为空；
     Host 可用此字段判断队列是否卡死（如超过 5 分钟未推进则告警）
+  - trigger_channel.queue_depth：触发通道当前深度（用于背压观测）
+  - trigger_channel.queue_capacity：触发通道容量（用于背压观测）
+  - trigger_channel.collapse_trigger_count：过载折叠累计计数
+  - trigger_channel.overflow_drop_count：过载溢出丢弃累计计数
+
+背压采样口径（P1-S2a Gate）：
+- `queue_saturation_ratio` 的统计基于 `trigger_channel` 数据，按 1Hz 采样、连续 5 分钟窗口计算。
+- 分母定义为窗口内有效采样点总数（剔除窗口外样本）。
 
 计数一致性约束（P1-S1，SSOT）：
 - `GET /v1/ingest/queue/status` 的四个计数 MUST 与 DB 中对应 status 的行数一致（不允许使用“进程启动后累计计数器”替代）。
@@ -789,6 +810,7 @@ data: {"type":"response","success":true}
 **字段说明：**
 - `status`：`"pending"` / `"processing"` / `"completed"` / `"failed"`
 - `capture_trigger`：P1 为 `"idle"` / `"app_switch"` / `"manual"` / `"click"`；P2+ 追加 `"window_focus"` / `"typing_pause"` / `"scroll_stop"` / `"clipboard"` / `"visual_change"`；其中 `window_focus` 若启用需与 screenpipe `capture_window_focus` 语义对齐（默认关闭）；对应 CapturePayload（[data-model.md §3.0.6](data-model.md#306-host-上传-payload)）
+- ingest 校验（P1-S2a+）：`capture_trigger` 缺失/null/非法值 → `400 INVALID_PARAMS`；仅历史存量行允许在 DB 中保持 `NULL`。
 
 ### `GET /v1/frames/:frame_id/context` 契约（020B）
 
@@ -842,10 +864,12 @@ data: {"type":"response","success":true}
 - `capture_permission_status`：`"granted"` / `"transient_failure"` / `"denied_or_revoked"` / `"recovering"`
 - `capture_permission_reason`：权限异常原因（例如 `accessibility_denied`、`input_monitoring_denied`、`tcc_transient_failure`）；正常时为 `null`
 - `last_permission_check_ts`：最近一次权限轮询时间（UTC ISO8601）
+- 权限字段完整性约束：响应 MUST 同时包含 `capture_permission_status`、`capture_permission_reason`、`last_permission_check_ts`
 - `message`：面向 UI 的可读状态文案（P1-S1 推荐值：`服务健康/队列正常`、`等待首帧`、`队列异常`、`数据延迟`、`服务异常`）
 - P1-S1 判定约束：`status="ok"` 当且仅当 `queue.failed == 0` 且 `frame_status == "ok"`；否则 `status="degraded"`
 - 空库判定约束：当 `frames` 为空（`last_frame_timestamp=null`）时，`frame_status="stale"`，并据上条规则返回 `status="degraded"`
 - P1-S2a+ 权限判定约束：当 `capture_permission_status in ("denied_or_revoked", "recovering")` 时，`status` 至少为 `"degraded"`（不得返回 `"ok"`）
+- P1-S2a+ 快照时效约束：当 `now_utc - last_permission_check_ts > 60s` 时，`status` 至少为 `"degraded"`，且 `capture_permission_reason="stale_permission_state"`
 
 ### Capture Permission State Machine（P1-S2a+）
 

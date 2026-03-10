@@ -59,9 +59,10 @@ references:
     - macOS CGEventTap 事件监听（click, app_switch；typing_pause/scroll_stop 推迟至 P2）
     - 触发标记（`capture_trigger` 字段赋值，P1 枚举：`idle/app_switch/manual/click`；`window_focus` 不纳入 P1）
     - 去抖门控（`min_capture_interval_ms=1000`，有意偏离 screenpipe Performance 200ms；Python 安全起点）
-    - idle fallback（集成现有 `is_user_active()`，`idle_capture_interval_ms=30000`）
+- idle fallback（超时触发语义，`idle_capture_interval_ms=30000`，不依赖用户活跃判定）
     - 背压保护（有界通道 + lag 折叠）
-    - Timeline 可见 capture 上传中/已入队状态
+    - Grid（`/`）可见 capture 上传中/已入队状态（状态主视图）
+    - `/timeline` 仅用于新帧可见与时间定位验证（浏览主视图）
     - **性能监控（强制观测记录）**：`capture_latency_p95` 作为端到端采集性能观测基线（non-blocking）
     - 本机 Gate 验收脚本：`scripts/acceptance/p1_s2a_local.sh`（产出标准证据包）
     - Gate 校验测试文件（本阶段必须新增并通过）：

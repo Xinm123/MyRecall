@@ -49,7 +49,7 @@
 - macOS CGEventTap 事件监听：click, app_switch（typing_pause/scroll_stop 推迟至 P2）
 - 触发标记（`capture_trigger` 字段赋值，P1 枚举：`idle/app_switch/manual/click`）
 - 去抖门控（`min_capture_interval_ms=1000`，1 Hz 安全起点）
-- idle fallback（集成现有 `is_user_active()`，`idle_capture_interval_ms=30000`）
+- idle fallback（超时触发语义，`idle_capture_interval_ms=30000`，不依赖用户活跃判定）
 - 背压保护（有界通道 + lag 折叠）
 - Grid（`/`）可见 capture 上传中/已入队状态（状态主视图）
 - Timeline（`/timeline`）可见新帧并可按时间定位（浏览主视图）

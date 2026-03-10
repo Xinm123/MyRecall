@@ -633,13 +633,14 @@ total = count_search_ocr(params) + count_search_accessibility(params)
 class CapturePayload(BaseModel):
     """Host → Edge 上传的单条 capture 数据。"""
     capture_id: str                    # UUID v7, Host 生成
+    event_ts: Optional[str] = None     # 触发时刻（UTC ISO8601），观测字段；缺失不阻断 ingest
     timestamp: float                   # UNIX epoch 秒
     app_name: Optional[str] = None
     window_name: Optional[str] = None
     browser_url: Optional[str] = None
     device_name: str = "monitor_0"  # 屏幕标识，格式: monitor_{id}
     focused: Optional[bool] = True
-    capture_trigger: Optional[str] = None  # "idle" | "app_switch" | "manual" | "click" (P1); P2+: "window_focus" | "typing_pause" | "scroll_stop" | "clipboard" | "visual_change"
+    capture_trigger: str  # P1-S2a+ 新上报必填: "idle" | "app_switch" | "manual" | "click"；P2+ 追加 "window_focus" | "typing_pause" | "scroll_stop" | "clipboard" | "visual_change"
     accessibility_text: Optional[str] = None
     content_hash: Optional[str] = None    # sha256 hex，用于 Edge 去重
     simhash: Optional[int] = None         # 感知哈希，用于近似重复检测
@@ -651,12 +652,13 @@ class CapturePayload(BaseModel):
 | 字段 | 类型约束 | 必填 | 验证规则 |
 |------|----------|------|---------|
 | `capture_id` | string | ✅ | UUID v7 格式；重复时返回 `HTTP 200 + status=already_exists`（幂等成功） |
+| `event_ts` | string｜null | ❌（P1-S2a+ 观测字段，建议提供） | UTC ISO8601；用于 `capture_latency_ms = (frames.ingested_at - event_ts) * 1000`；缺失/非法或晚于入库时刻（负延迟）时 ingest 可继续成功，但该样本不得进入 `capture_latency_p95` 分位统计，并计入观测异常计数 |
 | `timestamp` | float | ✅ | UNIX epoch 秒；不得早于当前时间 30 天，不得晚于当前时间 60 秒 |
 | `device_name` | string | ✅ | 非空，最长 128 字符，格式: `monitor_{id}`，与 screenpipe vision-only 对齐 |
 | `app_name` | string｜null | ❌ | 最长 256 字符 |
 | `window_name` | string｜null | ❌ | 最长 512 字符 |
 | `browser_url` | string｜null | ❌ | 若非 null 则必须为合法 URL；最长 2048 字符 |
-| `capture_trigger` | string｜null | ❌ | P1 枚举：`"idle"` / `"app_switch"` / `"manual"` / `"click"`；P2+ 追加：`"window_focus"` / `"typing_pause"` / `"scroll_stop"` / `"clipboard"` / `"visual_change"`；`window_focus` 按 screenpipe `capture_window_focus` 语义对齐（默认关闭，高频时按需开启）；其他值→ `INVALID_PARAMS` |
+| `capture_trigger` | string | ✅（P1-S2a+ 新上报） | P1 枚举：`"idle"` / `"app_switch"` / `"manual"` / `"click"`；P2+ 追加：`"window_focus"` / `"typing_pause"` / `"scroll_stop"` / `"clipboard"` / `"visual_change"`；`window_focus` 按 screenpipe `capture_window_focus` 语义对齐（默认关闭，高频时按需开启）；缺失/null/非法值→ `INVALID_PARAMS` |
 | `content_hash` | string｜null | ❌ | 若非 null 则必须为 `sha256:` 前缀 + 64 位十六进制 |
 | `simhash` | int｜null | ❌ | 若非 null 则必须为非负 64 位整数 |
 | `image_data` | multipart file | ✅ | JPEG（`image/jpeg`）主契约；兼容模式可接收 PNG/WebP，但入库前统一转码为 JPEG；最大 10MB；缺失→ `INVALID_PARAMS` |
@@ -664,6 +666,14 @@ class CapturePayload(BaseModel):
 **图片格式语义（P1）**：
 - 主采集/主读取链路统一 JPEG：`POST /v1/ingest` 主契约 `image/jpeg`，`frames.snapshot_path` 持久化为 JPEG，`GET /v1/frames/:frame_id` 返回 `image/jpeg`。
 - 若启用兼容输入并接收 PNG/WebP，Edge 在入库前统一转码为 JPEG，不改变读取契约。
+
+**S2a 兼容边界（capture_trigger）**：
+- API 语义：自 P1-S2a 起，`POST /v1/ingest` 对新上报 capture 强制要求 `capture_trigger`（不得缺失或为 null）。
+- 存储语义：`frames.capture_trigger` 保持 `DEFAULT NULL`，仅用于承载 S1 历史数据与迁移过渡，不改变历史行。
+
+**S2a 观测边界（event_ts）**：
+- `event_ts` 是 latency 观测字段，不改变 ingest 幂等语义与 `frames` 写入语义。
+- `event_ts` 缺失/非法不应阻断 ingest 成功路径，但该样本必须排除在 `capture_latency_p95` 统计之外。
 
 **幂等语义：**
 - `capture_id` 重复时，Edge 不重新处理，直接返回 `HTTP 200` + `{"status": "already_exists", ...}`（可附 `request_id`；不返回错误 `code`）。

@@ -4,7 +4,7 @@ context: |
   Current substage: P1-S2a (事件驱动采集)
   ADR: docs/v3/adr/ADR-0013-event-driven-ax-split.md
   
-  SSOT documents (read before writing any artifact):
+  SSOT documents (MUST read before writing any artifact):
   - docs/v3/spec.md — 架构总览、API 契约、capture pipeline 定义
   - docs/v3/acceptance/phase1/p1-s2a.md — 验收步骤、Entry/Exit Gate(P1-S2a primary reference)
   - docs/v3/gate_baseline.md — Gate/SLO 指标口径、公式、判定规则
@@ -38,14 +38,15 @@ rules:
   proposal:
     - "Output language: Chinese. Keep all ASCII Anchors exactly literal."
     - Always include a "Non-goals" section
+    - "Capabilities naming guidance (kebab-case; keep small): event-capture, debounce, backpressure, idle-fallback, permission-state-machine, capture-trigger-tag, health-permission-status."
   specs:
     - "Output language: Chinese. Keep all ASCII Anchors exactly literal."
     - Classify changes from capture-pipeline perspective (trigger → debounce → queue → ingest)
   design:
     - "Output language: Chinese. Keep all ASCII Anchors exactly literal."
-    - "Design must be codebase-grounded: reference existing entry points under openrecall/client, propose concrete module layout for event listener, debounce gate, and permission state machine"
-    - For each key decision, cite screenpipe file path + aligned vs intentionally different
+    - "Design must be codebase-grounded: reference existing entry points under openrecall/server and openrecall/client."
+    - For each key decision, if screenpipe has a comparable pattern, cite screenpipe file path + aligned vs intentionally different
   tasks:
     - "Output language: Chinese. Keep all ASCII Anchors exactly literal."
-    - 'tasks.md must be split into: "## Implementation Tasks" (code changes) and "## Acceptance Verification" (verification actions)'
+    - 'tasks.md must be split into two top-level sections: "## Implementation Tasks" (code changes) and "## Acceptance Verification" (verification actions)'
     - "Every implementation task must be atomic (target: finish + verify in < 30 minutes)"
