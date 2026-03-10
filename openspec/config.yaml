@@ -1,55 +1,51 @@
 schema: spec-driven
 context: |
   Project: MyRecall-v3 (Edge-centric, vision-only). Reference repo: _ref/screenpipe
-  Current substage: P1-S1 (基础链路)
-  SSOT documents (MUST read before writing any artifact; do not invent behavior):
-  - docs/v3/spec.md (key: §4.7 ingest/queue + Host spool; §4.8.1 UI health; §4.9 endpoints)
-  - docs/v3/http_contract_ledger.md (P1-S1 delta; legacy namespace retirement rules; gate scope for /api/*)
-  - docs/v3/gate_baseline.md (key: §3.3 UI health timings + anchors)
-  - docs/v3/runbook_phase1.md (run/verify commands; legacy /api/* note)
-  - docs/v3/acceptance/phase1/p1-s1.md (acceptance steps 1-10; evidence expectations)
-  - docs/v3/data-model.md (DDL + status fields; DB is counter source)
-  Phase 1 topology (SSOT: docs/v3/runbook_phase1.md):
-  - Start via wrappers: ./run_server.sh --debug and ./run_client.sh --debug
+  Current substage: P1-S2a (事件驱动采集)
+  ADR: docs/v3/adr/ADR-0013-event-driven-ax-split.md
+  
+  SSOT documents (read before writing any artifact):
+  - docs/v3/spec.md — 架构总览、API 契约、capture pipeline 定义
+  - docs/v3/acceptance/phase1/p1-s2a.md — 验收步骤、Entry/Exit Gate(P1-S2a primary reference)
+  - docs/v3/gate_baseline.md — Gate/SLO 指标口径、公式、判定规则
+  - docs/v3/data-model.md — DDL、CapturePayload 定义、capture_trigger 字段
+  - docs/v3/roadmap.md — 阶段目标、Exit Gate 条件
+  - docs/v3/http_contract_ledger.md — P1-S2a delta: capture_trigger on POST /v1/ingest
+
+  Precedence rule:
+  - If this config conflicts with SSOT docs above, SSOT docs win.
+  
+  Inherited from P1-S1 (frozen):
+  - /v1/ingest 基础链路、queue-observability、frame-serving、legacy /api/* 301/410
+  - processing_mode=noop (unchanged until P1-S3)
+  
   Scope invariants:
-  - Vision-only for P1-P3 (no audio).
-  - P1-S1 processing_mode=noop (details in SSOT: docs/v3/spec.md §4.7).
-  - Legacy /api/* scope and 301/410 rules are SSOT: docs/v3/http_contract_ledger.md §4.
-  P1-S1 non-goals (MUST list in proposal):
-  - /v1/search availability (P1-S4+)
-  - /v1/chat availability (P1-S5+)
-  - AX-first/OCR-fallback processing (P1-S3+)
-  - Event-driven capture on Host (P1-S2)
-  - TLS/mTLS enforcement (P2+)
+  - Vision-only for P1-P3 (no audio)
+  - macOS-only for P1 (Windows/Linux deferred to P2)
+  - Python implementation (ADR-0013)
+
   ASCII Anchors (literal-match; do not translate/paraphrase):
-  - MRV3 processing_mode=noop
-  - MRV3 frame_failed reason=
-  - DB_WRITE_FAILED
-  - IO_ERROR
-  - STATE_MACHINE_ERROR
-  - [DEPRECATED]
-  - Location
-  - #mr-health
-  - data-state
-  - healthy
-  - unreachable
-  - degraded
-  Gate Copy Anchors (CN):
-  - 服务健康/队列正常
-  - Edge 不可达
+  # Trigger types (P1 enum)
+  - capture_trigger, idle, app_switch, manual, click
+  # Permission states
+  - granted, transient_failure, denied_or_revoked, recovering
+  # Metrics
+  - trigger_coverage, queue_saturation_ratio, collapse_trigger_count, overflow_drop_count, capture_latency_p95
+  # UI anchors
+  - "#mr-health", data-state, healthy, unreachable, degraded
+  
 rules:
   proposal:
     - "Output language: Chinese. Keep all ASCII Anchors exactly literal."
     - Always include a "Non-goals" section
-    - "Capabilities naming guidance (kebab-case; keep small): ingest, queue-observability, frame-serving, health-endpoint, legacy-deprecation, ui-health-gate."
   specs:
     - "Output language: Chinese. Keep all ASCII Anchors exactly literal."
-    - Classify changes from the external contract perspective (/v1 and legacy behavior) rather than current code state (/api existing).
+    - Classify changes from capture-pipeline perspective (trigger → debounce → queue → ingest)
   design:
     - "Output language: Chinese. Keep all ASCII Anchors exactly literal."
-    - "Design must be codebase-grounded: reference existing entry points under openrecall/server and openrecall/client, and propose concrete file/module layout for new /v1 endpoints and legacy 301 handling."
-    - For each key decision, if screenpipe has a comparable pattern, cite the screenpipe file path + what is aligned vs intentionally different.
+    - "Design must be codebase-grounded: reference existing entry points under openrecall/client, propose concrete module layout for event listener, debounce gate, and permission state machine"
+    - For each key decision, cite screenpipe file path + aligned vs intentionally different
   tasks:
     - "Output language: Chinese. Keep all ASCII Anchors exactly literal."
-    - 'tasks.md must be split into two top-level sections: "## Implementation Tasks" (code changes only) and "## Acceptance Verification (P1-S1)" (verification actions)'
-    - 'Every implementation task must be atomic (target: finish + verify in < 30 minutes)'
+    - 'tasks.md must be split into: "## Implementation Tasks" (code changes) and "## Acceptance Verification" (verification actions)'
+    - "Every implementation task must be atomic (target: finish + verify in < 30 minutes)"
