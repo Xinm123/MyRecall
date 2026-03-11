@@ -35,7 +35,7 @@ from openrecall.shared.config import settings
 from openrecall.shared.utils import (
     _build_request_kwargs,
     get_active_app_name,
-    get_active_window_title,
+    get_active_window_title_for_app,
 )
 
 logger = logging.getLogger(__name__)
@@ -334,6 +334,8 @@ class ScreenRecorder:
     def stop(self) -> None:
         """Stop the recorder and consumer thread gracefully."""
         self._stop_requested = True
+        if self._app_switch_monitor is not None:
+            self._app_switch_monitor.stop()
         if self.consumer is not None:
             self.consumer.stop()
         self._spool_uploader.stop()
@@ -415,11 +417,24 @@ class ScreenRecorder:
                 _ = self._emit_trigger(idle_event)
                 continue
 
-    def _build_capture_metadata(self, event: TriggerEvent) -> dict[str, str]:
-        active_app = (
-            event.active_app or get_frontmost_app_name() or get_active_app_name()
-        )
-        active_window = event.active_window or get_active_window_title()
+    def _snapshot_active_context(self) -> tuple[str, str]:
+        active_app = get_active_app_name() or get_frontmost_app_name()
+        active_window = get_active_window_title_for_app(active_app)
+        return active_app, active_window
+
+    def _build_capture_metadata(
+        self,
+        event: TriggerEvent,
+        *,
+        context_active_app: str,
+        context_active_window: str,
+    ) -> dict[str, str]:
+        if event.capture_trigger is CaptureTrigger.APP_SWITCH:
+            active_app = event.active_app or context_active_app
+            active_window = event.active_window or context_active_window
+        else:
+            active_app = context_active_app or event.active_app
+            active_window = context_active_window or event.active_window
         return {
             "timestamp": utc_now_iso(),
             "capture_trigger": event.capture_trigger.value,
@@ -556,7 +571,14 @@ class ScreenRecorder:
                     filepath = settings.client_screenshots_path / f"{file_tag}.webp"
                     image.save(str(filepath), format="webp", lossless=True)
 
-                metadata = self._build_capture_metadata(event)
+                context_active_app, context_active_window = (
+                    self._snapshot_active_context()
+                )
+                metadata = self._build_capture_metadata(
+                    event,
+                    context_active_app=context_active_app,
+                    context_active_window=context_active_window,
+                )
                 self._spool.enqueue(image, metadata)
                 self._warn_if_blank_frame(event, screenshot)
 

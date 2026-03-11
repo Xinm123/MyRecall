@@ -72,6 +72,7 @@ flowchart LR
 
 ### 2.1 Host 职责（严格）
 - 采集：截图 + 基础上下文（app/window/monitor/timestamp/trigger）。
+- 语义约束：`app/window` 必须来自同一次 capture 的同源上下文快照；禁止 app/window 分别独立查询后拼接。
 - 轻处理：压缩、去重哈希、可选 accessibility 文本快照（仅采集，不推理）。
 - 传输：断点续传、重试、幂等上传。
 - 缓存：本地 spool 与提交位点（offset/checkpoint）。
@@ -592,6 +593,7 @@ P1-S1 的 "processing" 定义为 noop/轻量处理，其目标仅是驱动状态
 - 进程重启/断电/断网恢复后自动续传
 - 幂等依赖 Edge `/v1/ingest` 的 `capture_id` + DB UNIQUE 约束
 - metadata 兼容键：Edge 接受 `app_name/app/active_app` 与 `window_name/window/active_window`，统一写入 `frames.app_name/window_name`
+- 兼容键语义不变：键名可兼容映射，但 `app_name/window_name` 必须保持同源上下文语义；当 window 归属不确定时写 `NULL/None`，不得写错值。
 - WebUI 桥接输出：`/api/memories/latest|recent` 对 `status` 使用大写归一化（`PENDING|PROCESSING|COMPLETED|FAILED`）以避免前端统计口径漂移
 
 **Client 重试策略（P1）**：

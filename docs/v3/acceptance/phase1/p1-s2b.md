@@ -57,6 +57,8 @@
   - 语义边界（强制）：
     - `AX timeout / AX empty` 属于数据质量分支，按 AX->OCR fallback 处理。
     - `permission denied/revoked` 属于能力失效分支，必须进入权限降级流程，不得仅按 OCR fallback 吞掉异常。
+    - `app_name/window_name` 必须来自同一次 capture 的同源上下文快照（最终以 AX snapshot 为准）；禁止对 app/window 分别二次查询后拼接。
+    - 若同帧无法确认 window 归属，`window_name` 必须置 `NULL/None`；禁止写入明显错误窗口（原则：**Better None than wrong window**）。
   - **Electron 异步树构建**：首次遍历可能返回空文本（Chromium 异步构建 DOM 树），下次事件触发时自然获得完整文本；空文本帧由 OCR fallback 兜底
 - **Browser URL 提取策略**（与 screenpipe 完全对齐）：
   - **三层 Fallback 链**：
@@ -98,6 +100,8 @@
 - 上传契约：`POST /v1/ingest` 的 CapturePayload 必须包含 `accessibility_text` 字段（可为空字符串）与 `content_hash` 字段（AX 成功帧按 S2b Gate 口径覆盖）。
 - 空 AX 文本语义：当 AX 结果为空（含仅空白）时，S2b 必须仍然上传该帧，不得因空 AX 丢弃 capture；该帧由 S3 执行 OCR fallback。
 - Handoff 可审计性：S2b 上传的原始 `accessibility_text` 必须可追溯，S3 仅可基于 `TRIM(COALESCE(accessibility_text, ''))` 做空值判定，不得要求 S2b 承担处理阶段语义。
+- 上下文一致性契约：CapturePayload 中 `app_name/window_name`（或兼容键映射后的字段）必须来自同一时刻同一来源上下文；`window_name` 不可与 `app_name` 跨来源拼接。
+- 一致性验收口径：新增 `app_window_mismatch_rate`（抽样人工核验 + 自动规则）并作为 S2b 观测指标，目标接近 0；出现不确定样本时按 `window_name=None` 处理，不计错填。
 
 ### 1.0d Input dependencies from stable P1-S2a contracts
 
@@ -105,6 +109,14 @@
 - `capture_trigger` 字段赋值逻辑（由 P1-S2a 实现）
 - 去抖门控（`min_capture_interval_ms=1000`，由 P1-S2a 实现，1 Hz 安全起点）
 - 性能监控框架（`capture_latency_p95`，由 P1-S2a 引入）
+
+### 1.0e Stage 2 alignment plan (screenpipe-style monitor semantics)
+
+- 目标：对齐 screenpipe 的“全局 trigger 广播 + 每 monitor 独立 capture loop”语义，消除触发语义与采样语义耦合。
+- 设计约束：event source 仅发 trigger（不绑定 device）；`device_name` 由 monitor worker 在消费 trigger 时确定。
+- `primary_monitor_only` 语义收敛：仅控制启用的 monitor worker 集合，不在 click/app_switch 事件源中做分叉过滤。
+- 元数据口径：`app_name/window_name` 表示 focused context，`device_name` 表示实际采样 monitor；三者须在同一 capture 周期内组装。
+- 验收增量（S2b）：新增多屏一致性场景（主屏+副屏）并验证 `trigger`、`device_name`、截图归属的可解释性与稳定性。
 
 ### 1.1 HTTP 契约 delta（本阶段，scope=对外 HTTP）
 

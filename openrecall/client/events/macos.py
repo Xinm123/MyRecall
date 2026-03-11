@@ -25,6 +25,8 @@ try:
 except ImportError:
     Quartz = None
 
+from openrecall.shared.utils import get_active_app_name, get_active_window_title
+
 
 def list_monitors(primary_only: bool = False) -> list[MonitorDescriptor]:
     if Quartz is not None:
@@ -203,12 +205,21 @@ class MacOSEventTap:
         location = event_get_location(event)
         monitor = self._monitor_lookup(location.x, location.y)
         if monitor is None:
+            logger.debug(
+                "dropped click trigger: no registered monitor matched point x=%.1f y=%.1f",
+                location.x,
+                location.y,
+            )
             return event
+        active_app = get_frontmost_app_name() or None
+        active_window = get_active_window_title() or None
         self._callback(
             TriggerEvent(
                 capture_trigger=CaptureTrigger.CLICK,
                 device_name=monitor.device_name,
                 event_ts=utc_now_iso(),
+                active_app=active_app,
+                active_window=active_window,
             )
         )
         return event
@@ -234,45 +245,54 @@ class MacOSAppSwitchMonitor:
     ) -> None:
         self._callback = callback
         self._monitor_provider = monitor_provider
-        self._observer = None
+        self._stop_event = threading.Event()
+        self._thread: threading.Thread | None = None
+        self._last_frontmost_app: str = ""
 
     def start(self) -> None:
+        if self._thread is not None and self._thread.is_alive():
+            return
+        self._stop_event.clear()
+        self._thread = threading.Thread(
+            target=self._run,
+            daemon=True,
+            name="MacOSAppSwitchMonitor",
+        )
+        self._thread.start()
+
+    def stop(self) -> None:
+        self._stop_event.set()
+        if self._thread is not None and self._thread.is_alive():
+            self._thread.join(timeout=1.0)
+
+    def _run(self) -> None:
         if AppKit is None:
             logger.warning("NSWorkspace unavailable; app switch listener disabled")
             return
-        workspace_class = getattr(AppKit, "NSWorkspace", None)
-        notification_center_class = getattr(AppKit, "NSNotificationCenter", None)
-        notification_name = getattr(
-            AppKit,
-            "NSWorkspaceDidActivateApplicationNotification",
-            None,
-        )
-        if (
-            workspace_class is None
-            or notification_center_class is None
-            or notification_name is None
-        ):
-            logger.warning("NSWorkspace notification symbols unavailable")
-            return
-        workspace = workspace_class.sharedWorkspace()
-        center = notification_center_class.defaultCenter()
-        self._observer = center.addObserverForName_object_queue_usingBlock_(
-            notification_name,
-            workspace,
-            None,
-            self._handle_notification,
-        )
+        self._last_frontmost_app = get_active_app_name() or get_frontmost_app_name()
+        while not self._stop_event.is_set():
+            current_app = get_active_app_name() or get_frontmost_app_name()
+            if (
+                current_app
+                and self._last_frontmost_app
+                and current_app != self._last_frontmost_app
+            ):
+                self._emit_app_switch(current_app)
+            self._last_frontmost_app = current_app or self._last_frontmost_app
+            self._stop_event.wait(0.2)
 
-    def _handle_notification(self, _notification) -> None:
+    def _emit_app_switch(self, active_app: str) -> None:
         monitor = self._monitor_provider()
         if monitor is None:
             return
+        active_window = get_active_window_title() or None
         self._callback(
             TriggerEvent(
                 capture_trigger=CaptureTrigger.APP_SWITCH,
                 device_name=monitor.device_name,
                 event_ts=utc_now_iso(),
-                active_app=get_frontmost_app_name() or None,
+                active_app=active_app,
+                active_window=active_window,
             )
         )
 

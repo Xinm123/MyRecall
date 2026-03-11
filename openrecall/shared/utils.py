@@ -146,7 +146,7 @@ def get_active_app_name_osx() -> str:
         return ""
 
 
-def get_active_window_title_osx() -> str:
+def get_active_window_title_osx(active_app_name: str | None = None) -> str:
     """Gets the title of the active window on macOS.
 
     Requires the pyobjc package. Finds the frontmost window associated with the
@@ -162,7 +162,7 @@ def get_active_window_title_osx() -> str:
     ):
         return ""  # Indicate unavailability if import failed
     try:
-        app_name = get_active_app_name_osx()
+        app_name = active_app_name or get_active_app_name_osx()
         if not app_name:
             return ""
 
@@ -401,6 +401,12 @@ def get_active_window_title() -> str:
         raise NotImplementedError(
             f"Platform '{sys.platform}' not supported yet for get_active_window_title"
         )
+
+
+def get_active_window_title_for_app(active_app_name: str) -> str:
+    if sys.platform == "darwin":
+        return get_active_window_title_osx(active_app_name=active_app_name)
+    return get_active_window_title()
 
 
 def is_user_active_osx() -> bool:

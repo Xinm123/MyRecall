@@ -104,7 +104,11 @@ def test_build_capture_metadata_includes_required_section2_fields():
         active_window="Desktop",
     )
 
-    metadata = recorder._build_capture_metadata(event)
+    metadata = recorder._build_capture_metadata(
+        event,
+        context_active_app="Google Chrome",
+        context_active_window="Desktop",
+    )
 
     assert metadata["capture_trigger"] == "app_switch"
     assert metadata["device_name"] == "monitor_2"
@@ -112,6 +116,74 @@ def test_build_capture_metadata_includes_required_section2_fields():
     assert metadata["active_app"] == "Finder"
     assert metadata["active_window"] == "Desktop"
     assert "timestamp" in metadata
+
+
+@pytest.mark.unit
+def test_build_capture_metadata_prefers_live_app_for_click() -> None:
+    recorder = ScreenRecorder()
+    event = TriggerEvent(
+        capture_trigger=CaptureTrigger.CLICK,
+        device_name="monitor_1",
+        event_ts="2026-03-10T00:00:00Z",
+        active_app="Antigravity",
+        active_window="MyRecall",
+    )
+
+    metadata = recorder._build_capture_metadata(
+        event,
+        context_active_app="Google Chrome",
+        context_active_window="Chrome Tab",
+    )
+
+    assert metadata["active_app"] == "Google Chrome"
+
+
+@pytest.mark.unit
+def test_build_capture_metadata_prefers_live_window_for_click() -> None:
+    recorder = ScreenRecorder()
+    event = TriggerEvent(
+        capture_trigger=CaptureTrigger.CLICK,
+        device_name="monitor_1",
+        event_ts="2026-03-10T00:00:00Z",
+        active_app="Google Chrome",
+        active_window="MyRecall",
+    )
+
+    metadata = recorder._build_capture_metadata(
+        event,
+        context_active_app="Google Chrome",
+        context_active_window="Stack Overflow - Google Chrome",
+    )
+
+    assert metadata["active_window"] == "Stack Overflow - Google Chrome"
+
+
+@pytest.mark.unit
+def test_snapshot_active_context_uses_same_app_for_window_lookup(monkeypatch) -> None:
+    recorder = ScreenRecorder()
+    captured_app: list[str] = []
+
+    monkeypatch.setattr(
+        "openrecall.client.recorder.get_active_app_name", lambda: "Google Chrome"
+    )
+    monkeypatch.setattr(
+        "openrecall.client.recorder.get_frontmost_app_name", lambda: "Antigravity"
+    )
+
+    def _window_for_app(app_name: str) -> str:
+        captured_app.append(app_name)
+        return "Stack Overflow - Google Chrome"
+
+    monkeypatch.setattr(
+        "openrecall.client.recorder.get_active_window_title_for_app",
+        _window_for_app,
+    )
+
+    active_app, active_window = recorder._snapshot_active_context()
+
+    assert active_app == "Google Chrome"
+    assert active_window == "Stack Overflow - Google Chrome"
+    assert captured_app == ["Google Chrome"]
 
 
 @pytest.mark.unit
@@ -246,3 +318,28 @@ def test_take_screenshots_logs_warning_for_out_of_bounds_monitor(monkeypatch, ca
 
     assert screenshots == []
     assert "Monitor index 1 out of bounds. Skipping." in caplog.text
+
+
+@pytest.mark.unit
+def test_stop_stops_app_switch_monitor(monkeypatch) -> None:
+    recorder = ScreenRecorder()
+    calls: list[str] = []
+
+    class _FakeSwitchMonitor:
+        def stop(self) -> None:
+            calls.append("switch")
+
+    class _FakeThread:
+        def stop(self) -> None:
+            calls.append("thread")
+
+        def is_alive(self) -> bool:
+            return False
+
+    monkeypatch.setattr(recorder, "_app_switch_monitor", _FakeSwitchMonitor())
+    monkeypatch.setattr(recorder, "consumer", _FakeThread())
+    monkeypatch.setattr(recorder, "_spool_uploader", _FakeThread())
+
+    recorder.stop()
+
+    assert calls == ["switch", "thread", "thread"]

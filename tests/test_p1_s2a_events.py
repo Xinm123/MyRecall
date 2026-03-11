@@ -174,6 +174,13 @@ def test_list_monitors_uses_distinct_quartz_binding_name():
     assert "return quartz_monitors" in source
 
 
+def test_app_switch_monitor_uses_frontmost_app_polling_fallback():
+    source = Path("openrecall/client/events/macos.py").read_text()
+
+    assert "get_active_app_name() or get_frontmost_app_name()" in source
+    assert "self._stop_event.wait(0.2)" in source
+
+
 def test_list_monitors_falls_back_to_mss_on_quartz_error(monkeypatch):
     from openrecall.client.events import macos
 
@@ -209,3 +216,75 @@ def test_list_monitors_falls_back_to_mss_on_quartz_error(monkeypatch):
     assert len(monitors) == 1
     assert monitors[0].source == "mss_fallback"
     assert warnings
+
+
+def test_app_switch_monitor_emits_when_frontmost_app_changes(monkeypatch):
+    from openrecall.client.events import macos
+    from openrecall.client.events.base import CaptureTrigger, MonitorDescriptor
+
+    events = []
+    monitor = MonitorDescriptor(
+        stable_id="primary",
+        left=0,
+        top=0,
+        width=100,
+        height=100,
+        is_primary=True,
+        source="test",
+    )
+
+    app_sequence = iter(["Antigravity", "Finder"])
+
+    def _next_app() -> str:
+        try:
+            return next(app_sequence)
+        except StopIteration:
+            return "Finder"
+
+    monitor_thread = macos.MacOSAppSwitchMonitor(
+        callback=lambda event: events.append(event),
+        monitor_provider=lambda: monitor,
+    )
+
+    monkeypatch.setattr(macos, "get_active_app_name", _next_app)
+    monkeypatch.setattr(macos, "get_frontmost_app_name", _next_app)
+    monkeypatch.setattr(macos, "get_active_window_title", lambda: "Finder")
+
+    def _stop_after_first_poll(_seconds: float) -> None:
+        monitor_thread._stop_event.set()
+
+    monkeypatch.setattr(monitor_thread._stop_event, "wait", _stop_after_first_poll)
+
+    monitor_thread._run()
+
+    assert len(events) == 1
+    assert events[0].capture_trigger is CaptureTrigger.APP_SWITCH
+    assert events[0].active_app == "Finder"
+    assert events[0].active_window == "Finder"
+
+
+def test_click_on_unregistered_monitor_logs_drop_reason(monkeypatch):
+    from openrecall.client.events import macos
+
+    dropped_logs: list[str] = []
+    fake_quartz = SimpleNamespace(
+        kCGEventLeftMouseDown=1,
+        kCGEventRightMouseDown=2,
+        kCGEventOtherMouseDown=3,
+        CGEventGetLocation=lambda _event: SimpleNamespace(x=2000.0, y=120.0),
+    )
+    event_tap = macos.MacOSEventTap(
+        callback=lambda _event: None, monitor_lookup=lambda _x, _y: None
+    )
+
+    monkeypatch.setattr(macos, "Quartz", fake_quartz)
+    monkeypatch.setattr(
+        macos.logger,
+        "debug",
+        lambda message, *args: dropped_logs.append(message % args),
+    )
+
+    event_tap._handle_event(None, 1, object(), None)
+
+    assert dropped_logs
+    assert "dropped click trigger" in dropped_logs[0]
