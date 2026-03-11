@@ -1,52 +1,56 @@
 schema: spec-driven
 context: |
   Project: MyRecall-v3 (Edge-centric, vision-only). Reference repo: _ref/screenpipe
-  Current substage: P1-S2a (事件驱动采集)
+  Current substage: P1-S2b (AX采集)
   ADR: docs/v3/adr/ADR-0013-event-driven-ax-split.md
-  
-  SSOT documents (MUST read before writing any artifact):
-  - docs/v3/spec.md — 架构总览、API 契约、capture pipeline 定义
-  - docs/v3/acceptance/phase1/p1-s2a.md — 验收步骤、Entry/Exit Gate(P1-S2a primary reference)
-  - docs/v3/gate_baseline.md — Gate/SLO 指标口径、公式、判定规则
-  - docs/v3/data-model.md — DDL、CapturePayload 定义、capture_trigger 字段
-  - docs/v3/roadmap.md — 阶段目标、Exit Gate 条件
-  - docs/v3/http_contract_ledger.md — P1-S2a delta: capture_trigger on POST /v1/ingest
 
-  Precedence rule:
-  - If this config conflicts with SSOT docs above, SSOT docs win.
-  
-  Inherited from P1-S1 (frozen):
-  - /v1/ingest 基础链路、queue-observability、frame-serving、legacy /api/* 301/410
-  - processing_mode=noop (unchanged until P1-S3)
-  
+  Source precedence (MUST follow; do not invent local reinterpretation):
+  - docs/v3/spec.md - 架构与 frozen behavior SSOT
+  - docs/v3/data-model.md - payload/data contract consequences
+  - docs/v3/open_questions.md - 已冻结决策与 ownership boundary
+  - docs/v3/acceptance/phase1/p1-s2b.md - S2b Gate、证据、运行步骤
+  - docs/v3/gate_baseline.md - Gate/SLO formulas, thresholds, sample rules
+
+  Supplemental references (use only for their own scope):
+  - docs/v3/p1-s2b-frozen-rules-index.md - frozen rule locator, not a behavior source
+  - docs/v3/http_contract_ledger.md - external HTTP delta only
+  - docs/v3/roadmap.md - planning context only; not behavior SSOT
+  - docs/v3/acceptance/phase1/p1-s3.md - S2b->S3 handoff/ownership enforcement
+
+  Precedence rule: higher-priority docs win over lower-priority docs; all docs win over this config.
+  Conflict rule: if sources conflict, cite the higher-priority source and surface the conflict; do not synthesize a new rule.
+
   Scope invariants:
-  - Vision-only for P1-P3 (no audio)
-  - macOS-only for P1 (Windows/Linux deferred to P2)
-  - Python implementation (ADR-0013)
+  - Vision-only for P1-P3 (no audio); macOS-only for P1 (Windows/Linux deferred to P2).
+  - Python implementation (ADR-0013).
+  - AX采集: Raw handoff only (P1-S2b). S2b is responsible for AX traversal capability (macOS AXUIElement) and raw handoff correctness (empty-AX no-drop upload, URL stale rejection, permissions).
+  - v3-only mainline: S2b correctness is proven on `/v1/*` + v3 runtime/store; legacy `/api/*` is compatibility-only and carries no new S2b semantics.
 
-  ASCII Anchors (literal-match; do not translate/paraphrase):
-  # Trigger types (P1 enum)
+  Frozen dependencies inherited from P1-S2a (do not redefine as new scope):
+  - `capture_trigger` semantics stay `idle` / `app_switch` / `manual` / `click`
+  - permission states stay `granted`, `transient_failure`, `denied_or_revoked`, `recovering`
+
+  ASCII Anchors (literal-match):
   - capture_trigger, idle, app_switch, manual, click
-  # Permission states
   - granted, transient_failure, denied_or_revoked, recovering
-  # Metrics
-  - trigger_coverage, queue_saturation_ratio, collapse_trigger_count, overflow_drop_count, capture_latency_p95
-  # UI anchors
+  - content_hash, ax_hash_eligible, inter_write_gap_sec, broken_window
+  - accessibility_text, focused_context, device_name, browser_url
   - "#mr-health", data-state, healthy, unreachable, degraded
-  
+
 rules:
   proposal:
     - "Output language: Chinese. Keep all ASCII Anchors exactly literal."
-    - Always include a "Non-goals" section
-    - "Capabilities naming guidance (kebab-case; keep small): event-capture, debounce, backpressure, idle-fallback, permission-state-machine, capture-trigger-tag, health-permission-status."
+    - Always include a "Non-goals" section.
+    - State source precedence briefly when the proposal touches frozen behavior, contract semantics, or Gate thresholds.
   specs:
     - "Output language: Chinese. Keep all ASCII Anchors exactly literal."
-    - Classify changes from capture-pipeline perspective (trigger → debounce → queue → ingest)
+    - Include a short "Acceptance impact" block when the spec changes a Gate formula, threshold, sample rule, SQL denominator, or required evidence.
   design:
     - "Output language: Chinese. Keep all ASCII Anchors exactly literal."
-    - "Design must be codebase-grounded: reference existing entry points under openrecall/server and openrecall/client."
-    - For each key decision, if screenpipe has a comparable pattern, cite screenpipe file path + aligned vs intentionally different
+    - "Design must be codebase-grounded: reference actual entry points under `openrecall/server` and `openrecall/client`, prioritizing `openrecall/server/api_v1.py`, `openrecall/client/events/base.py`, `openrecall/client/v3_uploader.py`, `openrecall/client/accessibility/macos.py`, and `openrecall/client/events/permissions.py` when relevant."
+    - For each material decision, if screenpipe has a comparable pattern, cite the screenpipe file path and label it as `aligned`, `intentional divergence`, or `no comparable pattern`.
+    - Must not invent retry policies, semantic states, or processing-stage meaning not present in the cited docs.
   tasks:
     - "Output language: Chinese. Keep all ASCII Anchors exactly literal."
-    - 'tasks.md must be split into two top-level sections: "## Implementation Tasks" (code changes) and "## Acceptance Verification" (verification actions)'
-    - "Every implementation task must be atomic (target: finish + verify in < 30 minutes)"
+    - 'tasks.md must be split into two top-level sections: "## Implementation Tasks" (code changes) and "## Acceptance Verification" (verification actions).'
+    - Every implementation task must be atomic.
