@@ -96,7 +96,7 @@ references:
     - `content_hash` 覆盖率 >= 90%（AX 成功帧）
     - AX 树遍历超时 < 500ms（P95）
     - `inter_write_gap_sec`：Soft KPI（记录 P50/P90/P99）+ Hard Gate（按 `device_name` 分桶，每设备 max <= 45s，样本 >= 100）
-    - 窗口有效性：Hard Gate 仅使用无 Edge 重启的连续窗口；若窗口内重启则标记 `broken_window=true`，该窗口仅用于观测
+    - 窗口有效性：Hard Gate 仅使用无 Host/Edge 重启的连续窗口；若窗口内发生 Host 或 Edge 重启则标记 `broken_window=true`，该窗口仅用于观测
     - Browser URL 提取成功率 >= 95%（观测指标）
 
 - P1-S3（处理，2026-03-12 ~ 2026-03-15）

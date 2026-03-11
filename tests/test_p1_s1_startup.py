@@ -42,7 +42,6 @@ class TestStartupBasicVerification:
     """Tests for Section 11: Startup and Basic Verification."""
 
     @pytest.mark.integration
-    @pytest.mark.unit
     def test_11_2_queue_status_returns_noop_mode(self):
         """
         11.2 Call GET /v1/ingest/queue/status and confirm processing_mode is 'noop'.
@@ -55,7 +54,6 @@ class TestStartupBasicVerification:
         )
 
     @pytest.mark.integration
-    @pytest.mark.unit
     def test_11_3_health_status_enum(self):
         """
         11.3 P1-S1 health status enumeration: status should be only 'ok' or 'degraded', never 'error'.
@@ -89,7 +87,6 @@ class TestManualStartup:
         yield
 
     @pytest.mark.integration
-    @pytest.mark.unit
     def test_11_1_server_startup_log_noop(self):
         """
         11.1 Verify startup log shows 'MRV3 processing_mode=noop' exactly once.
@@ -124,7 +121,6 @@ class TestManualStartup:
             )
 
     @pytest.mark.integration
-    @pytest.mark.unit
     def test_11_4_lifecycle_single_anchor(self):
         """
         11.4 Verify 'MRV3 processing_mode=noop' appears exactly once per process.
@@ -141,7 +137,6 @@ class TestManualStartup:
         assert count == 1, f"Expected 1 occurrence, found {count}"
 
     @pytest.mark.integration
-    @pytest.mark.unit
     def test_11_5_migration_log_anchor(self):
         """
         11.5 Verify 'v3 schema migrations ensured' log appears before NoopQueueDriver and health queries.

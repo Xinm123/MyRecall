@@ -138,7 +138,7 @@ Recommended (simple, reproducible): stop Edge process temporarily
 Note:
 - Queue/status 计数口径以 DB 实时状态为准（SSOT：[spec.md](./spec.md) §4.7），Edge 重启不应改变计数语义。
 - 若你在断连窗口中同时切换了 Edge data dir（导致 SQLite DB 变化/清空），则计数会随 DB 一并变化；此时应以“同一 DB 实例”的证据完成验收。
-- S2b 纯内存 dedup 语义：Edge 重启会重置 per-device dedup 运行态（`last_content_hash/last_write_time`）；该现象仅影响 dedup 观测，不改变 DB 事实计数语义。
+- S2b 纯内存 dedup 语义：Host 重启会重置 per-device dedup 运行态（`last_content_hash/last_write_time`）；该现象仅影响 dedup 观测，不改变 DB 事实计数语义。
 
 ## 7. Restart Policy Across P1-S1 ~ P1-S7
 
@@ -184,7 +184,7 @@ Procedure (per substage boundary):
 Caveats:
 - Queue/status 计数口径以 DB 实时状态为准（SSOT：[spec.md](./spec.md) §4.7）。
 - Strict isolation mode 下如果每个子阶段使用新的 data dir（新的 SQLite DB），则计数会从空 DB 开始；如果复用同一 data dir，则计数会在子阶段间延续。
-- S2b Hard Gate 采样若跨越 Edge 重启，需标记 `broken_window=true`，并重开新的连续窗口重测。
+- S2b Hard Gate 采样若跨越 Host 或 Edge 重启，需标记 `broken_window=true`，并重开新的连续窗口重测。
 
 Restart Edge when:
 - Edge API contract changes

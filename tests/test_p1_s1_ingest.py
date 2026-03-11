@@ -262,7 +262,6 @@ class TestIngestPipeline:
         yield
 
     @pytest.mark.integration
-    @pytest.mark.unit
     def test_12_1_upload_50_unique_captures(self):
         """
         12.1 Upload 50 unique captures, confirm each returns 201 Created.
@@ -310,7 +309,6 @@ class TestIngestPipeline:
         )
 
     @pytest.mark.integration
-    @pytest.mark.unit
     def test_12_2_replay_10_duplicate_captures(self):
         """
         12.2 Replay 10 duplicate capture_ids, confirm all return 200 OK with 'already_exists'.
@@ -360,7 +358,6 @@ class TestIngestPipeline:
         )
 
     @pytest.mark.integration
-    @pytest.mark.unit
     def test_12_3_queue_count_matches_db(self):
         """
         12.3 Verify pending + processing + completed + failed = total frames in DB.
@@ -383,7 +380,6 @@ class TestIngestPipeline:
         assert total_in_queue == total_in_db
 
     @pytest.mark.integration
-    @pytest.mark.unit
     def test_12_4_400_invalid_params_no_db_change(self):
         """
         12.4 Verify 400 INVALID_PARAMS does not change DB.
@@ -452,7 +448,6 @@ class TestIngestPipeline:
         assert db_count_before == db_count_after
 
     @pytest.mark.integration
-    @pytest.mark.unit
     def test_12_5_413_payload_too_large_no_db_change(self):
         """
         12.5 Verify 413 PAYLOAD_TOO_LARGE does not change DB.
@@ -484,7 +479,6 @@ class TestIngestPipeline:
         assert db_count_before == db_count_after
 
     @pytest.mark.integration
-    @pytest.mark.unit
     def test_12_6_503_queue_full_no_db_change(self):
         """
         12.6 Verify 503 QUEUE_FULL does not change DB.
@@ -547,7 +541,6 @@ class TestIngestPipeline:
             conn.close()
 
     @pytest.mark.integration
-    @pytest.mark.unit
     def test_12_7_non_jpeg_returns_400(self):
         """
         12.7 Verify non-JPEG upload returns 400 and does not change DB.
@@ -578,7 +571,6 @@ class TestIngestPipeline:
         assert db_count_before == db_count_after
 
     @pytest.mark.integration
-    @pytest.mark.unit
     def test_12_8_concurrent_same_capture_id(self):
         """
         12.8 Verify concurrent upload of same capture_id results in exactly one 201 and one 200.

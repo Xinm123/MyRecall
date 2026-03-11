@@ -142,38 +142,54 @@ flowchart LR
   - 非 `idle/manual` 触发启用内容去重（`content_hash` 相同则跳过写入），并保留 30s 强制落盘保底；
   - 触发通道有界，lag 时折叠为一次兜底触发，避免高频事件拖垮处理链路。
 
-**内容去重实现（对齐 screenpipe event_driven_capture.rs）**：
+**内容去重实现（Host 端执行，与 screenpipe 对齐）**：
 ```
-# Edge /v1/ingest 伪代码（P1-S1 已实现 capture_id 幂等；content_hash 去重留在 P1-S2+）
+# Host 端 dedup 伪代码（capture 前判定，避免重复图片上传）
+def should_capture(capture_trigger, accessibility_text, content_hash, last_write_time):
+    # 1. idle/manual 触发不参与 dedup（保证 timeline 不为空）
+    if capture_trigger in ('idle', 'manual'):
+        return True
+
+    # 2. 30s 强制写入保底（与 screenpipe 一致）
+    if (now - last_write_time).total_seconds() >= 30:
+        return True
+
+    # 3. 空文本不参与 dedup（与 screenpipe 一致）
+    if not accessibility_text or accessibility_text.strip() == '':
+        return True
+
+    # 4. content_hash 相同则跳过
+    if content_hash == last_content_hash:
+        return False  # dedup skip，不上传
+
+    return True  # 写入
+```
+
+**Edge 端 ingest 简化处理**：
+```
+# Edge /v1/ingest 伪代码
 def handle_ingest(payload):
     # 1. capture_id 幂等（已实现：DB UNIQUE 约束 + DB-first claim/finalize）
     if _exists_capture_id(payload.capture_id):
         return {"status": "already_exists"}
 
-    # 2. 内容去重（非 idle/manual + 30s 保底）
-    # 允许跨 capture_id 去重（capture_id 幂等与 content_hash 去重是两层语义）
-    device = payload.device_name
-    if payload.capture_trigger not in ('idle', 'manual'):
-        last_hash = _get_last_content_hash(device)
-        last_write = _get_last_write_time(device)
-
-        # 30s 强制写入保底
-        if (now - last_write).total_seconds() < 30:
-            if _is_valid_hash(payload.content_hash) and payload.content_hash == last_hash:
-                _record_dedup_skip(device)  # 计数器
-                return {"status": "dedup_skipped", "capture_id": payload.capture_id}
-
+    # 2. Host 端已完成 dedup 判定，Edge 直接写入
     # 3. 写入 DB
     _insert_frame(payload)
-    _set_last_content_hash(device, payload.content_hash)
-    _set_last_write_time(device, now)
     return {"status": "created"}
 ```
 
-**纯内存状态与重启语义（P1-S2b）**：
-- `last_content_hash/last_write_time` 为 per-device 纯内存运行态，不跨 Edge 重启持久化。
-- Edge 重启后 dedup 进入冷启动，重启边界附近允许出现额外写入；该现象为预期行为，不视为缺陷。
+**设计优势**：
+- dedup 在 Host 端执行，重复内容不浪费带宽上传
+- 空文本不参与 dedup（与 screenpipe 一致）
+- Edge 端逻辑简化
+
+**Host 端 dedup 状态与重启语义（P1-S2b）**：
+- `last_content_hash/last_write_time` 为 per-device 纯内存运行态，在 Host 端维护。
+- Host 重启后 dedup 进入冷启动，重启边界附近允许出现额外写入；该现象为预期行为，不视为缺陷。
 - 30s 保底写入语义始终成立，用于保证 timeline 连续性。
+- Edge 端不再维护 dedup 状态，仅接收并存储 `content_hash` 用于观测。
+- P1 不暴露 `dedup_skipped` 作为 Edge ingest 对外结果；dedup 属于 Host 侧 pre-ingest 决策。
 
 **关键参数对齐**：
 | 参数 | screenpipe | MyRecall v3 P1 |

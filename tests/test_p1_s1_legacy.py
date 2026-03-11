@@ -215,7 +215,6 @@ class TestLegacyRedirects:
     """Tests for Section 16: Legacy Redirect Verification."""
 
     @pytest.mark.integration
-    @pytest.mark.unit
     def test_16_1_legacy_redirects(self):
         """
         16.1 Verify legacy endpoints redirect to v1 with correct codes.
@@ -259,7 +258,6 @@ class TestLegacyRedirects:
         assert "/v1/health" in resp.headers["Location"]
 
     @pytest.mark.integration
-    @pytest.mark.unit
     def test_16_2_deprecated_log_anchor(self):
         """
         16.2 Verify every legacy request logs '[DEPRECATED]' marker.

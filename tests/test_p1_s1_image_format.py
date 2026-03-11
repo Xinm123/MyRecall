@@ -201,7 +201,6 @@ class TestImageFormatContract:
     """Tests for Section 17: Image Format Contract Verification."""
 
     @pytest.mark.integration
-    @pytest.mark.unit
     def test_17_1_frames_snapshot_path_is_jpg(self):
         """
         17.1 Verify frames.snapshot_path points to .jpg/.jpeg files.
@@ -228,7 +227,6 @@ class TestImageFormatContract:
             assert p.exists(), f"Snapshot file does not exist: {path}"
 
     @pytest.mark.integration
-    @pytest.mark.unit
     def test_17_2_spool_creates_jpg_json(self):
         """
         17.2 Verify Host spool creates .jpg + .json files (not .webp).

@@ -49,9 +49,10 @@ CREATE TABLE frames (
     device_name           TEXT NOT NULL DEFAULT 'monitor_0',
     snapshot_path         TEXT DEFAULT NULL,       -- JPEG 快照路径（主链路，推荐 .jpg）
     capture_trigger       TEXT DEFAULT NULL,       -- 'idle'|'app_switch'|'manual'|'click' (P1); P2+: 'window_focus'|'typing_pause'|'scroll_stop'|'clipboard'|'visual_change'
+    event_ts              TEXT DEFAULT NULL,       -- 触发时刻（UTC ISO8601），用于 capture_latency 计算
     accessibility_text    TEXT DEFAULT NULL,
     text_source           TEXT DEFAULT NULL,       -- 'ocr'|'accessibility'
-    content_hash          TEXT DEFAULT NULL,       -- sha256:hex，Edge 去重辅助
+    content_hash          TEXT DEFAULT NULL,       -- sha256:hex，Host dedup 判定后上传
     simhash               INTEGER DEFAULT NULL,    -- 感知哈希，近似重复检测
 
     -- v3 Edge-Centric 追加
@@ -642,7 +643,7 @@ class CapturePayload(BaseModel):
     focused: Optional[bool] = True
     capture_trigger: str  # P1-S2a+ 新上报必填: "idle" | "app_switch" | "manual" | "click"；P2+ 追加 "window_focus" | "typing_pause" | "scroll_stop" | "clipboard" | "visual_change"
     accessibility_text: Optional[str] = None
-    content_hash: Optional[str] = None    # sha256 hex，用于 Edge 去重
+    content_hash: Optional[str] = None    # sha256:hex，Host dedup 判定后上传
     simhash: Optional[int] = None         # 感知哈希，用于近似重复检测
     # image_data: 通过 multipart/form-data 的 file 字段传输
 ```
@@ -677,12 +678,19 @@ class CapturePayload(BaseModel):
 
 **幂等语义：**
 - `capture_id` 重复时，Edge 不重新处理，直接返回 `HTTP 200` + `{"status": "already_exists", ...}`（可附 `request_id`；不返回错误 `code`）。
-- `content_hash` 去重与 `capture_id` 幂等是两层语义：当 dedup 条件满足（非 `idle/manual`、距该设备最近写入 < 30s、hash 有效且匹配）时，即使 `capture_id` 不同也可返回 `dedup_skipped`。
+- `content_hash` 去重与 `capture_id` 幂等是两层语义：当 dedup 条件满足（非 `idle/manual`、距该设备最近写入 < 30s、hash 有效且匹配）时，Host 会直接跳过本次 ingest；`capture_id` 幂等仅作用于实际发送到 Edge 的请求。
+
+**dedup 语义（P1-S2b）**：
+- dedup 判定由 **Host 端**执行（capture 前），避免重复图片上传浪费带宽
+- dedup 条件：非 idle/manual + 距上次写入 < 30s + content_hash 相同 + 非空文本
+- 空文本不参与 dedup（与 screenpipe 对齐）
+- dedup 判定成功后，Host 不调用 ingest API
+- Edge 仅接收并存储 `content_hash`，不执行 dedup 判定
 
 **dedup 运行态约束（P1-S2b）**：
-- `last_content_hash/last_write_time` 为 per-device 纯内存运行态，不写入 `edge.db`。
-- `edge.db` 持久化事实数据（如 `frames`），不持久化 dedup 判定状态。
-- 部署前提：P1 为单 Edge 实例。
+- `last_content_hash/last_write_time` 为 per-device 纯内存运行态，**在 Host 端维护**，不写入 `edge.db`。
+- Host 重启后 dedup 进入冷启动，重启边界附近允许出现额外写入；该现象为预期行为，不视为缺陷。
+- Edge 端存储的 `content_hash` 仅用于观测，不用于 dedup 判定。
 
 **device_name 字段说明**：
 

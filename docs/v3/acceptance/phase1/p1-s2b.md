@@ -109,6 +109,11 @@
 - `capture_trigger` 字段赋值逻辑（由 P1-S2a 实现）
 - 去抖门控（`min_capture_interval_ms=1000`，由 P1-S2a 实现，1 Hz 安全起点）
 - 性能监控框架（`capture_latency_p95`，由 P1-S2a 引入）
+- **Host 端 dedup 判定**（P1-S2b 新增）：
+  - Host 在 capture 前执行 dedup 判定，避免重复图片上传
+  - dedup 条件：非 idle/manual + 距上次写入 < 30s + content_hash 相同
+  - 空文本不参与 dedup（与 screenpipe 对齐）
+  - dedup 判定成功后不调用 ingest API
 
 ### 1.0e Stage 2 alignment plan (screenpipe-style monitor semantics)
 
@@ -140,17 +145,17 @@
 
 ### 2.1 指标口径与样本说明（必填）
 
-- 口径基线版本（默认 [../../gate_baseline.md](../../gate_baseline.md)）：v1.4
+- 口径基线版本（默认 [../../gate_baseline.md](../../gate_baseline.md)）：v1.5
 - 指标样本数：
   - AX 采集样本：>= 200 次（多应用场景）
-  - 去重样本：`dedup_eligible >= 500`（内容不变压测）
+  - `inter_write_gap_sec` Hard Gate：每设备样本 `>= 100`
   - Browser URL 样本：>= 50 次（多浏览器场景）
 - 统计时间窗：
   - 主窗：连续 5 分钟多窗口场景
   - 压测窗：内容不变压测持续 5 分钟
 - 百分位算法：Nearest-rank（剔除前 10 个预热样本）
-- 窗口元信息（必填）：`window_id`、`edge_pid`、`restart_events`、`broken_window`
-- 有效窗规则：窗口内若发生 Edge 重启，标记 `broken_window=true`；该窗口结果仅用于观测，不可作为 Hard Gate 证据
+- 窗口元信息（必填）：`window_id`、`host_pid`、`edge_pid`、`restart_events`、`broken_window`
+- 有效窗规则：窗口内若发生 Host 或 Edge 重启，标记 `broken_window=true`；该窗口结果仅用于观测，不可作为 Hard Gate 证据
 
 ## 3. 验收步骤
 
@@ -170,7 +175,7 @@
     - `browser_url` 正确（浏览器场景）
     - `content_hash` 计算正确
    - 边界样本：AX 空文本帧在 ingest 可见（不得丢帧），并在后续 S3 验收中可被 OCR fallback 消化
-5. 执行高频“内容不变”压测（app switch/click，5 分钟），记录窗口元信息，统计 `dedup_skip_rate` 并校验 `inter_write_gap_sec`（Soft KPI + Hard Gate：按 `device_name` 分桶，每设备 max <= 45s，样本 >= 100；`broken_window=true` 仅观测不判定）。
+5. 执行高频“内容不变”压测（app switch/click，5 分钟），记录窗口元信息，并校验 `inter_write_gap_sec`（Soft KPI + Hard Gate：按 `device_name` 分桶，每设备 max <= 45s，样本 >= 100；`broken_window=true` 仅观测不判定）。
 6. 测量 AX 树遍历延迟：
    - 记录每次遍历耗时
    - 统计 P95 是否 < 500ms
@@ -186,10 +191,6 @@
        AND timestamp >= datetime('now', '-5 minutes');
      ```
      判定：`coverage_pct >= 90%`
-    - `dedup_skip_rate`（Soft KPI，仅记录数值）：
-      - 取压测窗口起止点的 `dedup_eligible_total`、`dedup_skipped_total` 计数器差值，按公式计算；
-      - 记录实际数值用于生产可观测性（目标 >= 95%，但不作为判定条件）。
-      - 纯内存 dedup 场景下，Edge 重启后短时波动为预期，不触发 Fail。
     - `inter_write_gap_sec`（Soft KPI + Hard Gate）：
       - Hard Gate: 按 `device_name` 分桶判定，每设备 `max <= 45s`（每设备样本 >= 100）
       - Soft KPI（non-blocking）：记录 P50/P90/P99 分布
@@ -285,7 +286,6 @@
 
 - AX 树遍历延迟 P95（目标 < 500ms）：
 - `content_hash` 覆盖率（目标 >= 90%）：
-- `dedup_skip_rate`（观测指标，仅记录数值）：
 - `inter_write_gap_sec`（Soft KPI + Hard Gate）：
   - Hard Gate: 按 `device_name` 分桶，每设备 max <= 45s（样本 >= 100）
   - Soft KPI: 记录 P50/P90/P99 分布

@@ -43,7 +43,7 @@ references:
 | OQ-026 | P1 | P1 Search UI 分页模式 | A 加载更多（对齐 screenpipe，推荐）/ B 跳页（需加 offset 上限约束） | A（已决） | screenpipe `search-modal.tsx` 纯"加载更多"（`hasMoreOcr/loadMoreOcr`），offset 步长=limit，实际不超过几百；跳页模式下 `search_all()` 过量拉取内存风险不可控（offset=10000 时各路径拉 10020 行）；P2+ keyset cursor 可彻底替代 | 若未来需跳页，需补 `offset max` 约束并在 `search_all()` 加运行时 reject | 2026-03-02 |
 | OQ-027 | P1 | Capture 运行机制与频率口径 | A 事件驱动主机制 + 固定注入压测口径（推荐）/ B 全局固定频率假设 | A（已决，2026-03-04 补充） | 对齐 [spec.md](spec.md)/[roadmap.md](roadmap.md)/`acceptance/phase1/p1-s2a.md`/`acceptance/phase1/p1-s2b.md`，消除"事件驱动 vs 固定频率"文本冲突（`acceptance/phase1/archive/p1-s2.md` 仅历史参考） | 若 P2+ 引入 Power Profile，TTS 与丢失率阈值需按 profile 重新标定 | 2026-03-04 |
 | OQ-028 | P1 | Host spool 持久化策略 | A 磁盘持久化（推荐）/ B 内存队列 | A（已决，2026-03-05） | 进程重启/断电/断网场景下内存方案会丢数据，与 P1-S1 "断网恢复可自动重传" Gate 不兼容 | — | 2026-03-05 |
-| OQ-029 | P1 | P1-S2 是否拆分为事件驱动 (S2a) + AX 采集 (S2b) | A 拆分为 S2a + S2b 串行开发（推荐）/ B 合并为单一 S2 阶段 | A（已决，2026-03-09） | 事件驱动与 AX 采集是两个独立技术栈；`dedup_skip_rate` Gate 依赖 content_hash（需 S2b）；拆分后可独立验收、降低单阶段风险 | P1 阶段 Win/Linux 用户仅能用 idle/manual 触发 | 2026-03-09 |
+| OQ-029 | P1 | P1-S2 是否拆分为事件驱动 (S2a) + AX 采集 (S2b) | A 拆分为 S2a + S2b 串行开发（推荐）/ B 合并为单一 S2 阶段 | A（已决，2026-03-09） | 事件驱动与 AX 采集是两个独立技术栈；dedup 效果 Gate 依赖 `content_hash` + `inter_write_gap_sec`（需 S2b）；拆分后可独立验收、降低单阶段风险 | P1 阶段 Win/Linux 用户仅能用 idle/manual 触发 | 2026-03-09 |
 | OQ-030 | P1 | P2 频率目标（是否对齐 screenpipe 5Hz） | A 维持 1Hz（推荐）/ B 目标 5Hz / C 数据驱动 | A（已决，2026-03-09） | P1/P2 采用保守频率（1Hz），有意偏离 screenpipe（5Hz）；Python 实现安全余量充足；若未来需要更高频率需重新评估 | 与 screenpipe 频率差异可能影响部分用户预期 | 2026-03-09 |
 | OQ-034 | P1 | `ocr_preferred_apps` P1 初版白名单 | A 终端类最小名单（推荐）/ B 空名单（全量AX优先）/ C 扩大到更多应用 | A（已决，2026-03-09） | 对齐 screenpipe `paired_capture` 终端类 OCR 偏好，优先保证 terminal 场景可读性与框选质量，控制 P1 风险范围 | 名单过宽会抬高 OCR 开销；名单过窄会导致 terminal 场景质量下降 | 2026-03-09 |
 | OQ-035 | P1 | OCR 引擎策略（P1） | A RapidOCR 单引擎（推荐）/ B 多引擎可切换 | A（已决，2026-03-09） | 降低实现与验收复杂度；统一 OCR 指标口径；保持 AX-first + OCR-fallback 主路径不变 | 失去跨引擎对照能力，多语言/极端场景需在 P2+ 再评估 | 2026-03-09 |
@@ -112,12 +112,12 @@ references:
 
 29. OQ-028 = A：Host spool 采用磁盘持久化，不使用内存队列。spool 落盘为 JPEG（`.jpg`/`.jpeg` + `.json`，原子写入）；兼容读取历史（`.webp` + `.json`）仅用于 drain 清空，新写入不再产生 `.webp`。理由：进程重启/断电/断网场景下内存方案会丢数据，与 P1-S1 "断网恢复可自动重传" Gate 不兼容。
 
-> **补充（2026-03-05）**：capture_id 幂等与 content_hash 内容去重逻辑均需在 Edge /v1/ingest 中实现（对齐 screenpipe event_driven_capture.rs），P1-S2 验收前需完成。
+> **补充（2026-03-05，按议题 1 收口更新）**：`capture_id` 幂等由 Edge `/v1/ingest` 实现；`content_hash` 内容去重由 Host 在 capture 前执行。Edge 仅接收并存储 `content_hash` 用于观测，不承担 dedup 判定职责。
 
 ### 已拍板结论（2026-03-09）
 
-30. OQ-029 = A：P1-S2 拆分为 S2a（事件驱动 capture，Week 1-2）+ S2b（AX 文本采集，Week 3-4），串行开发，独立验收。实现语言为 Python（与现有 codebase 一致，开发周期 3-4 周）。平台策略 macOS-first，Win/Linux 推迟 P2。`dedup_skip_rate` 从 Hard Gate 调整为 Soft KPI（依赖 S2b 的 content_hash）。详见 ADR-0013。
-    - 阶段边界（强制）：P1-S2a 不判定 `content_hash` / `dedup_skip_rate`；上述指标从 P1-S2b（`content_hash` 交付后）开始记录与评审。
+30. OQ-029 = A：P1-S2 拆分为 S2a（事件驱动 capture，Week 1-2）+ S2b（AX 文本采集，Week 3-4），串行开发，独立验收。实现语言为 Python（与现有 codebase 一致，开发周期 3-4 周）。平台策略 macOS-first，Win/Linux 推迟 P2。`dedup_skip_rate` 不再作为正式验收指标；dedup 效果由 `inter_write_gap_sec` Hard Gate 覆盖。详见 ADR-0013。
+    - 阶段边界（强制）：P1-S2a 不判定 `content_hash` / `inter_write_gap_sec`；上述指标从 P1-S2b（`content_hash` 交付后）开始记录与评审。
 
 31. OQ-030 = A：P2 频率目标维持 1Hz（有意偏离 screenpipe 5Hz）。理由：Python 实现在 1Hz 频率下安全余量充足；若未来需要更高频率需重新评估。
 

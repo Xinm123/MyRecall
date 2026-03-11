@@ -201,7 +201,7 @@
   - `pytest tests/test_p1_s2a_debounce.py -q` — 去抖违规数 SQL 校验
   - 最小通过线：`0 failed`
 - S2a/S2b 口径收口（强制）：
-  - `content_hash` 与 `dedup_skip_rate` 为 P1-S2b 范围；P1-S2a 不作为 Gate 判定项。
+- `content_hash` 与 `inter_write_gap_sec` 为 P1-S2b 范围；P1-S2a 不作为 Gate 判定项。
   - P1-S2a 仅要求完成事件驱动触发、去抖、背压与观测证据闭环。
 - P1-S2a 最小集成测试（补充）：
   - `pytest tests/test_p1_s2a_integration.py -q`（如创建）

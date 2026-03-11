@@ -59,7 +59,6 @@ class TestFrameReading:
         yield
 
     @pytest.mark.integration
-    @pytest.mark.unit
     def test_13_1_get_frame_returns_jpeg(self):
         """
         13.1 Verify GET /v1/frames/:frame_id returns JPEG with correct Content-Type.
@@ -78,7 +77,6 @@ class TestFrameReading:
         assert content[:2] == b"\xff\xd8", "Response is not a valid JPEG"
 
     @pytest.mark.integration
-    @pytest.mark.unit
     def test_13_2_get_nonexistent_frame_returns_404(self):
         """
         13.2 Verify GET /v1/frames/:frame_id for nonexistent ID returns 404.
@@ -94,7 +92,6 @@ class TestFrameReading:
         assert data["code"] == "NOT_FOUND"
 
     @pytest.mark.integration
-    @pytest.mark.unit
     def test_13_3_missing_snapshot_file_returns_404_no_db_change(self):
         """
         13.3 Verify GET for missing snapshot file returns 404 and does not modify queue.

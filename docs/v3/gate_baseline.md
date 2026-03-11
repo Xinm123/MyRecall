@@ -84,43 +84,33 @@ references:
 - 阈值：`= 100%`
 - 最小样本：四类触发均命中，且每类样本 `>= 20`
 
-3. `dedup_skip_rate`（观测指标）
-- 公式：`dedup_skip_rate = (dedup_skipped / dedup_eligible) * 100%`
-- 说明：此指标为**观测指标**，仅记录数值用于生产可观测性，不设阈值，不影响 Gate 判定
-- 阶段边界（强制）：P1-S2a 不判定本指标；从 P1-S2b（`content_hash` 交付后）开始记录与评审。
-- 实现要求（验收前需完成）：
-  - `dedup_eligible`：非 `idle/manual` 触发且距上次写入 < 30s 的事件计数
-  - `dedup_skipped`：`content_hash` 匹配导致跳过写入的计数
-  - 需实现：Edge /v1/ingest 逻辑中维护 per-device 状态（last_content_hash, last_write_time）
-  - 纯内存 dedup 场景下，Edge 重启后短时波动为预期；该指标仍为 non-blocking 观测项
-
-4. `inter_write_gap_sec`（Soft KPI + Hard Gate）
+3. `inter_write_gap_sec`（Soft KPI + Hard Gate）
 - 公式：相邻两次成功写入时间差（秒）构成样本分布。
 - Hard Gate：按 `device_name` 分桶判定，且每设备 `max <= 45s`（每设备样本 >= 100）
 - Soft KPI（non-blocking）：记录 P50/P90/P99 分布，用于观测与回归，不设硬性阈值
 - 说明：P99 不设硬性阈值（dedup 保底写入场景下 P99 天然接近 30s，无区分度）
-- 窗口有效性：Hard Gate 仅使用无 Edge 重启的连续窗口；窗口内若发生 Edge 重启，标记 `broken_window=true`，该窗口仅用于观测记录，不用于 Hard Gate 判定
+- 窗口有效性：Hard Gate 仅使用无 Host/Edge 重启的连续窗口；窗口内若发生 Host 或 Edge 重启，标记 `broken_window=true`，该窗口仅用于观测记录，不用于 Hard Gate 判定
 
-5. `queue_saturation_ratio`（Hard Gate）
+4. `queue_saturation_ratio`（Hard Gate）
 - 公式：`queue_saturation_ratio = (queue_depth >= 0.9 * queue_capacity 的采样数 / 总采样数) * 100%`
 - 阈值：`<= 10%`
 - 最小样本：队列深度采样点 `>= 300`
 
-6. `collapse_trigger_count`（Hard Gate）
+5. `collapse_trigger_count`（Hard Gate）
 - 公式：过载注入窗口内 collapse 触发次数计数。
 - 阈值：`>= 1`
 
-7. `overflow_drop_count`（Hard Gate）
+6. `overflow_drop_count`（Hard Gate）
 - 公式：过载注入窗口内因通道溢出导致丢弃的 capture 数。
 - 阈值：`= 0`
 
-8. `ax_walk_timeout_p95`（Hard Gate，P1-S2b）
+7. `ax_walk_timeout_p95`（Hard Gate，P1-S2b）
 - 公式：AX 树遍历单次耗时分布。
 - 阈值：`P95 <= 500ms`（有意偏离 screenpipe 默认 250ms，适配复杂 Electron 应用）。
 - 最小样本：AX 成功帧 `>= 100`。
 - 说明：若超时，需检查是否为 Electron 应用，并考虑提高 walk_timeout 或增加重试逻辑。
 
-9. `Host CPU`（Soft KPI，non-blocking）
+8. `Host CPU`（Soft KPI，non-blocking）
 - 说明：CPU 使用率仅用于趋势观测与容量评估，不作为跨设备 Gate 判定条件。
 - 记录要求：验收报告需附硬件基线（机型/芯片/核心数）与负载背景（后台任务、显示器配置）。
 

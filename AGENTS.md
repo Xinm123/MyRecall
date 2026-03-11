@@ -1,12 +1,13 @@
-# AGENTS Guide: OpenRecall
+# AGENTS Guide: MyRecall
 
 This file is for coding agents working in `/Users/pyw/old/MyRecall`.
 Use it as the operational source of truth for commands and coding conventions.
 
 ## Project Snapshot
 
-- OpenRecall is a privacy-first local memory system (screenshot capture + AI + search).
-- Architecture is split into `openrecall/client` and `openrecall/server`.
+- MyRecall v3 is a privacy-first local memory system (screenshot capture + AI + search).
+- **Python 3.11+ required**.
+- Architecture is split into `openrecall/client`, `openrecall/server`, and `openrecall/client/events/` (event-driven capture).
 - Main entry points are module runs (`python -m openrecall.*`) and wrapper scripts.
 - Reference repo: `_ref/screenpipe`.
 
@@ -137,6 +138,8 @@ This pattern is used in `openrecall/server/api.py` and `openrecall/client/buffer
   - `unit`, `integration`, `e2e`, `perf`, `security`, `model`, `manual`
 - Some modules apply markers via module-level `pytestmark`.
 
+**Test Categories**: See `tests/README.md` for detailed test classification (which tests require running server, which are standalone).
+
 ## Configuration Conventions
 
 - Runtime config is centralized in `openrecall/shared/config.py` (`pydantic-settings`).
@@ -150,6 +153,13 @@ Common vars:
 - `OPENRECALL_CLIENT_DATA_DIR`
 - `OPENRECALL_AI_PROVIDER`
 - `OPENRECALL_DEVICE`
+
+Event-Driven Capture (P1-S2a+):
+- `OPENRECALL_MIN_CAPTURE_INTERVAL_MS` — Debounce interval (default: 1000)
+- `OPENRECALL_IDLE_CAPTURE_INTERVAL_MS` — Idle fallback interval (default: 30000)
+- `OPENRECALL_PERMISSION_POLL_INTERVAL_SEC` — Permission check interval (default: 10)
+- `OPENRECALL_TRIGGER_QUEUE_CAPACITY` — Trigger queue size (default: 64)
+- `OPENRECALL_STATS_INTERVAL_SEC` — Stats logging interval (default: 60)
 
 ## Agent Rules from Cursor / Copilot
 
