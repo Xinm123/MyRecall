@@ -1,9 +1,9 @@
 # P1-S2a UI Evidence Index
 
-- run_ts: 2026-03-11T06:02:54Z
-- window_id: p1-s2a-20260311T060254Z
-- edge_pid: unknown
-- base_url: http://localhost:8083
+- run_ts: 2026-03-11T08:56:21Z
+- window_id: p1-s2a-20260311T085621Z
+- edge_pid: 35056
+- base_url: http://localhost:8084
 - health_snapshots: p1-s2a-health-snapshots.json
 - raw_trigger_channel: p1-s2a-trigger-channel-raw.jsonl
 
@@ -19,8 +19,8 @@
 ## Attachments
 
 - Add screenshot/log references below:
-  - [x] Grid evidence path: ./p1-s2a-ui-proof.webp
-  - [x] Timeline new-frame evidence path: ./p1-s2a-ui-proof.webp
-  - [x] Timeline定位 evidence path: ./p1-s2a-ui-proof.webp
-  - [x] Health anchor evidence path: ./p1-s2a-ui-proof.webp
-  - [x] Additional notes: All UI elements verified via automated browser subagent recording.
+  - [ ] Grid evidence path:
+  - [ ] Timeline new-frame evidence path:
+  - [ ] Timeline定位 evidence path:
+  - [ ] Health anchor evidence path:
+  - [ ] Additional notes:

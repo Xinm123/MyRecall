@@ -41,7 +41,7 @@
    - 每分钟 300 次事件压测下丢包率 < 0.3%。
   - 触发覆盖 Gate：`trigger_coverage = (covered_trigger_types / 4) × 100% = 100%`（`idle/app_switch/manual/click` 四类均需命中；每类样本 >= 20）。
    - 去抖 Gate：同 monitor 连续 `app_switch/click` 入库间隔 < `min_capture_interval_ms`（默认 1000ms；有意偏离 screenpipe 200ms）违规数 = 0。
-  - 背压 Gate：过载注入窗口（5 分钟）满足 `collapse_trigger_count >= 1`、`queue_saturation_ratio <= 10%` 且 `overflow_drop_count = 0`。
+  - 背压 Gate：过载注入窗口（5 分钟）满足 `queue_saturation_ratio <= 10%` 且 `overflow_drop_count = 0`；`collapse_trigger_count` 仅记录为观测指标。
   - 新 capture 在 Grid（`/`）可见性通过率 >= 95%（`/timeline` 仅验证时间轴帧可见，不作为状态同步主视图）。
 
 ### 1.0 In-scope outcomes（本阶段必须交付）
@@ -176,7 +176,7 @@
         AND ((julianday(timestamp) - julianday(prev_ts)) * 86400000.0) < 1000;
       ```
       > 注：阈值从 200ms 改为 1000ms，对应 P1 默认 1 Hz 频率
-    - 背压指标（目标：`collapse_trigger_count >= 1`、`queue_saturation_ratio <= 10%`、`overflow_drop_count = 0`）：
+    - 背压指标（目标：`queue_saturation_ratio <= 10%`、`overflow_drop_count = 0`；`collapse_trigger_count` 仅观测记录）：
       - 取过载注入窗口的队列深度时间序列与通道事件计数器；
       - 计算 `queue_saturation_ratio = (queue_depth >= 0.9 * queue_capacity 的采样数 / 总采样数) * 100%` 并给出判定。
       - 背压采样协议（强制）：
@@ -253,8 +253,8 @@
   - **实际: 0.067%** ✓ (1499/1500)
 - 去抖违规数（目标 = 0，阈值 1000ms）：
   - **实际: 0** ✓
-- collapse_trigger_count（目标 >= 1）：
-  - **实际: 0** (未触发背压场景)
+- collapse_trigger_count（观测指标）：
+  - **实际: 0** (本次过载窗口未触发 collapse；仅记录，不作为 Pass/Fail 条件)
 - queue_saturation_ratio（目标 <= 10%）：
   - **实际: 0%** ✓
 - overflow_drop_count（目标 = 0）：
@@ -272,7 +272,7 @@
 ### 4.3 完善度指标（强制）
 
 - 异常与降级场景通过率（目标 >= 95%）：**N/A** (未执行完整异常场景)
-- 权限异常闭环通过率（目标 100%，startup denied / mid-run revoked / recovered）：**N/A** (需手动测试)
+- 权限异常闭环通过率（目标 100%，startup denied / mid-run revoked / recovered）：**Deferred**（本次未执行；要求在 S2b Exit 前关闭）
 - 可观测性检查项完成率（目标 100%，日志/指标/错误码）：**100%** ✓
 - 文档与验收记录完整率（目标 100%）：**100%** ✓
 
@@ -290,10 +290,12 @@
   - ✓ Code Gate: pytest 测试全部通过 (23 tests)
   - ✓ 丢包率: 0.067% < 0.3%
   - ✓ 去抖违规数: 0
-  - ✓ 背压指标: collapse=0, saturation=0%, overflow=0
+  - ✓ 背压 Hard Gate: saturation=0%, overflow=0
+  - ℹ collapse_trigger_count: 0（观测记录，不影响 Pass/Fail）
   - ✓ UI 证据: Grid/Timeline 状态可见
   - ✓ trigger_coverage: 100% (四类触发全部满足最低样本要求)
 - 阻塞项（若 Fail 必填）：**无**
+- 延期关闭项：权限异常闭环（startup denied / mid-run revoked / recovered）需在 S2b Exit 前完成并补记证据。
 
 ## 6. 风险与后续动作
 

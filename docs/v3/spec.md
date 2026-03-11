@@ -72,7 +72,10 @@ flowchart LR
 
 ### 2.1 Host 职责（严格）
 - 采集：截图 + 基础上下文（app/window/monitor/timestamp/trigger）。
-- 语义约束：`app/window` 必须来自同一次 capture 的同源上下文快照；禁止 app/window 分别独立查询后拼接。
+- 语义约束：上下文字段分为两组：`focused_context = {app_name, window_name, browser_url}` 与 `capture_device_binding = {device_name}`。
+- `focused_context` 契约：`app_name/window_name` 必须来自同一次 capture 的同源上下文快照；`browser_url` 仅可在与该 focused context 校验一致时附带写入；禁止字段级独立查询后混拼。
+- `capture_device_binding` 契约：`device_name` 必须标识本次 capture cycle 中实际被截取的 monitor；它要求 same-cycle coherence，不要求与 `focused_context` 同源。
+- 反承诺（P1）：不承诺 screenshot + AX + URL 查询形成全局原子同瞬时快照；仅承诺 capture-cycle coherence 与 stale rejection。
 - 轻处理：压缩、去重哈希、可选 accessibility 文本快照（仅采集，不推理）。
 - 传输：断点续传、重试、幂等上传。
 - 缓存：本地 spool 与提交位点（offset/checkpoint）。
@@ -244,12 +247,14 @@ def handle_ingest(payload):
 
 ### screenpipe 怎么做
 - accessibility 有文本时优先使用，OCR 作为 fallback（并对 terminal 类 app 做 OCR 偏好）。
-- AX 成功帧：`frames.accessibility_text` = AX 文本，`frames.text_source = 'accessibility'`，**不写 `ocr_text` 行**（`paired_capture.rs:153-154`，`db.rs:1538` 的 `if let Some(...)` 不执行）。
-- AX 失败帧：OCR fallback → 写 `ocr_text` 行，`frames.text_source = 'ocr'`。
+- 最终持久化阶段才决定 `text_source`；raw accessibility 提取成功与最终 `text_source` 归类属于不同层次。
+- AX 成功完成帧：`frames.accessibility_text` = AX 文本，`frames.text_source = 'accessibility'`，**不写 `ocr_text` 行**（`paired_capture.rs:153-154`，`db.rs:1538` 的 `if let Some(...)` 不执行）。
+- AX 失败/空文本完成帧：OCR fallback → 写 `ocr_text` 行，`frames.text_source = 'ocr'`。
 - 独立 `ui_recorder` 树遍历器（每 ~500ms）：写入独立 `accessibility` 表（`db.rs:5287-5311`），与 `paired_capture` 完全解耦。
 
 ### MyRecall-v3 决策（Scheme C，025A）
 - Edge 执行"AX-first + OCR-fallback"（与 screenpipe 完全对齐）。
+- 分阶段适配（MyRecall 特有）：P1-S2b 只验证 raw `accessibility_text/content_hash` 上传质量；P1-S3 才负责最终 `text_source` 判定与分表写入。
 - P1 OCR fallback 引擎固定为 RapidOCR（single-engine policy），不纳入多引擎切换与对比验收。
 - 对关键 app 维护 `ocr_preferred_apps`（P1 初版见 OQ-034：`wezterm`、`iterm`、`terminal`、`alacritty`、`kitty`、`hyper`、`warp`、`ghostty`）。
 - Edge 仅存储原始 OCR text 与 accessibility text，不做索引时 AI 增强（不生成 caption/keywords/fusion_text，不写入 embedding）。
@@ -300,6 +305,10 @@ paired_capture 处理一帧:
 | **AX 完全失败** | 记录错误，尝试 OCR fallback |
 | **text_source 标记** | `accessibility` / `ocr` |
 
+**阶段归属（P1-S2b / P1-S3）**：
+- P1-S2b 负责 capture capability 与 raw handoff correctness：permission denied/revoked/recovered、browser_url stale rejection、Arc deferred、empty-AX no-drop upload。
+- P1-S3 负责 semantic outcome 与 final persistence correctness：AX empty/timeout 的 AX-vs-OCR 判定、`ocr_preferred_apps` 路由、OCR fallback success/failure、`failed` 语义、Scheme C child-row 一致性。
+
 **与 screenpipe 对齐点**：
 - 截图永不阻塞
 - AX-first + OCR-fallback 逻辑完全对齐
@@ -319,6 +328,8 @@ paired_capture 处理一帧:
 ### 验证
 - A/B：AX-first vs OCR-only，在同一数据集比较 Recall@20 与 NDCG@10。
 - P1-S3 Gate：AX 成功帧写入 `accessibility` 表的正确率 = 100%。
+- P1-S2b 的 `content_hash` coverage 不以 `text_source` 为分母，避免把 S3 的完成态语义回灌到 S2b。
+- S2b->S3 handoff 采用显式字段语义：`accessibility_text` key 必带且禁止 `null`；`content_hash` key 必带且允许 `null`；缺 key 属于 contract error。
 
 ### 4.4 索引与存储（Host/Edge 边界）
 
@@ -502,7 +513,7 @@ Content-Type: multipart/form-data
 
 Fields:
   capture_id  string    UUID v7，Host 生成，必填
-  metadata    JSON      CapturePayload（除 image_data 的所有字段；必须包含 `event_ts` 用于 latency 观测）
+  metadata    JSON      CapturePayload（除 image_data 的所有字段；S2b 起必须包含 `accessibility_text` 与 `content_hash`；`accessibility_text` 为 string 且允许 `""`，`content_hash` 为 `sha256:...` 或 `null`）
   file        binary    JPEG 图像（主契约，`image/jpeg`；兼容模式可接收 PNG/WebP，但入库前统一转码为 JPEG）
 
 Response:
@@ -554,6 +565,12 @@ Response:
   - trigger_channel.queue_capacity：触发通道容量（用于背压观测）
   - trigger_channel.collapse_trigger_count：过载折叠累计计数
   - trigger_channel.overflow_drop_count：过载溢出丢弃累计计数
+  - status_sync：状态同步延迟统计（pending→completed 处理延迟）
+    - status_sync_p50/p90/p95/p99：分位延迟（毫秒）
+    - status_sync_sample_count：样本数
+    - window_id：时间窗标识
+    - edge_pid：Edge 进程 PID
+    - broken_window：窗口是否中断（重启等）
 
 背压采样口径（P1-S2a Gate）：
 - `queue_saturation_ratio` 的统计基于 `trigger_channel` 数据，按 1Hz 采样、连续 5 分钟窗口计算。
@@ -609,7 +626,7 @@ P1-S1 的 "processing" 定义为 noop/轻量处理，其目标仅是驱动状态
 - 进程重启/断电/断网恢复后自动续传
 - 幂等依赖 Edge `/v1/ingest` 的 `capture_id` + DB UNIQUE 约束
 - metadata 兼容键：Edge 接受 `app_name/app/active_app` 与 `window_name/window/active_window`，统一写入 `frames.app_name/window_name`
-- 兼容键语义不变：键名可兼容映射，但 `app_name/window_name` 必须保持同源上下文语义；当 window 归属不确定时写 `NULL/None`，不得写错值。
+- 兼容键语义不变：键名可兼容映射，但 `focused_context` 契约不变；`app_name/window_name` 必须保持同源上下文语义；当 window 归属不确定时写 `NULL/None`，不得写错值；`browser_url` 校验失败或 stale 时也必须写 `NULL/None`。
 - WebUI 桥接输出：`/api/memories/latest|recent` 对 `status` 使用大写归一化（`PENDING|PROCESSING|COMPLETED|FAILED`）以避免前端统计口径漂移
 
 **Client 重试策略（P1）**：
@@ -864,7 +881,7 @@ data: {"type":"response","success":true}
   "last_frame_timestamp": "2026-02-26T10:00:00Z",
   "frame_status": "ok",
   "capture_permission_status": "granted",
-  "capture_permission_reason": null,
+  "capture_permission_reason": "granted",
   "last_permission_check_ts": "2026-02-26T10:00:00Z",
   "message": "服务健康/队列正常",
   "queue": {
@@ -880,7 +897,7 @@ data: {"type":"response","success":true}
 - `last_frame_timestamp`：最新一条帧的 capture 时间（来自 `frames.timestamp`，即 `SELECT MAX(timestamp) FROM frames`，UTC ISO8601）；当 `frames` 为空时返回 `null`；不用于 stale 判定
 - `frame_status`：`"ok"` / `"stale"`（超过 5 分钟无新帧入库；判定基于 `frames.ingested_at`，即 `now_utc - SELECT MAX(ingested_at) FROM frames`）/ `"error"`
 - `capture_permission_status`：`"granted"` / `"transient_failure"` / `"denied_or_revoked"` / `"recovering"`
-- `capture_permission_reason`：权限异常原因（例如 `accessibility_denied`、`input_monitoring_denied`、`tcc_transient_failure`）；正常时为 `null`
+- `capture_permission_reason`：权限状态原因；正常时为 `"granted"`，异常时为具体原因（例如 `accessibility_denied`、`input_monitoring_denied`、`tcc_transient_failure`）
 - `last_permission_check_ts`：最近一次权限轮询时间（UTC ISO8601）
 - 权限字段完整性约束：响应 MUST 同时包含 `capture_permission_status`、`capture_permission_reason`、`last_permission_check_ts`
 - `message`：面向 UI 的可读状态文案（P1-S1 推荐值：`服务健康/队列正常`、`等待首帧`、`队列异常`、`数据延迟`、`服务异常`）
@@ -908,7 +925,8 @@ data: {"type":"response","success":true}
   - `denied_or_revoked -> recovering`：检测到权限恢复（首次成功）。
   - `recovering -> granted`：连续成功达到阈值（3 次）。
 - 语义边界：
-  - `accessibility_text` 为空不等于权限丢失；空文本属于数据质量分支（后续 OCR fallback），权限状态仍按权限检测链路判定。
+- `accessibility_text` 为空不等于权限丢失；空文本属于数据质量分支（后续 OCR fallback），权限状态仍按权限检测链路判定。
+- `accessibility_text=""` 表示“无可用 AX 文本”；`content_hash=null` 表示“无 hash-applicable AX 文本”。两者都不等于权限丢失。
 
 ### 统一错误响应格式（020A，不对齐 screenpipe）
 

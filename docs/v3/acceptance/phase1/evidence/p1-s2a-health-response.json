@@ -1,10 +1,10 @@
 {
   "capture_permission_reason": "stale_permission_state",
   "capture_permission_status": "granted",
-  "frame_status": "ok",
-  "last_frame_ingested_at": "2026-03-11T06:02:52.899Z",
-  "last_frame_timestamp": "2026-03-10T12:00:00Z",
-  "last_permission_check_ts": "2026-03-11T06:02:28.354385Z",
+  "frame_status": "stale",
+  "last_frame_ingested_at": null,
+  "last_frame_timestamp": null,
+  "last_permission_check_ts": "2026-03-11T08:54:13.731Z",
   "message": "\u6743\u9650\u72b6\u6001\u9648\u65e7",
   "queue": {
     "failed": 0,

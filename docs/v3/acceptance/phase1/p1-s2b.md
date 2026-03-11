@@ -33,7 +33,7 @@
 - 范围：macOS AXUIElement 树遍历、文本提取、Browser URL 提取、content_hash 计算、权限处理。
 - 目标：验证 AX 文本采集质量与 content_hash 去重效果。
 - 对应 Gate 条件：
-  - `content_hash` 覆盖率 >= 90%（AX 成功帧）
+  - `content_hash` 覆盖率 >= 90%（`ax_hash_eligible`：`TRIM(COALESCE(accessibility_text, '')) <> ''` 的已上传帧）
   - AX 树遍历超时 < 500ms（P95）
   - `inter_write_gap_sec`：Soft KPI（记录 P50/P90/P99）+ Hard Gate（按 `device_name` 分桶，每设备 max <= 45s，样本 >= 100）
 
@@ -45,18 +45,19 @@
   - **max_nodes = 5000**（与 screenpipe 一致）
   - **max_depth = 30**（与 screenpipe 一致）
 - 文本提取（AXValue, AXTitle, AXDescription）
-- Browser URL 提取（AXDocument + AppleScript fallback for Arc）
+- Browser URL 提取（Chrome/Safari/Edge 为 required evidence；Arc 为 AppleScript heuristic sub-scope）
 - `content_hash` 计算（SHA256，精确匹配，与 screenpipe DefaultHasher 行为一致）
 - 权限检测与 TCC 引导（Accessibility 权限）
 - **AX 降级策略**（与 screenpipe 对齐）：
   - 截图始终写入磁盘（永不阻塞）
   - AX 树遍历超时保护：500ms，超时后继续处理已获取部分
-  - AX 返回有文本 → 使用 AX 文本，跳过 OCR
-  - AX 返回空文本/失败 → 执行 OCR fallback
-  - text_source 字段标记：accessibility / ocr
+  - AX 返回有文本 → 上传 raw AX 文本，供 S3 直接判定为 `accessibility`
+  - AX 返回空文本/失败 → 仍上传 raw AX 结果，供 S3 执行 OCR fallback 判定
+  - `text_source` 最终标记：由 S3 处理阶段判定（S2b 不负责）
   - 语义边界（强制）：
-    - `AX timeout / AX empty` 属于数据质量分支，按 AX->OCR fallback 处理。
+    - `AX timeout / AX empty` 的最终语义归属 S3；S2b 仅负责 raw handoff 不丢帧、字段语义正确。
     - `permission denied/revoked` 属于能力失效分支，必须进入权限降级流程，不得仅按 OCR fallback 吞掉异常。
+    - `focused_context = {app_name, window_name, browser_url}`；`capture_device_binding = {device_name}`。
     - `app_name/window_name` 必须来自同一次 capture 的同源上下文快照（最终以 AX snapshot 为准）；禁止对 app/window 分别二次查询后拼接。
     - 若同帧无法确认 window 归属，`window_name` 必须置 `NULL/None`；禁止写入明显错误窗口（原则：**Better None than wrong window**）。
   - **Electron 异步树构建**：首次遍历可能返回空文本（Chromium 异步构建 DOM 树），下次事件触发时自然获得完整文本；空文本帧由 OCR fallback 兜底
@@ -92,15 +93,20 @@
 - OCR fallback（属于 P1-S3；P1 策略固定为 RapidOCR，不做多引擎对比）
 - `/v1/search` 与 `/v1/chat` 功能完成（分别属于 P1-S4/P1-S5+ 范围）
 - Windows/Linux AX 采集（属于 P2）
-- Arc Browser AppleScript URL 提取（若 S2b Day 3 仍未通过 Gate，降级跳过）
+- Arc Browser AppleScript URL 提取（timeboxed optional sub-scope；若 S2b Day 3 仍不稳定，则 defer，不影响 S2b 主 Gate）
 
 ### 1.0c S2b -> S3 handoff contract（进入 P1-S3 前冻结）
 
 - S2b 仅负责采集与上传，不负责 `text_source` 判定，不负责 `accessibility/ocr_text` 分表写入。
-- 上传契约：`POST /v1/ingest` 的 CapturePayload 必须包含 `accessibility_text` 字段（可为空字符串）与 `content_hash` 字段（AX 成功帧按 S2b Gate 口径覆盖）。
+- 上传契约：`POST /v1/ingest` 的 CapturePayload 必须包含 `accessibility_text` 与 `content_hash` 两个字段：`accessibility_text` 必须为 string（允许 `""`，禁止 `null`）；`content_hash` 必须存在且值为 `sha256:...` 或 `null`（禁止 `""`）。
 - 空 AX 文本语义：当 AX 结果为空（含仅空白）时，S2b 必须仍然上传该帧，不得因空 AX 丢弃 capture；该帧由 S3 执行 OCR fallback。
+- 空 AX 上传语义：空 AX 帧上传时必须满足 `accessibility_text=""` 且 `content_hash=null`。
 - Handoff 可审计性：S2b 上传的原始 `accessibility_text` 必须可追溯，S3 仅可基于 `TRIM(COALESCE(accessibility_text, ''))` 做空值判定，不得要求 S2b 承担处理阶段语义。
+- S2b Gate 口径：`content_hash` 覆盖率仅基于 `ax_hash_eligible = TRIM(COALESCE(accessibility_text, '')) <> ''` 的已上传帧；不得以 `frames.text_source` 作为分母过滤条件。
 - 上下文一致性契约：CapturePayload 中 `app_name/window_name`（或兼容键映射后的字段）必须来自同一时刻同一来源上下文；`window_name` 不可与 `app_name` 跨来源拼接。
+- focused-context 契约：`app_name/window_name/browser_url` 构成同一 capture 的 focused-context bundle；允许整体缺失/部分为 `None`，但不允许字段级跨来源混拼。
+- device-binding 契约：`device_name` 表示实际被截取的 monitor，要求与本次 capture cycle 一致，不要求与 `focused_context` 同源。
+- `browser_url` 仅可在与 `focused_context` 交叉校验一致时写入；校验失败或 stale 时必须置 `None`（原则：**Better None than wrong URL**）。
 - 一致性验收口径：新增 `app_window_mismatch_rate`（抽样人工核验 + 自动规则）并作为 S2b 观测指标，目标接近 0；出现不确定样本时按 `window_name=None` 处理，不计错填。
 
 ### 1.0d Input dependencies from stable P1-S2a contracts
@@ -109,6 +115,7 @@
 - `capture_trigger` 字段赋值逻辑（由 P1-S2a 实现）
 - 去抖门控（`min_capture_interval_ms=1000`，由 P1-S2a 实现，1 Hz 安全起点）
 - 性能监控框架（`capture_latency_p95`，由 P1-S2a 引入）
+- 队列安全边界（由 P1-S2a 验证）：`queue_saturation_ratio <= 10%`、`overflow_drop_count = 0`；`collapse_trigger_count` 仅保留为观测指标
 - **Host 端 dedup 判定**（P1-S2b 新增）：
   - Host 在 capture 前执行 dedup 判定，避免重复图片上传
   - dedup 条件：非 idle/manual + 距上次写入 < 30s + content_hash 相同
@@ -120,7 +127,7 @@
 - 目标：对齐 screenpipe 的“全局 trigger 广播 + 每 monitor 独立 capture loop”语义，消除触发语义与采样语义耦合。
 - 设计约束：event source 仅发 trigger（不绑定 device）；`device_name` 由 monitor worker 在消费 trigger 时确定。
 - `primary_monitor_only` 语义收敛：仅控制启用的 monitor worker 集合，不在 click/app_switch 事件源中做分叉过滤。
-- 元数据口径：`app_name/window_name` 表示 focused context，`device_name` 表示实际采样 monitor；三者须在同一 capture 周期内组装。
+- 元数据口径：`focused_context = {app_name, window_name, browser_url}` 表示 focused UI 上下文；`device_name` 表示实际采样 monitor；二者须在同一 capture 周期内组装，但不承诺同瞬时原子快照。
 - 验收增量（S2b）：新增多屏一致性场景（主屏+副屏）并验证 `trigger`、`device_name`、截图归属的可解释性与稳定性。
 
 ### 1.1 HTTP 契约 delta（本阶段，scope=对外 HTTP）
@@ -138,7 +145,7 @@
 - 权限要求：Accessibility 权限（System Preferences → Privacy & Security → Accessibility）
 - 配置与数据集：
   - AX 树遍历测试场景（Chrome, Safari, VS Code, Terminal, Finder 等）
-  - Browser URL 测试场景（Chrome, Safari, Arc, Firefox）
+- Browser URL 测试场景（required: Chrome, Safari, Edge；conditional: Arc）
   - 高频“内容不变”压测脚本（app switch/click，5 分钟）
   - 采集参数基线：AX 树遍历超时 `500ms`、深度限制 `50`、节点限制 `5000`
   - 依赖版本：记录 AX 模块版本
@@ -171,26 +178,44 @@
    - Terminal（终端文本）
    - Finder（文件名）
 4. 抽样核验 AX 文本字段完整性：
-    - `accessibility_text` 非空
+    - 非空 AX 样本：`accessibility_text` 非空
     - `browser_url` 正确（浏览器场景）
     - `content_hash` 计算正确
-   - 边界样本：AX 空文本帧在 ingest 可见（不得丢帧），并在后续 S3 验收中可被 OCR fallback 消化
+   - 边界样本：AX 空文本帧在 ingest 可见（不得丢帧），不计入 `content_hash` coverage 分母，并在后续 S3 验收中可被 OCR fallback 消化
 5. 执行高频“内容不变”压测（app switch/click，5 分钟），记录窗口元信息，并校验 `inter_write_gap_sec`（Soft KPI + Hard Gate：按 `device_name` 分桶，每设备 max <= 45s，样本 >= 100；`broken_window=true` 仅观测不判定）。
 6. 测量 AX 树遍历延迟：
    - 记录每次遍历耗时
    - 统计 P95 是否 < 500ms
 7. 执行 SQL 校验：
-   - `content_hash` 覆盖率：
-     ```sql
-     SELECT
-       COUNT(*) AS total,
-       SUM(CASE WHEN content_hash IS NOT NULL THEN 1 ELSE 0 END) AS with_hash,
-       ROUND(SUM(CASE WHEN content_hash IS NOT NULL THEN 1 ELSE 0 END) * 100.0 / COUNT(*), 2) AS coverage_pct
-     FROM frames
-     WHERE text_source = 'accessibility'
-       AND timestamp >= datetime('now', '-5 minutes');
-     ```
-     判定：`coverage_pct >= 90%`
+    - `content_hash` 覆盖率（`ax_hash_eligible`）：
+      ```sql
+      SELECT
+        COUNT(*) AS ax_hash_eligible,
+        SUM(
+          CASE
+            WHEN content_hash IS NOT NULL
+             AND LENGTH(content_hash) = 71
+             AND SUBSTR(content_hash, 1, 7) = 'sha256:'
+            THEN 1 ELSE 0
+          END
+        ) AS with_hash,
+        ROUND(
+          SUM(
+            CASE
+              WHEN content_hash IS NOT NULL
+               AND LENGTH(content_hash) = 71
+               AND SUBSTR(content_hash, 1, 7) = 'sha256:'
+              THEN 1 ELSE 0
+            END
+          ) * 100.0 / COUNT(*),
+          2
+        ) AS coverage_pct
+      FROM frames
+      WHERE TRIM(COALESCE(accessibility_text, '')) <> ''
+        AND timestamp >= datetime('now', '-5 minutes');
+      ```
+      判定：`coverage_pct >= 90%`
+      说明：空 AX 文本帧必须上传，但不进入本指标分母。
     - `inter_write_gap_sec`（Soft KPI + Hard Gate）：
       - Hard Gate: 按 `device_name` 分桶判定，每设备 `max <= 45s`（每设备样本 >= 100）
       - Soft KPI（non-blocking）：记录 P50/P90/P99 分布
@@ -220,9 +245,9 @@
 8. 抽样校验 Browser URL 提取：
    - Chrome: AXDocument 属性
    - Safari: AXDocument 属性
-   - Arc: AppleScript fallback
+   - Arc: AppleScript fallback（仅当 Arc support 未 defer 时作为 conditional evidence）
    - 判定：URL 以 `http://` 或 `https://` 开头
-9. **Arc Stale URL 检测测试**（关键，对齐 screenpipe）：
+9. **Arc Stale URL 检测测试**（conditional evidence，对齐 screenpipe）：
    - 在 Arc 中打开两个 tab（Tab A: google.com, Tab B: github.com）
    - 快速切换 tab（< 200ms 间隔）并触发 capture
    - 验证：browser_url 为 None 的帧比例合理（stale 被正确拒绝）
@@ -233,7 +258,8 @@
 11. **Browser URL 统计验证**：
     - 运行 5 分钟多浏览器场景
     - 验证 `browser_url_*` 计数器正确累加
-    - 计算成功率 >= 95%
+    - required browser success denominator 仅统计 Chrome/Safari/Edge
+    - Arc 若已实现则单独记录为 conditional evidence；若 deferred，不计入 required success denominator，也不视为回归
 12. 权限恢复验证（强制）：
     - 运行中撤销 Accessibility 权限，验证系统进入权限降级状态；
     - 重新授权后验证状态进入 `recovering` 并最终回到 `granted`；
@@ -285,7 +311,7 @@
 ### 4.1 数值指标
 
 - AX 树遍历延迟 P95（目标 < 500ms）：
-- `content_hash` 覆盖率（目标 >= 90%）：
+- `content_hash` 覆盖率（目标 >= 90%，分母=`ax_hash_eligible`）：
 - `inter_write_gap_sec`（Soft KPI + Hard Gate）：
   - Hard Gate: 按 `device_name` 分桶，每设备 max <= 45s（样本 >= 100）
   - Soft KPI: 记录 P50/P90/P99 分布
@@ -305,8 +331,8 @@
 
 ### 4.3 完善度指标（强制）
 
-- 异常与降级场景通过率（目标 >= 95%）：
-- 权限处理场景通过率（目标 100%）：
+- capability/context 异常与降级场景通过率（目标 >= 95%）：覆盖 `browser_url_rejected_stale`、empty-AX no-drop handoff、Arc deferred 记录与上下文一致性。
+- 权限处理场景通过率（目标 100%）：覆盖 `startup_denied / revoked_mid_run / restored_after_denied`，并在 S2b Exit 前关闭。
 - 可观测性检查项完成率（目标 100%，日志/指标/错误码）：
 - 文档与验收记录完整率（目标 100%）：
 
@@ -331,7 +357,7 @@
 - 后续动作：若 AX 遍历超时，调整深度限制或节点限制；若 Browser URL 失败，增加更多 fallback 策略。
 - 后续动作：
   - 若 500ms 超时仍不够，提高到 1000ms 并记录 CPU 影响。
-  - 若 Day 3 仍未通过 Gate，跳过 Arc Browser 支持，专注 Chrome/Safari/Edge。
+  - 若 Day 3 仍不稳定，defer Arc Browser 支持，专注 Chrome/Safari/Edge；该动作属于时间盒 scope-cut fallback，不构成 S2b Gate 分支。
 - **Electron 空文本处理**（对齐 screenpipe）：不重试，下次事件触发自然获得完整文本；空文本帧由 OCR fallback 兜底。
 
 ## 7. Rollback Rule

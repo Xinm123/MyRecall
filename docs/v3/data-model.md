@@ -78,6 +78,8 @@ CREATE INDEX idx_frames_status        ON frames(status)
     WHERE status IN ('pending', 'processing', 'failed');
 CREATE INDEX idx_frames_content_hash  ON frames(content_hash)
     WHERE content_hash IS NOT NULL;
+CREATE INDEX idx_frames_event_ts      ON frames(event_ts)
+    WHERE event_ts IS NOT NULL;
 ```
 
 #### Table 2: ocr_text（对齐 screenpipe ocr_text，仅 OCR-fallback 帧写入）
@@ -262,11 +264,17 @@ CREATE INDEX idx_accessibility_focused    ON accessibility(focused)
 - `text_source='accessibility'` 的完成帧必须满足：`accessibility.frame_id = frames.id` 存在，且不存在该 `frame_id` 的 `ocr_text` 行。
 - `text_source='ocr'` 的完成帧必须满足：存在该 `frame_id` 的 `ocr_text` 行，且 paired_capture 路径下不存在对应 `accessibility` 行。
 - 当 AX 不可用且 OCR 失败时，帧状态必须为 `failed`；不得将空/不可用 AX 文本误标为 `text_source='accessibility'`。
+- 上述 `text_source` / 分表语义均属于 P1-S3 完成态契约；P1-S2b 的 `content_hash` coverage 不得以这些终态字段作为分母。
 
 **AX 不可用（ax_unusable）定义**：
 - AX 遍历报错；或
 - AX 超时且已收集文本归一化后为空；或
 - AX 成功返回但 `TRIM(COALESCE(accessibility_text, '')) = ''`。
+
+**S2b raw coverage 口径（P1-S2b）**：
+- `ax_hash_eligible = TRIM(COALESCE(accessibility_text, '')) <> ''` 的已上传帧。
+- `content_hash` coverage 的分母仅使用 `ax_hash_eligible`，不使用 `frames.text_source`。
+- 空 AX 文本帧必须上传并可追溯，但不进入该 coverage 分母。
 
 **P0 修复说明**：screenpipe `search_accessibility()` 不接受 `focused` 参数（`db.rs:3408-3416`），`focused`/`browser_url` 存在时强制降级到 `content_type=ocr`（`db.rs:1870-1872`）。在 AX-first 模式下 ~90%+ 帧无 `ocr_text` 行，`search_ocr()` 用 `INNER JOIN ocr_text` 会漏掉这些帧。v3 通过在 `accessibility` 表增加 `focused` 列并让 `search_accessibility()` 支持过滤，修复此限制。
 
@@ -609,6 +617,7 @@ total = count_search_ocr(params) + count_search_accessibility(params)
 | 字段 | 表 | 用途 |
 |------|-----|------|
 | `capture_id` | frames | UUID v7 幂等去重键（Host→Edge 传输） |
+| `event_ts` | frames | 触发时刻（Host 端 UTC ISO8601），用于 `capture_latency_ms = (ingested_at - event_ts) * 1000` 计算 |
 | `image_size_bytes` | frames | 传输与存储管理 |
 | `ingested_at` | frames | 入库时间戳（Edge receipt time）：用于 TTS 测量、`GET /v1/health` 的 stale 判定、以及 `oldest_pending_ingested_at` 观测口径 |
 | `status` | frames | 处理队列状态机（PENDING→PROCESSING→COMPLETED/FAILED） |
@@ -625,6 +634,7 @@ total = count_search_ocr(params) + count_search_accessibility(params)
 |---|---|---:|---|---|
 | `min_capture_interval_ms` | ms | 1000 | 全触发共享最小间隔去抖（有意偏离：screenpipe Performance 200ms；P1 采用 Python 安全起点） | — |
 | `idle_capture_interval_ms` | ms | 30000 | 无事件时触发 `idle` fallback 的最大空窗 | — |
+| `trigger_queue_capacity` | — | 64 | 触发事件通道容量（有界队列）；与 screenpipe 对齐 | 环境变量 `OPENRECALL_TRIGGER_QUEUE_CAPACITY` 可覆盖 |
 | `OPENRECALL_CAPTURE_INTERVAL` | s | legacy | 兼容输入，不作为 P1 主触发机制定义 | 仅当未显式设置 `idle_capture_interval_ms` 时，映射为 `idle_capture_interval_ms = OPENRECALL_CAPTURE_INTERVAL * 1000` |
 
 - 优先级：`idle_capture_interval_ms`（显式） > `OPENRECALL_CAPTURE_INTERVAL` 映射 > `idle_capture_interval_ms` 默认值 `30000`。
@@ -632,18 +642,24 @@ total = count_search_ocr(params) + count_search_accessibility(params)
 
 ```python
 class CapturePayload(BaseModel):
-    """Host → Edge 上传的单条 capture 数据。"""
+    """Host → Edge 上传的单条 capture 数据。
+    
+    注：此为 API 契约层定义。Host 端内部 metadata 结构略有不同：
+    - API payload 的 `timestamp` 类型为 float（UNIX epoch 秒）
+    - Host 端 metadata 的 `timestamp` 为 ISO8601 字符串（由 `utc_now_iso()` 生成）
+    - 服务端在 `claim_frame()` 时将 ISO8601 字符串写入 `frames.timestamp`
+    """
     capture_id: str                    # UUID v7, Host 生成
     event_ts: Optional[str] = None     # 触发时刻（UTC ISO8601），观测字段；缺失不阻断 ingest
-    timestamp: float                   # UNIX epoch 秒
+    timestamp: float                   # UNIX epoch 秒（API 契约）；Host 端实际使用 ISO8601 字符串
     app_name: Optional[str] = None
     window_name: Optional[str] = None
     browser_url: Optional[str] = None
     device_name: str = "monitor_0"  # 屏幕标识，格式: monitor_{id}
     focused: Optional[bool] = True
     capture_trigger: str  # P1-S2a+ 新上报必填: "idle" | "app_switch" | "manual" | "click"；P2+ 追加 "window_focus" | "typing_pause" | "scroll_stop" | "clipboard" | "visual_change"
-    accessibility_text: Optional[str] = None
-    content_hash: Optional[str] = None    # sha256:hex，Host dedup 判定后上传
+    accessibility_text: str = ""
+    content_hash: Optional[str] = None    # required key；值为 sha256:hex 或 null
     simhash: Optional[int] = None         # 感知哈希，用于近似重复检测
     # image_data: 通过 multipart/form-data 的 file 字段传输
 ```
@@ -660,9 +676,24 @@ class CapturePayload(BaseModel):
 | `window_name` | string｜null | ❌ | 最长 512 字符 |
 | `browser_url` | string｜null | ❌ | 若非 null 则必须为合法 URL；最长 2048 字符 |
 | `capture_trigger` | string | ✅（P1-S2a+ 新上报） | P1 枚举：`"idle"` / `"app_switch"` / `"manual"` / `"click"`；P2+ 追加：`"window_focus"` / `"typing_pause"` / `"scroll_stop"` / `"clipboard"` / `"visual_change"`；`window_focus` 按 screenpipe `capture_window_focus` 语义对齐（默认关闭，高频时按需开启）；缺失/null/非法值→ `INVALID_PARAMS` |
-| `content_hash` | string｜null | ❌ | 若非 null 则必须为 `sha256:` 前缀 + 64 位十六进制 |
+| `accessibility_text` | string | ✅ | required key；禁止 `null`；允许 `""`，其语义为“该帧已上传，但无可用 AX 文本” |
+| `content_hash` | string｜null | ✅ | required key；允许 `null`；若非 null 则必须为 `sha256:` 前缀 + 64 位十六进制；禁止 `""` |
 | `simhash` | int｜null | ❌ | 若非 null 则必须为非负 64 位整数 |
 | `image_data` | multipart file | ✅ | JPEG（`image/jpeg`）主契约；兼容模式可接收 PNG/WebP，但入库前统一转码为 JPEG；最大 10MB；缺失→ `INVALID_PARAMS` |
+
+**S2b handoff 字段语义（强制）**：
+- `accessibility_text`：key 必须出现，值必须为 string；允许 `""`，不允许 `null`。
+- `content_hash`：key 必须出现；值为 `sha256:[0-9a-f]{64}` 或 `null`；不允许 `""`。
+- 缺少任一 key 均视为 ingest contract error（`INVALID_PARAMS`）。
+- `accessibility_text=""` 表示“该帧已上传，但无可用 AX 文本”；`content_hash=null` 表示“该帧不属于 hash-applicable 样本”。
+
+**上下文字段一致性契约（P1-S2b+）**：
+- `focused_context = {app_name, window_name, browser_url}`：表示同一 capture 的 focused UI 上下文。
+- `capture_device_binding = {device_name}`：表示该次 capture cycle 中实际被截取的 monitor。
+- `app_name/window_name` 若提供，必须来自同一个 focused-context source；禁止字段级混拼。
+- `browser_url` 若提供，必须与该 `focused_context` 校验一致；若无法确认一致性或命中 stale 检测，必须写 `null`。
+- `device_name` 必须与实际截图 monitor 一致；它要求 same-cycle coherence，不承担同源 focused-context 语义。
+- 不确定时遵循：`Better None than wrong window` / `Better None than wrong URL`。
 
 **图片格式语义（P1）**：
 - 主采集/主读取链路统一 JPEG：`POST /v1/ingest` 主契约 `image/jpeg`，`frames.snapshot_path` 持久化为 JPEG，`GET /v1/frames/:frame_id` 返回 `image/jpeg`。

@@ -1,7 +1,7 @@
 ---
 status: active
 owner: pyw
-last_updated: 2026-03-09
+last_updated: 2026-03-11
 depends_on: []
 references:
   - spec.md
@@ -48,6 +48,9 @@ references:
 | OQ-034 | P1 | `ocr_preferred_apps` P1 初版白名单 | A 终端类最小名单（推荐）/ B 空名单（全量AX优先）/ C 扩大到更多应用 | A（已决，2026-03-09） | 对齐 screenpipe `paired_capture` 终端类 OCR 偏好，优先保证 terminal 场景可读性与框选质量，控制 P1 风险范围 | 名单过宽会抬高 OCR 开销；名单过窄会导致 terminal 场景质量下降 | 2026-03-09 |
 | OQ-035 | P1 | OCR 引擎策略（P1） | A RapidOCR 单引擎（推荐）/ B 多引擎可切换 | A（已决，2026-03-09） | 降低实现与验收复杂度；统一 OCR 指标口径；保持 AX-first + OCR-fallback 主路径不变 | 失去跨引擎对照能力，多语言/极端场景需在 P2+ 再评估 | 2026-03-09 |
 | OQ-036 | P1 | macOS 权限状态机与恢复闭环口径 | A 对齐 screenpipe（2 fail / 3 success / 300s cooldown / 10s poll，推荐）/ B 简化为一次失败即判定 | A（已决，2026-03-09） | 解决 TCC 瞬态抖动导致的误判；保证 denied/revoked/recovered 有一致可观测语义 | 若不收敛，Gate 易出现“服务存活但采集失效”误判 | 2026-03-09 |
+| OQ-037 | P1 | S2a 背压 Gate 是否保留 `collapse_trigger_count >= 1` | A 移出 Hard Gate、降级为观测（推荐）/ B 保留 Hard Gate | A（已决，2026-03-11） | 过载窗口未命中 collapse 时，`=0` 不应制造假失败；背压放行以 saturation/overflow 为准 | 若无额外观测，保护路径是否命中过的可见性下降 | 2026-03-11 |
+| OQ-038 | P1 | Arc Browser AppleScript URL 提取在 S2b 的阶段语义 | A timeboxed optional heuristic sub-scope（推荐）/ B 正式 Gate 分支 | A（已决，2026-03-11） | 运行时行为对齐 screenpipe，但 Day 3 defer 属于 MyRecall 的 staged-delivery 适配 | Arc 若长期 deferred，需要后续阶段重新规划兼容目标 | 2026-03-11 |
+| OQ-039 | P1 | S2b / S3 的 failure-class ownership | A 按 handoff 边界分责（推荐）/ B 混合共享 | A（已决，2026-03-11） | S2b 负责 capability/context/raw handoff；S3 负责 semantic outcome/final persistence | 若文档不收口，阶段验收会重复或遗漏同类故障 | 2026-03-11 |
 
 ## 需实验清单
 
@@ -138,6 +141,9 @@ references:
     - **Scheme C 终态约束**：`text_source='accessibility'` 仅对应 `accessibility` 行；`text_source='ocr'` 仅对应 `ocr_text` 行；禁止同帧双写。
     - **失败语义**：AX 不可用且 OCR 失败时，帧状态必须为 `failed`，不得误标 `accessibility`。
     - **验收落点**：以 [spec.md](spec.md)（AX/OCR 决策契约）、[data-model.md](data-model.md)（终态不变量）、`acceptance/phase1/p1-s3.md`（边界用例）为执行依据。
+    - **阶段边界补充**：P1-S2b 的 `content_hash` coverage 仅基于 raw `accessibility_text` 非空样本，不依赖 `text_source`。
+    - **字段语义补充**：`accessibility_text` 在 S2b->S3 handoff 中必须为 string（允许 `""`，禁止 `null`）；`content_hash` key 必须存在，但值可为 `null`（禁止 `""`）。
+    - **上下文契约补充**：`focused_context = {app_name, window_name, browser_url}`，`capture_device_binding = {device_name}`；P1 仅承诺 capture-cycle coherence，不承诺截图/AX/URL 的全局原子同瞬时快照；不确定时按 `Better None than wrong` 置 `None`，禁止字段级混拼。
 
 35. OQ-034 = A：`ocr_preferred_apps` 采用 P1 初版“终端类最小名单”，匹配规则为 `app_name` 小写后子串包含。
     - **初版名单**：`wezterm`、`iterm`、`terminal`、`alacritty`、`kitty`、`hyper`、`warp`、`ghostty`。
@@ -155,3 +161,11 @@ references:
     - **状态机**：`granted/transient_failure/denied_or_revoked/recovering`。
     - **语义边界**：`AX empty/timeout` 归数据质量分支（OCR fallback）；`permission denied/revoked` 归能力失效分支（权限降级流）。
     - **验收要求**：必须覆盖 startup denied / mid-run revoked / restored 三类场景，并在 `/v1/health` 暴露权限状态。
+
+### 已拍板结论（2026-03-11）
+
+38. OQ-037 = A：`collapse_trigger_count` 从 P1-S2a Exit Hard Gate 移出，降级为观测/调试指标；S2a 背压放行仅以 `queue_saturation_ratio <= 10%` 与 `overflow_drop_count = 0` 为准。若权限异常闭环未在 S2a 执行，必须在 S2b Exit 前关闭，不允许长期 `N/A` 悬置。
+
+39. OQ-038 = A：Arc Browser AppleScript URL 提取在 P1-S2b 中定义为 timeboxed optional heuristic sub-scope，而非正式 Gate 分支。若 Day 3 仍不稳定，则 defer Arc-specific support；S2b required browser evidence 仍以 Chrome/Safari/Edge 为准，Arc stale-url 测试仅作为 conditional evidence。
+
+40. OQ-039 = A：S2b / S3 的 failure-class ownership 以 handoff 边界划分——S2b 负责 capability / frozen metadata / raw handoff correctness（permission denied/revoked/recovered、browser_url stale、Arc deferred、empty-AX no-drop）；S3 负责 semantic outcome / final persistence correctness（AX empty、AX timeout、ocr_preferred_apps、OCR fallback success/failure、failed 语义）。

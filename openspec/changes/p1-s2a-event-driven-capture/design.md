@@ -47,11 +47,26 @@ screenpipe 的对应方案（`crates/screenpipe-server/src/event_driven_capture.
 - `pynput`：高层封装，无法获取 app_switch 事件、无法控制 event mask。❌ 放弃。
 - `pyautogui`：无事件监听能力。❌ 放弃。
 
-**实现路径**：新模块 `openrecall/client/events/macos.py`，入口函数：
+**实现路径**：新模块 `openrecall/client/events/macos.py`，封装为类：
 
 ```python
-def start_event_tap(callback: Callable[[CaptureTrigger], None]) -> None:
-    """启动 CGEventTap 监听，将事件转换为 CaptureTrigger 回调。"""
+class MacOSEventTap:
+    """macOS CGEventTap 封装，监听鼠标点击事件并转换为 TriggerEvent 回调。"""
+    
+    def __init__(
+        self,
+        callback: Callable[[TriggerEvent], None],
+        monitor_lookup: Callable[[float, float], MonitorDescriptor | None],
+    ) -> None:
+        """初始化事件监听器。
+        
+        Args:
+            callback: 事件回调函数，接收 TriggerEvent 参数
+            monitor_lookup: 根据屏幕坐标查找对应 monitor 的函数
+        """
+    
+    def start(self) -> None:
+        """启动 CGEventTap 监听（在独立线程中运行 CFRunLoop）。"""
 ```
 
 ### D2：触发通道架构 — 有界 trigger_event_queue + 折叠
@@ -113,17 +128,37 @@ class TriggerDebouncer:
 - 热插拔/重排后，若 OS 稳定标识不变，则 `device_name` 不得变化；若稳定标识变化，必须产生日志事件并重建分区状态。
 - 事件源与截图源必须通过同一 `device_name` 关联，禁止跨设备配对写入。
 
-### D4：idle fallback — 超时触发 + 定时器
+### D4：idle fallback — 超时触发 + 阻塞队列
 
-**选择**：在事件驱动主线程中，维护 `_last_trigger_time`。当 `now - _last_trigger_time > idle_capture_interval_ms` 时触发 `capture_trigger=idle` capture。
+**选择**：在事件驱动主线程中，使用 `queue.Queue.get(timeout=idle_capture_interval_ms/1000)` 阻塞等待触发事件。当超时抛出 `queue.Empty` 异常时，生成 `capture_trigger=idle` 的触发事件并重新入队。
 
 **理由**：
 - screenpipe 的 idle fallback 与事件循环集成（当前实现默认 `idle_capture_interval_ms=30000`），触发条件基于超时窗口。
 - MyRecall idle 间隔 30s（对齐 screenpipe 当前默认值），作为无事件时的保底采集。
 - 去除用户活跃判定可避免语义分叉，确保 Gate 样本可重复构造。
+- 使用 `queue.Queue.get(timeout)` 的阻塞超时机制，比主动维护 `_last_trigger_time` 计时器更简洁，且天然与事件驱动架构集成。
+
+**实现路径**（`recorder.py`）：
+
+```python
+def _wait_for_trigger(self, timeout_seconds: float, fallback_device_name: str) -> TriggerEvent:
+    while True:
+        try:
+            return self._trigger_channel.get(timeout=timeout_seconds)
+        except queue.Empty:
+            # 超时后生成 idle 触发事件
+            idle_event = TriggerEvent(
+                capture_trigger=CaptureTrigger.IDLE,
+                device_name=fallback_device_name,
+                event_ts=utc_now_iso(),
+            )
+            # 重新入队（经过去抖门控）
+            _ = self._emit_trigger(idle_event)
+            continue
+```
 
 **语义边界（锁定）**：
-- P1-S2a 的 idle 触发采用“**无触发超时优先**”语义：只要超过 `idle_capture_interval_ms` 且未发生其他触发，就应产生 `capture_trigger=idle`。
+- P1-S2a 的 idle 触发采用"**无触发超时优先**"语义：只要超过 `idle_capture_interval_ms` 且未发生其他触发，就应产生 `capture_trigger=idle`。
 - S2a 不引入 `is_user_active()` 分支；idle fallback 不得依赖任何用户活跃判定。
 
 **screenpipe 对齐**：aligned — 同为 idle timer fallback，默认间隔对齐（30s）。
@@ -140,13 +175,25 @@ class TriggerDebouncer:
 **理由**：
 - 借鉴 screenpipe 权限检测入口与健康态判定思想，并在 MyRecall 侧扩展为四态 FSM（`granted/transient_failure/denied_or_revoked/recovering`）。
 - pyobjc 可调用 `AXIsProcessTrusted()` 检测 Accessibility 权限、`CGPreflightScreenCaptureAccess()` 检测 Screen Recording 权限。
-- Input Monitoring 通过事件 tap 创建/启用结果与回调存活性联合判定；异常原因需落为 `input_monitoring_denied` 或 `tcc_transient_failure`。
 - 连续 2 次失败才触发（防 TCC 数据库瞬态抖动误判），连续 3 次成功才恢复，5 分钟冷却期防弹窗风暴。
+
+**权限检测范围（P1 vs P2）**：
+
+| 权限 | 检测方法 | P1 状态 | 说明 |
+|------|---------|---------|------|
+| Accessibility | `AXIsProcessTrusted()` | ✅ 已实现 | 读取 UI 元素结构 |
+| Screen Recording | `CGPreflightScreenCaptureAccess()` | ✅ 已实现 | 截图、屏幕内容捕获 |
+| Input Monitoring | `CGEventTapCreate()` 返回值 | 🔜 P2 实现 | 监听键盘/鼠标事件（click 触发依赖） |
+
+**P1 有意简化**：
+- Input Monitoring 权限缺失时，click 触发静默失效（`CGEventTapCreate` 返回 `NULL`），不影响 idle/app_switch/manual 触发。
+- 用户可通过 `/v1/health` 看到的 `capture_permission_status` 仅反映 Accessibility + Screen Recording 状态。
+- P2 将引入完整的 Input Monitoring 检测与 `input_monitoring_denied` 原因码，并通过回调机制将 `MacOSEventTap` 的创建失败状态同步到权限状态机。
 
 **阈值来源（锁定）**：
 - `REQUIRED_CONSECUTIVE_FAILURES=2`、`REQUIRED_CONSECUTIVE_SUCCESSES=3`、`EMIT_COOLDOWN_SEC=300` 为 MyRecall 的工程化阈值选择，不宣称与 screenpipe 一一对应。
 
-**screenpipe 对齐**：partially aligned — 复用相同权限检测入口与健康态约束方向；四态 FSM 与阈值策略为 MyRecall 扩展。
+**screenpipe 对齐**：partially aligned — 复用相同权限检测入口与健康态约束方向；四态 FSM 与阈值策略为 MyRecall 扩展；Input Monitoring 检测推迟 P2。
 
 **状态转移（锁定）**：
 - `granted -> transient_failure`：单次检测失败。

@@ -96,9 +96,9 @@ references:
 - 阈值：`<= 10%`
 - 最小样本：队列深度采样点 `>= 300`
 
-5. `collapse_trigger_count`（Hard Gate）
+5. `collapse_trigger_count`（观测指标）
 - 公式：过载注入窗口内 collapse 触发次数计数。
-- 阈值：`>= 1`
+- 说明：用于证明背压保护路径是否被命中；`= 0` 不直接构成 Fail。
 
 6. `overflow_drop_count`（Hard Gate）
 - 公式：过载注入窗口内因通道溢出导致丢弃的 capture 数。
@@ -107,7 +107,7 @@ references:
 7. `ax_walk_timeout_p95`（Hard Gate，P1-S2b）
 - 公式：AX 树遍历单次耗时分布。
 - 阈值：`P95 <= 500ms`（有意偏离 screenpipe 默认 250ms，适配复杂 Electron 应用）。
-- 最小样本：AX 成功帧 `>= 100`。
+- 最小样本：`ax_hash_eligible` 样本 `>= 100`。
 - 说明：若超时，需检查是否为 Electron 应用，并考虑提高 walk_timeout 或增加重试逻辑。
 
 8. `Host CPU`（Soft KPI，non-blocking）

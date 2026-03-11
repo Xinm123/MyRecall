@@ -210,6 +210,10 @@ Restart Host when:
 
 目标：验证权限拒绝/撤销/恢复场景在运行态可观测、可恢复、可判定。
 
+阶段要求：若 S2a 验收未执行本 drill，不得长期以 `N/A` 悬置；必须在 S2b Exit 前完成并补记证据。
+
+归属说明：本 drill 的证据用于关闭 S2b 的 capability/permission Gate；S3 不重复承担 permission capability 验收，只继承其前提状态。
+
 ### 10.1 演练参数（固定）
 
 - `REQUIRED_CONSECUTIVE_FAILURES = 2`

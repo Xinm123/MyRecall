@@ -1,73 +1,73 @@
 {
-  "run_ts": "2026-03-11T06:02:54Z",
-  "window_id": "p1-s2a-20260311T060254Z",
-  "edge_pid": "unknown",
+  "run_ts": "2026-03-11T08:56:21Z",
+  "window_id": "p1-s2a-20260311T085621Z",
+  "edge_pid": "35056",
   "snapshots": [
     {
-      "ts": "2026-03-11T06:03:06Z",
+      "ts": "2026-03-11T08:56:34Z",
       "endpoint": "/v1/health",
       "status": "ok",
       "http_code": 200,
       "body_file": "p1-s2a-health-response.json"
     },
     {
-      "ts": "2026-03-11T06:03:06Z",
+      "ts": "2026-03-11T08:56:34Z",
       "endpoint": "/v1/ingest/queue/status",
       "status": "ok",
       "http_code": 200,
       "body_file": "p1-s2a-queue-response.json"
     },
     {
-      "ts": "2026-03-11T06:03:07Z",
+      "ts": "2026-03-11T08:56:35Z",
       "endpoint": "/v1/health",
       "status": "ok",
       "http_code": 200,
       "body_file": "p1-s2a-health-response.json"
     },
     {
-      "ts": "2026-03-11T06:03:07Z",
+      "ts": "2026-03-11T08:56:35Z",
       "endpoint": "/v1/ingest/queue/status",
       "status": "ok",
       "http_code": 200,
       "body_file": "p1-s2a-queue-response.json"
     },
     {
-      "ts": "2026-03-11T06:03:08Z",
+      "ts": "2026-03-11T08:56:36Z",
       "endpoint": "/v1/health",
       "status": "ok",
       "http_code": 200,
       "body_file": "p1-s2a-health-response.json"
     },
     {
-      "ts": "2026-03-11T06:03:08Z",
+      "ts": "2026-03-11T08:56:36Z",
       "endpoint": "/v1/ingest/queue/status",
       "status": "ok",
       "http_code": 200,
       "body_file": "p1-s2a-queue-response.json"
     },
     {
-      "ts": "2026-03-11T06:03:09Z",
+      "ts": "2026-03-11T08:56:37Z",
       "endpoint": "/v1/health",
       "status": "ok",
       "http_code": 200,
       "body_file": "p1-s2a-health-response.json"
     },
     {
-      "ts": "2026-03-11T06:03:09Z",
+      "ts": "2026-03-11T08:56:37Z",
       "endpoint": "/v1/ingest/queue/status",
       "status": "ok",
       "http_code": 200,
       "body_file": "p1-s2a-queue-response.json"
     },
     {
-      "ts": "2026-03-11T06:03:10Z",
+      "ts": "2026-03-11T08:56:38Z",
       "endpoint": "/v1/health",
       "status": "ok",
       "http_code": 200,
       "body_file": "p1-s2a-health-response.json"
     },
     {
-      "ts": "2026-03-11T06:03:10Z",
+      "ts": "2026-03-11T08:56:38Z",
       "endpoint": "/v1/ingest/queue/status",
       "status": "ok",
       "http_code": 200,

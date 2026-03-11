@@ -155,6 +155,8 @@ if app_lower.contains("arc") {
 }
 ```
 
+Interpretation note: screenpipe provides heuristic Arc support with stale rejection, not a separate staged gate path. MyRecall's Day 3 defer rule is a project-level scope-cut adaptation, not a direct screenpipe concept.
+
 **Tier 3: Shallow AXTextField Walk** ([tree/macos.rs:65-72](crates/screenpipe-accessibility/src/tree/macos.rs)):
 ```rust
 if let Some(url) = find_url_in_children(window, 0, 5) {  // max_depth=5
@@ -220,6 +222,7 @@ if !has_accessibility_text {
 - AX text available → use AX text, skip OCR
 - AX returns empty → run OCR fallback
 - S3 stage handles AX-first decision; S2b only uploads raw `accessibility_text` field
+- 因阶段已拆分，S2b coverage 仅验证 raw `accessibility_text` 非空样本是否带 `content_hash`，不直接使用最终 `text_source`
 
 **Assessment**: ✅ **ALIGNED IN PRINCIPLE** — Both use AX-first, OCR-fallback strategy. MyRecall S2b only captures; S3 stage makes the final AX vs OCR decision.
 
@@ -263,9 +266,11 @@ Trigger types (from P1-S2a, dependency):
 - **Stage 2 alignment plan** (S2b verification increment):
   - Event source sends **global trigger** (no device binding)
   - `device_name` assigned by monitor worker at consume time
-  - Same capture cycle: app_name/window_name + device_name must be co-present
+  - Same capture cycle: `focused_context = {app_name, window_name, browser_url}` and `device_name` must be co-present without field-level mixing
 
 **Assessment**: ✅ **ALIGNED ARCHITECTURE** — MyRecall explicitly plans S2b to match Screenpipe's "trigger broadcast → per-monitor consumption" pattern.
+
+Note: screenpipe demonstrates bundled best-effort context, not a globally atomic same-instant snapshot. MyRecall formalizes this as `focused_context` + `capture_device_binding`, with stale rejection and `None` fallback instead of over-promising atomicity.
 
 ---
 
@@ -313,11 +318,18 @@ Decision: MyRecall-v3 Search aligns with screenpipe (vision-only)
 **Requirement** ([p1-s2b.md §3 step 7](docs/v3/acceptance/phase1/p1-s2b.md)):
 ```sql
 SELECT
-  COUNT(*) AS total,
-  SUM(CASE WHEN content_hash IS NOT NULL THEN 1 ELSE 0 END) AS with_hash,
+  COUNT(*) AS ax_hash_eligible,
+  SUM(
+    CASE
+      WHEN content_hash IS NOT NULL
+       AND LENGTH(content_hash) = 71
+       AND SUBSTR(content_hash, 1, 7) = 'sha256:'
+      THEN 1 ELSE 0
+    END
+  ) AS with_hash,
   ROUND(...) AS coverage_pct
 FROM frames
-WHERE text_source = 'accessibility'
+WHERE TRIM(COALESCE(accessibility_text, '')) <> ''
   AND timestamp >= datetime('now', '-5 minutes');
 -- Judgment: coverage_pct >= 90%
 ```
@@ -325,6 +337,7 @@ WHERE text_source = 'accessibility'
 **Screenpipe Evidence** ([tree/mod.rs:79-85](crates/screenpipe-accessibility/src/tree/mod.rs)):
 - Hash always computed from `text_content` (line 81-84)
 - Non-empty text → hash is u64 (never NULL)
+- MyRecall phase split adaptation: raw AX/hash validation happens in S2b; final `text_source` classification stays in S3
 - Empty text → TreeSnapshot.content_hash remains set
 
 **Assessment**: ✅ **GATE VERIFIABLE** — SQL query aligns with screenpipe's guaranteed hash computation.
@@ -392,7 +405,7 @@ success_rate = success / (success + rejected_stale + failed_all_tiers) >= 95%
 ```
 S2b uploader MUST send:
 - accessibility_text: String (can be empty)
-- content_hash: SHA256 hex (AX success frames >= 90%)
+- content_hash: SHA256 hex or null (required key; null when AX text is not hash-applicable)
 - capture_trigger: String (idle/app_switch/manual/click)
 - app_name, window_name: (from same AX snapshot, never split)
 ```
@@ -412,6 +425,8 @@ pub struct PairedCaptureResult {
     pub content_hash: Option<i64>,
 }
 ```
+
+Note: screenpipe's unified pipeline uses `Option` at internal boundaries; MyRecall's staged S2b->S3 handoff intentionally uses a stricter wire contract: `accessibility_text` key is always present and `content_hash` key is always present.
 
 **Assessment**: ✅ **CONTRACT ALIGNED** — Screenpipe's `PairedCaptureResult` structure directly maps to MyRecall's `CapturePayload` schema.
 
@@ -496,4 +511,3 @@ Other apps return empty → skip OCR if accessibility text is non-empty.
 4. **Plan S2b→S3 Handoff Review**: Before entering S3, ensure CapturePayload schema matches this analysis's expected fields.
 
 5. **Document Python AX Performance**: Monitor actual walk_duration in Python implementation; adjust timeout if empirical data differs from 500ms assumption.
-

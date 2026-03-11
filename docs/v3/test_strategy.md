@@ -68,11 +68,14 @@ tests/
 - **Gate 校验脚本**（核心，必须）：
   - `test_p1_s2a_trigger_coverage.py` — SQL 校验 trigger_coverage = 100%
   - `test_p1_s2a_debounce.py` — SQL 校验去抖违规数 = 0
-  - `test_p1_s2b_content_hash.py` — content_hash 覆盖率 SQL 校验
+  - `test_p1_s2b_content_hash.py` — content_hash 覆盖率 SQL 校验（分母=`TRIM(COALESCE(accessibility_text, '')) <> ''`）
   - `test_p1_s2b_ax_timeout.py` — AX 遍历延迟 P95 < 500ms
 - **最小集成测试**（补充）：
   - 幂等去重逻辑（可单元测）
   - 队列状态 API
+  - S2b handoff 字段矩阵：`accessibility_text=""` 合法、`accessibility_text=null` 非法、`content_hash=null` 合法、`content_hash=""` 非法、缺 key 非法
+  - focused-context 一致性矩阵：禁止 mixed-source `app_name/window_name`、stale `browser_url` 必须 rejected to `null`、`device_name` 必须对应实际截图 monitor
+  - Arc stale-url 场景仅在 Arc support 未 defer 时执行；若 Arc deferred，不计入 required browser success 判定
 
 > 注：P1-S2 测试依赖 macOS CGEventTap 真实事件，需本机手动跑，不强制 CI 自动化
 
@@ -139,13 +142,17 @@ tests/
   - `/v1/health` 响应快照（至少两次：异常中、恢复后）
   - UI 状态截图（引导/降级/恢复）
 
+阶段归属说明：
+- P1-S2b：负责 permission state machine / degraded-recovering-ok 闭环、browser_url stale rejection、empty-AX no-drop handoff 与 Arc deferred 记录。
+- P1-S3：负责 `AX empty / AX timeout / ocr_preferred_apps / OCR fallback success|failure / failed status` 的 processing semantic tests。
+
 ### 需要的测试文件
 
 | 子阶段 | 文件 | 内容 |
 |--------|------|------|
 | S2a | `test_p1_s2a_trigger_coverage.py` | SQL 校验 trigger_coverage = 100% |
 | S2a | `test_p1_s2a_debounce.py` | SQL 校验去抖违规数 = 0 |
-| S2b | `test_p1_s2b_content_hash.py` | content_hash 覆盖率 SQL 校验 |
+| S2b | `test_p1_s2b_content_hash.py` | content_hash 覆盖率 SQL 校验（基于 raw `accessibility_text` 非空分母） |
 | S2b | `test_p1_s2b_ax_timeout.py` | AX 遍历延迟 P95 < 500ms |
 
 ### 不需要做的

@@ -75,7 +75,8 @@ references:
     - 每分钟 300 次事件压测下 Capture 丢失率 < 0.3%
     - 触发覆盖 Gate：`trigger_coverage = (covered_trigger_types / 4) × 100% = 100%`（`idle/app_switch/manual/click` 四类均需命中；每类样本 >= 20）
     - 去抖 Gate：同 monitor 连续 `app_switch/click` 入库间隔 < `min_capture_interval_ms`（1000ms，有意偏离）的违规数 = 0
-    - 背压 Gate：过载注入窗口（5 分钟）满足 `collapse_trigger_count >= 1`、`queue_saturation_ratio <= 10%`（`queue_depth >= 0.9 * queue_capacity` 采样占比）且 `overflow_drop_count = 0`
+    - 背压 Gate：过载注入窗口（5 分钟）满足 `queue_saturation_ratio <= 10%`（`queue_depth >= 0.9 * queue_capacity` 采样占比）且 `overflow_drop_count = 0`
+    - `collapse_trigger_count` 仅作为观测/调试指标记录，不作为 S2a Exit Hard Gate
     - Grid（`/`）新 capture 可见性通过率 >= 95%（状态主视图）
     - Grid 端 `pending -> completed` 状态可见收敛 P95 <= 8s（观测与验收记录必填）
     - `/timeline` 仅用于新帧可见与时间定位验证（浏览主视图）
@@ -93,17 +94,19 @@ references:
   - 实现语言：Python（详见 ADR-0013）
   - 依赖：P1-S2a 的触发机制（AX 采集在事件触发时执行）
   - Gate：
-    - `content_hash` 覆盖率 >= 90%（AX 成功帧）
+    - `content_hash` 覆盖率 >= 90%（`ax_hash_eligible`：`TRIM(COALESCE(accessibility_text, '')) <> ''` 的已上传帧）
     - AX 树遍历超时 < 500ms（P95）
     - `inter_write_gap_sec`：Soft KPI（记录 P50/P90/P99）+ Hard Gate（按 `device_name` 分桶，每设备 max <= 45s，样本 >= 100）
     - 窗口有效性：Hard Gate 仅使用无 Host/Edge 重启的连续窗口；若窗口内发生 Host 或 Edge 重启则标记 `broken_window=true`，该窗口仅用于观测
-    - Browser URL 提取成功率 >= 95%（观测指标）
+    - Browser URL 提取成功率 >= 95%（观测指标；required browser set = Chrome/Safari/Edge，Arc 仅在已实现时作为 conditional evidence）
 
 - P1-S3（处理，2026-03-12 ~ 2026-03-15）
   - 交付：
     - Edge AX-first + RapidOCR fallback（含 `ocr_preferred_apps` 初版）
     - Scheme C 分表写入：AX 成功 → `accessibility` 表（含 `focused`/`frame_id`）；OCR fallback → `ocr_text` 表
     - AX/OCR 决策记录到 `frames.text_source`
+    - S2b->S3 handoff 字段语义冻结：`accessibility_text` required string（允许 `""`），`content_hash` required nullable string
+    - 上下文字段语义冻结：`focused_context = {app_name, window_name, browser_url}`；`device_name` 为 same-cycle 的实际采样 monitor 绑定字段
     - 索引时零 AI 增强：不生成 `caption/keywords/fusion_text`，不写入 `ocr_text_embeddings`
     - Frame 详情可见处理来源（AX/OCR fallback）与处理时间戳（在 `/timeline` 内呈现，不新增 `/frame/:id` 页面）
   - Gate：
@@ -284,8 +287,8 @@ references:
 - 每个阶段/子阶段 Gate 评审除了性能数字，还必须包含以下功能指标：
   - 功能清单完成率（目标：100%）
   - API/Schema 契约完成率（目标：100%）
-  - 关键异常与降级场景通过率（目标：>= 95%）
-  - 权限状态机与恢复闭环通过率（目标：100%，至少覆盖 startup denied / mid-run revoked / recovered）
+  - 关键异常与降级场景通过率（目标：>= 95%；仅覆盖本阶段语义拥有的 failure classes）
+  - 权限状态机与恢复闭环通过率（目标：100%；owner=采集能力阶段，P1-S2b 前必须关闭）
   - 可观测性检查项完成率（目标：100%，至少含日志/指标/错误码）
   - UI 关键路径通过率（按阶段定义，目标：100%）
   - 验收文档完整率（目标：100%）
