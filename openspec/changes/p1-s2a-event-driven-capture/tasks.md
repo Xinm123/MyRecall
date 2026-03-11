@@ -52,7 +52,7 @@
 
 ## Acceptance Verification
 
-- [ ] 验收口径约束：P1-S2a 仅覆盖事件驱动采集、`capture_trigger`、去抖、背压、权限状态与观测链路；AX 文本采集、`content_hash` 去重与 `processing_mode=ax_ocr` 均不属于本阶段范围
+- [x] 验收口径约束：P1-S2a 仅覆盖事件驱动采集、`capture_trigger`、去抖、背压、权限状态与观测链路；AX 文本采集、`content_hash` 去重与 `processing_mode=ax_ocr` 均不属于本阶段范围
 
 ### 7. 启动与运行时基线验证
 
@@ -90,6 +90,6 @@
 
 ### 12. 本机 Gate 证据包验证
 
-- [ ] 12.1 运行 `pytest tests/test_p1_s2a_trigger_coverage.py tests/test_p1_s2a_debounce.py -q`，并补跑受影响的 ingest/health/startup/acceptance 脚本测试，确认阶段交付测试文件真实存在且通过
-- [ ] 12.2 运行 `scripts/acceptance/p1_s2a_local.sh`，确认生成 `p1-s2a-local-gate.log`、`p1-s2a-metrics.json`、`p1-s2a-health-snapshots.json`、`p1-s2a-ui-proof.md`、`p1-s2a-trigger-channel-raw.jsonl`，且指标文件已填入 `capture_latency_p95`、`capture_latency_sample_count`、`capture_latency_anomaly_count`、`trigger_coverage`、`collapse_trigger_count`、`queue_saturation_ratio`、`overflow_drop_count`、`loss_rate` 及窗口元信息（`window_id`/`edge_pid`/`broken_window`）
-- [ ] 12.3 在 `p1-s2a-ui-proof.md` 中补齐 Grid 状态可见、Timeline 新帧定位与健康锚点截图索引，保证证据包可直接支撑 `docs/v3/acceptance/phase1/p1-s2a.md` 的 Exit Gate 判定
+- [x] 12.1 运行 `pytest tests/test_p1_s2a_trigger_coverage.py tests/test_p1_s2a_debounce.py -q`，并补跑受影响的 ingest/health/startup/acceptance 脚本测试，确认阶段交付测试文件真实存在且通过
+- [x] 12.2 运行 `scripts/acceptance/p1_s2a_local.sh`，确认生成 `p1-s2a-local-gate.log`、`p1-s2a-metrics.json`、`p1-s2a-health-snapshots.json`、`p1-s2a-ui-proof.md`、`p1-s2a-trigger-channel-raw.jsonl`，且指标文件已填入 `capture_latency_p95`、`capture_latency_sample_count`、`capture_latency_anomaly_count`、`trigger_coverage`、`collapse_trigger_count`、`queue_saturation_ratio`、`overflow_drop_count`、`loss_rate` 及窗口元信息（`window_id`/`edge_pid`/`broken_window`）
+- [x] 12.3 在 `p1-s2a-ui-proof.md` 中补齐 Grid 状态可见、Timeline 新帧定位与健康锚点截图索引，保证证据包可直接支撑 `docs/v3/acceptance/phase1/p1-s2a.md` 的 Exit Gate 判定

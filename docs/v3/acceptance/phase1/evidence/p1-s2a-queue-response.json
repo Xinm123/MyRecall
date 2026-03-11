@@ -1,0 +1,36 @@
+{
+  "capacity": 200,
+  "capture_latency": {
+    "broken_window": false,
+    "capture_latency_anomaly_count": 0,
+    "capture_latency_p50": 64972759.0,
+    "capture_latency_p90": 64972810.0,
+    "capture_latency_p95": 64972815.5,
+    "capture_latency_p99": 64972859.0,
+    "capture_latency_sample_count": 51,
+    "edge_pid": 37292,
+    "window_id": "1773208690-1773208990"
+  },
+  "completed": 51,
+  "failed": 0,
+  "oldest_pending_ingested_at": null,
+  "pending": 0,
+  "processing": 0,
+  "processing_mode": "noop",
+  "status_sync": {
+    "broken_window": false,
+    "edge_pid": 37292,
+    "status_sync_p50": 877.0,
+    "status_sync_p90": 900.0,
+    "status_sync_p95": 903.5,
+    "status_sync_p99": 905.5,
+    "status_sync_sample_count": 51,
+    "window_id": "1773208690-1773208990"
+  },
+  "trigger_channel": {
+    "collapse_trigger_count": 0,
+    "overflow_drop_count": 0,
+    "queue_capacity": 0,
+    "queue_depth": 0
+  }
+}

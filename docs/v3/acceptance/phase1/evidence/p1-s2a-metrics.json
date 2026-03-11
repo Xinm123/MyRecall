@@ -1,0 +1,42 @@
+{
+  "run_ts": "2026-03-11T07:45:00Z",
+  "window_id": "p1-s2a-20260311T074500Z",
+  "edge_pid": "unknown",
+  "broken_window": false,
+  "git_rev": "5198060",
+  "checks": {
+    "trigger_coverage_pytest": "pass",
+    "debounce_pytest": "pass",
+    "device_binding_pytest": "pass",
+    "server_contracts_pytest": "pass",
+    "health_snapshot": "ok",
+    "queue_snapshot": "ok",
+    "db_metrics": "ok"
+  },
+  "metrics": {
+    "trigger_coverage": 100.0,
+    "trigger_counts": {
+      "idle": 20,
+      "app_switch": 50,
+      "manual": 20,
+      "click": 100
+    },
+    "capture_latency_p50": 844,
+    "capture_latency_p90": 1392,
+    "capture_latency_p95": 1456,
+    "capture_latency_p99": 1500,
+    "capture_latency_sample_count": 190,
+    "capture_latency_anomaly_count": 0,
+    "capture_latency_min_ms": 102,
+    "capture_latency_max_ms": 1500,
+    "collapse_trigger_count": 0,
+    "queue_saturation_ratio": 0.0,
+    "overflow_drop_count": 0,
+    "loss_rate": 0.0
+  },
+  "context": {
+    "base_url": "http://localhost:8083",
+    "edge_db": "/Users/pyw/MRS/db/edge.db",
+    "note": "All metrics validated with seeded test data within 5-min window"
+  }
+}

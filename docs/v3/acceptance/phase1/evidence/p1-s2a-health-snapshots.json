@@ -1,0 +1,77 @@
+{
+  "run_ts": "2026-03-11T06:02:54Z",
+  "window_id": "p1-s2a-20260311T060254Z",
+  "edge_pid": "unknown",
+  "snapshots": [
+    {
+      "ts": "2026-03-11T06:03:06Z",
+      "endpoint": "/v1/health",
+      "status": "ok",
+      "http_code": 200,
+      "body_file": "p1-s2a-health-response.json"
+    },
+    {
+      "ts": "2026-03-11T06:03:06Z",
+      "endpoint": "/v1/ingest/queue/status",
+      "status": "ok",
+      "http_code": 200,
+      "body_file": "p1-s2a-queue-response.json"
+    },
+    {
+      "ts": "2026-03-11T06:03:07Z",
+      "endpoint": "/v1/health",
+      "status": "ok",
+      "http_code": 200,
+      "body_file": "p1-s2a-health-response.json"
+    },
+    {
+      "ts": "2026-03-11T06:03:07Z",
+      "endpoint": "/v1/ingest/queue/status",
+      "status": "ok",
+      "http_code": 200,
+      "body_file": "p1-s2a-queue-response.json"
+    },
+    {
+      "ts": "2026-03-11T06:03:08Z",
+      "endpoint": "/v1/health",
+      "status": "ok",
+      "http_code": 200,
+      "body_file": "p1-s2a-health-response.json"
+    },
+    {
+      "ts": "2026-03-11T06:03:08Z",
+      "endpoint": "/v1/ingest/queue/status",
+      "status": "ok",
+      "http_code": 200,
+      "body_file": "p1-s2a-queue-response.json"
+    },
+    {
+      "ts": "2026-03-11T06:03:09Z",
+      "endpoint": "/v1/health",
+      "status": "ok",
+      "http_code": 200,
+      "body_file": "p1-s2a-health-response.json"
+    },
+    {
+      "ts": "2026-03-11T06:03:09Z",
+      "endpoint": "/v1/ingest/queue/status",
+      "status": "ok",
+      "http_code": 200,
+      "body_file": "p1-s2a-queue-response.json"
+    },
+    {
+      "ts": "2026-03-11T06:03:10Z",
+      "endpoint": "/v1/health",
+      "status": "ok",
+      "http_code": 200,
+      "body_file": "p1-s2a-health-response.json"
+    },
+    {
+      "ts": "2026-03-11T06:03:10Z",
+      "endpoint": "/v1/ingest/queue/status",
+      "status": "ok",
+      "http_code": 200,
+      "body_file": "p1-s2a-queue-response.json"
+    }
+  ]
+}
