@@ -83,6 +83,8 @@ tests/
 
 > Gate 边界说明：上述两个测试文件属于 **P1-S2a Exit Gate 交付物**（决定能否进入 P1-S2b），不是 P1-S2a Entry Gate 的阻塞前置。
 
+> P1-S2b 开发方式（已冻结，见 `open_questions.md` OQ-041）：S2b 采用 TDD 开发；`test_p1_s2b_content_hash.py`、`test_p1_s2b_ax_timeout.py` 等测试文件是随功能演进自然沉淀的阶段交付物，不要求在开工前一次性补齐。`scripts/acceptance/p1_s2b_local.sh` 属于 Exit Gate 编排层，应在阶段收口时补齐并执行。
+
 ### P1-S3（处理）
 - `test_ax_ocr_pipeline.py` — AX-first/OCR-fallback 决策、分表写入
 

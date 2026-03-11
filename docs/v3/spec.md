@@ -145,10 +145,23 @@ flowchart LR
   - 非 `idle/manual` 触发启用内容去重（`content_hash` 相同则跳过写入），并保留 30s 强制落盘保底；
   - 触发通道有界，lag 时折叠为一次兜底触发，避免高频事件拖垮处理链路。
 
+**P1-S2b frozen capture semantics（SSOT）**：
+- event source 仅负责发出 `capture_trigger`，不得绑定 `device_name`。
+- `device_name` 必须由 monitor worker 在消费 trigger、执行实际截图时绑定；其语义固定为“本次 capture cycle 中实际被截取的 monitor”。
+- `focused_context = {app_name, window_name, browser_url}` 必须由同一轮 focused-context snapshot 一次性产出；允许部分缺失为 `None`，但禁止字段级跨来源混拼。
+- `primary_monitor_only` 仅控制启用的 monitor worker 集合，不改变 trigger 语义。
+- P1 仅承诺 capture-cycle coherence，不承诺 screenshot / AX / URL 的全局原子同瞬时快照。
+
+**Browser URL stale rejection（SSOT）**：
+- `browser_url` 获取成功不等于可写入；写入前必须完成与同轮 `focused_context` 的一致性校验。
+- 仅当 URL 与同轮 `focused_context` 校验一致时，才允许写入 `browser_url`。
+- 若命中 stale 检测、标题不匹配、来源不可信或无法确认一致性，必须写 `None`。
+- 对 Arc / AppleScript 路径，标题匹配失败必须按 stale reject 处理，不得保守猜测写入。
+
 **内容去重实现（Host 端执行，与 screenpipe 对齐）**：
 ```
-# Host 端 dedup 伪代码（capture 前判定，避免重复图片上传）
-def should_capture(capture_trigger, accessibility_text, content_hash, last_write_time):
+# Host 端 dedup 伪代码（capture 完成并生成 AX/hash 后、upload 前判定）
+def should_upload(capture_trigger, accessibility_text, content_hash, last_write_time):
     # 1. idle/manual 触发不参与 dedup（保证 timeline 不为空）
     if capture_trigger in ('idle', 'manual'):
         return True
@@ -167,6 +180,13 @@ def should_capture(capture_trigger, accessibility_text, content_hash, last_write
 
     return True  # 写入
 ```
+
+**`content_hash` canonicalization（SSOT）**：
+- `content_hash` 必须仅基于最终上报的 `accessibility_text` 计算。
+- 计算前必须对 `accessibility_text` 执行固定 canonicalization：Unicode NFC、换行统一为 `\n`、每行去尾部空白、整体 `strip()`。
+- 不得做语义级改写，不得基于 AX 节点结构之外的额外推断生成 hash 输入。
+- 当 `TRIM(COALESCE(accessibility_text, '')) = ''` 时，`content_hash` 必须为 `null`；否则必须为 `sha256:` 前缀 + 64 位十六进制。
+- AX timeout 场景下，若仍产出部分文本，则按该最终 `accessibility_text` 正常计算 `content_hash`。
 
 **Edge 端 ingest 简化处理**：
 ```
@@ -189,6 +209,7 @@ def handle_ingest(payload):
 
 **Host 端 dedup 状态与重启语义（P1-S2b）**：
 - `last_content_hash/last_write_time` 为 per-device 纯内存运行态，在 Host 端维护。
+- `last_write_time` 的语义固定为“最近一次成功写入 Host 本地 spool 的时间”，不得以 HTTP 成功时间、Edge ingest 接收时间或 Edge DB 落库时间替代。
 - Host 重启后 dedup 进入冷启动，重启边界附近允许出现额外写入；该现象为预期行为，不视为缺陷。
 - 30s 保底写入语义始终成立，用于保证 timeline 连续性。
 - Edge 端不再维护 dedup 状态，仅接收并存储 `content_hash` 用于观测。
@@ -296,6 +317,8 @@ paired_capture 处理一帧:
 
 #### AX 降级策略（与 screenpipe 对齐）
 
+> P1-S3 语义 SSOT：见 [open_questions.md](open_questions.md) OQ-033、OQ-039；P1-S2b 仅负责 raw handoff，不负责最终 `text_source` 判定。
+
 | 场景 | 处理方式 |
 |------|----------|
 | **截图** | 始终写入磁盘（永不阻塞） |
@@ -373,6 +396,7 @@ paired_capture 处理一帧:
 - `/api/*` 为 v2 历史路径：P1-S1~P1-S3 对 `POST /api/upload` 返回 308、对其余 3 个 legacy GET 端点返回 301（均重定向至对应 `/v1/*` 并记录 `[DEPRECATED]` 日志）；自 P1-S4 起返回 410 Gone 完全废弃。
 - 重要澄清（P1 Gate scope）：legacy `/api/*` 渐进废弃的验收口径只覆盖 4 个端点：`POST /api/upload`、`GET /api/search`、`GET /api/queue/status`、`GET /api/health`（其余 `/api/*` 行为不纳入 P1 Gate 口径）。完整范围以 [http_contract_ledger.md](./http_contract_ledger.md) §4.0 与各阶段验收文档为准。
 - 兼容 alias（如存在）必须标记为 legacy，且不得作为文档、SDK、验收脚本默认入口。
+- P1-S2b 起的 capability / raw handoff / frozen metadata 语义只允许落在 `/v1/*` + v3 runtime/store 主链路；legacy `/api/*` 仅保留兼容职责，不承载新的 S2b 语义或验收责任。
 
 #### `GET /v1/search` — 完整契约
 
@@ -506,6 +530,8 @@ paired_capture 处理一帧:
 ### MyRecall-v3 决策（019A）
 
 #### P1 协议：单次幂等上传（方案 A）
+
+> P1-S2b implementation boundary: S2b 主功能只认 v3 主链路（`Host capture -> spool/uploader -> /v1/ingest -> v3 queue/status -> S3 handoff`）。legacy `/api/*` 与旧 worker 仅为兼容层，不作为新语义实现入口。
 
 ```
 POST /v1/ingest

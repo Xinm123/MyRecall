@@ -686,11 +686,13 @@ class CapturePayload(BaseModel):
 - `content_hash`：key 必须出现；值为 `sha256:[0-9a-f]{64}` 或 `null`；不允许 `""`。
 - 缺少任一 key 均视为 ingest contract error（`INVALID_PARAMS`）。
 - `accessibility_text=""` 表示“该帧已上传，但无可用 AX 文本”；`content_hash=null` 表示“该帧不属于 hash-applicable 样本”。
+- `content_hash` 必须仅基于最终上报的 `accessibility_text` 计算；计算前需执行固定 canonicalization：Unicode NFC、换行统一为 `\n`、每行去尾部空白、整体 `strip()`。
+- AX timeout 场景下，若仍产出部分文本，则按该最终 `accessibility_text` 正常计算 `content_hash`。
 
 **上下文字段一致性契约（P1-S2b+）**：
 - `focused_context = {app_name, window_name, browser_url}`：表示同一 capture 的 focused UI 上下文。
 - `capture_device_binding = {device_name}`：表示该次 capture cycle 中实际被截取的 monitor。
-- `app_name/window_name` 若提供，必须来自同一个 focused-context source；禁止字段级混拼。
+- `app_name/window_name/browser_url` 若提供，必须由同一轮 focused-context snapshot 一次性产出；禁止字段级混拼。
 - `browser_url` 若提供，必须与该 `focused_context` 校验一致；若无法确认一致性或命中 stale 检测，必须写 `null`。
 - `device_name` 必须与实际截图 monitor 一致；它要求 same-cycle coherence，不承担同源 focused-context 语义。
 - 不确定时遵循：`Better None than wrong window` / `Better None than wrong URL`。
@@ -712,7 +714,7 @@ class CapturePayload(BaseModel):
 - `content_hash` 去重与 `capture_id` 幂等是两层语义：当 dedup 条件满足（非 `idle/manual`、距该设备最近写入 < 30s、hash 有效且匹配）时，Host 会直接跳过本次 ingest；`capture_id` 幂等仅作用于实际发送到 Edge 的请求。
 
 **dedup 语义（P1-S2b）**：
-- dedup 判定由 **Host 端**执行（capture 前），避免重复图片上传浪费带宽
+- dedup 判定由 **Host 端**执行（capture 完成并生成 `accessibility_text/content_hash` 后、upload 前），避免重复图片上传浪费带宽
 - dedup 条件：非 idle/manual + 距上次写入 < 30s + content_hash 相同 + 非空文本
 - 空文本不参与 dedup（与 screenpipe 对齐）
 - dedup 判定成功后，Host 不调用 ingest API
@@ -720,8 +722,14 @@ class CapturePayload(BaseModel):
 
 **dedup 运行态约束（P1-S2b）**：
 - `last_content_hash/last_write_time` 为 per-device 纯内存运行态，**在 Host 端维护**，不写入 `edge.db`。
+- `last_write_time` 的语义固定为最近一次成功写入 Host 本地 spool 的时间，不得以 HTTP 成功时间、Edge ingest 接收时间或 Edge DB 落库时间替代。
 - Host 重启后 dedup 进入冷启动，重启边界附近允许出现额外写入；该现象为预期行为，不视为缺陷。
 - Edge 端存储的 `content_hash` 仅用于观测，不用于 dedup 判定。
+
+**trigger / device binding 语义（P1-S2b）**：
+- event source 仅发出 `capture_trigger`，不得绑定 `device_name`。
+- `device_name` 必须由 monitor worker 在消费 trigger、执行实际截图时绑定。
+- `primary_monitor_only` 仅影响启用的 monitor worker 集合，不改变 trigger 语义。
 
 **device_name 字段说明**：
 

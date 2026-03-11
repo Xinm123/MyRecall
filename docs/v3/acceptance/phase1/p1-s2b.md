@@ -103,10 +103,10 @@
 - 空 AX 上传语义：空 AX 帧上传时必须满足 `accessibility_text=""` 且 `content_hash=null`。
 - Handoff 可审计性：S2b 上传的原始 `accessibility_text` 必须可追溯，S3 仅可基于 `TRIM(COALESCE(accessibility_text, ''))` 做空值判定，不得要求 S2b 承担处理阶段语义。
 - S2b Gate 口径：`content_hash` 覆盖率仅基于 `ax_hash_eligible = TRIM(COALESCE(accessibility_text, '')) <> ''` 的已上传帧；不得以 `frames.text_source` 作为分母过滤条件。
-- 上下文一致性契约：CapturePayload 中 `app_name/window_name`（或兼容键映射后的字段）必须来自同一时刻同一来源上下文；`window_name` 不可与 `app_name` 跨来源拼接。
-- focused-context 契约：`app_name/window_name/browser_url` 构成同一 capture 的 focused-context bundle；允许整体缺失/部分为 `None`，但不允许字段级跨来源混拼。
+- 上下文一致性契约：CapturePayload 中 `app_name/window_name/browser_url` 必须由同一轮 focused-context snapshot 一次性产出；允许整体缺失/部分为 `None`，但不允许字段级跨来源混拼。
 - device-binding 契约：`device_name` 表示实际被截取的 monitor，要求与本次 capture cycle 一致，不要求与 `focused_context` 同源。
 - `browser_url` 仅可在与 `focused_context` 交叉校验一致时写入；校验失败或 stale 时必须置 `None`（原则：**Better None than wrong URL**）。
+- `content_hash` 仅可基于最终上报的 `accessibility_text` 计算；计算前必须执行与 [../../spec.md](../../spec.md) 一致的 canonicalization；空字符串对应 `content_hash=null`，partial AX text 仍正常计算 hash。
 - 一致性验收口径：新增 `app_window_mismatch_rate`（抽样人工核验 + 自动规则）并作为 S2b 观测指标，目标接近 0；出现不确定样本时按 `window_name=None` 处理，不计错填。
 
 ### 1.0d Input dependencies from stable P1-S2a contracts
@@ -117,22 +117,24 @@
 - 性能监控框架（`capture_latency_p95`，由 P1-S2a 引入）
 - 队列安全边界（由 P1-S2a 验证）：`queue_saturation_ratio <= 10%`、`overflow_drop_count = 0`；`collapse_trigger_count` 仅保留为观测指标
 - **Host 端 dedup 判定**（P1-S2b 新增）：
-  - Host 在 capture 前执行 dedup 判定，避免重复图片上传
+  - Host 在 capture 完成并生成 `accessibility_text/content_hash` 后、upload 前执行 dedup 判定，避免重复图片上传
   - dedup 条件：非 idle/manual + 距上次写入 < 30s + content_hash 相同
   - 空文本不参与 dedup（与 screenpipe 对齐）
   - dedup 判定成功后不调用 ingest API
+  - `last_write_time` 的语义固定为最近一次成功写入 Host 本地 spool 的时间
 
-### 1.0e Stage 2 alignment plan (screenpipe-style monitor semantics)
+### 1.0e Stage 2 alignment (frozen screenpipe-style monitor semantics)
 
 - 目标：对齐 screenpipe 的“全局 trigger 广播 + 每 monitor 独立 capture loop”语义，消除触发语义与采样语义耦合。
 - 设计约束：event source 仅发 trigger（不绑定 device）；`device_name` 由 monitor worker 在消费 trigger 时确定。
 - `primary_monitor_only` 语义收敛：仅控制启用的 monitor worker 集合，不在 click/app_switch 事件源中做分叉过滤。
-- 元数据口径：`focused_context = {app_name, window_name, browser_url}` 表示 focused UI 上下文；`device_name` 表示实际采样 monitor；二者须在同一 capture 周期内组装，但不承诺同瞬时原子快照。
+- 元数据口径：`focused_context = {app_name, window_name, browser_url}` 表示 focused UI 上下文，必须由同一轮 snapshot 一次性产出；`device_name` 表示实际采样 monitor；二者须在同一 capture 周期内组装，但不承诺同瞬时原子快照。
 - 验收增量（S2b）：新增多屏一致性场景（主屏+副屏）并验证 `trigger`、`device_name`、截图归属的可解释性与稳定性。
 
 ### 1.1 HTTP 契约 delta（本阶段，scope=对外 HTTP）
 
 - SSOT：[../../http_contract_ledger.md](../../http_contract_ledger.md)
+- 实施边界（已冻结）：S2b 功能正确性的证明链路仅认 `/v1/*` + v3 runtime/store；legacy `/api/*` 与旧 worker 仅做兼容回归检查，不承担新的 S2b 语义或验收责任（见 [../../open_questions.md](../../open_questions.md) OQ-042）。
 
 | 类型 | 接口 | 变化/说明 | SSOT |
 |---|---|---|---|
@@ -147,12 +149,12 @@
   - AX 树遍历测试场景（Chrome, Safari, VS Code, Terminal, Finder 等）
 - Browser URL 测试场景（required: Chrome, Safari, Edge；conditional: Arc）
   - 高频“内容不变”压测脚本（app switch/click，5 分钟）
-  - 采集参数基线：AX 树遍历超时 `500ms`、深度限制 `50`、节点限制 `5000`
+  - 采集参数基线：AX 树遍历超时 `500ms`、深度限制 `30`、节点限制 `5000`
   - 依赖版本：记录 AX 模块版本
 
 ### 2.1 指标口径与样本说明（必填）
 
-- 口径基线版本（默认 [../../gate_baseline.md](../../gate_baseline.md)）：v1.5
+- 口径基线版本（默认 [../../gate_baseline.md](../../gate_baseline.md)）：v1.4
 - 指标样本数：
   - AX 采集样本：>= 200 次（多应用场景）
   - `inter_write_gap_sec` Hard Gate：每设备样本 `>= 100`
@@ -269,6 +271,8 @@
 
 > 注：P1-S2b 测试依赖 macOS AX 权限，需本机手动跑。测试策略为「Gate 校验脚本 + 最小集成测试」，不强制 CI 自动化。
 
+> 开发约束（已冻结）：P1-S2b 核心能力采用 TDD；`tests/test_p1_s2b_content_hash.py`、`tests/test_p1_s2b_ax_timeout.py` 等测试文件属于阶段正式交付物，但应在开发过程中随功能自然落地。`scripts/acceptance/p1_s2b_local.sh` 作为 Exit Gate 编排层，在阶段收口时补齐并执行（见 [../../open_questions.md](../../open_questions.md) OQ-041）。
+
 - P1-S2a 防回归基线（必须先过）：
   - `pytest tests/test_v3_migrations_bootstrap.py tests/test_p1_s1_*.py tests/test_p1_s1_grid_data_contract.py -q`
   - 最小通过线：`0 failed`
@@ -287,6 +291,7 @@
 
 - 目标：把 AX 权限与 S2b 指标验证流程标准化，确保复测可比、证据可审计。
 - 执行入口（建议固定）：`scripts/acceptance/p1_s2b_local.sh`
+- 定位：该脚本属于 S2b Exit Gate 编排层，负责串联已落地测试、指标导出与证据收集；不替代开发期的 TDD 契约测试。
 - 执行前置：
   - 运行环境为 macOS（Accessibility 权限已配置）；
   - Host/Edge 进程已按 runbook 启动；

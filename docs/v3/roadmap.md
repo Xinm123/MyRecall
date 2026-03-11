@@ -20,6 +20,8 @@ references:
 > **SSOT**: [open_questions.md](open_questions.md) — "已拍板结论" 各节
 > 
 > 所有已锁定决策（当前范围：001A–031A）的完整内容以 open_questions.md 为唯一事实源。本节不再重复列举。
+>
+> **P1-S2b frozen rules index**: [p1-s2b-frozen-rules-index.md](p1-s2b-frozen-rules-index.md) — 用于快速定位 P1-S2b 冻结规则的 canonical source、supporting source 与验收落点。
 
 ## 1. 阶段目标与里程碑
 
@@ -251,7 +253,7 @@ references:
 - P1：语义型查询能力下降导致 Chat 检索上下文不充分。
 - P1：macOS 权限瞬态失败导致 Gate 误判（需用 Python + pyobjc 实现 screenpipe permissions.rs 的瞬态检测逻辑）。
 - P1：权限被拒绝/运行中撤销后未进入受控降级，导致“服务存活但采集不可用”不可观测。
-- P1：Electron 应用 AX 遍历超时（需提高 walk_timeout 至 500ms 并增加首次遍历重试逻辑）。
+- P1：Electron 应用 AX 遍历超时（需提高 walk_timeout 至 500ms；首次空树不做同帧重试，由后续事件再次获取 AX 文本）。
 
 ## 4. 里程碑退出条件（DoD）
 

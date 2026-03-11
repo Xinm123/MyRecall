@@ -169,3 +169,25 @@ references:
 39. OQ-038 = A：Arc Browser AppleScript URL 提取在 P1-S2b 中定义为 timeboxed optional heuristic sub-scope，而非正式 Gate 分支。若 Day 3 仍不稳定，则 defer Arc-specific support；S2b required browser evidence 仍以 Chrome/Safari/Edge 为准，Arc stale-url 测试仅作为 conditional evidence。
 
 40. OQ-039 = A：S2b / S3 的 failure-class ownership 以 handoff 边界划分——S2b 负责 capability / frozen metadata / raw handoff correctness（permission denied/revoked/recovered、browser_url stale、Arc deferred、empty-AX no-drop）；S3 负责 semantic outcome / final persistence correctness（AX empty、AX timeout、ocr_preferred_apps、OCR fallback success/failure、failed 语义）。
+
+41. OQ-040 = A：P1-S2b trigger / focused-context / dedup / URL stale 规则冻结为单一口径。
+    - **Trigger 语义**：event source 仅发出 `capture_trigger`，不得绑定 `device_name`；`device_name` 由 monitor worker 在消费 trigger、执行实际截图时绑定。
+    - **Focused-context 语义**：`app_name/window_name/browser_url` 必须由同一轮 focused-context snapshot 一次性产出；允许部分为 `None`，但禁止字段级混拼。
+    - **Hash 语义**：`content_hash` 仅基于最终上报的 `accessibility_text` 计算；canonicalization 采用 Unicode NFC、换行统一为 `\n`、每行去尾部空白、整体 `strip()`；空字符串对应 `null`，partial AX text 仍正常计算。
+    - **Dedup 语义**：Host 在 capture 完成并生成 `accessibility_text/content_hash` 后、upload 前执行 dedup；`last_write_time` 固定为最近一次成功写入 Host 本地 spool 的时间。
+    - **URL stale 语义**：`browser_url` 获取成功不等于可写入；必须先完成与同轮 `focused_context` 的一致性校验，失败则写 `None`；Arc / AppleScript 路径标题匹配失败必须按 stale reject 处理。
+    - **落点**：`spec.md` 作为规则 SSOT，`acceptance/phase1/p1-s2b.md` 作为阶段验收口径，`data-model.md` 仅承载数据契约结果。
+
+42. OQ-041 = A：P1-S2b 的测试与 Gate 交付采用“TDD 开发 + 收口脚本”模式。
+    - **开发方式**：S2b 核心能力采用 TDD；每推进一个冻结规则或核心能力，先写失败测试，再实现最小代码通过。
+    - **测试产物语义**：`tests/test_p1_s2b_content_hash.py`、`tests/test_p1_s2b_ax_timeout.py` 等属于 S2b 阶段正式交付物，但应在开发过程中随功能自然落地，而不是要求在开工前一次性手工补齐。
+    - **阶段收口方式**：`scripts/acceptance/p1_s2b_local.sh` 属于 S2b Exit Gate 交付物；其职责是编排已存在的测试、指标导出、health snapshot 与证据产物，而不是承担最早期规则发现责任。
+    - **实施顺序**：先用 TDD 落实最小契约测试与必要集成测试，再在阶段收口时补齐并执行 Gate 编排层。
+    - **目的**：避免过早写死验收脚本导致返工，同时避免把契约测试拖到功能完成后才补。
+
+43. OQ-042 = A：P1-S2b 采用 v3-only 主链路；legacy `/api/*` 与旧 worker 仅保留兼容职责。
+    - **主链路**：S2b 新语义仅允许沿 `Host capture -> spool/uploader -> POST /v1/ingest -> v3 queue/status -> S3 handoff` 生长。
+    - **legacy 边界**：`/api/*` 仅用于渐进废弃与兼容回归检查；旧 worker / 旧处理心智模型不得承载新的 S2b 语义、字段规则或验收责任。
+    - **语义范围**：`accessibility_text`、`content_hash`、browser URL stale rejection、Host dedup、`device_name` binding、`focused_context` frozen bundle 等规则仅属于 v3 主链路。
+    - **实施方式**：如确需复用 legacy 代码，只允许通过 adapter 接入，不允许反向把 legacy 语义带回 v3 主链路。
+    - **验收原则**：S2b 测试、Gate 脚本、runbook 与人工验证只认 `/v1/*` + v3 runtime/store；legacy 路径仅做兼容检查，不作为功能正确性的证明链路。

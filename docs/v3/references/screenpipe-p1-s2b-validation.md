@@ -263,12 +263,12 @@ Trigger types (from P1-S2a, dependency):
 - Each monitor consumes trigger independently, captures independently
 
 **MyRecall P1-S2b** ([p1-s2b.md §1.0e](docs/v3/acceptance/phase1/p1-s2b.md)):
-- **Stage 2 alignment plan** (S2b verification increment):
+- **Stage 2 frozen alignment** (S2b verification increment):
   - Event source sends **global trigger** (no device binding)
   - `device_name` assigned by monitor worker at consume time
   - Same capture cycle: `focused_context = {app_name, window_name, browser_url}` and `device_name` must be co-present without field-level mixing
 
-**Assessment**: ✅ **ALIGNED ARCHITECTURE** — MyRecall explicitly plans S2b to match Screenpipe's "trigger broadcast → per-monitor consumption" pattern.
+**Assessment**: ✅ **ALIGNED ARCHITECTURE** — MyRecall explicitly freezes S2b to match Screenpipe's "trigger broadcast → per-monitor consumption" pattern.
 
 Note: screenpipe demonstrates bundled best-effort context, not a globally atomic same-instant snapshot. MyRecall formalizes this as `focused_context` + `capture_device_binding`, with stale rejection and `None` fallback instead of over-promising atomicity.
 
