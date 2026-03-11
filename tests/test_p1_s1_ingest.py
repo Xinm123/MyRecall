@@ -230,9 +230,17 @@ def upload_frame(
 ) -> requests.Response:
     url = f"{API_V1}/ingest"
     files = {"file": ("test.jpg", io.BytesIO(jpeg_bytes), "image/jpeg")}
+    payload_metadata: dict[str, object] = {
+        "timestamp": "2026-03-10T12:00:00Z",
+        "capture_trigger": "manual",
+        "device_name": "monitor_0",
+        "event_ts": "2026-03-10T12:00:00Z",
+    }
+    if metadata:
+        payload_metadata.update(metadata)
     data = {
         "capture_id": capture_id,
-        "metadata": json.dumps(metadata or {}),
+        "metadata": json.dumps(payload_metadata),
     }
     return requests.post(url, files=files, data=data, timeout=10)
 

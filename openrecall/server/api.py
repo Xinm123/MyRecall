@@ -438,10 +438,12 @@ def heartbeat():
         JSON with status "ok" and current configuration.
     """
     try:
+        payload = request.get_json(silent=True) or {}
+        now = time.time()
         with runtime_settings._lock:
-            runtime_settings.last_heartbeat = time.time()
+            runtime_settings.update_client_state(payload, now_epoch=now)
             config = runtime_settings.to_dict()
-            client_online = (time.time() - runtime_settings.last_heartbeat) < 15
+            client_online = (now - runtime_settings.last_heartbeat) < 15
             config["client_online"] = client_online
 
         return jsonify({"status": "ok", "config": config}), 200

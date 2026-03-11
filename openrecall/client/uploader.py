@@ -1,21 +1,21 @@
-"""HTTP Uploader for OpenRecall client.
+"""HTTP Uploader for OpenRecall client."""
 
-Handles communication with the OpenRecall server API.
-Provides health check and screenshot upload functionality.
-"""
-
-import time
-import json
+import logging
 import io
-import urllib.parse
-from typing import Optional
+import json
+import time
 
 import numpy as np
 import requests
+from numpy.typing import NDArray
 from PIL import Image
 
 from openrecall.shared.config import settings
 from openrecall.shared.utils import _build_request_kwargs
+
+logger = logging.getLogger(__name__)
+
+ImageArray = NDArray[np.uint8]
 
 
 class HTTPUploader:
@@ -26,15 +26,15 @@ class HTTPUploader:
         timeout: Request timeout in seconds.
     """
 
-    def __init__(self, api_url: Optional[str] = None, timeout: Optional[int] = None):
+    def __init__(self, api_url: str | None = None, timeout: int | None = None):
         """Initialize the uploader.
 
         Args:
             api_url: Override the default API URL from settings.
             timeout: Request timeout in seconds. Defaults to settings.upload_timeout.
         """
-        self.api_url = api_url or settings.api_url
-        self.timeout = timeout or settings.upload_timeout
+        self.api_url: str = api_url or settings.api_url
+        self.timeout: int = timeout or settings.upload_timeout
 
     def health_check(self) -> bool:
         """Check if the server is healthy.
@@ -71,7 +71,7 @@ class HTTPUploader:
 
     def upload_screenshot(
         self,
-        image: np.ndarray,
+        image: ImageArray,
         timestamp: int,
         active_app: str,
         active_window: str,
@@ -111,16 +111,18 @@ class HTTPUploader:
             if response.status_code in (200, 202):
                 return True
             else:
-                print(f"Upload failed: {response.status_code} - {response.text}")
+                logger.error(
+                    "Upload failed: %s - %s", response.status_code, response.text
+                )
                 return False
 
         except requests.RequestException as e:
-            print(f"Upload error: {e}")
+            logger.error("Upload error: %s", e)
             return False
 
 
 # Module-level singleton for convenience
-_uploader: Optional[HTTPUploader] = None
+_uploader: HTTPUploader | None = None
 
 
 def get_uploader() -> HTTPUploader:

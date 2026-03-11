@@ -426,6 +426,7 @@
       <div x-data="controlCenter()" class="control-center-btn">
         <button 
           @click="toggle()" 
+          type="button"
           class="toolbar-icon-link" 
           title="Control"
           style="position: relative; margin-left: 8px;">
@@ -631,6 +632,20 @@
         const frameStatus = data.frame_status;
         const failed = data.queue ? data.queue.failed : 0;
         const lastFrameTimestamp = data.last_frame_timestamp;
+        const permissionStatus = data.capture_permission_status;
+        const permissionReason = data.capture_permission_reason;
+
+        if (permissionReason === 'stale_permission_state') {
+          return { state: 'degraded', message: '权限状态陈旧' };
+        }
+
+        if (permissionStatus === 'recovering') {
+          return { state: 'degraded', message: '权限恢复中' };
+        }
+
+        if (permissionStatus === 'denied_or_revoked') {
+          return { state: 'degraded', message: '权限异常' };
+        }
         
         // Healthy: status == "ok" and frame_status == "ok" and queue.failed == 0
         if (status === 'ok' && frameStatus === 'ok' && failed === 0) {

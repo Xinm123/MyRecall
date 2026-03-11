@@ -1,10 +1,11 @@
 """v3 FramesStore: SQLite-backed store for the `frames` table."""
 
 import logging
+import os
 import sqlite3
 import uuid
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Optional
 
@@ -61,6 +62,29 @@ def normalize_timestamp_filter(value: object) -> Optional[str]:
     return _to_utc_iso8601(value)
 
 
+def _parse_utc_datetime(value: object) -> Optional[datetime]:
+    normalized = _to_utc_iso8601(value)
+    if normalized is None:
+        return None
+    return datetime.fromisoformat(normalized.replace("Z", "+00:00")).astimezone(
+        timezone.utc
+    )
+
+
+def _percentile(values: list[float], percentile: float) -> Optional[float]:
+    if not values:
+        return None
+    if len(values) == 1:
+        return float(values[0])
+
+    ordered = sorted(values)
+    rank = (len(ordered) - 1) * percentile
+    lower = int(rank)
+    upper = min(lower + 1, len(ordered) - 1)
+    weight = rank - lower
+    return float(ordered[lower] + (ordered[upper] - ordered[lower]) * weight)
+
+
 @dataclass
 class Frame:
     id: int
@@ -106,7 +130,7 @@ class FramesStore:
 
     def _extract_metadata_fields(
         self, metadata: dict[str, object]
-    ) -> tuple[object, object, object, object, object, object, object]:
+    ) -> tuple[object, object, object, object, object, object, object, object, object]:
         raw_timestamp = metadata.get("timestamp") or metadata.get("capture_time")
         timestamp = _to_utc_iso8601(raw_timestamp) or ""
         app_name = (
@@ -121,7 +145,9 @@ class FramesStore:
         )
         browser_url = metadata.get("browser_url")
         focused = metadata.get("focused")
+        device_name = metadata.get("device_name") or "monitor_0"
         capture_trigger = metadata.get("capture_trigger")
+        event_ts = _to_utc_iso8601(metadata.get("event_ts"))
         image_size_bytes = metadata.get("image_size_bytes")
         return (
             timestamp,
@@ -129,7 +155,9 @@ class FramesStore:
             window_name,
             browser_url,
             focused,
+            device_name,
             capture_trigger,
+            event_ts,
             image_size_bytes,
         )
 
@@ -142,7 +170,9 @@ class FramesStore:
             window_name,
             browser_url,
             focused,
+            device_name,
             capture_trigger,
+            event_ts,
             image_size_bytes,
         ) = self._extract_metadata_fields(metadata)
 
@@ -152,8 +182,9 @@ class FramesStore:
                     """
                     INSERT OR IGNORE INTO frames
                         (capture_id, timestamp, app_name, window_name, browser_url,
-                         focused, capture_trigger, snapshot_path, image_size_bytes, status)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')
+                         focused, device_name, capture_trigger, event_ts, snapshot_path,
+                         image_size_bytes, status)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')
                     """,
                     (
                         capture_id,
@@ -162,7 +193,9 @@ class FramesStore:
                         window_name,
                         browser_url,
                         focused,
+                        device_name,
                         capture_trigger,
+                        event_ts,
                         None,
                         image_size_bytes,
                     ),
@@ -334,8 +367,17 @@ class FramesStore:
         try:
             with self._connect() as conn:
                 cursor = conn.execute(
-                    "UPDATE frames SET status = ? WHERE id = ? AND status = ?",
-                    (to_status, frame_id, from_status),
+                    """
+                    UPDATE frames
+                    SET status = ?,
+                        processed_at = CASE
+                            WHEN ? = 'completed'
+                            THEN strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+                            ELSE processed_at
+                        END
+                    WHERE id = ? AND status = ?
+                    """,
+                    (to_status, to_status, frame_id, from_status),
                 )
                 conn.commit()
                 updated = cursor.rowcount > 0
@@ -557,3 +599,95 @@ class FramesStore:
         except sqlite3.Error as e:
             logger.error("get_memories_since failed: %s", e)
         return memories
+
+    def get_capture_latency_summary(
+        self, window_seconds: int = 300
+    ) -> dict[str, object]:
+        now = datetime.now(timezone.utc)
+        window_start = now - timedelta(seconds=window_seconds)
+        window_start_iso = window_start.isoformat().replace("+00:00", "Z")
+        values: list[float] = []
+        anomaly_count = 0
+
+        try:
+            with self._connect() as conn:
+                rows = conn.execute(
+                    """
+                    SELECT event_ts, ingested_at
+                    FROM frames
+                    WHERE ingested_at >= ?
+                    ORDER BY ingested_at ASC
+                    """,
+                    (window_start_iso,),
+                ).fetchall()
+        except sqlite3.Error as e:
+            logger.error("get_capture_latency_summary failed: %s", e)
+            rows = []
+
+        for row in rows:
+            ingested_at = _parse_utc_datetime(row["ingested_at"])
+            event_ts = _parse_utc_datetime(row["event_ts"])
+            if ingested_at is None or event_ts is None:
+                anomaly_count += 1
+                continue
+            latency_ms = (ingested_at - event_ts).total_seconds() * 1000.0
+            if latency_ms < 0:
+                anomaly_count += 1
+                continue
+            values.append(latency_ms)
+
+        return {
+            "capture_latency_p50": _percentile(values, 0.50),
+            "capture_latency_p90": _percentile(values, 0.90),
+            "capture_latency_p95": _percentile(values, 0.95),
+            "capture_latency_p99": _percentile(values, 0.99),
+            "capture_latency_sample_count": len(values),
+            "capture_latency_anomaly_count": anomaly_count,
+            "window_id": f"{int(window_start.timestamp())}-{int(now.timestamp())}",
+            "edge_pid": os.getpid(),
+            "broken_window": False,
+        }
+
+    def get_status_sync_summary(self, window_seconds: int = 300) -> dict[str, object]:
+        now = datetime.now(timezone.utc)
+        window_start = now - timedelta(seconds=window_seconds)
+        window_start_iso = window_start.isoformat().replace("+00:00", "Z")
+        values: list[float] = []
+
+        try:
+            with self._connect() as conn:
+                rows = conn.execute(
+                    """
+                    SELECT ingested_at, processed_at
+                    FROM frames
+                    WHERE status = 'completed'
+                      AND processed_at IS NOT NULL
+                      AND processed_at >= ?
+                    ORDER BY processed_at ASC
+                    """,
+                    (window_start_iso,),
+                ).fetchall()
+        except sqlite3.Error as e:
+            logger.error("get_status_sync_summary failed: %s", e)
+            rows = []
+
+        for row in rows:
+            ingested_at = _parse_utc_datetime(row["ingested_at"])
+            processed_at = _parse_utc_datetime(row["processed_at"])
+            if ingested_at is None or processed_at is None:
+                continue
+            latency_ms = (processed_at - ingested_at).total_seconds() * 1000.0
+            if latency_ms < 0:
+                continue
+            values.append(latency_ms)
+
+        return {
+            "status_sync_p50": _percentile(values, 0.50),
+            "status_sync_p90": _percentile(values, 0.90),
+            "status_sync_p95": _percentile(values, 0.95),
+            "status_sync_p99": _percentile(values, 0.99),
+            "status_sync_sample_count": len(values),
+            "window_id": f"{int(window_start.timestamp())}-{int(now.timestamp())}",
+            "edge_pid": os.getpid(),
+            "broken_window": False,
+        }

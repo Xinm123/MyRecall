@@ -42,6 +42,31 @@ class Settings(BaseSettings):
 
     debug: bool = Field(default=True, alias="OPENRECALL_DEBUG")
     capture_interval: int = Field(default=10, alias="OPENRECALL_CAPTURE_INTERVAL")
+    min_capture_interval_ms: int = Field(
+        default=1000,
+        alias="OPENRECALL_MIN_CAPTURE_INTERVAL_MS",
+        description="Minimum debounce interval shared by capture_trigger values idle/app_switch/manual/click",
+    )
+    idle_capture_interval_ms: int = Field(
+        default=30000,
+        alias="OPENRECALL_IDLE_CAPTURE_INTERVAL_MS",
+        description="Idle fallback interval in milliseconds for capture_trigger=idle",
+    )
+    permission_poll_interval_sec: int = Field(
+        default=10,
+        alias="OPENRECALL_PERMISSION_POLL_INTERVAL_SEC",
+        description="Polling interval for capture permission state checks",
+    )
+    trigger_queue_capacity: int = Field(
+        default=64,
+        alias="OPENRECALL_TRIGGER_QUEUE_CAPACITY",
+        description="Capacity of the bounded trigger event queue",
+    )
+    stats_interval_sec: int = Field(
+        default=60,
+        alias="OPENRECALL_STATS_INTERVAL_SEC",
+        description="Statistics logging interval in seconds",
+    )
     host: str = Field(default="127.0.0.1", alias="OPENRECALL_HOST")
     port: int = Field(default=8083, alias="OPENRECALL_PORT")
     primary_monitor_only: bool = Field(
@@ -415,6 +440,11 @@ class Settings(BaseSettings):
     @model_validator(mode="after")
     def _ensure_dirs_on_init(self) -> "Settings":
         """Automatically create directories after settings initialization."""
+        if "OPENRECALL_IDLE_CAPTURE_INTERVAL_MS" not in os.environ:
+            legacy_capture_interval = os.environ.get("OPENRECALL_CAPTURE_INTERVAL")
+            if legacy_capture_interval:
+                self.idle_capture_interval_ms = int(legacy_capture_interval) * 1000
+
         try:
             self.ensure_directories()
             self.verify_writable()

@@ -18,6 +18,7 @@ from typing import Optional
 
 from flask import Blueprint, jsonify, request, send_file
 
+from openrecall.server.config_runtime import runtime_settings
 from openrecall.server.database.frames_store import FramesStore
 from openrecall.shared.config import settings
 
@@ -31,6 +32,7 @@ _frames_store: Optional[FramesStore] = None
 # Constants for validation
 _MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024  # 10 MB
 _ALLOWED_MIME_TYPE = "image/jpeg"
+_ALLOWED_CAPTURE_TRIGGERS = frozenset({"idle", "app_switch", "manual", "click"})
 
 
 def _get_frames_store() -> FramesStore:
@@ -212,6 +214,19 @@ def ingest():
                 request_id=request_id,
             )
 
+    capture_trigger = metadata.get("capture_trigger")
+    if (
+        capture_trigger is None
+        or not isinstance(capture_trigger, str)
+        or capture_trigger not in _ALLOWED_CAPTURE_TRIGGERS
+    ):
+        return make_error_response(
+            "capture_trigger must be one of idle, app_switch, manual, click",
+            "INVALID_PARAMS",
+            400,
+            request_id=request_id,
+        )
+
     # ------------------------------------------------------------------
     # Step 3: Back-pressure check (503) — no DB writes before this point
     # ------------------------------------------------------------------
@@ -375,6 +390,9 @@ def queue_status():
             "processing_mode": settings.processing_mode,
             "capacity": settings.queue_capacity,
             "oldest_pending_ingested_at": oldest,
+            "trigger_channel": runtime_settings.get_trigger_channel_snapshot(),
+            "capture_latency": store.get_capture_latency_summary(),
+            "status_sync": store.get_status_sync_summary(),
         }
     )
 
@@ -485,18 +503,34 @@ def health():
             frame_status = "stale" if age_seconds >= _STALE_THRESHOLD_SECONDS else "ok"
 
     failed_count = counts.get("failed", 0)
+    permission_snapshot = runtime_settings.get_permission_snapshot()
+    permission_status = permission_snapshot["capture_permission_status"]
+    permission_reason = permission_snapshot["capture_permission_reason"]
+    permission_degraded = permission_snapshot["is_stale"] or permission_status in {
+        "denied_or_revoked",
+        "recovering",
+    }
+
     # P1-S1: status is only "ok" or "degraded"
-    if failed_count > 0 or frame_status != "ok":
+    if failed_count > 0 or frame_status != "ok" or permission_degraded:
         overall_status = "degraded"
     else:
         overall_status = "ok"
 
     if overall_status == "ok":
         message = "服务健康/队列正常"
+    elif permission_reason == "stale_permission_state":
+        message = "权限状态陈旧"
+    elif permission_status == "recovering":
+        message = "权限恢复中"
+    elif permission_status == "denied_or_revoked":
+        message = "权限异常"
     elif last_frame_ts is None and frame_status == "stale" and failed_count == 0:
         message = "等待首帧"
+    elif failed_count > 0:
+        message = "队列异常"
     else:
-        message = "degraded"
+        message = "数据延迟"
 
     return jsonify(
         {
@@ -505,6 +539,9 @@ def health():
             "last_frame_ingested_at": last_ingested_at,
             "frame_status": frame_status,
             "message": message,
+            "capture_permission_status": permission_status,
+            "capture_permission_reason": permission_reason,
+            "last_permission_check_ts": permission_snapshot["last_permission_check_ts"],
             "queue": {
                 "pending": counts.get("pending", 0),
                 "processing": counts.get("processing", 0),
