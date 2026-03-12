@@ -69,6 +69,8 @@ class RuntimeSettings:
         self.capture_permission_reason: str = "granted"
         self.last_permission_check_ts: str = _utc_now_iso()
         self.last_permission_snapshot_epoch: float = 0.0
+        self.screen_capture_status: str = "ok"
+        self.screen_capture_reason: str = "capture_continuing"
 
         self.queue_depth: int = 0
         self.queue_capacity: int = 0
@@ -96,6 +98,8 @@ class RuntimeSettings:
                 "capture_permission_status": self.capture_permission_status,
                 "capture_permission_reason": self.capture_permission_reason,
                 "last_permission_check_ts": self.last_permission_check_ts,
+                "screen_capture_status": self.screen_capture_status,
+                "screen_capture_reason": self.screen_capture_reason,
                 "queue_depth": self.queue_depth,
                 "queue_capacity": self.queue_capacity,
                 "collapse_trigger_count": self.collapse_trigger_count,
@@ -132,6 +136,12 @@ class RuntimeSettings:
                 self.capture_permission_reason = str(permission_reason)
                 self.last_permission_check_ts = str(permission_check_ts)
                 self.last_permission_snapshot_epoch = now
+
+            screen_capture_status = payload.get("screen_capture_status")
+            screen_capture_reason = payload.get("screen_capture_reason")
+            if screen_capture_status is not None and screen_capture_reason is not None:
+                self.screen_capture_status = str(screen_capture_status)
+                self.screen_capture_reason = str(screen_capture_reason)
 
             trigger_fields = (
                 _coerce_int(payload.get("queue_depth")),
@@ -179,6 +189,13 @@ class RuntimeSettings:
                 "capture_permission_reason": reason,
                 "last_permission_check_ts": self.last_permission_check_ts,
                 "is_stale": is_stale,
+            }
+
+    def get_screen_capture_snapshot(self) -> dict[str, str]:
+        with self._lock:
+            return {
+                "screen_capture_status": self.screen_capture_status,
+                "screen_capture_reason": self.screen_capture_reason,
             }
 
     def get_trigger_channel_snapshot(

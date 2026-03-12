@@ -38,6 +38,8 @@ class PermissionCheckResult:
     ok: bool
     reason: str
     checked_at: str | None = None
+    screen_capture_ok: bool = True
+    screen_capture_reason: str = "capture_continuing"
 
 
 @dataclass(frozen=True)
@@ -125,24 +127,56 @@ def detect_permissions() -> PermissionCheckResult:
             logger.debug(
                 "DEV MODE: Permission bypass active (OPENRECALL_SKIP_PERMISSION_CHECK=true)"
             )
-        return PermissionCheckResult(ok=True, reason="dev_mode_bypass")
+        return PermissionCheckResult(
+            ok=True,
+            reason="dev_mode_bypass",
+            screen_capture_ok=True,
+            screen_capture_reason="capture_continuing",
+        )
 
     if ApplicationServices is None or Quartz is None:
-        return PermissionCheckResult(ok=True, reason="permission_check_unavailable")
+        return PermissionCheckResult(
+            ok=True,
+            reason="permission_check_unavailable",
+            screen_capture_ok=True,
+            screen_capture_reason="capture_continuing",
+        )
 
     ax_is_process_trusted = getattr(ApplicationServices, "AXIsProcessTrusted", None)
     screen_capture_access = getattr(Quartz, "CGPreflightScreenCaptureAccess", None)
     if ax_is_process_trusted is None or screen_capture_access is None:
-        return PermissionCheckResult(ok=True, reason="permission_check_unavailable")
+        return PermissionCheckResult(
+            ok=True,
+            reason="permission_check_unavailable",
+            screen_capture_ok=True,
+            screen_capture_reason="capture_continuing",
+        )
 
     accessibility_ok = bool(ax_is_process_trusted())
     screen_capture_ok = bool(screen_capture_access())
 
     if accessibility_ok and screen_capture_ok:
-        return PermissionCheckResult(ok=True, reason="granted")
+        return PermissionCheckResult(
+            ok=True,
+            reason="granted",
+            screen_capture_ok=True,
+            screen_capture_reason="capture_continuing",
+        )
     if not accessibility_ok:
-        return PermissionCheckResult(ok=False, reason="accessibility_denied")
-    return PermissionCheckResult(ok=False, reason="screen_recording_denied")
+        return PermissionCheckResult(
+            ok=False,
+            reason="accessibility_denied",
+            screen_capture_ok=screen_capture_ok,
+            screen_capture_reason=(
+                "capture_continuing" if screen_capture_ok else "screen_recording_denied"
+            ),
+        )
+    return PermissionCheckResult(
+        ok=True,
+        reason="granted",
+        screen_capture_ok=False,
+        screen_capture_reason="screen_recording_denied",
+    )
 
 
 def permission_poll_interval_sec() -> int:

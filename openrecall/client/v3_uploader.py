@@ -20,6 +20,37 @@ _INGEST_TIMEOUT = 30
 _BACKOFF_BASE = 1
 _BACKOFF_MAX = 60
 
+_CANONICAL_METADATA_KEYS = {
+    "timestamp",
+    "event_ts",
+    "app_name",
+    "window_name",
+    "browser_url",
+    "browser_url_classification",
+    "focused",
+    "device_name",
+    "capture_trigger",
+    "accessibility_text",
+    "content_hash",
+    "event_device_hint",
+    "outcome",
+    "capture_cycle_latency_ms",
+    "host_pid",
+    "runtime_started_at",
+    "image_size_bytes",
+    "capture_id",
+}
+
+
+def _canonicalize_upload_metadata(metadata: dict[str, object]) -> dict[str, object]:
+    canonical = {k: v for k, v in metadata.items() if k in _CANONICAL_METADATA_KEYS}
+    canonical.setdefault("browser_url", None)
+    canonical.setdefault("accessibility_text", "")
+    canonical.setdefault("content_hash", None)
+    canonical.setdefault("device_name", "monitor_0")
+    canonical.setdefault("capture_trigger", "manual")
+    return canonical
+
 
 @dataclass
 class UploadResult:
@@ -59,9 +90,10 @@ def upload_capture(item: SpoolItem, spool: Optional[SpoolQueue] = None) -> Uploa
     try:
         with open(item.jpg_path, "rb") as jpg_fh:
             files = {"file": (f"{item.capture_id}.jpg", jpg_fh, "image/jpeg")}
+            metadata = _canonicalize_upload_metadata(dict(item.metadata))
             data = {
                 "capture_id": item.capture_id,
-                "metadata": json.dumps(item.metadata),
+                "metadata": json.dumps(metadata),
             }
             response = requests.post(
                 url,
@@ -104,6 +136,21 @@ def upload_capture(item: SpoolItem, spool: Optional[SpoolQueue] = None) -> Uploa
             retry_after,
         )
         return UploadResult(success=False, retry_after=retry_after, apply_backoff=False)
+
+    if response.status_code == 400:
+        body = {}
+        try:
+            body = response.json()
+        except Exception:
+            pass
+        if body.get("code") == "INVALID_PARAMS":
+            logger.error(
+                "v3_uploader: schema_rejected capture_id=%s code=%s",
+                item.capture_id,
+                body.get("code"),
+            )
+            spool.commit(item.capture_id)
+            return UploadResult(success=False, apply_backoff=False)
 
     logger.error(
         "v3_uploader: unexpected %d capture_id=%s body=%r",

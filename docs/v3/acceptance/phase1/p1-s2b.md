@@ -191,7 +191,7 @@
     - 边界样本：AX 空文本帧在 ingest 可见（不得丢帧），不计入 `content_hash` coverage 分母，并在后续 S3 验收中可被 OCR fallback 消化
     - outcome 样本：必须能区分 `ax_empty`、`ax_timeout_partial`、`permission_blocked`
 5. 执行高频“内容不变”压测（app switch/click，5 分钟），记录窗口元信息，并校验 `inter_write_gap_sec`（Soft KPI + Hard Gate：按 `device_name` 分桶，每设备 max <= 45s，样本 >= 100；`broken_window=true` 仅观测不判定）。
-   - 执行约束：Hard Gate 统计前必须先依据 `p1-s2b-proof-sample-filter.json` 剔除 `broken_window=true` 样本；SQL 仅对剩余有效样本执行。
+   - 执行约束：Hard Gate 统计前必须先依据 `p1-s2b-proof-filter.json` 剔除 `broken_window=true` 样本；SQL 仅对剩余有效样本执行。
 6. 测量 AX 树遍历延迟：
    - 记录每次遍历耗时
    - 统计 P95 是否 < 500ms
@@ -320,7 +320,7 @@
   - `p1-s2b-metrics.json`（content_hash/inter_write_gap/browser_url 指标汇总）
   - `p1-s2b-health-snapshots.json`（健康态与权限态快照）
   - `p1-s2b-outcomes.json`（capture outcome 分类汇总）
-  - `p1-s2b-proof-sample-filter.json`（proof sample 排除与原因）
+  - `p1-s2b-proof-filter.json`（proof sample 排除与原因）
   - `p1-s2b-ui-proof.md`（timeline 新帧、URL 提取、恢复流程截图索引）
 - 通过线：
   - Gate 脚本 `0 failed`；

@@ -634,6 +634,8 @@
         const lastFrameTimestamp = data.last_frame_timestamp;
         const permissionStatus = data.capture_permission_status;
         const permissionReason = data.capture_permission_reason;
+        const screenCaptureStatus = data.screen_capture_status;
+        const screenCaptureReason = data.screen_capture_reason;
 
         if (permissionReason === 'stale_permission_state') {
           return { state: 'degraded', message: '权限状态陈旧' };
@@ -645,6 +647,13 @@
 
         if (permissionStatus === 'denied_or_revoked') {
           return { state: 'degraded', message: '权限异常' };
+        }
+
+        if (screenCaptureStatus && screenCaptureStatus !== 'ok') {
+          if (screenCaptureReason === 'screen_recording_denied') {
+            return { state: 'degraded', message: '截图权限异常' };
+          }
+          return { state: 'degraded', message: '截图链路异常' };
         }
         
         // Healthy: status == "ok" and frame_status == "ok" and queue.failed == 0

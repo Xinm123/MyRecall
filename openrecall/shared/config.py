@@ -317,6 +317,11 @@ class Settings(BaseSettings):
         alias="OPENRECALL_FUSION_LOG_ENABLED",
         description="Whether to log fusion text to a file for debugging",
     )
+    plaintext_forensic_log_enabled: bool = Field(
+        default=True,
+        alias="OPENRECALL_PLAINTEXT_FORENSIC_LOG_ENABLED",
+        description="Whether to persist full plaintext capture forensic logs to a per-run file",
+    )
 
     @field_validator(
         "server_data_dir",

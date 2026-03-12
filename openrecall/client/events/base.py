@@ -139,6 +139,16 @@ class TriggerEvent:
         )
 
 
+@dataclass(frozen=True)
+class TriggerIntent:
+    capture_trigger: CaptureTrigger
+    event_ts: str
+    event_device_hint: str | None
+    active_app: str | None = None
+    active_window: str | None = None
+    payload: EventPayload | None = None
+
+
 class TriggerDebouncer:
     def __init__(self, min_interval_ms: int) -> None:
         self._min_interval_ms: int = min_interval_ms
@@ -223,3 +233,48 @@ class TriggerEventChannel:
                 collapse_trigger_count=self._collapse_trigger_count,
                 overflow_drop_count=self._overflow_drop_count,
             )
+
+
+class TriggerBus:
+    def __init__(self, capacity: int = 1) -> None:
+        self._capacity = max(1, capacity)
+        self._queues: dict[str, queue.Queue[TriggerIntent]] = {}
+        self._lock: threading.RLock = threading.RLock()
+
+    def ensure_worker(self, worker_id: str) -> queue.Queue[TriggerIntent]:
+        with self._lock:
+            existing = self._queues.get(worker_id)
+            if existing is not None:
+                return existing
+            created: queue.Queue[TriggerIntent] = queue.Queue(maxsize=self._capacity)
+            self._queues[worker_id] = created
+            return created
+
+    def remove_worker(self, worker_id: str) -> None:
+        with self._lock:
+            _ = self._queues.pop(worker_id, None)
+
+    def broadcast(self, intent: TriggerIntent) -> None:
+        with self._lock:
+            for worker_id, worker_queue in self._queues.items():
+                try:
+                    worker_queue.put_nowait(intent)
+                    continue
+                except queue.Full:
+                    pass
+
+                try:
+                    _ = worker_queue.get_nowait()
+                except queue.Empty:
+                    logger.debug(
+                        "TriggerBus queue unexpectedly empty for worker_id=%s",
+                        worker_id,
+                    )
+
+                try:
+                    worker_queue.put_nowait(intent)
+                except queue.Full:
+                    logger.debug(
+                        "TriggerBus dropped intent for saturated worker_id=%s",
+                        worker_id,
+                    )

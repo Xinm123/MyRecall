@@ -1,9 +1,15 @@
 from __future__ import annotations
 
 import queue
+import time
 
+import numpy as np
 import pytest
 
+from openrecall.client.accessibility.types import (
+    AccessibilityRawHandoff,
+    FocusedContext,
+)
 from openrecall.client.events.base import (
     CaptureTrigger,
     MonitorDescriptor,
@@ -343,3 +349,144 @@ def test_stop_stops_app_switch_monitor(monkeypatch) -> None:
     recorder.stop()
 
     assert calls == ["switch", "thread", "thread"]
+
+
+@pytest.mark.unit
+def test_capture_cycle_latency_includes_screenshot_time(monkeypatch) -> None:
+    recorder = ScreenRecorder()
+    captured_metadata: list[dict[str, object]] = []
+    monitor = MonitorDescriptor(
+        stable_id="1",
+        left=0,
+        top=0,
+        width=100,
+        height=100,
+        is_primary=True,
+    )
+    event = TriggerEvent(
+        capture_trigger=CaptureTrigger.CLICK,
+        device_name=monitor.device_name,
+        event_ts="2026-03-12T00:00:00Z",
+    )
+
+    monkeypatch.setattr(recorder, "start", lambda: None)
+    monkeypatch.setattr(recorder, "_start_event_sources", lambda: None)
+    monkeypatch.setattr(recorder, "_send_heartbeat", lambda **kwargs: None)
+    monkeypatch.setattr(recorder, "_poll_permissions", lambda **kwargs: None)
+    monkeypatch.setattr(recorder, "_report_stats", lambda: None)
+    monkeypatch.setattr(recorder, "_refresh_monitors", lambda: [monitor])
+    monkeypatch.setattr(recorder, "_wait_for_trigger", lambda **kwargs: event)
+    monkeypatch.setattr(
+        recorder,
+        "_snapshot_active_context",
+        lambda: ("Google Chrome", "Example Tab"),
+    )
+
+    handoff = AccessibilityRawHandoff(
+        accessibility_text="hello",
+        content_hash="sha256:" + "1" * 64,
+        focused_context=FocusedContext(
+            app_name="Google Chrome",
+            window_name="Example Tab",
+            browser_url="https://example.com",
+        ),
+        browser_url_classification="browser_url_success",
+        event_device_hint=monitor.device_name,
+        final_device_name=monitor.device_name,
+        outcome="capture_completed",
+    )
+    monkeypatch.setattr(
+        recorder._accessibility_service,
+        "collect_raw_handoff",
+        lambda **kwargs: handoff,
+    )
+
+    def _capture_monitors(monitors: list[MonitorDescriptor]):
+        time.sleep(0.02)
+        return {monitor.device_name: np.zeros((2, 2, 3), dtype=np.uint8)}
+
+    monkeypatch.setattr(recorder, "_capture_monitors", _capture_monitors)
+    monkeypatch.setattr(recorder, "_warn_if_blank_frame", lambda *args, **kwargs: None)
+    monkeypatch.setattr(recorder._spool, "count", lambda: 1)
+
+    def _enqueue(_image, metadata):
+        captured_metadata.append(dict(metadata))
+        recorder._stop_requested = True
+        return "capture-001"
+
+    monkeypatch.setattr(recorder._spool, "enqueue", _enqueue)
+
+    recorder.run_capture_loop()
+
+    assert captured_metadata
+    assert isinstance(captured_metadata[0]["capture_cycle_latency_ms"], int)
+    assert captured_metadata[0]["capture_cycle_latency_ms"] >= 20
+
+
+@pytest.mark.unit
+def test_spool_failed_outcome_is_logged_with_structured_metadata(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    recorder = ScreenRecorder()
+    monitor = MonitorDescriptor(
+        stable_id="1",
+        left=0,
+        top=0,
+        width=100,
+        height=100,
+        is_primary=True,
+    )
+    event = TriggerEvent(
+        capture_trigger=CaptureTrigger.CLICK,
+        device_name=monitor.device_name,
+        event_ts="2026-03-12T00:00:00Z",
+    )
+
+    monkeypatch.setattr(recorder, "start", lambda: None)
+    monkeypatch.setattr(recorder, "_start_event_sources", lambda: None)
+    monkeypatch.setattr(recorder, "_send_heartbeat", lambda **kwargs: None)
+    monkeypatch.setattr(recorder, "_poll_permissions", lambda **kwargs: None)
+    monkeypatch.setattr(recorder, "_report_stats", lambda: None)
+    monkeypatch.setattr(recorder, "_refresh_monitors", lambda: [monitor])
+    monkeypatch.setattr(recorder, "_wait_for_trigger", lambda **kwargs: event)
+    monkeypatch.setattr(
+        recorder,
+        "_snapshot_active_context",
+        lambda: ("Google Chrome", "Example Tab"),
+    )
+    monkeypatch.setattr(
+        recorder,
+        "_capture_monitors",
+        lambda monitors: {monitor.device_name: np.zeros((2, 2, 3), dtype=np.uint8)},
+    )
+    monkeypatch.setattr(recorder, "_warn_if_blank_frame", lambda *args, **kwargs: None)
+
+    handoff = AccessibilityRawHandoff(
+        accessibility_text="hello",
+        content_hash="sha256:" + "1" * 64,
+        focused_context=FocusedContext(
+            app_name="Google Chrome",
+            window_name="Example Tab",
+            browser_url="https://example.com",
+        ),
+        browser_url_classification="browser_url_success",
+        event_device_hint=monitor.device_name,
+        final_device_name=monitor.device_name,
+        outcome="capture_completed",
+    )
+    monkeypatch.setattr(
+        recorder._accessibility_service,
+        "collect_raw_handoff",
+        lambda **kwargs: handoff,
+    )
+
+    def _raise_spool_failure(_image, _metadata):
+        recorder._stop_requested = True
+        raise RuntimeError("disk full")
+
+    monkeypatch.setattr(recorder._spool, "enqueue", _raise_spool_failure)
+
+    with caplog.at_level("ERROR"):
+        recorder.run_capture_loop()
+
+    assert "outcome=spool_failed" in caplog.text

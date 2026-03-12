@@ -5,7 +5,12 @@ from typing import Any
 import pytest
 
 from openrecall.client.spool import SpoolItem, SpoolQueue
-from openrecall.client.v3_uploader import SpoolUploader, UploadResult, upload_capture
+from openrecall.client.v3_uploader import (
+    SpoolUploader,
+    UploadResult,
+    _canonicalize_upload_metadata,
+    upload_capture,
+)
 
 
 class _FakeResponse:
@@ -87,3 +92,50 @@ def test_spool_uploader_uses_single_wait_for_retry_after(tmp_path: Path, monkeyp
     assert calls["n"] == 2
     assert event.wait_calls == [3.0]
     assert uploader._retry_count == 0
+
+
+@pytest.mark.unit
+def test_canonicalize_upload_metadata_preserves_section7_evidence_fields() -> None:
+    metadata = _canonicalize_upload_metadata(
+        {
+            "timestamp": "2026-03-12T00:00:00Z",
+            "event_ts": "2026-03-12T00:00:00Z",
+            "device_name": "monitor_a",
+            "capture_trigger": "click",
+            "accessibility_text": "hello",
+            "content_hash": "sha256:" + "1" * 64,
+            "outcome": "capture_completed",
+            "event_device_hint": "monitor_hint",
+            "capture_cycle_latency_ms": 137,
+            "host_pid": 4242,
+            "runtime_started_at": "2026-03-12T00:00:00Z",
+            "schema_rejected": True,
+        }
+    )
+
+    assert metadata["outcome"] == "capture_completed"
+    assert metadata["event_device_hint"] == "monitor_hint"
+    assert metadata["capture_cycle_latency_ms"] == 137
+    assert metadata["host_pid"] == 4242
+    assert metadata["runtime_started_at"] == "2026-03-12T00:00:00Z"
+    assert "schema_rejected" not in metadata
+
+
+@pytest.mark.unit
+def test_upload_capture_invalid_params_commits_schema_rejected_without_backoff(
+    tmp_path: Path, monkeypatch
+):
+    item = _make_item(tmp_path, capture_id="c3")
+    spool = SpoolQueue(storage_dir=tmp_path)
+    commits: list[str] = []
+    monkeypatch.setattr(spool, "commit", lambda capture_id: commits.append(capture_id))
+    monkeypatch.setattr(
+        "openrecall.client.v3_uploader.requests.post",
+        lambda *args, **kwargs: _FakeResponse(400, {"code": "INVALID_PARAMS"}),
+    )
+
+    result = upload_capture(item, spool=spool)
+
+    assert result.success is False
+    assert result.apply_backoff is False
+    assert commits == ["c3"]

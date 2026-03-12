@@ -5,7 +5,7 @@ Use it as the operational source of truth for commands and coding conventions.
 
 ## Project Snapshot
 
-- MyRecall v3 is a privacy-first local memory system (screenshot capture + AI + search).
+- MyRecall v3 is a local memory system (screenshot capture + AI + search).
 - **Python 3.11+ required**.
 - Architecture is split into `openrecall/client`, `openrecall/server`, and `openrecall/client/events/` (event-driven capture).
 - Main entry points are module runs (`python -m openrecall.*`) and wrapper scripts.

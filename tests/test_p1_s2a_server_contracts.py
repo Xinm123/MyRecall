@@ -17,6 +17,8 @@ from openrecall.server import __main__ as server_main
 from openrecall.server import api, api_v1
 from openrecall.server.config_runtime import runtime_settings
 from openrecall.server.database.frames_store import FramesStore
+from openrecall.client import v3_uploader
+from openrecall.client.spool import SpoolItem
 
 
 def generate_uuid_v7() -> str:
@@ -98,8 +100,10 @@ def test_claim_frame_persists_s2a_metadata_fields(tmp_path: Path) -> None:
         "capture_trigger": "click",
         "event_ts": "2026-03-10T11:59:59Z",
         "device_name": "monitor_7",
-        "active_app": "Finder",
-        "active_window": "Desktop",
+        "app_name": "Finder",
+        "window_name": "Desktop",
+        "accessibility_text": "AX text",
+        "content_hash": "sha256:" + "f" * 64,
     }
 
     frame_id, is_new = store.claim_frame(capture_id=capture_id, metadata=metadata)
@@ -251,6 +255,241 @@ def test_ingest_rejects_invalid_capture_trigger_without_claim(monkeypatch, metad
 
 @pytest.mark.unit
 @pytest.mark.parametrize(
+    "missing_key",
+    [
+        "accessibility_text",
+        "content_hash",
+        "device_name",
+    ],
+)
+def test_ingest_rejects_missing_s2b_required_keys_without_claim(
+    monkeypatch: pytest.MonkeyPatch,
+    missing_key: str,
+) -> None:
+    app = Flask(__name__)
+    app.register_blueprint(api_v1.v1_bp)
+    client = app.test_client()
+
+    class _FakeStore:
+        @staticmethod
+        def get_pending_count() -> int:
+            return 0
+
+        @staticmethod
+        def claim_frame(*args, **kwargs):
+            raise AssertionError("claim_frame must not run for schema_rejected payload")
+
+    monkeypatch.setattr(api_v1, "_get_frames_store", lambda: _FakeStore())
+
+    metadata: dict[str, object] = {
+        "timestamp": "2026-03-10T12:00:00Z",
+        "capture_trigger": "manual",
+        "device_name": "monitor_1",
+        "accessibility_text": "",
+        "content_hash": None,
+    }
+    _ = metadata.pop(missing_key)
+
+    response = client.post(
+        "/v1/ingest",
+        data={
+            "capture_id": generate_uuid_v7(),
+            "metadata": json.dumps(metadata),
+            "file": (io.BytesIO(create_test_jpeg()), "test.jpg", "image/jpeg"),
+        },
+        content_type="multipart/form-data",
+    )
+
+    assert response.status_code == 400
+    payload = response.get_json()
+    assert payload["code"] == "INVALID_PARAMS"
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    ("accessibility_text", "content_hash"),
+    [
+        (None, None),
+        ("ok", ""),
+        ("ok", 123),
+    ],
+)
+def test_ingest_rejects_invalid_s2b_field_types(
+    monkeypatch: pytest.MonkeyPatch,
+    accessibility_text: object,
+    content_hash: object,
+) -> None:
+    app = Flask(__name__)
+    app.register_blueprint(api_v1.v1_bp)
+    client = app.test_client()
+
+    class _FakeStore:
+        @staticmethod
+        def get_pending_count() -> int:
+            return 0
+
+        @staticmethod
+        def claim_frame(*args, **kwargs):
+            raise AssertionError("claim_frame must not run for invalid required fields")
+
+    monkeypatch.setattr(api_v1, "_get_frames_store", lambda: _FakeStore())
+
+    response = client.post(
+        "/v1/ingest",
+        data={
+            "capture_id": generate_uuid_v7(),
+            "metadata": json.dumps(
+                {
+                    "timestamp": "2026-03-10T12:00:00Z",
+                    "capture_trigger": "manual",
+                    "device_name": "monitor_1",
+                    "accessibility_text": accessibility_text,
+                    "content_hash": content_hash,
+                }
+            ),
+            "file": (io.BytesIO(create_test_jpeg()), "test.jpg", "image/jpeg"),
+        },
+        content_type="multipart/form-data",
+    )
+
+    assert response.status_code == 400
+    payload = response.get_json()
+    assert payload["code"] == "INVALID_PARAMS"
+
+
+@pytest.mark.unit
+def test_ingest_accepts_empty_ax_payload_and_persists_s2b_fields(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    client, _store, db_path = build_test_client(tmp_path, monkeypatch)
+
+    response = client.post(
+        "/v1/ingest",
+        data={
+            "capture_id": generate_uuid_v7(),
+            "metadata": json.dumps(
+                {
+                    "timestamp": "2026-03-10T12:00:00Z",
+                    "capture_trigger": "manual",
+                    "device_name": "monitor_2",
+                    "app_name": "Finder",
+                    "window_name": "Desktop",
+                    "browser_url": None,
+                    "accessibility_text": "",
+                    "content_hash": None,
+                }
+            ),
+            "file": (io.BytesIO(create_test_jpeg()), "test.jpg", "image/jpeg"),
+        },
+        content_type="multipart/form-data",
+    )
+
+    assert response.status_code == 201
+    with sqlite3.connect(str(db_path)) as conn:
+        row = conn.execute(
+            "SELECT accessibility_text, content_hash, device_name, app_name, window_name FROM frames"
+        ).fetchone()
+
+    assert row is not None
+    assert row[0] == ""
+    assert row[1] is None
+    assert row[2] == "monitor_2"
+    assert row[3] == "Finder"
+    assert row[4] == "Desktop"
+
+
+@pytest.mark.unit
+def test_ingest_alias_only_payload_is_treated_as_migration_observation(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    client, _store, db_path = build_test_client(tmp_path, monkeypatch)
+
+    response = client.post(
+        "/v1/ingest",
+        data={
+            "capture_id": generate_uuid_v7(),
+            "metadata": json.dumps(
+                {
+                    "timestamp": "2026-03-10T12:00:00Z",
+                    "capture_trigger": "app_switch",
+                    "device_name": "monitor_3",
+                    "active_app": "Legacy Finder",
+                    "active_window": "Legacy Window",
+                    "accessibility_text": "AX text",
+                    "content_hash": "sha256:" + "a" * 64,
+                }
+            ),
+            "file": (io.BytesIO(create_test_jpeg()), "test.jpg", "image/jpeg"),
+        },
+        content_type="multipart/form-data",
+    )
+
+    assert response.status_code == 201
+    with sqlite3.connect(str(db_path)) as conn:
+        row = conn.execute("SELECT app_name, window_name FROM frames").fetchone()
+
+    assert row is not None
+    assert row[0] is None
+    assert row[1] is None
+
+
+@pytest.mark.unit
+def test_v3_uploader_enforces_required_keys_and_canonical_metadata(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    jpg_path = tmp_path / "frame.jpg"
+    jpg_path.write_bytes(create_test_jpeg())
+
+    item = SpoolItem(
+        capture_id=generate_uuid_v7(),
+        jpg_path=jpg_path,
+        metadata={
+            "timestamp": "2026-03-10T12:00:00Z",
+            "capture_trigger": "manual",
+            "device_name": "monitor_9",
+            "active_app": "Legacy App",
+            "active_window": "Legacy Window",
+        },
+    )
+
+    class _Response:
+        status_code = 201
+
+        @staticmethod
+        def json() -> dict[str, object]:
+            return {"status": "queued", "frame_id": 1}
+
+    captured_data: dict[str, str] = {}
+
+    def _fake_post(*args, **kwargs):
+        captured_data.update(kwargs["data"])
+        return _Response()
+
+    class _FakeSpool:
+        @staticmethod
+        def commit(_capture_id: str) -> None:
+            return None
+
+    monkeypatch.setattr(v3_uploader.requests, "post", _fake_post)
+    monkeypatch.setattr(v3_uploader, "get_spool", lambda: _FakeSpool())
+    result = v3_uploader.upload_capture(item)
+
+    assert result.success is True
+    metadata = json.loads(captured_data["metadata"])
+    assert metadata["capture_trigger"] == "manual"
+    assert metadata["device_name"] == "monitor_9"
+    assert metadata["browser_url"] is None
+    assert metadata["accessibility_text"] == ""
+    assert metadata["content_hash"] is None
+    assert "active_app" not in metadata
+    assert "active_window" not in metadata
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize(
     "metadata_overrides",
     [
         {},
@@ -268,6 +507,8 @@ def test_ingest_accepts_missing_or_invalid_event_ts_but_excludes_latency_stats(
         "timestamp": iso_seconds_ago(1),
         "capture_trigger": "manual",
         "device_name": "monitor_1",
+        "accessibility_text": "",
+        "content_hash": None,
     }
     metadata.update(metadata_overrides)
 
@@ -304,6 +545,8 @@ def test_ingest_accepts_future_event_ts_but_excludes_negative_latency_sample(
                     "capture_trigger": "click",
                     "device_name": "monitor_1",
                     "event_ts": iso_seconds_ago(-60),
+                    "accessibility_text": "",
+                    "content_hash": None,
                 }
             ),
             "file": (io.BytesIO(create_test_jpeg()), "test.jpg", "image/jpeg"),
@@ -329,6 +572,8 @@ def test_duplicate_capture_id_with_valid_s2a_metadata_returns_already_exists(
         "capture_trigger": "manual",
         "device_name": "monitor_7",
         "event_ts": iso_seconds_ago(2),
+        "accessibility_text": "",
+        "content_hash": None,
     }
 
     first = client.post(
@@ -377,6 +622,8 @@ def test_heartbeat_updates_runtime_mirror_fields() -> None:
             "capture_permission_status": "recovering",
             "capture_permission_reason": "screen_recording_denied",
             "last_permission_check_ts": "2026-03-10T12:00:00Z",
+            "screen_capture_status": "degraded",
+            "screen_capture_reason": "screen_recording_denied",
             "queue_depth": 7,
             "queue_capacity": 64,
             "collapse_trigger_count": 2,
@@ -389,6 +636,8 @@ def test_heartbeat_updates_runtime_mirror_fields() -> None:
         assert runtime_settings.capture_permission_status == "recovering"
         assert runtime_settings.capture_permission_reason == "screen_recording_denied"
         assert runtime_settings.last_permission_check_ts == "2026-03-10T12:00:00Z"
+        assert runtime_settings.screen_capture_status == "degraded"
+        assert runtime_settings.screen_capture_reason == "screen_recording_denied"
         assert runtime_settings.queue_depth == 7
         assert runtime_settings.queue_capacity == 64
         assert runtime_settings.collapse_trigger_count == 2
@@ -547,5 +796,7 @@ def test_layout_health_polling_handles_permission_payload() -> None:
 
     assert "capture_permission_status" in content
     assert "capture_permission_reason" in content
+    assert "screen_capture_status" in content
+    assert "screen_capture_reason" in content
     assert "stale_permission_state" in content
     assert "权限异常" in content or "权限恢复中" in content

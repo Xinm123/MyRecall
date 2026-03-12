@@ -235,6 +235,8 @@ def upload_frame(
         "capture_trigger": "manual",
         "device_name": "monitor_0",
         "event_ts": "2026-03-10T12:00:00Z",
+        "accessibility_text": "",
+        "content_hash": None,
     }
     if metadata:
         payload_metadata.update(metadata)

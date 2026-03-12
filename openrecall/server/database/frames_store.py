@@ -130,25 +130,31 @@ class FramesStore:
 
     def _extract_metadata_fields(
         self, metadata: dict[str, object]
-    ) -> tuple[object, object, object, object, object, object, object, object, object]:
+    ) -> tuple[
+        object,
+        object,
+        object,
+        object,
+        object,
+        object,
+        object,
+        object,
+        object,
+        object,
+        object,
+    ]:
         raw_timestamp = metadata.get("timestamp") or metadata.get("capture_time")
         timestamp = _to_utc_iso8601(raw_timestamp) or ""
-        app_name = (
-            metadata.get("app_name")
-            or metadata.get("app")
-            or metadata.get("active_app")
-        )
-        window_name = (
-            metadata.get("window_name")
-            or metadata.get("window")
-            or metadata.get("active_window")
-        )
+        app_name = metadata.get("app_name") or metadata.get("app")
+        window_name = metadata.get("window_name") or metadata.get("window")
         browser_url = metadata.get("browser_url")
         focused = metadata.get("focused")
         device_name = metadata.get("device_name") or "monitor_0"
         capture_trigger = metadata.get("capture_trigger")
         event_ts = _to_utc_iso8601(metadata.get("event_ts"))
         image_size_bytes = metadata.get("image_size_bytes")
+        accessibility_text = metadata.get("accessibility_text")
+        content_hash = metadata.get("content_hash")
         return (
             timestamp,
             app_name,
@@ -159,6 +165,8 @@ class FramesStore:
             capture_trigger,
             event_ts,
             image_size_bytes,
+            accessibility_text,
+            content_hash,
         )
 
     def claim_frame(
@@ -174,6 +182,8 @@ class FramesStore:
             capture_trigger,
             event_ts,
             image_size_bytes,
+            accessibility_text,
+            content_hash,
         ) = self._extract_metadata_fields(metadata)
 
         try:
@@ -183,8 +193,8 @@ class FramesStore:
                     INSERT OR IGNORE INTO frames
                         (capture_id, timestamp, app_name, window_name, browser_url,
                          focused, device_name, capture_trigger, event_ts, snapshot_path,
-                         image_size_bytes, status)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')
+                         image_size_bytes, accessibility_text, content_hash, status)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')
                     """,
                     (
                         capture_id,
@@ -198,6 +208,8 @@ class FramesStore:
                         event_ts,
                         None,
                         image_size_bytes,
+                        accessibility_text,
+                        content_hash,
                     ),
                 )
                 conn.commit()

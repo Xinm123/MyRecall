@@ -40,3 +40,20 @@ def test_spool_enqueue_commits_jpg_and_json_with_replace(tmp_path: Path, monkeyp
         tmp_path / "capture-001.json.tmp",
         tmp_path / "capture-001.json",
     )
+
+
+@pytest.mark.unit
+def test_spool_init_removes_orphan_jpg_without_json(tmp_path: Path) -> None:
+    orphan_jpg = tmp_path / "orphan.jpg"
+    orphan_jpg.write_bytes(b"jpeg")
+
+    paired_jpg = tmp_path / "paired.jpg"
+    paired_json = tmp_path / "paired.json"
+    paired_jpg.write_bytes(b"jpeg")
+    paired_json.write_text("{}", encoding="utf-8")
+
+    spool.SpoolQueue(storage_dir=tmp_path)
+
+    assert not orphan_jpg.exists()
+    assert paired_jpg.exists()
+    assert paired_json.exists()

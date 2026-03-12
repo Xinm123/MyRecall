@@ -11,6 +11,7 @@ SSOT: docs/v3/spec.md §4.7, §4.8.1, §4.9; docs/v3/http_contract_ledger.md
 
 import json
 import logging
+import re
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
@@ -33,6 +34,56 @@ _frames_store: Optional[FramesStore] = None
 _MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024  # 10 MB
 _ALLOWED_MIME_TYPE = "image/jpeg"
 _ALLOWED_CAPTURE_TRIGGERS = frozenset({"idle", "app_switch", "manual", "click"})
+_CONTENT_HASH_PATTERN = re.compile(r"^sha256:[0-9a-f]{64}$")
+
+_INGEST_OBSERVATION_COUNTERS: dict[str, int] = {
+    "schema_rejected": 0,
+    "mixed_version_observation": 0,
+    "handoff_success": 0,
+}
+
+
+def _record_ingest_observation(key: str) -> None:
+    _INGEST_OBSERVATION_COUNTERS[key] = _INGEST_OBSERVATION_COUNTERS.get(key, 0) + 1
+
+
+def _is_alias_only_payload(metadata: dict[str, object]) -> bool:
+    canonical_present = any(
+        metadata.get(k) is not None for k in ("app_name", "window_name", "browser_url")
+    )
+    alias_present = any(
+        metadata.get(k) is not None for k in ("active_app", "active_window")
+    )
+    return alias_present and not canonical_present
+
+
+def _validate_s2b_metadata(metadata: dict[str, object]) -> tuple[bool, str | None]:
+    accessibility_text = metadata.get("accessibility_text")
+    if accessibility_text is None or not isinstance(accessibility_text, str):
+        return False, "accessibility_text must be a required string"
+
+    if "content_hash" not in metadata:
+        return False, "content_hash is required"
+
+    content_hash = metadata.get("content_hash")
+    if content_hash == "":
+        return (
+            False,
+            "content_hash must be null or sha256:<64hex>; empty string is invalid",
+        )
+    if content_hash is not None:
+        if not isinstance(content_hash, str):
+            return False, "content_hash must be null or sha256:<64hex>"
+        if not _CONTENT_HASH_PATTERN.fullmatch(content_hash):
+            return False, "content_hash must match sha256:<64hex>"
+
+    device_name = metadata.get("device_name")
+    if not isinstance(device_name, str) or not device_name.strip():
+        return False, "device_name must be a required non-empty string"
+    if not device_name.startswith("monitor_"):
+        return False, "device_name must represent final capture monitor binding"
+
+    return True, None
 
 
 def _get_frames_store() -> FramesStore:
@@ -227,6 +278,31 @@ def ingest():
             request_id=request_id,
         )
 
+    is_valid_s2b, s2b_error = _validate_s2b_metadata(metadata)
+    if not is_valid_s2b:
+        _record_ingest_observation("schema_rejected")
+        logger.warning(
+            "ingest schema_rejected request_id=%s capture_id=%s reason=%s",
+            request_id,
+            capture_id_raw,
+            s2b_error,
+        )
+        return make_error_response(
+            s2b_error or "invalid metadata",
+            "INVALID_PARAMS",
+            400,
+            request_id=request_id,
+        )
+
+    if _is_alias_only_payload(metadata):
+        _record_ingest_observation("mixed_version_observation")
+        metadata["proof_observation"] = "alias_only_payload"
+        logger.info(
+            "ingest mixed_version_observation request_id=%s capture_id=%s reason=alias_only_payload",
+            request_id,
+            capture_id_raw,
+        )
+
     # ------------------------------------------------------------------
     # Step 3: Back-pressure check (503) — no DB writes before this point
     # ------------------------------------------------------------------
@@ -334,6 +410,7 @@ def ingest():
         frame_id,
         request_id,
     )
+    _record_ingest_observation("handoff_success")
     return (
         jsonify(
             {
@@ -393,6 +470,7 @@ def queue_status():
             "trigger_channel": runtime_settings.get_trigger_channel_snapshot(),
             "capture_latency": store.get_capture_latency_summary(),
             "status_sync": store.get_status_sync_summary(),
+            "ingest_contract": dict(_INGEST_OBSERVATION_COUNTERS),
         }
     )
 
@@ -504,15 +582,24 @@ def health():
 
     failed_count = counts.get("failed", 0)
     permission_snapshot = runtime_settings.get_permission_snapshot()
+    screen_capture_snapshot = runtime_settings.get_screen_capture_snapshot()
     permission_status = permission_snapshot["capture_permission_status"]
     permission_reason = permission_snapshot["capture_permission_reason"]
+    screen_capture_status = screen_capture_snapshot["screen_capture_status"]
+    screen_capture_reason = screen_capture_snapshot["screen_capture_reason"]
     permission_degraded = permission_snapshot["is_stale"] or permission_status in {
         "denied_or_revoked",
         "recovering",
     }
+    screen_capture_degraded = screen_capture_status != "ok"
 
     # P1-S1: status is only "ok" or "degraded"
-    if failed_count > 0 or frame_status != "ok" or permission_degraded:
+    if (
+        failed_count > 0
+        or frame_status != "ok"
+        or permission_degraded
+        or screen_capture_degraded
+    ):
         overall_status = "degraded"
     else:
         overall_status = "ok"
@@ -525,6 +612,8 @@ def health():
         message = "权限恢复中"
     elif permission_status == "denied_or_revoked":
         message = "权限异常"
+    elif screen_capture_degraded:
+        message = "截图链路异常"
     elif last_frame_ts is None and frame_status == "stale" and failed_count == 0:
         message = "等待首帧"
     elif failed_count > 0:
@@ -542,6 +631,8 @@ def health():
             "capture_permission_status": permission_status,
             "capture_permission_reason": permission_reason,
             "last_permission_check_ts": permission_snapshot["last_permission_check_ts"],
+            "screen_capture_status": screen_capture_status,
+            "screen_capture_reason": screen_capture_reason,
             "queue": {
                 "pending": counts.get("pending", 0),
                 "processing": counts.get("processing", 0),

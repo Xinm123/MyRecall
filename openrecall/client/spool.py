@@ -16,6 +16,19 @@ from openrecall.shared.config import settings
 
 logger = logging.getLogger(__name__)
 
+_SPOOL_METADATA_DEFAULTS = {
+    "accessibility_text": "",
+    "content_hash": None,
+    "browser_url": None,
+    "device_name": "monitor_0",
+    "capture_trigger": "manual",
+    "event_ts": None,
+    "outcome": None,
+    "capture_cycle_latency_ms": None,
+    "host_pid": None,
+    "runtime_started_at": None,
+}
+
 
 def _uuid_v7() -> str:
     """Generate a UUID v7 (time-ordered, RFC 9562) string.
@@ -57,6 +70,7 @@ class SpoolQueue:
         self.storage_dir: Path = storage_dir or settings.spool_path
         self.storage_dir.mkdir(parents=True, exist_ok=True)
         self._drain_legacy_webp()
+        self._drain_orphan_jpg()
 
     def enqueue(self, image: Image.Image, metadata: Dict[str, Any]) -> str:
         capture_id = _uuid_v7()
@@ -69,6 +83,14 @@ class SpoolQueue:
         os.replace(jpg_tmp, jpg_path)
 
         meta = self._serialize_metadata(metadata)
+        capture_cycle_started_at = meta.pop("_capture_cycle_started_at", None)
+        for key, default in _SPOOL_METADATA_DEFAULTS.items():
+            meta.setdefault(key, default)
+        if isinstance(capture_cycle_started_at, (int, float)):
+            meta["capture_cycle_latency_ms"] = int(
+                (time.perf_counter() - float(capture_cycle_started_at)) * 1000
+            )
+        meta.setdefault("event_device_hint", meta.get("device_name"))
         meta["capture_id"] = capture_id
         meta.setdefault(
             "timestamp",
@@ -123,6 +145,31 @@ class SpoolQueue:
             "spool: committed capture_id=%s remaining=%d", capture_id, self.count()
         )
 
+    def update_metadata(self, capture_id: str, updates: Dict[str, Any]) -> None:
+        json_path = self.storage_dir / f"{capture_id}.json"
+        if not json_path.exists():
+            return
+        json_tmp = self.storage_dir / f"{capture_id}.json.tmp"
+        try:
+            with open(json_path, "r", encoding="utf-8") as fh:
+                metadata = json.load(fh)
+            metadata.update(self._serialize_metadata(updates))
+            with open(json_tmp, "w", encoding="utf-8") as fh:
+                json.dump(metadata, fh, ensure_ascii=False, indent=2)
+            os.replace(json_tmp, json_path)
+        except OSError as exc:
+            logger.warning(
+                "spool: failed to update metadata capture_id=%s: %s",
+                capture_id,
+                exc,
+            )
+        except json.JSONDecodeError as exc:
+            logger.warning(
+                "spool: failed to decode metadata capture_id=%s: %s",
+                capture_id,
+                exc,
+            )
+
     def count(self) -> int:
         return sum(
             1
@@ -139,6 +186,18 @@ class SpoolQueue:
             stem = webp_path.stem
             self._safe_unlink(webp_path)
             self._safe_unlink(self.storage_dir / f"{stem}.json")
+
+    def _drain_orphan_jpg(self) -> None:
+        orphan_jpg_files = [
+            jpg_path
+            for jpg_path in self.storage_dir.glob("*.jpg")
+            if not (self.storage_dir / f"{jpg_path.stem}.json").exists()
+        ]
+        if not orphan_jpg_files:
+            return
+        logger.info("spool: draining %d orphan .jpg item(s)", len(orphan_jpg_files))
+        for jpg_path in orphan_jpg_files:
+            self._safe_unlink(jpg_path)
 
     @staticmethod
     def _serialize_metadata(metadata: Dict[str, Any]) -> Dict[str, Any]:
