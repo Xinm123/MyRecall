@@ -338,7 +338,7 @@ WHERE TRIM(COALESCE(accessibility_text, '')) <> ''
 - Hash always computed from `text_content` (line 81-84)
 - Non-empty text → hash is u64 (never NULL)
 - MyRecall phase split adaptation: raw AX/hash validation happens in S2b; final `text_source` classification stays in S3
-- Empty text → TreeSnapshot.content_hash remains set
+- For MyRecall S2b contract purposes, empty text remains non-dedup-eligible and `content_hash=null` is a valid raw handoff outcome
 
 **Assessment**: ✅ **GATE VERIFIABLE** — SQL query aligns with screenpipe's guaranteed hash computation.
 
@@ -437,7 +437,7 @@ Note: screenpipe's unified pipeline uses `Option` at internal boundaries; MyReca
 ### 12.1 Accessibility Permission States
 
 **MyRecall P1-S2b** ([p1-s2b.md §2, §3 step 12](docs/v3/acceptance/phase1/p1-s2b.md)):
-- Permission states: `denied`, `recovering`, `granted`
+- Permission states: `granted`, `transient_failure`, `denied_or_revoked`, `recovering`
 - Permission revocation: system enters degraded (non-blocking fallback)
 - Re-grant: state transitions `recovering` → `granted`
 
@@ -446,7 +446,7 @@ Note: screenpipe's unified pipeline uses `Option` at internal boundaries; MyReca
 - Returns `None` when permission denied (no panic)
 - Continues with OCR fallback
 
-**Assessment**: ✅ **ALIGNED PATTERN** — Both treat permission errors as degradation, not failure.
+**Assessment**: ✅ **ALIGNED IN PRINCIPLE** — Both treat permission errors as degradation rather than hard failure, while MyRecall S2b formalizes this more explicitly as an AX capability gate with raw handoff preserved.
 
 ### 12.2 Electron Async Tree Building
 
@@ -486,7 +486,7 @@ Other apps return empty → skip OCR if accessibility text is non-empty.
 | **Vision-Only Search** | ✅ Aligned | ADR-0005-search-screenpipe-vision-only.md |
 | **Gate Verification Anchors** | ✅ Verifiable | All metrics map to screenpipe source |
 | **Handoff Contract** | ✅ Aligned | paired_capture.rs:41-66 |
-| **Permission & Error Handling** | ✅ Aligned | paired_capture.rs + p1-s2b.md |
+| **Permission & Error Handling** | ✅ Aligned in principle | paired_capture.rs + p1-s2b.md |
 
 ### Key Findings
 
@@ -496,7 +496,7 @@ Other apps return empty → skip OCR if accessibility text is non-empty.
 
 3. **Gate Criteria are Screenpipe-Validated**: All quantitative metrics (content_hash coverage ≥90%, AX P95 <500ms, inter_write_gap ≤45s, browser_url success ≥95%) derive directly from Screenpipe's proven capabilities.
 
-4. **No Unaddressed Risks**: Arc stale URL detection, Electron async AX, permission handling, and multi-monitor semantics are all explicitly addressed with Screenpipe evidence.
+4. **No Additional Upstream-Reference Gaps Identified**: Arc stale URL detection, Electron async AX, permission handling, and multi-monitor semantics are all explicitly addressed at the Screenpipe-reference layer, though MyRecall implementation risk still remains until code and tests land.
 
 5. **S2b→S3 Handoff is Clean**: The CapturePayload contract preserves all necessary fields for downstream processing without over-committing S2b to S3's responsibilities.
 

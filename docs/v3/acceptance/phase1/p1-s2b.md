@@ -84,7 +84,7 @@
     | `browser_url_rejected_stale` | Arc title mismatch（stale 被拒绝）|
     | `browser_url_failed_all_tiers` | 三层 fallback 全失败 |
     | `browser_url_skipped` | 非 browser 应用 |
-  - **成功率口径**：success / (success + rejected_stale + failed_all_tiers) >= 95%（观测指标）
+  - **成功率口径**：仅对 Chrome/Safari/Edge 计算 `browser_url_success / (browser_url_success + browser_url_rejected_stale + browser_url_failed_all_tiers) >= 95%`；`browser_url_skipped` 与 deferred Arc 不进入 required denominator（观测指标）
 
 ### 1.0b Out-of-scope（本阶段明确不做）
 
@@ -99,15 +99,17 @@
 
 - S2b 仅负责采集与上传，不负责 `text_source` 判定，不负责 `accessibility/ocr_text` 分表写入。
 - 上传契约：`POST /v1/ingest` 的 CapturePayload 必须包含 `accessibility_text` 与 `content_hash` 两个字段：`accessibility_text` 必须为 string（允许 `""`，禁止 `null`）；`content_hash` 必须存在且值为 `sha256:...` 或 `null`（禁止 `""`）。
+- proof sample canonical key 契约：进入 S2b Gate proof 的 payload 必须使用 canonical keys `app_name`、`window_name`、`browser_url`、`device_name`；`active_app`、`active_window` 等 alias 仅允许用于 compatibility/migration observation，不得作为 proof sample 真值。
 - 空 AX 文本语义：当 AX 结果为空（含仅空白）时，S2b 必须仍然上传该帧，不得因空 AX 丢弃 capture；该帧由 S3 执行 OCR fallback。
 - 空 AX 上传语义：空 AX 帧上传时必须满足 `accessibility_text=""` 且 `content_hash=null`。
 - Handoff 可审计性：S2b 上传的原始 `accessibility_text` 必须可追溯，S3 仅可基于 `TRIM(COALESCE(accessibility_text, ''))` 做空值判定，不得要求 S2b 承担处理阶段语义。
 - S2b Gate 口径：`content_hash` 覆盖率仅基于 `ax_hash_eligible = TRIM(COALESCE(accessibility_text, '')) <> ''` 的已上传帧；不得以 `frames.text_source` 作为分母过滤条件。
 - 上下文一致性契约：CapturePayload 中 `app_name/window_name/browser_url` 必须由同一轮 focused-context snapshot 一次性产出；允许整体缺失/部分为 `None`，但不允许字段级跨来源混拼。
-- device-binding 契约：`device_name` 表示实际被截取的 monitor，要求与本次 capture cycle 一致，不要求与 `focused_context` 同源。
+- device-binding 契约：`device_name` 表示实际被截取的 monitor，要求与本次 capture cycle 一致，不要求与 `focused_context` 同源。迁移期内部允许存在 `event_device_hint`，但 proof sample、payload、dedup bucket 与验收统计一律以 `final_device_name` 为准。
 - `browser_url` 仅可在与 `focused_context` 交叉校验一致时写入；校验失败或 stale 时必须置 `None`（原则：**Better None than wrong URL**）。
 - `content_hash` 仅可基于最终上报的 `accessibility_text` 计算；计算前必须执行与 [../../spec.md](../../spec.md) 一致的 canonicalization；空字符串对应 `content_hash=null`，partial AX text 仍正常计算 hash。
-- 一致性验收口径：新增 `app_window_mismatch_rate`（抽样人工核验 + 自动规则）并作为 S2b 观测指标，目标接近 0；出现不确定样本时按 `window_name=None` 处理，不计错填。
+- outcome 契约：S2b evidence 必须能区分 `capture_completed`、`ax_empty`、`ax_timeout_partial`、`browser_url_rejected_stale`、`permission_blocked`、`dedup_skipped`、`spool_failed`、`schema_rejected`。
+- 一致性验收口径：新增 `focused_context_mismatch_count` 与抽样人工核验；不确定样本按 `window_name=None` 处理且不计错填，确认错误的非空 `window_name/browser_url` 必须计为 mismatch/failure。
 
 ### 1.0d Input dependencies from stable P1-S2a contracts
 
@@ -130,6 +132,7 @@
 - `primary_monitor_only` 语义收敛：仅控制启用的 monitor worker 集合，不在 click/app_switch 事件源中做分叉过滤。
 - 元数据口径：`focused_context = {app_name, window_name, browser_url}` 表示 focused UI 上下文，必须由同一轮 snapshot 一次性产出；`device_name` 表示实际采样 monitor；二者须在同一 capture 周期内组装，但不承诺同瞬时原子快照。
 - 验收增量（S2b）：新增多屏一致性场景（主屏+副屏）并验证 `trigger`、`device_name`、截图归属的可解释性与稳定性。
+- 迁移口径（强制）：若内部实现仍保留事件源预绑定 `device_name`，则其仅可解释为 `event_device_hint`；一切验收结论与 proof sample 必须按 `final_device_name` 判定。
 
 ### 1.1 HTTP 契约 delta（本阶段，scope=对外 HTTP）
 
@@ -165,6 +168,8 @@
 - 百分位算法：Nearest-rank（剔除前 10 个预热样本）
 - 窗口元信息（必填）：`window_id`、`host_pid`、`edge_pid`、`restart_events`、`broken_window`
 - 有效窗规则：窗口内若发生 Host 或 Edge 重启，标记 `broken_window=true`；该窗口结果仅用于观测，不可作为 Hard Gate 证据
+- proof sample 排除规则（必填）：命中以下任一条件的样本不得进入 S2b Gate 统计：legacy `/api/*` 路径、alias-only payload、mixed Host/Edge required-key 缺失、`broken_window=true`。
+- Browser URL required denominator：仅统计 Chrome/Safari/Edge 的 `browser_url_success + browser_url_rejected_stale + browser_url_failed_all_tiers`；Arc 若 defer，则统一记入 observation，不进入 required denominator。
 
 ## 3. 验收步骤
 
@@ -183,8 +188,10 @@
     - 非空 AX 样本：`accessibility_text` 非空
     - `browser_url` 正确（浏览器场景）
     - `content_hash` 计算正确
-   - 边界样本：AX 空文本帧在 ingest 可见（不得丢帧），不计入 `content_hash` coverage 分母，并在后续 S3 验收中可被 OCR fallback 消化
+    - 边界样本：AX 空文本帧在 ingest 可见（不得丢帧），不计入 `content_hash` coverage 分母，并在后续 S3 验收中可被 OCR fallback 消化
+    - outcome 样本：必须能区分 `ax_empty`、`ax_timeout_partial`、`permission_blocked`
 5. 执行高频“内容不变”压测（app switch/click，5 分钟），记录窗口元信息，并校验 `inter_write_gap_sec`（Soft KPI + Hard Gate：按 `device_name` 分桶，每设备 max <= 45s，样本 >= 100；`broken_window=true` 仅观测不判定）。
+   - 执行约束：Hard Gate 统计前必须先依据 `p1-s2b-proof-sample-filter.json` 剔除 `broken_window=true` 样本；SQL 仅对剩余有效样本执行。
 6. 测量 AX 树遍历延迟：
    - 记录每次遍历耗时
    - 统计 P95 是否 < 500ms
@@ -245,15 +252,15 @@
       ```
       判定：每个 `device_name` 都满足 `writes >= 100` 且 `max_gap_sec <= 45`；同时输出 P50/P90/P99 分布作为 Soft KPI 记录。
 8. 抽样校验 Browser URL 提取：
-   - Chrome: AXDocument 属性
-   - Safari: AXDocument 属性
-   - Arc: AppleScript fallback（仅当 Arc support 未 defer 时作为 conditional evidence）
-   - 判定：URL 以 `http://` 或 `https://` 开头
+    - Chrome: AXDocument 属性
+    - Safari: AXDocument 属性
+    - Arc: AppleScript fallback（仅当 Arc support 未 defer 时作为 conditional evidence）
+    - 判定：URL 以 `http://` 或 `https://` 开头
 9. **Arc Stale URL 检测测试**（conditional evidence，对齐 screenpipe）：
-   - 在 Arc 中打开两个 tab（Tab A: google.com, Tab B: github.com）
-   - 快速切换 tab（< 200ms 间隔）并触发 capture
-   - 验证：browser_url 为 None 的帧比例合理（stale 被正确拒绝）
-   - 验证：无 URL 与截图内容不匹配的情况
+    - 在 Arc 中打开两个 tab（Tab A: google.com, Tab B: github.com）
+    - 快速切换 tab（< 200ms 间隔）并触发 capture
+    - 验证：出现 stale 时，相关样本必须记为 `browser_url_rejected_stale` 或 `browser_url_skipped`
+    - 验证：不得出现 URL 与截图内容明确不匹配的 false positive
 10. **Title 匹配算法测试**：
     - Arc 显示 `(45) WhatsApp`，验证能正确匹配 `WhatsApp`
     - Discord 显示 `💬1 - screenpipe | Discord`，验证能正确匹配
@@ -262,7 +269,13 @@
     - 验证 `browser_url_*` 计数器正确累加
     - required browser success denominator 仅统计 Chrome/Safari/Edge
     - Arc 若已实现则单独记录为 conditional evidence；若 deferred，不计入 required success denominator，也不视为回归
-12. 权限恢复验证（强制）：
+12. **proof sample isolation 检查**（强制）：
+    - 验证 `/api/*`、alias-only payload、mixed-version 样本未混入 S2b Gate proof
+    - 验证 `broken_window=true` 样本仅进入 observation，不进入 Hard Gate
+13. 权限恢复验证（强制）：
+    - 验证 `transient_failure`、`denied_or_revoked`、`recovering` 三种非 `granted` 状态都走 capability-blocked 路径；
+    - 验证 capability-blocked 样本保持 screenshot / heartbeat 主链路存活；
+    - 验证 capability-blocked 样本字段矩阵固定为 `accessibility_text=""`、`content_hash=null`、`browser_url=null`，且不会触发 dedup；
     - 运行中撤销 Accessibility 权限，验证系统进入权限降级状态；
     - 重新授权后验证状态进入 `recovering` 并最终回到 `granted`；
     - 验证恢复后 AX 路径重新生效，且不会把 `permission denied` 误判为 `AX empty`。
@@ -299,12 +312,15 @@
 - 脚本最小职责：
   - 固化本次验收上下文（时间窗、权限状态、配置快照、git rev）；
   - 按文档顺序运行 Gate 校验脚本（content_hash 覆盖率、AX timeout、inter_write_gap 分桶）；
+  - 先生成 proof sample 过滤结果，再对有效样本执行 Hard Gate 统计；
   - 导出 `/v1/ingest/queue/status` 与 `/v1/health` 快照；
   - 输出统一结果摘要（`Pass/Fail` + 失败项 + 证据路径）。
 - 证据产物（必填）：
   - `p1-s2b-local-gate.log`（脚本总日志）
   - `p1-s2b-metrics.json`（content_hash/inter_write_gap/browser_url 指标汇总）
   - `p1-s2b-health-snapshots.json`（健康态与权限态快照）
+  - `p1-s2b-outcomes.json`（capture outcome 分类汇总）
+  - `p1-s2b-proof-sample-filter.json`（proof sample 排除与原因）
   - `p1-s2b-ui-proof.md`（timeline 新帧、URL 提取、恢复流程截图索引）
 - 通过线：
   - Gate 脚本 `0 failed`；
@@ -325,7 +341,16 @@
   - `browser_url_rejected_stale`：
   - `browser_url_failed_all_tiers`：
   - `browser_url_skipped`：
-  - 成功率（目标 >= 95%）：
+  - 成功率（目标 >= 95%，分母仅限 Chrome/Safari/Edge required samples）：
+- **Outcome 分类统计**：
+  - `capture_completed`：
+  - `ax_empty`：
+  - `ax_timeout_partial`：
+  - `browser_url_rejected_stale`：
+  - `permission_blocked`：
+  - `dedup_skipped`：
+  - `spool_failed`：
+  - `schema_rejected`：
 - 备注（是否满足最小样本数要求）：是 | 否（不足项：...）
 
 ### 4.2 功能完成度指标（强制）
@@ -338,6 +363,8 @@
 
 - capability/context 异常与降级场景通过率（目标 >= 95%）：覆盖 `browser_url_rejected_stale`、empty-AX no-drop handoff、Arc deferred 记录与上下文一致性。
 - 权限处理场景通过率（目标 100%）：覆盖 `startup_denied / revoked_mid_run / restored_after_denied`，并在 S2b Exit 前关闭。
+- outcome 分类完整率（目标 100%）：`ax_empty`、`ax_timeout_partial`、`browser_url_rejected_stale`、`permission_blocked`、`dedup_skipped`、`spool_failed`、`schema_rejected` 可被证据区分。
+- proof-sample exclusion 正确率（目标 100%）：legacy、alias-only、mixed-version、`broken_window` 样本全部被正确排除。
 - 可观测性检查项完成率（目标 100%，日志/指标/错误码）：
 - 文档与验收记录完整率（目标 100%）：
 
@@ -359,6 +386,7 @@
 - 风险：AX 树遍历在 Electron 应用中可能超时（10k+ 节点）。
 - 风险：Browser URL 提取在某些浏览器可能失败（需要 fallback）。
 - 风险：Electron 应用首次遍历可能返回空文本（异步树构建）。
+- 风险：当前 runtime 仍存在“权限降级即停采集”的实现惯性；若迁移不彻底，S2b `permission_blocked` evidence 可能失真。
 - 后续动作：若 AX 遍历超时，调整深度限制或节点限制；若 Browser URL 失败，增加更多 fallback 策略。
 - 后续动作：
   - 若 500ms 超时仍不够，提高到 1000ms 并记录 CPU 影响。

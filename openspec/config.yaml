@@ -13,7 +13,7 @@ context: |
 
   Supplemental references (use only for their own scope):
   - docs/v3/p1-s2b-frozen-rules-index.md - frozen rule locator, not a behavior source
-  - docs/v3/http_contract_ledger.md - external HTTP delta only
+  - docs/v3/http_contract_ledger.md - external HTTP delta
   - docs/v3/roadmap.md - planning context only; not behavior SSOT
   - docs/v3/acceptance/phase1/p1-s3.md - S2b->S3 handoff/ownership enforcement
 
@@ -26,11 +26,7 @@ context: |
   - AX采集: Raw handoff only (P1-S2b). S2b is responsible for AX traversal capability (macOS AXUIElement) and raw handoff correctness (empty-AX no-drop upload, URL stale rejection, permissions).
   - v3-only mainline: S2b correctness is proven on `/v1/*` + v3 runtime/store; legacy `/api/*` is compatibility-only and carries no new S2b semantics.
 
-  Frozen dependencies inherited from P1-S2a (do not redefine as new scope):
-  - `capture_trigger` semantics stay `idle` / `app_switch` / `manual` / `click`
-  - permission states stay `granted`, `transient_failure`, `denied_or_revoked`, `recovering`
-
-  ASCII Anchors (literal-match):
+  ASCII Anchors:
   - capture_trigger, idle, app_switch, manual, click
   - granted, transient_failure, denied_or_revoked, recovering
   - content_hash, ax_hash_eligible, inter_write_gap_sec, broken_window
