@@ -76,7 +76,7 @@
 
 | 场景 | 前置条件 | 期望状态机 | 期望 `/v1/health.status` | 期望 reason | 期望 capture 行为 | 证据要求 |
 |---|---|---|---|---|---|---|
-| `startup_not_determined` | 首次启动或权限状态未定 | `transient_failure` 或等价引导态 | `degraded` | 不得为 `granted` | 不得静默开始事件驱动 capture | health 快照 + UI 引导截图 + 日志 |
+| `startup_not_determined` | 首次启动或权限状态未定 | `transient_failure`（对外状态） | `degraded` | 不得为 `granted` | 不得静默开始事件驱动 capture | health 快照 + UI 引导截图 + 日志 |
 | `startup_denied` | 启动前已拒绝 Input Monitoring | `denied_or_revoked` | `degraded` | `input_monitoring_denied` 或等价实现枚举 | capture 不启动或立即进入受控降级 | health 快照 + 日志 + UI 降级截图 |
 | `revoked_mid_run` | 运行中撤销权限 | `granted -> transient_failure -> denied_or_revoked` | `ok/degraded -> degraded` | 非 `granted`，且应能区分 denied/revoked/transient | capture 停止继续消费外部事件触发 | 状态变化时间线 + health 快照 + 日志 |
 | `restored_after_denied` | denied/revoked 后重新授权 | `denied_or_revoked -> recovering -> granted` | `degraded -> ok` | `granted` 或恢复中原因 | capture 自动恢复，无需人工重启进程 | 状态变化时间线 + health 快照 + 恢复日志 + UI 截图 |
@@ -84,7 +84,7 @@
 
 ### 3.1 判定补充
 
-- `startup_not_determined` 允许实现层采用等价引导态，但对外 health 语义必须表现为 `degraded`，且不得让用户误以为 capture 已稳定可用。
+- `startup_not_determined` 是启动阶段的内部条件名，不是第五个对外状态；对外契约必须表现为 `capture_permission_status=transient_failure`，且 health 语义必须为 `degraded`。
 - `transient_failure` 不得直接等价于 `denied_or_revoked`；必须遵守 2 次连续失败阈值。
 - `recovering` 期间系统可以继续运行，但 `/v1/health.status` 不得返回 `ok`，直到连续 3 次成功达标。
 
@@ -119,9 +119,7 @@
 ### 6.1 执行入口要求
 
 - S2a+ 必须拥有独立、可追溯的本机 Gate 执行入口。
-- 可接受形式：
-  - 新增独立脚本 `scripts/acceptance/p1_s2a_plus_local.sh`，或
-  - 明确扩展现有 `scripts/acceptance/p1_s2a_local.sh` 并实际支持 S2a+ 专用入口。
+- 执行入口固定为新增独立脚本 `scripts/acceptance/p1_s2a_plus_local.sh`。
 - 在入口未落地前，本文档只能作为 `Planned`，不得填写 `Pass`。
 
 ### 6.2 证据产物（最小集合）

@@ -816,7 +816,7 @@ data: {"type":"response","success":true}
 - `last_frame_timestamp`：最新一条帧的 capture 时间（来自 `frames.timestamp`，即 `SELECT MAX(timestamp) FROM frames`，UTC ISO8601）；当 `frames` 为空时返回 `null`；不用于 stale 判定
 - `frame_status`：`"ok"` / `"stale"`（超过 5 分钟无新帧入库；判定基于 `frames.ingested_at`，即 `now_utc - SELECT MAX(ingested_at) FROM frames`）/ `"error"`
 - `capture_permission_status`：`"granted"` / `"transient_failure"` / `"denied_or_revoked"` / `"recovering"`
-- `capture_permission_reason`：权限状态原因；正常时为 `"granted"`，异常时为具体原因（例如 `accessibility_denied`、`input_monitoring_denied`、`tcc_transient_failure`）
+- `capture_permission_reason`：权限状态原因；正常时为 `"granted"`，异常时为具体原因（例如 `input_monitoring_denied`、`input_monitoring_revoked`、`tcc_transient_failure`）；v3 P1 不再以 Accessibility reason code 作为主线权限语义
 - `last_permission_check_ts`：最近一次权限轮询时间（UTC ISO8601）
 - 权限字段完整性约束：响应 MUST 同时包含 `capture_permission_status`、`capture_permission_reason`、`last_permission_check_ts`
 - `message`：面向 UI 的可读状态文案（P1-S1 推荐值：`服务健康/队列正常`、`等待首帧`、`队列异常`、`数据延迟`、`服务异常`）

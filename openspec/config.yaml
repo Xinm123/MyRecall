@@ -1,52 +1,43 @@
 schema: spec-driven
 context: |
-  Project: MyRecall-v3 (Edge-centric, vision-only). Reference repo: _ref/screenpipe
-  Current substage: P1-S2b (AX采集)
-  ADR: docs/v3/adr/ADR-0013-event-driven-ax-split.md
+  Project: MyRecall-v3 (Edge-centric, vision-only, OCR-only). Reference repo: _ref/screenpipe
+  Current substage: P1-S2a+ (权限稳定性收口)
+  ADR: docs/v3/adr/ADR-0013-event-driven-ax-split.md (S2a+ as post-S2a closing stage per OQ-043)
 
   Source precedence (MUST follow; do not invent local reinterpretation):
   - docs/v3/spec.md - 架构与 frozen behavior SSOT
   - docs/v3/data-model.md - payload/data contract consequences
-  - docs/v3/open_questions.md - 已冻结决策与 ownership boundary
-  - docs/v3/acceptance/phase1/p1-s2b.md - S2b Gate、证据、运行步骤
+  - docs/v3/open_questions.md - 已冻结决策与 ownership boundary (OQ-043 OCR-only)
+  - docs/v3/acceptance/phase1/p1-s2a-plus.md - S2a+ Gate、证据、运行步骤
   - docs/v3/gate_baseline.md - Gate/SLO formulas, thresholds, sample rules
 
   Supplemental references (use only for their own scope):
-  - docs/v3/p1-s2b-frozen-rules-index.md - frozen rule locator, not a behavior source
+  - docs/v3/acceptance/phase1/p1-s2a.md - S2a 前置阶段契约继承
+  - docs/v3/acceptance/phase1/p1-s2b.md - S2b Entry prerequisite enforcement
   - docs/v3/http_contract_ledger.md - external HTTP delta
   - docs/v3/roadmap.md - planning context only; not behavior SSOT
-  - docs/v3/acceptance/phase1/p1-s3.md - S2b->S3 handoff/ownership enforcement
 
   Precedence rule: higher-priority docs win over lower-priority docs; all docs win over this config.
   Conflict rule: if sources conflict, cite the higher-priority source and surface the conflict; do not synthesize a new rule.
 
-  Scope invariants:
+  Scope invariants (P1-S2a+):
   - Vision-only for P1-P3 (no audio); macOS-only for P1 (Windows/Linux deferred to P2).
   - Python implementation (ADR-0013).
-  - AX采集: Raw handoff only (P1-S2b). S2b is responsible for AX traversal capability (macOS AXUIElement) and raw handoff correctness (empty-AX no-drop upload, URL stale rejection, permissions).
-  - v3-only mainline: S2b correctness is proven on `/v1/*` + v3 runtime/store; legacy `/api/*` is compatibility-only and carries no new S2b semantics.
+  - OCR-only mainline (OQ-043): v3主线收口为OCR-only, AX主链路defer到v4。
+  - S2a+ is a post-S2a closing stage (not a full feature stage): 专注Input Monitoring权限稳定性收口。
+  - S2a+ is P1-S2b Entry Gate prerequisite: 权限稳定性必须通过才能进入S2b (Capture Completion)。
 
-  ASCII Anchors:
-  - capture_trigger, idle, app_switch, manual, click
-  - granted, transient_failure, denied_or_revoked, recovering
-  - content_hash, ax_hash_eligible, inter_write_gap_sec, broken_window
-  - accessibility_text, focused_context, device_name, browser_url
-  - "#mr-health", data-state, healthy, unreachable, degraded
 
 rules:
   proposal:
-    - "Output language: Chinese. Keep all ASCII Anchors exactly literal."
     - Always include a "Non-goals" section.
     - State source precedence briefly when the proposal touches frozen behavior, contract semantics, or Gate thresholds.
   specs:
-    - "Output language: Chinese. Keep all ASCII Anchors exactly literal."
     - Include a short "Acceptance impact" block when the spec changes a Gate formula, threshold, sample rule, SQL denominator, or required evidence.
   design:
-    - "Output language: Chinese. Keep all ASCII Anchors exactly literal."
-    - "Design must be codebase-grounded: reference actual entry points under `openrecall/server` and `openrecall/client`, prioritizing `openrecall/server/api_v1.py`, `openrecall/client/events/base.py`, `openrecall/client/v3_uploader.py`, `openrecall/client/accessibility/macos.py`, and `openrecall/client/events/permissions.py` when relevant."
-    - For each material decision, if screenpipe has a comparable pattern, cite the screenpipe file path and label it as `aligned`, `intentional divergence`, or `no comparable pattern`.
+    - "Design must be codebase-grounded."
+    - "For each material decision, if screenpipe has a comparable pattern, cite the screenpipe file path and label it as 'aligned', 'intentional divergence', or 'no comparable pattern'."
     - Must not invent retry policies, semantic states, or processing-stage meaning not present in the cited docs.
   tasks:
-    - "Output language: Chinese. Keep all ASCII Anchors exactly literal."
     - 'tasks.md must be split into two top-level sections: "## Implementation Tasks" (code changes) and "## Acceptance Verification" (verification actions).'
     - Every implementation task must be atomic.

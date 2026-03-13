@@ -116,9 +116,10 @@ tests/
 
 ### 轨道 A（本机 Gate 验收）落地规范
 
-- 适用范围：P1-S2a（CGEventTap）与 P1-S2b（capture completion / monitor-aware coordination）两个子阶段。
+- 适用范围：P1-S2a（CGEventTap）、P1-S2a+（permission stability closure）与 P1-S2b（capture completion / monitor-aware coordination）三个子阶段。
 - 脚本入口（统一约定）：
   - `scripts/acceptance/p1_s2a_local.sh`
+  - `scripts/acceptance/p1_s2a_plus_local.sh`
   - `scripts/acceptance/p1_s2b_local.sh`
 - 运行要求：
   - 必须在 macOS 实机执行（不得在 CI 容器替代）；

@@ -36,8 +36,8 @@ references:
 ### Phase 1：本机模拟 Edge（进程级隔离）
 - 时间：2026-03-02 ~ 2026-03-20
 - 目标：将当前单机闭环（client+server）按 Edge-Centric 职责拆为 Host/Edge 两进程，并在本机完成全功能闭环。
-- 执行规则：P1-S1 -> P1-S2a -> P1-S2b -> P1-S3 -> P1-S4 -> P1-S5 -> P1-S6 -> P1-S7 串行推进；每阶段必须先通过验收 Gate。
-- 阶段说明：P1-S2a 负责 trigger generation；P1-S2b 负责 capture completion（trigger routing、monitor-aware coordination、device binding freeze、spool handoff）；P1-S3 起进入 OCR processing 主线。
+- 执行规则：P1-S1 -> P1-S2a -> P1-S2a+ -> P1-S2b -> P1-S3 -> P1-S4 -> P1-S5 -> P1-S6 -> P1-S7 串行推进；每阶段必须先通过验收 Gate。
+- 阶段说明：P1-S2a 负责 trigger generation；P1-S2a+ 负责 permission stability closure；P1-S2b 负责 capture completion（trigger routing、monitor-aware coordination、device binding freeze、spool handoff）；P1-S3 起进入 OCR processing 主线。
 - P1-S1（基础链路，2026-03-02 ~ 2026-03-05）
   - 交付：
     - Host spool + uploader（磁盘持久化；spool 落盘 JPEG（`.jpg`/`.jpeg` + `.json`，原子写入）；兼容读取历史 `.webp` 仅用于 drain；幂等、可续传）
@@ -254,6 +254,7 @@ references:
 
 - P1-S1：Host 上传链路 + Edge ingest/queue + 页面保持可用
 - P1-S2a：事件驱动 capture（macOS-only，Python 实现）
+- P1-S2a+：权限稳定性收口（Input Monitoring FSM、health 语义、受控降级/自动恢复）
 - P1-S2b：Capture Completion / Monitor-Aware Coordination（macOS-only，Python 实现）
 - P1-S3：OCR-only processing 能力闭环
 - P1-S4：Search（FTS+过滤，OCR-only）能力闭环
@@ -294,6 +295,7 @@ references:
 - 文件映射（固定）：
   - `phase1/p1-s1.md`
   - `phase1/p1-s2a.md`
+  - `phase1/p1-s2a-plus.md`
   - `phase1/p1-s2b.md`
   - `phase1/p1-s3.md`
   - `phase1/p1-s4.md`
