@@ -1,7 +1,7 @@
 ---
 status: active
 owner: pyw
-last_updated: 2026-03-04
+last_updated: 2026-03-13
 depends_on:
   - open_questions.md
 references:
@@ -11,8 +11,9 @@ references:
 
 # MyRecall-v3 Gate 指标口径基线（SSOT）
 
-- 版本：v1.4
-- 生效日期：2026-03-04
+- 版本：v1.6
+- 生效日期：2026-03-13
+- 变更说明：OQ-043 OCR-only 收口 — `inter_write_gap_sec` 降级为 Soft KPI（原 Hard Gate 移除）
 - 适用范围：[spec.md](spec.md)、[roadmap.md](roadmap.md)、`adr/`、`acceptance/`
 
 ## 1. 口径优先级
@@ -39,29 +40,23 @@ references:
 
 - 说明：Chat 引用覆盖率不参与 Gate Pass/Fail 判定；若低于目标，必须在验收记录中给出整改动作与回归计划。
 
-## 3.1 Search 引用字段完整率（P1-S4）
+## 3.1 Search 引用字段完整率（P1-S4，OCR-only）
 
-- 目的：统一 `/v1/search` 在 `OCR`/`UI` 两类结果下的引用字段验收口径，避免将类型化结果误判为统一字段模型。
+- 目的：统一 `/v1/search` OCR-only 结果的引用字段验收口径，避免将 v4 预留 seam 误当成 v3 活跃结果模型。
 - 判定类型：
-  - `OCR 引用字段完整率`：**Hard Gate**
-  - `UI 引用字段完整率`：**Hard Gate**
-  - `OCR capture_id 覆盖率`：**Soft KPI**（non-blocking）
+  - `Search 引用字段完整率`：**Hard Gate**
+  - `Search capture_id 覆盖率`：**Soft KPI**（non-blocking）
 - 阈值（P1-S4）：
-  - OCR 引用字段完整率 = 100%
-  - UI 引用字段完整率 = 100%
-  - OCR capture_id 覆盖率目标 >= 99%（未达标需提交整改动作，不触发 Gate Fail）
+  - Search 引用字段完整率 = 100%
+  - Search capture_id 覆盖率目标 >= 99%（未达标需提交整改动作，不触发 Gate Fail）
 
 定义：
 
-1. `OCR 引用字段完整率`（Hard Gate）
-- 公式：`ocr_ref_completeness = (OCR 结果中 frame_id 与 timestamp 同时非空的条数 / OCR 结果总条数) * 100%`
+1. `Search 引用字段完整率`（Hard Gate）
+- 公式：`search_ref_completeness = (搜索结果中 frame_id 与 timestamp 同时非空的条数 / 搜索结果总条数) * 100%`
 
-2. `UI 引用字段完整率`（Hard Gate）
-- 公式：`ui_ref_completeness = (UI 结果中 frame_id 与 timestamp 同时非空的条数 / UI 结果总条数) * 100%`
-- 说明：P1 阶段正常 paired_capture 路径下 accessibility.frame_id 应为非 NULL（由 paired_capture 写入）
-
-3. `OCR capture_id 覆盖率`（Soft KPI）
-- 公式：`ocr_capture_id_coverage = (OCR 结果中 capture_id 非空的条数 / OCR 结果总条数) * 100%`
+2. `Search capture_id 覆盖率`（Soft KPI）
+- 公式：`search_capture_id_coverage = (搜索结果中 capture_id 非空的条数 / 搜索结果总条数) * 100%`
 - 说明：`capture_id` 为 v3 增强可选字段，不属于 Search 对齐硬门槛；该指标仅用于质量观测与回归。
 
 ## 3.2 Capture 去重与背压口径（P1-S2）
@@ -84,12 +79,15 @@ references:
 - 阈值：`= 100%`
 - 最小样本：四类触发均命中，且每类样本 `>= 20`
 
-3. `inter_write_gap_sec`（Soft KPI + Hard Gate）
+3. `inter_write_gap_sec`（Soft KPI，OQ-043 后降级）
 - 公式：相邻两次成功写入时间差（秒）构成样本分布。
-- Hard Gate：按 `device_name` 分桶判定，且每设备 `max <= 45s`（每设备样本 >= 100）
-- Soft KPI（non-blocking）：记录 P50/P90/P99 分布，用于观测与回归，不设硬性阈值
-- 说明：P99 不设硬性阈值（dedup 保底写入场景下 P99 天然接近 30s，无区分度）
-- 窗口有效性：Hard Gate 仅使用无 Host/Edge 重启的连续窗口；窗口内若发生 Host 或 Edge 重启，标记 `broken_window=true`，该窗口仅用于观测记录，不用于 Hard Gate 判定
+- 类型：**Soft KPI only**（OQ-043 OCR-only 收口后，不再设 Hard Gate）
+- 观测口径：按 `device_name` 分桶记录 P50/P90/P99 分布
+- 最小样本：每设备 >= 100
+- 说明：
+  - OCR-only 主线下 content-based dedup 暂不活跃，该指标仅用于观测与回归
+  - 若 v4 恢复 AX path 并引入 Host-side dedup，可重新评估 Hard Gate 需求
+- 窗口有效性：仅使用无 Host/Edge 重启的连续窗口；窗口内若发生 Host 或 Edge 重启，标记 `broken_window=true`
 
 4. `queue_saturation_ratio`（Hard Gate）
 - 公式：`queue_saturation_ratio = (queue_depth >= 0.9 * queue_capacity 的采样数 / 总采样数) * 100%`
@@ -104,13 +102,27 @@ references:
 - 公式：过载注入窗口内因通道溢出导致丢弃的 capture 数。
 - 阈值：`= 0`
 
-7. `ax_walk_timeout_p95`（Hard Gate，P1-S2b）
-- 公式：AX 树遍历单次耗时分布。
-- 阈值：`P95 <= 500ms`（有意偏离 screenpipe 默认 250ms，适配复杂 Electron 应用）。
-- 最小样本：`ax_hash_eligible` 样本 `>= 100`。
-- 说明：若超时，需检查是否为 Electron 应用，并考虑提高 walk_timeout 或增加重试逻辑。
+7. `trigger_target_routing_correctness`（Hard Gate，P1-S2b）
+- 公式：`routing_correctness = (目标 monitor 归属正确的 trigger 数 / 参与判定的 trigger 总数) * 100%`
+- 阈值：`= 100%`
+- 最小样本：`idle/app_switch/manual/click` 四类 trigger 均命中，且每类样本 `>= 20`
 
-8. `Host CPU`（Soft KPI，non-blocking）
+8. `device_binding_correctness`（Hard Gate，P1-S2b）
+- 公式：`device_binding_correctness = (capture metadata 中 device_name 与实际截图 monitor 一致的 capture 数 / 参与判定的 capture 总数) * 100%`
+- 阈值：`= 100%`
+- 最小样本：`>= 100 captures`
+
+9. `single_monitor_duplicate_capture_rate`（Hard Gate，P1-S2b）
+- 公式：`duplicate_capture_rate = (单 monitor 作用域 trigger 产生重复 capture 的次数 / 单 monitor 作用域 trigger 总数) * 100%`
+- 阈值：`= 0%`
+- 最小样本：`>= 100` 个单 monitor 作用域 trigger
+
+10. `topology_rebuild_correctness`（Hard Gate，P1-S2b）
+- 公式：`topology_rebuild_correctness = (monitor topology 变化后恢复正确分发的场景数 / monitor topology 变化场景总数) * 100%`
+- 阈值：`= 100%`
+- 最小场景集：至少覆盖 monitor 增加、移除、primary 切换、monitor 不可用恢复各 `>= 1` 次
+
+11. `Host CPU`（Soft KPI，non-blocking）
 - 说明：CPU 使用率仅用于趋势观测与容量评估，不作为跨设备 Gate 判定条件。
 - 记录要求：验收报告需附硬件基线（机型/芯片/核心数）与负载背景（后台任务、显示器配置）。
 
@@ -160,9 +172,7 @@ references:
 1. `Citation Coverage`（DA-8A 默认口径）
 - 公式：`coverage = (有有效引用的回答数 / 应当提供引用的回答总数) * 100%`
 - 有效引用（DA-8A）：
-  - OCR 结果：回答中包含可解析 deep link `myrecall://frame/{frame_id}`
-  - UI 结果：回答中包含可解析 deep link `myrecall://frame/{accessibility.frame_id}`（v3 改进，外键精确关联）
-  - 无 frame_id 时回退 `myrecall://timeline?timestamp=ISO8601`（仅未来独立 walker 场景，P1 不触发）
+  - OCR/frame 结果：回答中包含可解析 deep link `myrecall://frame/{frame_id}`
 - UI 落点：点击 `myrecall://frame/{id}` 后统一落到 `/timeline`，通过 `GET /v1/frames/:frame_id/metadata`（timestamp resolver，最小稳定契约）解析 timestamp 定位
 - 说明：`GET /v1/frames/:frame_id/context` 为可选增强（URL/上下文提取），不作为 P1 Gate 前置条件
   - `frame_id`/`timestamp` 必须来自真实检索结果，不得伪造。
@@ -170,21 +180,15 @@ references:
 
 2. `TTS P95`（Time-to-Searchable）—— 分层定义
 
-### 2.1 AX成功路径 TTS（Hard Gate）
-- 公式：Host capture timestamp → accessibility表写入完成且FTS索引就绪
-- 阈值：P95 <= 8s
-- 样本占比预期：~70-80% captures（AX成功率高的场景）
-- 测量方法：过滤 `text_source='accessibility'` 的frames，计算 `searchable_at - capture_timestamp`
-
-### 2.2 OCR fallback路径 TTS（Soft KPI）
+### 2.1 OCR主路径 TTS（Soft KPI）
 - 公式：Host capture timestamp → ocr_text表写入完成且FTS索引就绪
 - 目标：P95 <= 15s
-- 样本占比预期：~20-30% captures（终端/游戏/AX失败场景）
-- P1 引擎口径：OCR fallback 统一按 RapidOCR 路径统计（不做跨引擎归一化）
-- 说明：OCR路径受分辨率、CPU负载、模型性能影响大，作为观测项而非Gate Fail条件
+- 样本占比预期：v3 主线 `~100% captures`
+- P1 引擎口径：OCR 主路径统一按 RapidOCR 路径统计（不做跨引擎归一化）
+- 说明：OCR路径受分辨率、CPU负载、模型性能影响大，作为观测项而非 Gate Fail 条件
 - 超标处置：若OCR路径P95 > 15s，验收报告需附加根因分析（分辨率分布/CPU瓶颈/队列深度）
 
-### 2.3 全局TTS P95（参考值）
+### 2.2 全局TTS P95（参考值）
 - 阈值：<= 15s（P1-S7记录，不强制Gate）
 - 测量方法：不分路径，全量capture的TTS分布
 - 用途：端到端体验趋势观测，用于P2 LAN场景的性能基线对比
@@ -256,10 +260,9 @@ references:
 - 百分位算法：Nearest-rank。
 - 预热剔除：每轮测量剔除前 10 个样本。
 - 最小样本数（低于该值不得做有效判定）：
-  - TTS（分层独立统计）：
-    - AX成功路径：>= 100 captures（用于Hard Gate判定）
-    - OCR路径：>= 50 captures（用于Soft KPI观测）
-    - 全局混合：>= 200 captures（用于趋势参考）
+- TTS（分层独立统计）：
+    - OCR主路径：>= 100 captures（用于Soft KPI观测）
+    - 全局：>= 100 captures（v3 中通常与 OCR 主路径样本集一致；用于趋势参考）
   - Search：>= 200 queries
   - Chat 系统可用率：>= 100 requests
   - Chat 首 token（观测，可选）：>= 100 requests（若输出该指标）

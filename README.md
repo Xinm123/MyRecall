@@ -63,12 +63,12 @@ MyRecall v3 captures your digital history through automatic screenshots, then us
 - **Capture**: Event-driven (idle/app_switch/manual/click) with debouncing (1000ms)
 - **Spool**: Local disk queue (`~/MRC/spool/`) for reliability
 - **Uploader**: Background consumer with idempotent retry
-- **Deduplication**: Compute `content_hash` (SHA256) for Edge-side dedup
+- **Deduplication**: `capture_id` idempotency + trigger/capture coordination; `content_hash` is reserved for future use
 
 ### Edge (Processing + API)
 
 - **Ingest**: `POST /v1/ingest` (幂等)
-- **Processing**: AX-first + OCR-fallback; 索引时零 AI 增强
+- **Processing**: OCR-only; 索引时零 AI 增强
 - **Storage**:
   - `db/edge.db`: frames, accessibility, ocr_text
   - `fts.db`: FTS5 全文索引
@@ -79,10 +79,7 @@ MyRecall v3 captures your digital history through automatic screenshots, then us
 ### Search Pipeline
 
 1. **Query Sanitization**: User queries are sanitized for FTS5 MATCH syntax (token wrapping, operator escaping)
-2. **Content-Type Routing**: Searches are routed by `content_type` parameter:
-   - `ocr`: Searches OCR fallback results (`ocr_text_fts` + `frames_fts`)
-   - `accessibility`: Searches AX-collected text (`accessibility_fts` + `accessibility` table)
-   - `all` (default): Parallel search of both paths, merged by timestamp DESC
+2. **Search Routing**: v3 mainline uses a single OCR-backed search path (`ocr_text_fts` + `frames_fts`); AX/search dual-path remains deferred to v4
 3. **Metadata Filtering**: Time range, app_name, window_name, browser_url, focused filters applied via B-tree indexes or FTS
 4. **Sorting & Pagination**: Results ordered by FTS5 rank (when `q` provided) or timestamp DESC; pagination via offset/limit
 

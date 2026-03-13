@@ -47,9 +47,8 @@ Frontend → POST /v1/chat {message, session_id, images?} → Edge Python Manage
 ### Citation 策略（DA-8=A→B 渐进）
 
 - P1-S5：不做结构化 citation 解析（`chat_messages.citations` 字段留空）；通过提示词与 Skill 规则要求 Pi 输出可解析 deep link：
-  - OCR 结果：`myrecall://frame/{frame_id}`
-  - UI 结果：优先 `myrecall://frame/{accessibility.frame_id}`（v3 改进，外键精确关联）
-  - 无 frame_id 时回退 `myrecall://timeline?timestamp=ISO8601`（仅未来独立 walker 场景，P1 不触发）
+  - OCR/frame 结果：`myrecall://frame/{frame_id}`
+  - P1 不使用 UI/accessibility citation；若 v4 恢复 AX path，再重新定义该引用口径
 - deep link 导航解析：点击 `myrecall://frame/{id}` 后，通过 `GET /v1/frames/:frame_id/metadata`（timestamp resolver，最小稳定契约）解析 timestamp 并在 `/timeline` 定位（对齐 screenpipe `/frames/{id}/metadata` 语义）。
 - 帧上下文（URL/文本）获取：通过 `GET /v1/frames/:frame_id/context`（020B）获取（对齐 screenpipe `/frames/{id}/context`；P1 仅 text/urls，P2+ 扩展 nodes）。
 - P1-S7 评估点：根据引用覆盖率观测数据决定是否启动 B 阶段（结构化 citation 后处理）。

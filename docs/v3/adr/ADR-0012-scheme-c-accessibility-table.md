@@ -1,9 +1,17 @@
 # ADR-0012 Scheme C：accessibility 表分表写入 + focused P0 修复
 
-- 状态：Accepted
+- 状态：**Superseded for v3 mainline on 2026-03-13**
 - 日期：2026-03-02
 - 覆盖：018A（部分）、022A（部分）
 - 新增：025A
+- 关联：**OQ-043（OCR-only 收口）**
+
+> **重要说明**：本 ADR 的 Scheme C 分表写入语义（AX 成功 → accessibility 表，OCR fallback → ocr_text 表）已被 **OQ-043** defer 到 v4。
+>
+> - v3 主线：OCR-only，所有帧写入 `ocr_text` 表，`text_source='ocr'`
+> - accessibility 表：保留为 **v4 reserved seam**，v3 代码完全不触碰
+>
+> 本 ADR 保留为审计历史，用于 v4 恢复 AX 时的设计输入。
 
 ## Context
 

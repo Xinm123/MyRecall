@@ -105,7 +105,7 @@ tests/
 | S5-2 | PiProcess | `chat/process.py` | ~150 | `subprocess.Popen` wrapper；spawn Pi with `--mode rpc --provider --model`；stdin write JSON Lines；stdout readline loop（daemon thread）；graceful shutdown（SIGTERM → 3s → SIGKILL）；startup wait 1.5s |
 | S5-3 | PiManager | `chat/manager.py` | ~400 | Singleton；`start()`/`stop()`/`send_prompt(message, session_id, images?)`/`abort(req_id)`/`new_session()`；Session history injection（DP-3=A：每次 `send_prompt` 前从 `chat_messages` 读取最近 N 条，构造 `<conversation_history>` XML block 拼入 prompt）；Event queue（`queue.Queue`）供 SSE generator 消费 |
 | S5-4 | Protocol 桥接 | `chat/protocol.py` | ~100 | `parse_pi_event(json_line) → PiEvent`（dataclass：type, data, id）；`pi_event_to_sse(event) → str`（`data: {json}\n\n`）；处理 11 种 Pi 事件类型；stream end 判定：`response` 事件（success 或 error） |
-| S5-5 | myrecall-search Skill | `skills/myrecall-search/SKILL.md` | ~200 | 对标 `screenpipe-search/SKILL.md`（255 行）；定义 `curl http://localhost:{port}/v1/search` 调用方式；包含参数说明（query, app_name, start_time, end_time, limit）；包含返回格式说明与引用规则：OCR 结果输出 `myrecall://frame/{frame_id}`，UI 结果优先输出 `myrecall://frame/{accessibility.frame_id}`（v3 改进，外键精确关联），无 frame_id 时回退 `myrecall://timeline?timestamp=ISO8601`（P1 不触发），且禁止伪造 ID/时间戳。 |
+| S5-5 | myrecall-search Skill | `skills/myrecall-search/SKILL.md` | ~200 | 对标 `screenpipe-search/SKILL.md`（255 行）；定义 `curl http://localhost:{port}/v1/search` 调用方式；包含参数说明（query, app_name, start_time, end_time, limit）；包含返回格式说明与引用规则：搜索结果统一输出 OCR 帧链接 `myrecall://frame/{frame_id}?timestamp=...`；P1 OCR-only path，禁止伪造 ID/时间戳；不支持结构化 citation（如 UI 元素定位）。 |
 | S5-6 | Skills 注入 | `chat/config.py` | ~60 | `inject_skills(pi_workdir)`：将 `openrecall/server/skills/*/SKILL.md` 复制到 `{pi_workdir}/skills/{name}/SKILL.md`；`detect_bun()`/`detect_pi()`：检查可执行文件可用性；`get_pi_workdir() → Path`：返回 `$OPENRECALL_SERVER_DATA_DIR/.pi`（DP-2=A） |
 | S5-7 | /v1/chat endpoint | `api.py`（修改） | ~80 | `POST /v1/chat`：解析 `{message, session_id, images?}`；调用 `PiManager.send_prompt()`；返回 `Response(stream_with_context(sse_generator()), mimetype='text/event-stream')`（DP-1=A：Flask + threading） |
 | S5-8 | 持久化 | `chat/persistence.py` | ~80 | `save_message(session_id, role, content, citations, tool_calls, model, latency_ms)`；`get_session_history(session_id, limit=20) → list[dict]`；`list_sessions() → list[dict]`；使用 `chat_messages` 表（schema per [data-model.md](./data-model.md) §3.0.3 Table 5）；stream end 后由 Manager 调用保存 user + assistant 消息 |
@@ -159,8 +159,7 @@ tests/
 
 ### S7 验收对照
 
-- TTS（AX成功路径）P95 <= 8s（Hard Gate）
-- TTS（OCR路径）P95 <= 15s（Soft KPI，non-blocking）
+- OCR主路径 TTS P95 <= 15s（Soft KPI，non-blocking）
 - S1~S6 回归全通过
 - P1 功能清单完成率 = 100%
 - P1 验收记录完整率 = 100%

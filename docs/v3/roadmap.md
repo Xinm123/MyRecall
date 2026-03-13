@@ -1,7 +1,7 @@
 ---
 status: draft
 owner: pyw
-last_updated: 2026-03-10
+last_updated: 2026-03-13
 depends_on:
   - gate_baseline.md
   - open_questions.md
@@ -19,9 +19,9 @@ references:
 
 > **SSOT**: [open_questions.md](open_questions.md) — "已拍板结论" 各节
 > 
-> 所有已锁定决策（当前范围：001A–031A）的完整内容以 open_questions.md 为唯一事实源。本节不再重复列举。
+> 所有已锁定决策的完整内容以 open_questions.md 为唯一事实源。本节不再重复列举。
 >
-> **P1-S2b frozen rules index**: [p1-s2b-frozen-rules-index.md](p1-s2b-frozen-rules-index.md) — 用于快速定位 P1-S2b 冻结规则的 canonical source、supporting source 与验收落点。
+> **OCR-only 收口**: 自 OQ-043 (2026-03-13) 起，v3 主线收口为 OCR-only；`accessibility` 相关 schema 仅保留为 v4 seam，不参与 v3 主线数据流。原 P1-S2b 已转型为 capture completion 阶段。
 
 ## 1. 阶段目标与里程碑
 
@@ -37,6 +37,7 @@ references:
 - 时间：2026-03-02 ~ 2026-03-20
 - 目标：将当前单机闭环（client+server）按 Edge-Centric 职责拆为 Host/Edge 两进程，并在本机完成全功能闭环。
 - 执行规则：P1-S1 -> P1-S2a -> P1-S2b -> P1-S3 -> P1-S4 -> P1-S5 -> P1-S6 -> P1-S7 串行推进；每阶段必须先通过验收 Gate。
+- 阶段说明：P1-S2a 负责 trigger generation；P1-S2b 负责 capture completion（trigger routing、monitor-aware coordination、device binding freeze、spool handoff）；P1-S3 起进入 OCR processing 主线。
 - P1-S1（基础链路，2026-03-02 ~ 2026-03-05）
   - 交付：
     - Host spool + uploader（磁盘持久化；spool 落盘 JPEG（`.jpg`/`.jpeg` + `.json`，原子写入）；兼容读取历史 `.webp` 仅用于 drain；幂等、可续传）
@@ -85,52 +86,54 @@ references:
     - 本机 Gate 验收脚本可执行且证据产物齐全（日志/指标汇总/健康快照/UI 证据索引）
     - Gate 校验测试文件已落地并通过：`tests/test_p1_s2a_trigger_coverage.py`、`tests/test_p1_s2a_debounce.py`
 
-- P1-S2b（AX 采集，2026-03-10 ~ 2026-03-14）
+- P1-S2b（Capture Completion / Monitor-Aware Coordination，2026-03-10 ~ 2026-03-14）
   - 交付：
-    - macOS AXUIElement 树遍历
-    - 文本提取（AXValue, AXTitle, AXDescription）
-    - Browser URL 提取（三层 Fallback + Arc Stale URL 检测，详见 p1-s2b.md）
-    - `content_hash` 计算（SHA256，精确匹配，与 screenpipe DefaultHasher 行为一致）
-    - 权限检测与 TCC 引导
+    - Trigger routing 语义冻结：`specific-monitor` / `active-monitor` / `global-reevaluation` 三类触发的目标 monitor 归属规则明确
+    - TriggerSource -> TriggerRouter -> CaptureCoordinator -> MonitorWorker[target] 拓扑收口；`MonitorWorker` 只执行 monitor-bound capture work，不承担 fan-out 策略
+    - `device_name` 绑定语义冻结：由实际完成截图的 monitor capture worker 负责最终绑定，保证与截图 monitor 同 cycle
+    - monitor topology rebuild：monitor 增减、`primary_monitor_only` 变化、worker 集合重建与分区状态恢复
+    - `focused_context = {app_name, window_name, browser_url}` 与 `device_name` 的 capture completion 语义冻结；`browser_url` 保持 best-effort metadata，不阻断主链路
+    - spool handoff correctness：capture completion 后入 spool 的 metadata、图像与 `capture_trigger`/`device_name` 一致
   - 平台策略：macOS-only（P1 仅实现 macOS，Windows/Linux 推迟 P2）
   - 实现语言：Python（详见 ADR-0013）
-  - 依赖：P1-S2a 的触发机制（AX 采集在事件触发时执行）
+  - 依赖：P1-S2a 的触发机制（S2b 在事件触发后完成 monitor-aware capture coordination）
   - Gate：
-    - `content_hash` 覆盖率 >= 90%（`ax_hash_eligible`：`TRIM(COALESCE(accessibility_text, '')) <> ''` 的已上传帧）
-    - AX 树遍历超时 < 500ms（P95）
+    - trigger -> target monitor routing correctness = 100%（click/app_switch/manual/idle 的目标 monitor 行为与冻结语义一致）
+    - `device_name` binding correctness = 100%（capture metadata 中 `device_name` 与实际截图 monitor 一致）
+    - single-monitor trigger duplicate capture rate = 0（单个 monitor 作用域的 trigger 不得生成重复 capture）
+    - monitor topology rebuild correctness = 100%（monitor 增减、不可用、切换 primary 后仍能恢复正确分发）
     - `inter_write_gap_sec`：Soft KPI（记录 P50/P90/P99）+ Hard Gate（按 `device_name` 分桶，每设备 max <= 45s，样本 >= 100）
     - 窗口有效性：Hard Gate 仅使用无 Host/Edge 重启的连续窗口；若窗口内发生 Host 或 Edge 重启则标记 `broken_window=true`，该窗口仅用于观测
-    - Browser URL 提取成功率 >= 95%（观测指标；required browser set = Chrome/Safari/Edge，Arc 仅在已实现时作为 conditional evidence）
 
 - P1-S3（处理，2026-03-12 ~ 2026-03-15）
   - 交付：
-    - Edge AX-first + RapidOCR fallback（含 `ocr_preferred_apps` 初版）
-    - Scheme C 分表写入：AX 成功 → `accessibility` 表（含 `focused`/`frame_id`）；OCR fallback → `ocr_text` 表
-    - AX/OCR 决策记录到 `frames.text_source`
-    - S2b->S3 handoff 字段语义冻结：`accessibility_text` required string（允许 `""`），`content_hash` required nullable string
+    - Edge OCR processing（RapidOCR，single-engine policy）
+    - OCR 成功 → `ocr_text` 表；`frames.text_source='ocr'`
+    - OCR 失败语义冻结：失败帧进入 `failed`，不得伪造 UI/accessibility 结果
+    - S2b->S3 handoff 语义冻结：S3 仅依赖截图、`capture_trigger`、`device_name`、`focused_context` 等 capture-completion 产物
     - 上下文字段语义冻结：`focused_context = {app_name, window_name, browser_url}`；`device_name` 为 same-cycle 的实际采样 monitor 绑定字段
     - 索引时零 AI 增强：不生成 `caption/keywords/fusion_text`，不写入 `ocr_text_embeddings`
-    - Frame 详情可见处理来源（AX/OCR fallback）与处理时间戳（在 `/timeline` 内呈现，不新增 `/frame/:id` 页面）
+    - Frame 详情可见 OCR 处理来源与处理时间戳（在 `/timeline` 内呈现，不新增 `/frame/:id` 页面）
   - Gate：
-    - AX 成功帧写入 `accessibility` 表的正确率 = 100%
-    - AX-first/OCR-fallback 决策日志可追溯率 >= 95%
+    - OCR 成功帧写入 `ocr_text` 的正确率 = 100%
+    - `frames.text_source='ocr'` 标记正确率 = 100%
+    - OCR 失败帧 `failed` 语义正确率 = 100%
     - OCR 路径验收口径固定为 RapidOCR（P1 不做跨引擎归一化）
     - 索引时零 AI 增强检查通过率 = 100%（禁用字段/写入路径回归为 0）
     - 处理来源字段 UI 展示完整率 = 100%
 - P1-S4（检索能力，2026-03-16 ~ 2026-03-18）
   - 交付：
     - `/v1/search`（含 keyword 检索语义，FTS+过滤完整能力）
-    - Scheme C 三路径分发：`search_ocr()`、`search_accessibility()`、`search_all()`，由 `content_type` 参数路由
-    - `focused` 过滤在 `search_accessibility()` 直接支持（P0 修复，不做 screenpipe force-OCR 降级）
-    - 返回结构包含 frame/citation 关键字段，`type` 字段区分 `OCR`/`UI`
+    - OCR-only 搜索路径：FTS + 元数据过滤 + OCR/frame citation 返回结构
+    - `focused`、`browser_url`、时间范围、应用/窗口过滤在 OCR 结果上正确生效
+    - 返回结构包含 frame/citation 关键字段；v3 主线不暴露 UI/accessibility result type
     - Search 页过滤项与 API 参数 1:1 映射，结果可回溯到 frame/citation
   - Gate：
     - 观测 KPI：Search P95 记录实际分布（P1 阶段暂不设硬性阈值，参考 screenpipe 5s 问题阈值，在 P1-S7 前确定目标）
-    - `/v1/search` 过滤参数契约完成率 = 100%（含 `content_type`）
-    - Search SQL 三路径分发一致性 = 100%（search_ocr：INNER JOIN ocr_text；search_accessibility：accessibility + FTS；search_all：并行合并）
-    - `focused` 过滤在 `search_accessibility()` 正确性 = 100%（不降级为 OCR-only）
+    - `/v1/search` 过滤参数契约完成率 = 100%
+    - OCR 搜索 SQL/返回结构一致性 = 100%
+    - `focused` 过滤正确性 = 100%
     - OCR 检索结果引用字段完整率 = 100%（`frame_id`/`timestamp`，Hard Gate）
-    - UI 检索结果引用字段完整率 = 100%（`frame_id`/`timestamp`，Hard Gate，P1 阶段 accessibility.frame_id 非 NULL）
     - 观测 KPI（non-blocking）：OCR 检索结果 `capture_id` 覆盖率目标 >= 99%（未达标需提交整改动作）
     - Search UI 过滤项契约映射完成率 = 100%
     - 检索结果点击回溯成功率 >= 95%
@@ -143,8 +146,6 @@ references:
     - Chat UI minimal（Alpine.js + EventSource）
     - 引用通过提示词与 Skill 显式要求输出 deep link：
       - OCR 结果：`myrecall://frame/{frame_id}`（点击后统一落到 `/timeline` 定位对应帧）
-      - UI 结果：优先 `myrecall://frame/{accessibility.frame_id}`（v3 改进，外键精确关联；点击后统一落到 `/timeline`）
-      - 无 frame_id 时回退 `myrecall://timeline?timestamp=ISO8601`（仅未来独立 walker 场景，P1 不触发）
       - `frame_id`/`timestamp` 必须来自检索结果且禁止伪造（DA-8=A）
   - Gate：
     - Chat 工具能力清单（via myrecall-search SKILL.md）完成率 = 100%
@@ -170,7 +171,6 @@ references:
     - P1 功能冻结清单（进入 P2/P3 的基线）
     - UI 关键路径回归报告（timeline -> search -> chat -> citation -> frame）
   - Gate：
-    - TTS（AX成功路径）P95 <= 8s（Hard Gate）
     - TTS（OCR路径）P95 <= 15s（Soft KPI，观测记录）
     - S1~S6 的 Hard Gate/SLO Gate 回归全通过（Soft KPI 仅记录偏差与整改动作）
     - P1 功能清单完成率 = 100%
@@ -212,15 +212,15 @@ references:
 
 1. Capture
 - P1-S2a：事件驱动框架（macOS CGEventTap + 触发标记 + 去抖 + 背压保护）
-- P1-S2b：AX 文本采集 + content_hash 计算
-- P2/P3：Windows/Linux 事件监听 + AX 采集，功能冻结，仅做稳定性压测与参数调优。
+- P1-S2b：trigger routing + monitor-aware capture coordination + `device_name`/context freeze + spool handoff
+- P2/P3：Windows/Linux 事件监听与 capture coordination，功能冻结，仅做稳定性压测与参数调优。
 
 2. Processing
-- P1：完成功能实现（AX-first + OCR-fallback；Scheme C 分表写入 — AX→accessibility 表，OCR→ocr_text 表；仅存储原始文本，不做索引时 AI 增强；Embedding 仅离线实验表）。
+- P1：完成功能实现（OCR-only；`ocr_text` 持久化；`frames.text_source='ocr'`；仅存储原始文本，不做索引时 AI 增强；Embedding 仅离线实验表）。
 - P2/P3：功能冻结，仅做资源与性能稳定性优化。
 
 3. Search
-- P1：完成功能实现（完全对齐 screenpipe vision-only：FTS+过滤 API 与返回契约；Scheme C 三路径分发 search_ocr/search_accessibility/search_all；`content_type` 参数路由）。
+- P1：完成功能实现（FTS+过滤 API 与返回契约；OCR-only 搜索与 frame citation 回溯）。
 - P2/P3：不新增检索功能，仅做性能与可观测性优化。
 
 4. Chat
@@ -235,9 +235,9 @@ references:
 
 - P1-S1：Host 上传链路 + Edge ingest/queue + 页面保持可用
 - P1-S2a：事件驱动 capture（macOS-only，Python 实现）
-- P1-S2b：AX 文本采集 + content_hash（macOS-only，Python 实现）
-- P1-S3：AX-first/OCR-fallback 处理 + Scheme C 分表写入能力闭环
-- P1-S4：Search（FTS+过滤，三路径分发）能力闭环
+- P1-S2b：Capture Completion / Monitor-Aware Coordination（macOS-only，Python 实现）
+- P1-S3：OCR-only processing 能力闭环
+- P1-S4：Search（FTS+过滤，OCR-only）能力闭环
 - P1-S5：Chat Grounding 与引用闭环
 - P1-S6：Chat 路由/流式/降级闭环
 - P1-S7：端到端验收（仅验收，不新增功能）
@@ -249,11 +249,11 @@ references:
 - P0：Chat 无引用导致可用性失败。
 - P0：Phase 1 范围膨胀导致里程碑延期。
 - P1：事件驱动策略过激导致采集风暴。
+- P1：trigger routing / monitor ownership 设计错误导致错 monitor capture 或重复 capture。
 - P1：OCR 处理性能不达标导致 TTS（OCR路径）超过 15s，影响 P1-S7 观测指标。
 - P1：语义型查询能力下降导致 Chat 检索上下文不充分。
 - P1：macOS 权限瞬态失败导致 Gate 误判（需用 Python + pyobjc 实现 screenpipe permissions.rs 的瞬态检测逻辑）。
 - P1：权限被拒绝/运行中撤销后未进入受控降级，导致“服务存活但采集不可用”不可观测。
-- P1：Electron 应用 AX 遍历超时（需提高 walk_timeout 至 500ms；首次空树不做同帧重试，由后续事件再次获取 AX 文本）。
 
 ## 4. 里程碑退出条件（DoD）
 

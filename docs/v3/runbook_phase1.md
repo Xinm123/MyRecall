@@ -138,7 +138,7 @@ Recommended (simple, reproducible): stop Edge process temporarily
 Note:
 - Queue/status 计数口径以 DB 实时状态为准（SSOT：[spec.md](./spec.md) §4.7），Edge 重启不应改变计数语义。
 - 若你在断连窗口中同时切换了 Edge data dir（导致 SQLite DB 变化/清空），则计数会随 DB 一并变化；此时应以“同一 DB 实例”的证据完成验收。
-- S2b 纯内存 dedup 语义：Host 重启会重置 per-device dedup 运行态（`last_content_hash/last_write_time`）；该现象仅影响 dedup 观测，不改变 DB 事实计数语义。
+- S2b 当前主线不使用 `content_hash` 作为 active dedup 语义；Host/Edge 重启会影响运行态窗口连续性，但不改变 `capture_id` 幂等与 DB 事实计数语义。
 
 ## 7. Restart Policy Across P1-S1 ~ P1-S7
 
@@ -163,7 +163,7 @@ This mode is for debugging state contamination or producing a reproducibility ba
 It MUST NOT be used as a Gate requirement for Phase 1.
 
 Policy:
-- After completing each substage acceptance record (P1-S1, then P1-S2, ...), stop both processes and restart a fresh Host+Edge pair before moving to the next substage.
+- After completing each substage acceptance record (P1-S1, then P1-S2a/P1-S2b, ...), stop both processes and restart a fresh Host+Edge pair before moving to the next substage.
 
 Procedure (per substage boundary):
 1) Stop Host (Ctrl+C), then stop Edge (Ctrl+C).
@@ -184,7 +184,7 @@ Procedure (per substage boundary):
 Caveats:
 - Queue/status 计数口径以 DB 实时状态为准（SSOT：[spec.md](./spec.md) §4.7）。
 - Strict isolation mode 下如果每个子阶段使用新的 data dir（新的 SQLite DB），则计数会从空 DB 开始；如果复用同一 data dir，则计数会在子阶段间延续。
-- S2b Hard Gate 采样若跨越 Host 或 Edge 重启，需标记 `broken_window=true`，并重开新的连续窗口重测。
+- S2b capture-completion Gate 采样若跨越 Host 或 Edge 重启，需标记 `broken_window=true`，并重开新的连续窗口重测。
 
 Restart Edge when:
 - Edge API contract changes
@@ -193,7 +193,7 @@ Restart Edge when:
 - Pi Manager/Sidecar integration changes (P1-S5+)
 
 Restart Host when:
-- Capture trigger behavior changes (P1-S2)
+- Capture trigger or capture-completion behavior changes (P1-S2a/P1-S2b)
 - Upload/retry/buffering behavior changes
 
 ## 8. Stop
@@ -206,13 +206,13 @@ Restart Host when:
 - Phase 1 topology uses "two processes + single Edge port".
 - Do not require Host to expose an inbound port in Phase 1.
 
-## 10. Permission Fault Drill (P1-S2a/S2b)
+## 10. Permission Fault Drill (P1-S2a prerequisite, P1-S2b inherited verification)
 
 目标：验证权限拒绝/撤销/恢复场景在运行态可观测、可恢复、可判定。
 
-阶段要求：若 S2a 验收未执行本 drill，不得长期以 `N/A` 悬置；必须在 S2b Exit 前完成并补记证据。
+阶段要求：本 drill 由 S2a 建立权限前提；若 S2a 验收未执行本 drill，不得长期以 `N/A` 悬置；最迟必须在 S2b Exit 前完成并补记证据。
 
-归属说明：本 drill 的证据用于关闭 S2b 的 capability/permission Gate；S3 不重复承担 permission capability 验收，只继承其前提状态。
+归属说明：本 drill 的证据首先用于关闭 S2a 的 permission observability 前提；S2b 仅继承并验证 permission 状态不会阻断 capture completion 证据链；S3 不重复承担 permission capability 验收，只继承其前提状态。
 
 ### 10.1 演练参数（固定）
 

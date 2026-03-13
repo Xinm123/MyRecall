@@ -1,6 +1,10 @@
 # Search 差异矩阵
 
 > 生成日期：2026-03-02
+> **状态声明**：本文档生成于 OQ-043 之前。自 OQ-043 (2026-03-13) 起 v3 主线收口为 **OCR-only**，`content_type=accessibility/all` 路径仅保留为 v4 seam，不参与 v3 主线 Gate。
+>
+> 本文档保留为历史参考，用于 v4 恢复 AX 时的设计输入。
+>
 > 比较对象：screenpipe（仅屏幕链路）↔ MyRecall-v3（设计 + 实现）
 > 决策记录：D1=B, D2=A, D3=A, TBD-01=A, TBD-02=关闭, D4=Scheme C（025A）
 > 证据编号映射：`E-01..E-11/E-25` 来自 `screenpipe-search-fact-baseline-screen-only.md`；`E-12..E-17` 来自 `myrecall-v3-search-current-baseline.md`。

@@ -18,7 +18,7 @@ references:
 | OQ-001 | P0 | "对齐 screenpipe" 的语义是行为对齐还是实现对齐？ | A 行为对齐（推荐）/ B 实现对齐 | A（已决） | 你的 Edge-Centric 要求与 screenpipe 单机拓扑冲突 | 不拍板会导致方案反复摇摆 | 2026-03-01 |
 | OQ-002 | P0 | Chat API 形态 | A（修订）请求简单 JSON + 响应 SSE 透传 Pi 原生事件 / ~~原 A OpenAI-compatible~~ / B 自定义协议 | A 修订版（已决） | DA-7=A 确定 Pi Sidecar 后，Pi 有 11 种事件类型，OpenAI format 仅能无损映射 1 种；透传 Pi 原生事件避免有损翻译；行业趋势（AG-UI Protocol）验证 agent 场景用自定义事件协议；Chat UI 绿地开发无存量兼容需求 | 若未来需支持第三方 OpenAI-compatible 客户端（不在 P1-P3 范围），需额外适配层 | 2026-03-03 |
 | OQ-003 | P0 | Search 策略（vision-only） | A 完全对齐 screenpipe（FTS+元数据过滤，舍弃 hybrid）/ B 保留 MyRecall hybrid | A（已决，覆盖原003） | 你明确要求"search 完全和 screenpipe 对齐，舍弃 hybrid" | 语义召回能力可能下降 | 2026-03-05 |
-| OQ-004 | P1 | Host 是否采集 accessibility 文本 | A 采集（推荐）/ B 不采集 | A（已决） | 可对齐 screenpipe paired capture，降低 Edge OCR 压力 | A 需处理平台差异 | 2026-03-08 |
+| OQ-004 | P1 | Host 是否采集 accessibility 文本 | A 采集（推荐）/ B 不采集 | ~~A（已决）~~ **被 OQ-043 superseded** | ~~可对齐 screenpipe paired capture，降低 Edge OCR 压力~~ | ~~A 需处理平台差异~~ | 2026-03-08 |
 | OQ-005 | P1 | Edge 默认模型策略 | A 本地与云端都支持，按配置切换（P1 不做自动 fallback，推荐）/ B cloud-first 固定 | A（修订后已决） | 与 screenpipe 的 provider 配置切换能力对齐，且不破坏 Edge-Centric | 若 provider 故障将直接返回 timeout/error，需保证错误可见性与恢复流程 | 2026-03-10 |
 | OQ-006 | P1 | 传输安全级别（LAN） | A token + TLS 可选（P1）/ B mTLS 强制（P2+） | A->B（已决） | 当前同 LAN，先保证可用性，再在 P2+ 强制 mTLS | 若迟迟不进入 B 阶段，存在长期内网信任风险 | 2026-03-12 |
 | OQ-007 | P1 | 页面/UI 在 P1~P3 的部署位置 | A 继续部署在 Edge（推荐）/ B 迁移到 Host | A（已决） | 先保障 Edge 主链路与 Chat 能力收敛，避免并行改造 UI 拖慢节奏 | Edge 计算与 UI 资源争用风险上升 | 2026-03-14 |
@@ -32,25 +32,26 @@ references:
 | OQ-015 | P1 | embedding 是否进入线上 search 主路径 | A 仅离线实验表（推荐）/ B 线上 hybrid | A（已决） | 完全对齐 screenpipe，控制 P1 复杂度 | — | 2026-02-27 |
 | OQ-016 | P1 | v2 数据迁移 | A v3 全新起点不迁移（推荐）/ B 迁移 | A（已决） | 简化 P1 启动 | — | 2026-02-27 |
 | OQ-017 | P0 | 数据模型 schema 对齐策略 | A 主路径对齐 + 差异显式（推荐）/ B 自定义 | A（已决） | P1 对齐 `frames`/`ocr_text`/`frames_fts`/`ocr_text_fts`；`ocr_text_embeddings` 为 P2+ 可选实验表（同名保留，P1 不建） | — | 2026-02-27 |
-| OQ-018 | P0 | ocr_text 关系 + text_source 位置 | A ocr_text 1:1 / B 1:N / ~~A~~ → C Scheme C 分表写入（已决） | C（已决，覆盖 A） | Scheme C：AX 成功 → accessibility 表（无 ocr_text 行）；OCR fallback → ocr_text 表（无 accessibility 行）；text_source 仍在 frames 表。证据：paired_capture.rs:153-154, db.rs:1538 | — | 2026-03-02 |
+| OQ-018 | P0 | ocr_text 关系 + text_source 位置 | A ocr_text 1:1 / B 1:N / ~~A~~ → C Scheme C 分表写入（已决） | ~~C（已决，覆盖 A）~~ **被 OQ-043 superseded** | ~~Scheme C：AX 成功 → accessibility 表（无 ocr_text 行）；OCR fallback → ocr_text 表（无 accessibility 行）；text_source 仍在 frames 表。证据：paired_capture.rs:153-154, db.rs:1538~~ | — | 2026-03-02 |
 | OQ-019 | P0 | P1 ingest 协议复杂度 | A 单次幂等上传 + queue/status 端点（推荐）/ B 4 端点全量 / C 折中 | A（已决） | P1 本机双进程，4 端点解决 P1 不存在的问题；session/chunk/commit/checkpoint 推迟 P2 | P2 LAN 场景需新增分片协议 | 2026-02-27 |
 | OQ-020 | P0 | API 契约定义（P1 端点完整 schema） | A 按 020A 落盘（推荐）/ B 留白 | A（已决） | P1-S4 Gate 必须有完整接口约束 | — | 2026-02-27 |
 | OQ-021 | P0 | `ocr_text` 表 `app_name`/`window_name` 补齐策略 | A 补齐列 + 接受 drift（推荐）/ B 触发器 JOIN frames | A（已决） | 对齐 screenpipe 历史 migration；B 引入不必要子查询耦合 | 与 frames 列潜在 drift（P1 内无修正场景，接受） | 2026-02-27 |
-| OQ-022 | P0 | Search SQL JOIN 策略 | A INNER JOIN 单路径 / ~~A~~ → C 三路径分发（已决） | C（已决，覆盖 A） | Scheme C 下 search 拆为 search_ocr()（INNER JOIN ocr_text）+ search_accessibility()（accessibility 表 + accessibility_fts）+ search_all()（并行合并 by timestamp DESC）；content_type 参数路由 | — | 2026-03-02 |
+| OQ-022 | P0 | Search SQL JOIN 策略 | A INNER JOIN 单路径 / ~~A~~ → C 三路径分发（已决） | ~~C（已决，覆盖 A）~~ **被 OQ-043 superseded** | ~~Scheme C 下 search 拆为 search_ocr()（INNER JOIN ocr_text）+ search_accessibility()（accessibility 表 + accessibility_fts）+ search_all()（并行合并 by timestamp DESC）；content_type 参数路由~~ | — | 2026-03-02 |
 | OQ-023 | P1 | Migration 策略 | A 手写 SQL + `schema_migrations` 表（推荐）/ B Alembic / C PRAGMA user_version | A（已决） | 零额外依赖；对齐 screenpipe sqlx migrate 命名规范 | — | 2026-02-27 |
 | OQ-024 | P0 | API 命名空间冻结 | A /v1/* 统一 + /api/* 渐进废弃（推荐）| A（已决，2026-03-04 补充；2026-03-07 更新） | 对外 HTTP 契约统一 `/v1/*`；`/api/*` P1-S1~S3 按阶段策略重定向（`POST /api/upload`=308，其余 GET=301）至 `/v1/*` + `[DEPRECATED]` 日志，P1-S4 返回 410 Gone 完全废弃；不纳入客户端默认调用路径 | — | 2026-02-26 |
-| OQ-025 | P0 | accessibility 表架构（Scheme C） | A P0 建表 + focused 修复 + frame_id 方案 3（推荐，已决）/ B 对齐 screenpipe 不加 focused / C P1+ 延迟建表 | A（已决） | (1) accessibility 表 P0 建，paired_capture 按 text_source 分表写入；(2) 新增 focused 列修复 screenpipe 的 focused→force OCR 限制（db.rs:1870-1872）；(3) frame_id DEFAULT NULL 精确关联 frames（paired_capture 填入，未来独立 walker 留 NULL） | DDL 复杂度+1（多一张表+FTS+triggers）；P0 范围略增 | 2026-03-02 |
+| OQ-025 | P0 | accessibility 表架构（Scheme C） | A P0 建表 + focused 修复 + frame_id 方案 3（推荐，已决）/ B 对齐 screenpipe 不加 focused / C P1+ 延迟建表 | A（已决，**语义调整为 v4 seam**） | (1) accessibility 表 P0 **建表保留**（作为 v4 seam）；(2) ~~paired_capture 按 text_source 分表写入~~（v3 主线不写入）；(3) 新增 focused 列等为 v4 预留；**v3 主线代码不触碰此表** | DDL 保留但不增加 v3 实现负担；v4 恢复时无需重建 schema | 2026-03-02 |
 | OQ-026 | P1 | P1 Search UI 分页模式 | A 加载更多（对齐 screenpipe，推荐）/ B 跳页（需加 offset 上限约束） | A（已决） | screenpipe `search-modal.tsx` 纯"加载更多"（`hasMoreOcr/loadMoreOcr`），offset 步长=limit，实际不超过几百；跳页模式下 `search_all()` 过量拉取内存风险不可控（offset=10000 时各路径拉 10020 行）；P2+ keyset cursor 可彻底替代 | 若未来需跳页，需补 `offset max` 约束并在 `search_all()` 加运行时 reject | 2026-03-02 |
 | OQ-027 | P1 | Capture 运行机制与频率口径 | A 事件驱动主机制 + 固定注入压测口径（推荐）/ B 全局固定频率假设 | A（已决，2026-03-04 补充） | 对齐 [spec.md](spec.md)/[roadmap.md](roadmap.md)/`acceptance/phase1/p1-s2a.md`/`acceptance/phase1/p1-s2b.md`，消除"事件驱动 vs 固定频率"文本冲突（`acceptance/phase1/archive/p1-s2.md` 仅历史参考） | 若 P2+ 引入 Power Profile，TTS 与丢失率阈值需按 profile 重新标定 | 2026-03-04 |
 | OQ-028 | P1 | Host spool 持久化策略 | A 磁盘持久化（推荐）/ B 内存队列 | A（已决，2026-03-05） | 进程重启/断电/断网场景下内存方案会丢数据，与 P1-S1 "断网恢复可自动重传" Gate 不兼容 | — | 2026-03-05 |
 | OQ-029 | P1 | P1-S2 是否拆分为事件驱动 (S2a) + AX 采集 (S2b) | A 拆分为 S2a + S2b 串行开发（推荐）/ B 合并为单一 S2 阶段 | A（已决，2026-03-09） | 事件驱动与 AX 采集是两个独立技术栈；dedup 效果 Gate 依赖 `content_hash` + `inter_write_gap_sec`（需 S2b）；拆分后可独立验收、降低单阶段风险 | P1 阶段 Win/Linux 用户仅能用 idle/manual 触发 | 2026-03-09 |
 | OQ-030 | P1 | P2 频率目标（是否对齐 screenpipe 5Hz） | A 维持 1Hz（推荐）/ B 目标 5Hz / C 数据驱动 | A（已决，2026-03-09） | P1/P2 采用保守频率（1Hz），有意偏离 screenpipe（5Hz）；Python 实现安全余量充足；若未来需要更高频率需重新评估 | 与 screenpipe 频率差异可能影响部分用户预期 | 2026-03-09 |
-| OQ-034 | P1 | `ocr_preferred_apps` P1 初版白名单 | A 终端类最小名单（推荐）/ B 空名单（全量AX优先）/ C 扩大到更多应用 | A（已决，2026-03-09） | 对齐 screenpipe `paired_capture` 终端类 OCR 偏好，优先保证 terminal 场景可读性与框选质量，控制 P1 风险范围 | 名单过宽会抬高 OCR 开销；名单过窄会导致 terminal 场景质量下降 | 2026-03-09 |
-| OQ-035 | P1 | OCR 引擎策略（P1） | A RapidOCR 单引擎（推荐）/ B 多引擎可切换 | A（已决，2026-03-09） | 降低实现与验收复杂度；统一 OCR 指标口径；保持 AX-first + OCR-fallback 主路径不变 | 失去跨引擎对照能力，多语言/极端场景需在 P2+ 再评估 | 2026-03-09 |
+| OQ-034 | P1 | `ocr_preferred_apps` P1 初版白名单 | A 终端类最小名单（推荐）/ B 空名单（全量AX优先）/ C 扩大到更多应用 | ~~A（已决，2026-03-09）~~ **被 OQ-043 superseded** | ~~对齐 screenpipe `paired_capture` 终端类 OCR 偏好~~；OCR-only 收口后无需 AX/OCR 优先级判定 | — | 2026-03-09 |
+| OQ-035 | P1 | OCR 引擎策略（P1） | A RapidOCR 单引擎（推荐）/ B 多引擎可切换 | A（已决，2026-03-09） | 降低实现与验收复杂度；统一 OCR 指标口径；OCR-only 主路径固定为 RapidOCR | 失去跨引擎对照能力，多语言/极端场景需在 P2+ 再评估 | 2026-03-09 |
 | OQ-036 | P1 | macOS 权限状态机与恢复闭环口径 | A 对齐 screenpipe（2 fail / 3 success / 300s cooldown / 10s poll，推荐）/ B 简化为一次失败即判定 | A（已决，2026-03-09） | 解决 TCC 瞬态抖动导致的误判；保证 denied/revoked/recovered 有一致可观测语义 | 若不收敛，Gate 易出现“服务存活但采集失效”误判 | 2026-03-09 |
 | OQ-037 | P1 | S2a 背压 Gate 是否保留 `collapse_trigger_count >= 1` | A 移出 Hard Gate、降级为观测（推荐）/ B 保留 Hard Gate | A（已决，2026-03-11） | 过载窗口未命中 collapse 时，`=0` 不应制造假失败；背压放行以 saturation/overflow 为准 | 若无额外观测，保护路径是否命中过的可见性下降 | 2026-03-11 |
 | OQ-038 | P1 | Arc Browser AppleScript URL 提取在 S2b 的阶段语义 | A timeboxed optional heuristic sub-scope（推荐）/ B 正式 Gate 分支 | A（已决，2026-03-11） | 运行时行为对齐 screenpipe，但 Day 3 defer 属于 MyRecall 的 staged-delivery 适配 | Arc 若长期 deferred，需要后续阶段重新规划兼容目标 | 2026-03-11 |
 | OQ-039 | P1 | S2b / S3 的 failure-class ownership | A 按 handoff 边界分责（推荐）/ B 混合共享 | A（已决，2026-03-11） | S2b 负责 capability/context/raw handoff；S3 负责 semantic outcome/final persistence | 若文档不收口，阶段验收会重复或遗漏同类故障 | 2026-03-11 |
+| OQ-043 | P0 | v3 是否正式收口为 OCR-only，并将 AX defer 到 v4 | A OCR-only + 保留 AX schema seam（推荐）/ B OCR-only + 移除 AX seam / C 维持 AX-first 计划 | A（已决） | 与当前代码现实一致：P1-S2a 已落地，AX 主链路仍主要停留在文档与 schema 预留；保留 seam 可避免已执行 migration 回退，同时为 v4 恢复 AX 留兼容边界 | 若不收口，spec/roadmap/acceptance/gate 会持续承诺未实现的 AX 主链路，导致后续实现与验收反复摇摆 | 2026-03-13 |
 
 ## 需实验清单
 
@@ -191,3 +192,13 @@ references:
     - **语义范围**：`accessibility_text`、`content_hash`、browser URL stale rejection、Host dedup、`device_name` binding、`focused_context` frozen bundle 等规则仅属于 v3 主链路。
     - **实施方式**：如确需复用 legacy 代码，只允许通过 adapter 接入，不允许反向把 legacy 语义带回 v3 主链路。
     - **验收原则**：S2b 测试、Gate 脚本、runbook 与人工验证只认 `/v1/*` + v3 runtime/store；legacy 路径仅做兼容检查，不作为功能正确性的证明链路。
+
+### 已拍板结论（2026-03-13）
+
+44. OQ-043 = A：v3 正式收口为 OCR-only；AX 主链路 defer 到 v4。收口原则如下：
+    - **活跃主线**：v3 仅承诺 `S2a event-driven capture -> ingest -> OCR processing -> OCR search -> frame citation`；不再以 AX 采集、AX-first 判定、UI 结果或 `accessibility.frame_id` citation 作为 v3 active semantics。
+    - **保留 seam**：已存在的 `accessibility` / `accessibility_fts` 表、`frames.accessibility_text`、`frames.content_hash`、`frames.text_source` 等 schema 预留保持不删，作为 v4 恢复 AX 的兼容边界；其中 v3 active path 的 `text_source` 仅允许收口到 `'ocr'`。
+    - **覆盖范围**：对 v3 active semantics 而言，OQ-004 / OQ-018 / OQ-022 / OQ-029 / OQ-033 / OQ-034 / OQ-035 / OQ-039 / OQ-040 / OQ-041 / OQ-042 中涉及 AX 主链路的表述均由本决议 supersede；这些条目保留为历史记录或 v4 设计输入，不再作为 v3 主线执行依据。
+    - **引用口径收口**：OQ-013 中 UI 结果优先 `myrecall://frame/{accessibility.frame_id}` 的口径不再属于 v3 active path；v3 仅承诺 OCR/frame 结果 `myrecall://frame/{frame_id}`，UI/AX citation 回退到 v4 重新定义。
+    - **S2b 阶段语义**：P1-S2b 不再作为 v3 主线的必经阶段；凡依赖 `accessibility_text`、AX timeout/empty、browser URL stale、Host AX dedup 的规则与 Gate，统一降级为 deferred AX scope，待 v4 重新收口。
+    - **OQ-025 解释补充**：`accessibility` 表 P0 建表的决定仍保留，但其语义从“v3 active path”调整为“v4 reserved seam”；保留该表不构成 v3 必须实现 AX 采集或 AX 搜索的承诺。

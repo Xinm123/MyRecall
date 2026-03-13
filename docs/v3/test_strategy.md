@@ -1,7 +1,7 @@
 # MyRecall-v3 测试策略
 
-- 版本：v1.0
-- 日期：2026-03-05
+- 版本：v1.1
+- 日期：2026-03-13
 - 状态：已锁定
 - 关联决策：016A（v3 全新数据起点）
 
@@ -20,7 +20,7 @@
 | 维度 | v2 | v3 | 结论 |
 |------|-----|-----|------|
 | 架构 | 单机闭环 | Host/Edge 分离 | 不兼容 |
-| 数据模型 | LanceDB + FTS | SQLite Scheme C | 不兼容 |
+| 数据模型 | LanceDB + FTS | SQLite（v3 主线 OCR-only，AX schema seam 保留） | 不兼容 |
 | API | `/api/*` | `/v1/*` | 契约变更 |
 | Capture | 定时轮询 | 事件驱动 | 逻辑重写 |
 | Chat | 无 | Pi Sidecar + SSE | 全新 |
@@ -40,7 +40,7 @@ tests/
 │
 ├── edge/                          # Edge 端测试（全新）
 │   ├── test_ingest_api.py         # /v1/ingest 端点
-│   ├── test_ax_ocr_pipeline.py   # AX-first + OCR-fallback
+│   ├── test_ocr_pipeline.py      # OCR-only processing
 │   ├── test_search_api.py        # /v1/search 端点
 │   ├── test_frames_api.py        # /v1/frames/* 端点
 │   └── test_health_api.py        # /v1/health 端点
@@ -68,12 +68,12 @@ tests/
 - **Gate 校验脚本**（核心，必须）：
   - `test_p1_s2a_trigger_coverage.py` — SQL 校验 trigger_coverage = 100%
   - `test_p1_s2a_debounce.py` — SQL 校验去抖违规数 = 0
-  - `test_p1_s2b_content_hash.py` — content_hash 覆盖率 SQL 校验（分母=`TRIM(COALESCE(accessibility_text, '')) <> ''`）
-  - `test_p1_s2b_ax_timeout.py` — AX 遍历延迟 P95 < 500ms
+  - `test_p1_s2_routing.py` — routing correctness / duplicate capture / topology rebuild 校验（注：S2a/S2b 联合交付，命名为 S2 而非 S2b）
+  - `test_p1_s2_device_binding.py` — `device_name` 绑定与 focused-context coherence 校验（注：S2a/S2b 联合交付，命名为 S2 而非 S2b）
 - **最小集成测试**（补充）：
-  - 幂等去重逻辑（可单元测）
+  - capture-completion 协调逻辑（可单元测）
   - 队列状态 API
-  - S2b handoff 字段矩阵：`accessibility_text=""` 合法、`accessibility_text=null` 非法、`content_hash=null` 合法、`content_hash=""` 非法、缺 key 非法
+  - S2b metadata/handoff 字段矩阵：`capture_trigger`、`device_name`、`app_name/window_name/browser_url` 的 canonical key 与一致性规则
   - focused-context 一致性矩阵：禁止 mixed-source `app_name/window_name`、stale `browser_url` 必须 rejected to `null`、`device_name` 必须对应实际截图 monitor
   - Arc stale-url 场景仅在 Arc support 未 defer 时执行；若 Arc deferred，不计入 required browser success 判定
 
@@ -83,13 +83,13 @@ tests/
 
 > Gate 边界说明：上述两个测试文件属于 **P1-S2a Exit Gate 交付物**（决定能否进入 P1-S2b），不是 P1-S2a Entry Gate 的阻塞前置。
 
-> P1-S2b 开发方式（已冻结，见 `open_questions.md` OQ-041）：S2b 采用 TDD 开发；`test_p1_s2b_content_hash.py`、`test_p1_s2b_ax_timeout.py` 等测试文件是随功能演进自然沉淀的阶段交付物，不要求在开工前一次性补齐。`scripts/acceptance/p1_s2b_local.sh` 属于 Exit Gate 编排层，应在阶段收口时补齐并执行。
+> P1-S2b 开发方式（已冻结）：S2b 采用 TDD 开发；`test_p1_s2b_routing.py`、`test_p1_s2b_device_binding.py` 等测试文件是随功能演进自然沉淀的阶段交付物，不要求在开工前一次性补齐。`scripts/acceptance/p1_s2b_local.sh` 属于 Exit Gate 编排层，应在阶段收口时补齐并执行。
 
 ### P1-S3（处理）
-- `test_ax_ocr_pipeline.py` — AX-first/OCR-fallback 决策、分表写入
+- `test_ocr_pipeline.py` — OCR-only 处理、`ocr_text` 写入与失败语义
 
 ### P1-S4（检索）
-- `test_search_api.py` — FTS、过滤参数、`content_type` 路由
+- `test_search_api.py` — FTS、过滤参数、OCR-only 搜索契约
 
 ### P1-S5~S6（Chat）
 - `test_chat_manager.py` — Pi 进程管理
@@ -105,7 +105,7 @@ tests/
 
 ## 5. P1-S2 测试策略补充
 
-> **重要说明**：P1-S2（采集）测试依赖 macOS CGEventTap 真实事件和 AX 权限，**无法在 CI 环境自动化**，需本机手动跑。
+> **重要说明**：P1-S2（采集）测试依赖 macOS CGEventTap 真实事件与多屏/权限实机场景，**无法在 CI 环境自动化**，需本机手动跑。
 
 ### 测试策略：「Gate 校验脚本 + 最小集成测试」
 
@@ -116,7 +116,7 @@ tests/
 
 ### 轨道 A（本机 Gate 验收）落地规范
 
-- 适用范围：P1-S2a（CGEventTap）与 P1-S2b（AX 权限）两个子阶段。
+- 适用范围：P1-S2a（CGEventTap）与 P1-S2b（capture completion / monitor-aware coordination）两个子阶段。
 - 脚本入口（统一约定）：
   - `scripts/acceptance/p1_s2a_local.sh`
   - `scripts/acceptance/p1_s2b_local.sh`
@@ -145,8 +145,9 @@ tests/
   - UI 状态截图（引导/降级/恢复）
 
 阶段归属说明：
-- P1-S2b：负责 permission state machine / degraded-recovering-ok 闭环、browser_url stale rejection、empty-AX no-drop handoff 与 Arc deferred 记录。
-- P1-S3：负责 `AX empty / AX timeout / ocr_preferred_apps / OCR fallback success|failure / failed status` 的 processing semantic tests。
+- P1-S2a：负责 permission state machine / degraded-recovering-ok 闭环与健康态可观测性。
+- P1-S2b：继承并验证 permission 状态不会阻断 capture completion，同时负责 browser_url stale rejection、routing / device binding / topology rebuild 等采集闭环验证。
+- P1-S3：负责 OCR success / failure / failed status 的 processing semantic tests。
 
 ### 需要的测试文件
 
@@ -154,8 +155,8 @@ tests/
 |--------|------|------|
 | S2a | `test_p1_s2a_trigger_coverage.py` | SQL 校验 trigger_coverage = 100% |
 | S2a | `test_p1_s2a_debounce.py` | SQL 校验去抖违规数 = 0 |
-| S2b | `test_p1_s2b_content_hash.py` | content_hash 覆盖率 SQL 校验（基于 raw `accessibility_text` 非空分母） |
-| S2b | `test_p1_s2b_ax_timeout.py` | AX 遍历延迟 P95 < 500ms |
+| S2b | `test_p1_s2b_routing.py` | trigger routing / duplicate capture / topology rebuild 校验 |
+| S2b | `test_p1_s2b_device_binding.py` | `device_name` binding 与 focused-context coherence 校验 |
 
 ### 不需要做的
 

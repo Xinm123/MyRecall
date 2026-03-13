@@ -13,7 +13,7 @@
 
 - `phase1/p1-s1.md`
 - `phase1/p1-s2a.md`（事件驱动）
-- `phase1/p1-s2b.md`（AX 采集）
+- `phase1/p1-s2b.md`（Capture Completion / Monitor-Aware Coordination）
 - `phase1/archive/p1-s2.md`（历史参考，已被 S2a/S2b 取代，不用于当前 Gate 判定）
 - `phase1/p1-s3.md`
 - `phase1/p1-s4.md`

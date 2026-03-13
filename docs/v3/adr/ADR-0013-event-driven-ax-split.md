@@ -1,8 +1,16 @@
 # ADR-0013 P1-S2 拆分：事件驱动 (S2a) + AX 采集 (S2b)
 
-- 状态：Accepted
+- 状态：**Superseded for v3 mainline on 2026-03-13**
 - 日期：2026-03-09
-- 关联：ADR-0008（Phase 1 串行子阶段）、OQ-027（Capture 运行机制）、OQ-028（Host spool 持久化）
+- 关联：ADR-0008（Phase 1 串行子阶段）、OQ-027（Capture 运行机制）、OQ-028（Host spool 持久化）、**OQ-043（OCR-only 收口）**
+
+> **重要说明**: 本 ADR 记录原始 P1-S2 拆分决策（S2a=事件驱动 + S2b=AX 采集）。自 **OQ-043 (2026-03-13)** 起，v3 主线正式收口为 **OCR-only**，AX 主链路 defer 到 v4。
+>
+> - S2a 已完成并保持不变
+> - **S2b 转型为 "Capture Completion"**（专注 trigger routing、monitor-aware coordination、device binding、spool handoff），不再负责 AX 文本采集
+> - 本 ADR 的 S2b=AX 语义仅保留为审计历史，不再作为 v3 主线执行依据
+>
+> 当前执行口径：[open_questions.md OQ-043](../open_questions.md)、[roadmap.md P1-S2b](../roadmap.md)
 
 ## Context
 

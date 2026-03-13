@@ -8,9 +8,9 @@
 - 当前草案中部分功能原本分布在 P2（例如事件驱动 capture、Chat 部分能力），与上述要求冲突。
 
 ## Decision
-- Phase 1（本机模拟 Edge）必须完成 v3 全视觉链路功能闭环：
+- Phase 1（本机模拟 Edge）必须完成 v3 OCR-only 链路功能闭环：
   - capture：事件驱动 + idle fallback
-  - processing：AX-first + OCR-fallback
+  - processing：OCR-only
   - search：FTS+过滤（vision-only）
   - chat：Pi Sidecar + SKILL.md tool-driven retrieval + 提示词驱动引用 + provider/model 路由 + 流式输出 + timeout 处理
 - Phase 2（LAN 双机）和 Phase 3（Debian 生产）执行功能冻结：

@@ -11,9 +11,9 @@
 - Phase 1 固定拆分为八个串行子阶段（S2 于 2026-03-09 拆分为 S2a + S2b，见 ADR-0013）：
   - P1-S1：基础链路（Host 上传 + Edge ingest/queue + 页面可用）
   - P1-S2a：事件驱动 capture（事件监听 + 触发标记 + 去抖 + 背压保护）
-  - P1-S2b：AX 文本采集（AX 树遍历 + content_hash + 权限处理）
-  - P1-S3：处理（AX-first/OCR-fallback + text_source 记录，索引时零 AI 增强）
-  - P1-S4：检索（FTS+过滤 API 与返回契约）
+  - P1-S2b：Capture Completion / Monitor-Aware Coordination
+  - P1-S3：处理（OCR-only processing + text_source='ocr' + 索引时零 AI 增强）
+  - P1-S4：检索（OCR-only FTS+过滤 API 与返回契约）
   - P1-S5：Chat-1（grounding 与引用）
   - P1-S6：Chat-2（provider/model 路由、Pi 事件流式输出、timeout 处理）
   - P1-S7：端到端验收（仅验收，不新增功能）

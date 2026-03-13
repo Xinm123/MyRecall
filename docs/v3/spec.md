@@ -1,7 +1,7 @@
 ---
 status: draft
 owner: pyw
-last_updated: 2026-03-03
+last_updated: 2026-03-13
 depends_on:
   - data-model.md
   - roadmap.md
@@ -57,7 +57,7 @@ flowchart LR
     W[Web UI\nFlask Pages]
     I[Ingest API]
     Q[Processing Queue]
-    P[Vision Pipeline\nAX-first / OCR-fallback]
+    P[Vision Pipeline\nOCR-only]
     IDX[Index Layer\nSQLite+FTS]
     S[Search API]
     CH[Chat\nPi Sidecar + Manager]
@@ -75,14 +75,14 @@ flowchart LR
 - 语义约束：上下文字段分为两组：`focused_context = {app_name, window_name, browser_url}` 与 `capture_device_binding = {device_name}`。
 - `focused_context` 契约：`app_name/window_name` 必须来自同一次 capture 的同源上下文快照；`browser_url` 仅可在与该 focused context 校验一致时附带写入；禁止字段级独立查询后混拼。
 - `capture_device_binding` 契约：`device_name` 必须标识本次 capture cycle 中实际被截取的 monitor；它要求 same-cycle coherence，不要求与 `focused_context` 同源。
-- 反承诺（P1）：不承诺 screenshot + AX + URL 查询形成全局原子同瞬时快照；仅承诺 capture-cycle coherence 与 stale rejection。
-- 轻处理：压缩、去重哈希、可选 accessibility 文本快照（仅采集，不推理）。
+- 反承诺（P1）：不承诺 screenshot + URL 查询形成全局原子同瞬时快照；仅承诺 capture-cycle coherence 与 best-effort metadata coherence。
+- 轻处理：压缩、基础元数据打包、spool 持久化与幂等上传准备。
 - 传输：断点续传、重试、幂等上传。
 - 缓存：本地 spool 与提交位点（offset/checkpoint）。
 - 不允许：OCR、embedding、rerank、chat 推理、页面/UI 承载（P1~P3）。
 
 ### 2.2 Edge 职责（严格）
-- 重处理：OCR（AX-first + OCR-fallback），仅存储原始文本，不做索引时 AI 增强（与 screenpipe 对齐）。
+- 重处理：OCR，仅存储原始文本，不做索引时 AI 增强（与 screenpipe 对齐）。
 - 索引：`frames` 元数据表 + `ocr_text` + `frames_fts` / `ocr_text_fts`（FTS5）。
 - 检索：FTS 召回 + 元数据过滤 + 排序。
 - Chat：RAG 编排（Orchestrator 在查询时将原始文本送入 LLM 实时推理）、工具调用、引用回溯、流式输出。
@@ -139,54 +139,30 @@ flowchart LR
 - idle 语义约束（P1-S2a+）：`idle` fallback 必须仅由 `idle_capture_interval_ms` 超时触发，不依赖用户活跃判定。
 - Phase 2/3：capture 功能冻结，不新增采集能力，只做 LAN/Debian 稳定性验证与参数调优。
 - 上传协议改为"幂等 + 可续传"：`capture_id` 唯一、chunk ACK、断点续传。
-- 已拍板（OQ-004=A）：Host 采集 accessibility 文本并随 capture 上传；Host 不做 OCR/embedding 推理。
+- 已拍板（OQ-043=A）：v3 主线收口为 OCR-only；Host 不以 accessibility 采集作为主线要求，仍不做 OCR/embedding 推理。
 - 事件风暴抑制（有意偏离 screenpipe Performance 模式）：
   - 全触发共享最小间隔去抖（`min_capture_interval_ms`，默认 1000ms，有意偏离 screenpipe Performance 200ms）；
-  - 非 `idle/manual` 触发启用内容去重（`content_hash` 相同则跳过写入），并保留 30s 强制落盘保底；
+  - 非 `idle/manual` 触发允许后续接入内容去重，但不得成为 v3 OCR-only 主线 Gate 前提；
+  - 保留 30s 强制落盘保底，避免 timeline 出现长时间空洞；
   - 触发通道有界，lag 时折叠为一次兜底触发，避免高频事件拖垮处理链路。
 
-**P1-S2b frozen capture semantics（SSOT）**：
+**P1 capture semantics（SSOT）**：
 - event source 仅负责发出 `capture_trigger`，不得绑定 `device_name`。
 - `device_name` 必须由 monitor worker 在消费 trigger、执行实际截图时绑定；其语义固定为“本次 capture cycle 中实际被截取的 monitor”。
 - `focused_context = {app_name, window_name, browser_url}` 必须由同一轮 focused-context snapshot 一次性产出；允许部分缺失为 `None`，但禁止字段级跨来源混拼。
 - `primary_monitor_only` 仅控制启用的 monitor worker 集合，不改变 trigger 语义。
-- P1 仅承诺 capture-cycle coherence，不承诺 screenshot / AX / URL 的全局原子同瞬时快照。
+- P1 仅承诺 capture-cycle coherence，不承诺 screenshot / URL 的全局原子同瞬时快照。
 
-**Browser URL stale rejection（SSOT）**：
+**Browser URL best-effort semantics（SSOT）**：
 - `browser_url` 获取成功不等于可写入；写入前必须完成与同轮 `focused_context` 的一致性校验。
 - 仅当 URL 与同轮 `focused_context` 校验一致时，才允许写入 `browser_url`。
 - 若命中 stale 检测、标题不匹配、来源不可信或无法确认一致性，必须写 `None`。
 - 对 Arc / AppleScript 路径，标题匹配失败必须按 stale reject 处理，不得保守猜测写入。
 
-**内容去重实现（Host 端执行，与 screenpipe 对齐）**：
-```
-# Host 端 dedup 伪代码（capture 完成并生成 AX/hash 后、upload 前判定）
-def should_upload(capture_trigger, accessibility_text, content_hash, last_write_time):
-    # 1. idle/manual 触发不参与 dedup（保证 timeline 不为空）
-    if capture_trigger in ('idle', 'manual'):
-        return True
-
-    # 2. 30s 强制写入保底（与 screenpipe 一致）
-    if (now - last_write_time).total_seconds() >= 30:
-        return True
-
-    # 3. 空文本不参与 dedup（与 screenpipe 一致）
-    if not accessibility_text or accessibility_text.strip() == '':
-        return True
-
-    # 4. content_hash 相同则跳过
-    if content_hash == last_content_hash:
-        return False  # dedup skip，不上传
-
-    return True  # 写入
-```
-
-**`content_hash` canonicalization（SSOT）**：
-- `content_hash` 必须仅基于最终上报的 `accessibility_text` 计算。
-- 计算前必须对 `accessibility_text` 执行固定 canonicalization：Unicode NFC、换行统一为 `\n`、每行去尾部空白、整体 `strip()`。
-- 不得做语义级改写，不得基于 AX 节点结构之外的额外推断生成 hash 输入。
-- 当 `TRIM(COALESCE(accessibility_text, '')) = ''` 时，`content_hash` 必须为 `null`；否则必须为 `sha256:` 前缀 + 64 位十六进制。
-- AX timeout 场景下，若仍产出部分文本，则按该最终 `accessibility_text` 正常计算 `content_hash`。
+**OCR-only 主线约束（P1）**：
+- Host 主线 payload 仅要求截图与基础上下文（`timestamp`、`capture_trigger`、`device_name`、`app_name/window_name`、best-effort `browser_url`）。
+- v3 主线不以 `accessibility_text`、AX timeout/empty、AX dedup 或 AX URL 规则作为 ingest / processing / Gate 前提。
+- 若后续为兼容或实验保留 AX 相关字段，它们仅作为 reserved seam，不得改变 v3 OCR-only 主线语义。
 
 **Edge 端 ingest 简化处理**：
 ```
@@ -196,32 +172,10 @@ def handle_ingest(payload):
     if _exists_capture_id(payload.capture_id):
         return {"status": "already_exists"}
 
-    # 2. Host 端已完成 dedup 判定，Edge 直接写入
-    # 3. 写入 DB
+    # 2. Edge 直接写入 DB（capture_id 幂等仍由 Edge 负责）
     _insert_frame(payload)
     return {"status": "created"}
 ```
-
-**设计优势**：
-- dedup 在 Host 端执行，重复内容不浪费带宽上传
-- 空文本不参与 dedup（与 screenpipe 一致）
-- Edge 端逻辑简化
-
-**Host 端 dedup 状态与重启语义（P1-S2b）**：
-- `last_content_hash/last_write_time` 为 per-device 纯内存运行态，在 Host 端维护。
-- `last_write_time` 的语义固定为“最近一次成功写入 Host 本地 spool 的时间”，不得以 HTTP 成功时间、Edge ingest 接收时间或 Edge DB 落库时间替代。
-- Host 重启后 dedup 进入冷启动，重启边界附近允许出现额外写入；该现象为预期行为，不视为缺陷。
-- 30s 保底写入语义始终成立，用于保证 timeline 连续性。
-- Edge 端不再维护 dedup 状态，仅接收并存储 `content_hash` 用于观测。
-- P1 不暴露 `dedup_skipped` 作为 Edge ingest 对外结果；dedup 属于 Host 侧 pre-ingest 决策。
-
-**关键参数对齐**：
-| 参数 | screenpipe | MyRecall v3 P1 |
-|------|-----------|----------------|
-| `min_capture_interval_ms` | 200 | 1000（有意偏离：Python 实现安全起点） |
-| `idle_capture_interval_ms` | 30000 | 30000 |
-| dedup 保底写入窗口 | 30s | 30s |
-| dedup 排除触发 | idle, manual | idle, manual |
 
 ### 对齐结论
 - 对齐级别：高度对齐（P1 即达到行为对齐）。
@@ -233,7 +187,7 @@ def handle_ingest(payload):
 - 指标：切窗场景 95% capture 在 3 秒内入 Edge 队列。
 - 压测：每分钟 300 次事件下，Capture 丢失率 < 0.3%；Host CPU 作为容量观测项记录（参考 [gate_baseline.md §3.2](gate_baseline.md#32)）。
 - 去抖校验：同 monitor 连续 `app_switch/click` 入库间隔 < `min_capture_interval_ms` 的违规数应为 0。
-- 去重校验：重复内容压测中应观测到 dedup skip，且 30s 保底写入仍成立（timeline 不空洞）。
+- OCR-only 主线校验：capture payload 与 ingest 成功不依赖 AX 字段，且 best-effort `browser_url` 缺失或置空不得阻断主链路。
 
 ### 4.2.1 Monitor 动态监测（与 screenpipe 对齐）
 
@@ -264,7 +218,7 @@ def handle_ingest(payload):
 - 对齐级别：完全对齐（运行时监测机制 + 识别方式 + 格式）
 - 差异：无（v3 Host 端实现与 screenpipe 等效的监测逻辑）
 
-### 4.3 Vision processing（与 screenpipe 对齐，Scheme C）
+### 4.3 Vision processing（OCR-only，v3 主线）
 
 ### screenpipe 怎么做
 - accessibility 有文本时优先使用，OCR 作为 fallback（并对 terminal 类 app 做 OCR 偏好）。
@@ -273,86 +227,47 @@ def handle_ingest(payload):
 - AX 失败/空文本完成帧：OCR fallback → 写 `ocr_text` 行，`frames.text_source = 'ocr'`。
 - 独立 `ui_recorder` 树遍历器（每 ~500ms）：写入独立 `accessibility` 表（`db.rs:5287-5311`），与 `paired_capture` 完全解耦。
 
-### MyRecall-v3 决策（Scheme C，025A）
-- Edge 执行"AX-first + OCR-fallback"（与 screenpipe 完全对齐）。
-- 分阶段适配（MyRecall 特有）：P1-S2b 只验证 raw `accessibility_text/content_hash` 上传质量；P1-S3 才负责最终 `text_source` 判定与分表写入。
-- P1 OCR fallback 引擎固定为 RapidOCR（single-engine policy），不纳入多引擎切换与对比验收。
-- 对关键 app 维护 `ocr_preferred_apps`（P1 初版见 OQ-034：`wezterm`、`iterm`、`terminal`、`alacritty`、`kitty`、`hyper`、`warp`、`ghostty`）。
-- Edge 仅存储原始 OCR text 与 accessibility text，不做索引时 AI 增强（不生成 caption/keywords/fusion_text，不写入 embedding）。
+### MyRecall-v3 决策（OCR-only，043A）
+- v3 主线仅执行 OCR 处理，不执行 AX-first 判定，也不以 Scheme C 分表写入作为 active semantics。
+- P1 OCR 引擎固定为 RapidOCR（single-engine policy），不纳入多引擎切换与对比验收。
+- Edge 仅存储原始 OCR 文本，不做索引时 AI 增强（不生成 caption/keywords/fusion_text，不写入 embedding）。
 - Chat grounding 由 Orchestrator 在查询时将原始文本送入 LLM 实时推理（与 screenpipe Pi agent 模式对齐）。
 - 已拍板（014A）：删除 fusion_text，索引时零 AI 调用，完全对齐 screenpipe vision-only 处理链路。
 
-#### AX/OCR 决策契约（P1-S3 SSOT）
+#### OCR-only 处理契约（v3 SSOT）
 
-注：P1 阶段第 4 步中的 "OCR fallback" 统一指 RapidOCR 路径。
+对每一帧，v3 active path 的处理语义如下：
 
-对每一帧，最终持久化 `frames.text_source` 必须按以下优先级确定：
+1. 截图持久化独立于 OCR 结果，OCR 成功或失败均不得阻塞截图落盘。
+2. Edge 对进入处理队列的帧执行 RapidOCR。
+3. OCR 成功时：写入 `ocr_text` 行，并将 `frames.text_source='ocr'`。
+4. OCR 失败时：该帧标记为 `failed`；不得伪造 `text_source='accessibility'` 或写入伪 UI 结果。
+5. `accessibility` / `accessibility_fts` 与相关列保留为 v4 seam，但不参与 v3 主线数据流与 Gate。
 
-1. 若 `app_name` 命中 `ocr_preferred_apps`，则该帧必须走 OCR 路径（`text_source='ocr'`）。
-2. 否则，令 `ax_text_normalized = TRIM(COALESCE(accessibility_text, ''))`。
-3. 若 `ax_text_normalized != ''`，则该帧必须归类为 `text_source='accessibility'`。
-4. 否则必须执行 OCR fallback；OCR 成功时归类为 `text_source='ocr'`。
-
-边界条件（P1 强约束）：
-
-- 仅空白字符的 `accessibility_text` 视为“空文本”。
-- AX 文本允许“部分/截断”；只要归一化后非空，仍按 `accessibility` 处理，不因“质量主观判断”改走 OCR。
-- AX 超时时使用超时前已收集文本：非空则 `accessibility`，为空则 OCR fallback。
-- Electron/Chromium 首次遍历空文本场景，不做同帧 AX 重试；该帧走 OCR fallback，后续事件可再次获得 AX 文本。
-- 截图持久化独立于 AX/OCR 结果，任何一侧失败均不得阻塞截图落盘。
-
-#### 写入路径（Scheme C 分表写入）
+#### 写入路径（v3 OCR-only）
 
 ```
-paired_capture 处理一帧:
-  ├─ AX 成功 → frames 行 (text_source='accessibility', accessibility_text=AX文本)
-  │            + accessibility 行 (text_content=AX文本, frame_id=frames.id, focused=...)
-  │            + 无 ocr_text 行
+processing worker 处理一帧:
+  ├─ OCR 成功 → frames 行 (text_source='ocr')
+  │            + ocr_text 行 (text=OCR文本, frame_id=frames.id)
   │
-  └─ AX 失败 → OCR fallback
-               → frames 行 (text_source='ocr')
-               + ocr_text 行 (text=OCR文本, frame_id=frames.id)
+  └─ OCR 失败 → frames.status='failed'
                + 无 accessibility 行
 ```
 
-#### AX 降级策略（与 screenpipe 对齐）
-
-> P1-S3 语义 SSOT：见 [open_questions.md](open_questions.md) OQ-033、OQ-039；P1-S2b 仅负责 raw handoff，不负责最终 `text_source` 判定。
-
-| 场景 | 处理方式 |
-|------|----------|
-| **截图** | 始终写入磁盘（永不阻塞） |
-| **AX 树遍历超时** | 500ms 超时保护，超时后继续处理已获取部分 |
-| **AX 返回有文本** | 使用 AX 文本，跳过 OCR |
-| **AX 返回空文本** | 执行 OCR fallback |
-| **AX 完全失败** | 记录错误，尝试 OCR fallback |
-| **text_source 标记** | `accessibility` / `ocr` |
-
-**阶段归属（P1-S2b / P1-S3）**：
-- P1-S2b 负责 capture capability 与 raw handoff correctness：permission denied/revoked/recovered、browser_url stale rejection、Arc deferred、empty-AX no-drop upload。
-- P1-S3 负责 semantic outcome 与 final persistence correctness：AX empty/timeout 的 AX-vs-OCR 判定、`ocr_preferred_apps` 路由、OCR fallback success/failure、`failed` 语义、Scheme C child-row 一致性。
-
-**与 screenpipe 对齐点**：
-- 截图永不阻塞
-- AX-first + OCR-fallback 逻辑完全对齐
-- text_source 字段语义一致
-- terminal 类 app 偏好 OCR
-
-- 处理链产物白名单（P1）：`ocr_text.text`、`ocr_text.text_json`、`frames.text_source`、`accessibility.text_content`。
-- 禁止产物（P1）：`caption`、`keywords`、`fusion_text`、`ocr_text_embeddings` 写入。
+**处理链产物白名单（P1）**：`ocr_text.text`、`ocr_text.text_json`、`frames.text_source`。
+**禁止产物（P1）**：`caption`、`keywords`、`fusion_text`、`ocr_text_embeddings`、active accessibility child rows。
 
 ### 对齐结论
-- 对齐级别：完全对齐（数据流与存储结构均与 screenpipe vision-only 一致；分表写入语义对齐 screenpipe `paired_capture` + `accessibility` 独立表架构）。
-- v3 增强：`accessibility.focused` 列（P0 修复，ADR-0012）、`accessibility.frame_id` 精确关联（方案 3）。
+- 对齐级别：主路径对齐（OCR raw-text processing、零索引时 AI 增强、查询时实时推理与 screenpipe vision-only 保持一致）。
+- v4 seam：`accessibility.focused`、`accessibility.frame_id` 等结构保留，但不属于 v3 active semantics。
 
 ### 风险
-- accessibility 文本质量不稳定，导致召回波动。
+- OCR 质量在终端/浏览器/复杂 UI 中可能出现召回波动。
 
 ### 验证
-- A/B：AX-first vs OCR-only，在同一数据集比较 Recall@20 与 NDCG@10。
-- P1-S3 Gate：AX 成功帧写入 `accessibility` 表的正确率 = 100%。
-- P1-S2b 的 `content_hash` coverage 不以 `text_source` 为分母，避免把 S3 的完成态语义回灌到 S2b。
-- S2b->S3 handoff 采用显式字段语义：`accessibility_text` key 必带且禁止 `null`；`content_hash` key 必带且允许 `null`；缺 key 属于 contract error。
+- OCR 处理成功帧必须写入 `ocr_text` 且 `frames.text_source='ocr'`。
+- OCR 失败帧必须进入 `failed`，且不得生成 UI/accessibility 结果。
 
 ### 4.4 索引与存储（Host/Edge 边界）
 
@@ -362,22 +277,23 @@ paired_capture 处理一帧:
 ### MyRecall-v3 决策
 - Edge 作为唯一事实源（source of truth），使用单一 `edge.db`（SQLite）：
   - `frames`（原始采集元数据 + 处理队列状态）← 对齐 screenpipe frames
-  - `ocr_text`（OCR fallback 原文 + bbox）← 对齐 screenpipe ocr_text（Scheme C：仅 AX 失败帧写入）
-  - `accessibility`（AX 成功帧文本 + 独立 walker 数据）← 对齐 screenpipe accessibility 表（Scheme C，025A）
-  - `frames_fts` / `ocr_text_fts` / `accessibility_fts`（FTS5 全文索引）← 对齐 screenpipe（`accessibility_fts` 增加 `browser_url` 列，确保 API 语义一致）
+  - `ocr_text`（OCR 原文 + bbox）← v3 active text store
+  - `accessibility`（预留表，不参与 v3 主线写入）← 保留为 v4 seam
+  - `frames_fts` / `ocr_text_fts`（FTS5 全文索引）← v3 active 索引
+  - `accessibility_fts`（预留索引，不参与 v3 主线查询）
   - `chat_messages`（Chat 会话记录）← v3 独有
   - `ocr_text_embeddings`（P2+ 可选离线实验表，P1 不建）← 参考 screenpipe 预留
 - Host 仅保留短期 spool，不做长期索引。
 - 详细 DDL 见 [data-model.md §3.0.3](data-model.md#303-ddledge-sqlite)。
 
 ### 对齐结论
-- 对齐级别：主路径高对齐（P1 已落地表与核心字段对齐 screenpipe vision-only，含 `accessibility` 表 + FTS）；`ocr_text_embeddings` 为 P2+ 可选，不计入 P1"100% 对齐"定义。
+- 对齐级别：主路径高对齐（P1 已落地主链为 `frames` + `ocr_text` + `frames_fts/ocr_text_fts`；`accessibility` 相关表仅作 v4 预留）；`ocr_text_embeddings` 为 P2+ 可选，不计入 P1"100% 对齐"定义。
 
 ### 风险
 - 索引与原始文档同步延迟导致检索可见性抖动。
 
 ### 验证
-- 每小时对账任务：`ocr_text` 行数 + `accessibility` 行数（paired_capture 写入）≈ `frames`（status=COMPLETED）行数（允许独立 walker 带来的 accessibility 行多出）。
+- 每小时对账任务：`ocr_text` 行数应与 `frames.status='completed' AND frames.text_source='ocr'` 的行数一致。
 
 ### 4.5 Search（召回与排序）
 
@@ -396,7 +312,7 @@ paired_capture 处理一帧:
 - `/api/*` 为 v2 历史路径：P1-S1~P1-S3 对 `POST /api/upload` 返回 308、对其余 3 个 legacy GET 端点返回 301（均重定向至对应 `/v1/*` 并记录 `[DEPRECATED]` 日志）；自 P1-S4 起返回 410 Gone 完全废弃。
 - 重要澄清（P1 Gate scope）：legacy `/api/*` 渐进废弃的验收口径只覆盖 4 个端点：`POST /api/upload`、`GET /api/search`、`GET /api/queue/status`、`GET /api/health`（其余 `/api/*` 行为不纳入 P1 Gate 口径）。完整范围以 [http_contract_ledger.md](./http_contract_ledger.md) §4.0 与各阶段验收文档为准。
 - 兼容 alias（如存在）必须标记为 legacy，且不得作为文档、SDK、验收脚本默认入口。
-- P1-S2b 起的 capability / raw handoff / frozen metadata 语义只允许落在 `/v1/*` + v3 runtime/store 主链路；legacy `/api/*` 仅保留兼容职责，不承载新的 S2b 语义或验收责任。
+- 与未来 AX 恢复相关的 capability / raw handoff / frozen metadata 语义只允许落在 `/v1/*` + v3 runtime/store 主链路；legacy `/api/*` 仅保留兼容职责，不承载新的 OCR/AX 语义或验收责任。
 
 #### `GET /v1/search` — 完整契约
 
@@ -405,7 +321,6 @@ paired_capture 处理一帧:
 | 参数 | 类型 | 默认 | 说明 |
 |------|------|------|------|
 | `q` | string | `""` | FTS5 全文检索，空值返回全部 |
-| `content_type` | string | `"all"` | 搜索路径路由：`"ocr"` / `"accessibility"` / `"all"`（Scheme C，对齐 screenpipe `ContentType`） |
 | `limit` | uint32 | `20` | 分页大小，最大 100 |
 | `offset` | uint32 | `0` | 分页偏移。UI 采用"加载更多"模式（OQ-026=A，对齐 screenpipe），offset 单调递增步长=limit，实际不超过几百；P2+ 升级为 keyset cursor 后本字段废弃 |
 | `start_time` | ISO8601 | null | 时间范围起点（UTC） |
@@ -414,8 +329,8 @@ paired_capture 处理一帧:
 | `window_name` | string | null | 窗口名过滤（精确匹配） |
 | `browser_url` | string | null | 浏览器 URL 过滤（FTS token 序列匹配，对齐 screenpipe `frames_fts MATCH`；`unicode61` 按非字母数字字符断词后做短语连续匹配） |
 | `focused` | bool | null | 仅返回前台焦点帧 |
-| `min_length` | uint | null | OCR 文本最小字符数（仅作用于 `content_type=ocr/all` 的 OCR 路径；`search_accessibility()` 函数不接受此参数，对齐 screenpipe） |
-| `max_length` | uint | null | OCR 文本最大字符数（仅作用于 `content_type=ocr/all` 的 OCR 路径；`search_accessibility()` 函数不接受此参数，对齐 screenpipe） |
+| `min_length` | uint | null | OCR 文本最小字符数 |
+| `max_length` | uint | null | OCR 文本最大字符数 |
 | `include_frames` | bool | `false` | true 时内嵌 base64 图像；P1 预留字段，不实现（始终返回 null） |
 
 **Response 200 OK：**
@@ -438,22 +353,6 @@ paired_capture 处理一帧:
         "device_name": "monitor_0",
         "tags": []
       }
-    },
-    {
-      "type": "UI",
-      "content": {
-        "id": 456,
-        "text": "AX 提取的 UI 文本",
-        "timestamp": "2026-02-26T10:00:01Z",
-        "file_path": "/data/screenshots/def.jpg",
-        "frame_url": "/v1/frames/789",
-        "app_name": "VS Code",
-        "window_name": "spec.md — MyRecall",
-        "browser_url": null,
-        "focused": true,
-        "device_name": "monitor_0",
-        "tags": []
-      }
     }
   ],
   "pagination": {
@@ -466,20 +365,17 @@ paired_capture 处理一帧:
 
 **字段说明：**
 - `file_path`：Edge 本地磁盘绝对路径（对齐 screenpipe；P1 WebUI/Chat 均在 Edge 侧可直接使用）
-- `frame_url`：`/v1/frames/:frame_id` 相对路径（P2+ 跨机器时可替代 `file_path`）；`type=OCR` 时 frame_id 始终有值；`type=UI` 时 frame_id 来源于 `accessibility.frame_id`（v3 改进，外键精确关联），当为 NULL 时返回 `null`
-- `type`：`"OCR"`（来自 `search_ocr()` 路径）或 `"UI"`（来自 `search_accessibility()` 路径）；对齐 screenpipe `ContentType::OCR` / `ContentType::Accessibility`。P2+ 预留 `"Audio"`
-- `type=OCR` 的引用锚点字段为 `frame_id` + `timestamp`（P1-S4 Hard Gate 口径）；`type=UI` 的引用锚点字段为 `frame_id` + `timestamp`（P1-S4 Hard Gate 口径）
-- `content_type=ocr` 时 response 只含 `type=OCR`；`content_type=accessibility` 时只含 `type=UI`；`content_type=all` 时混合
-- `type=UI` 的 `content.text` 来源于 `accessibility.text_content`；`content.frame_id` 为 `accessibility.frame_id`（v3 改进，通过外键精确关联截图，避免 screenpipe 的 ±1s 时间窗口模糊匹配）；当 `accessibility.frame_id` 为 NULL 时，`frame_url` 返回 `null`；`file_path`/`frame_url`/`device_name` 通过 LEFT JOIN frames 获取
+- `frame_url`：`/v1/frames/:frame_id` 相对路径（P2+ 跨机器时可替代 `file_path`）；v3 OCR-only 搜索结果始终基于 `frame_id`
+- `type`：固定为 `"OCR"`；P2+ 若恢复多内容类型，再扩展 response 枚举
+- 引用锚点字段为 `frame_id` + `timestamp`（P1-S4 Hard Gate 口径）
 - `capture_id`：v3 增强可选字段（可由 `frames.capture_id` 回传），用于观测与回归；不作为 Search 对齐硬门槛
 - `include_frames=true` 时 `content` 中追加 `"frame": "<base64>"` 字段；P1 不实现，始终为 null
 
 **错误响应：** 见 §4.9 统一错误响应格式。
 
 ### 对齐结论
-- **高对齐**：query params 对齐 screenpipe `SearchQuery`（含 `content_type` 路由），response 对齐 `OCRContent` + `UiContent`。
-- **差异**：去掉 audio/speaker/input 相关参数（P1 无音频/输入）；新增 `frame_url` 字段；`/v1/search/keyword` 合并。
-- **v3 改进**：`content_type=accessibility` + `focused` 过滤不做 screenpipe 的 force-OCR 降级。
+- **高对齐**：保留 FTS5 + 元数据过滤主路径，对齐 screenpipe vision-only 的 OCR 检索思路。
+- **差异**：v3 主线暂不暴露 accessibility/UI 搜索路径；新增 `frame_url` 字段；`/v1/search/keyword` 合并。
 
 ### 风险
 - 语义型查询（抽象描述、长尾表述）召回能力下降。
@@ -500,8 +396,6 @@ paired_capture 处理一帧:
   - 工具以 Pi SKILL.md 格式定义（对齐 screenpipe），P1-S5 最小集为 `myrecall-search` Skill（对标 `screenpipe-search`），统一包含搜索、时间范围渐进扩展、帧详情获取等能力。
   - 软约束引用（DA-8=A）：系统提示与 `myrecall-search` Skill 显式要求输出可解析 deep link：
     - OCR 结果：使用 `myrecall://frame/{frame_id}`（frame_id 始终有值）
-    - UI 结果：优先使用 `myrecall://frame/{accessibility.frame_id}`（v3 改进，通过外键精确关联）
-    - 当 `accessibility.frame_id` 为 NULL 时回退 `myrecall://timeline?timestamp=ISO8601`（仅未来独立 walker 场景，P1 不触发）
   - UI 落点规则：不新增独立 `/frame/:id` 页面；`myrecall://frame/{id}` 在前端统一落到 `/timeline`，并通过 `GET /v1/frames/:frame_id/metadata`（timestamp resolver，最小稳定契约）解析 `timestamp` 后定位。
     - `frame_id`/`timestamp` 必须直接拷贝自检索结果，禁止伪造。P1-S5 不做结构化 citation（`chat_messages.citations` 留空），评估是否在 P1-S7 增加 DA-8B。
   - 模型路由：通过 Pi `--provider`/`--model` 启动参数 + `models.json` 配置控制（对齐 screenpipe）。P1 不做自动 fallback chain（对齐 screenpipe）。
@@ -531,7 +425,7 @@ paired_capture 处理一帧:
 
 #### P1 协议：单次幂等上传（方案 A）
 
-> P1-S2b implementation boundary: S2b 主功能只认 v3 主链路（`Host capture -> spool/uploader -> /v1/ingest -> v3 queue/status -> S3 handoff`）。legacy `/api/*` 与旧 worker 仅为兼容层，不作为新语义实现入口。
+> v3 implementation boundary: 主功能只认 v3 主链路（`Host capture -> spool/uploader -> /v1/ingest -> v3 queue/status -> processing`）。legacy `/api/*` 与旧 worker 仅为兼容层，不作为新语义实现入口。
 
 ```
 POST /v1/ingest
@@ -539,7 +433,7 @@ Content-Type: multipart/form-data
 
 Fields:
   capture_id  string    UUID v7，Host 生成，必填
-  metadata    JSON      CapturePayload（除 image_data 的所有字段；S2b 起必须包含 `accessibility_text` 与 `content_hash`；`accessibility_text` 为 string 且允许 `""`，`content_hash` 为 `sha256:...` 或 `null`）
+  metadata    JSON      CapturePayload（除 image_data 的所有字段；v3 主线要求基础上下文字段，兼容/预留字段可存在但不作为 OCR-only 主线路径必填项）
   file        binary    JPEG 图像（主契约，`image/jpeg`；兼容模式可接收 PNG/WebP，但入库前统一转码为 JPEG）
 
 Response:
@@ -583,7 +477,7 @@ Response:
   - failed：DB 中 `frames.status='failed'` 的行数（实时）。
   - processing_mode：处理模式（SSOT）。
     - noop：P1-S1 固定值；仅驱动队列状态机流转与可观测性闭环，不做 AX/OCR/Embedding 等任何推理路径。
-    - ax_ocr：P1-S3+ 可用；启用 AX-first + OCR-fallback 管线与 Scheme C 分表写入。
+    - ocr：P1-S3+ 可用；启用 OCR 处理与 `ocr_text` 持久化，不启用 AX-first / UI 路径。
   - capacity：队列最大容量（固定配置值）；pending >= capacity 时 ingest 返回 503 QUEUE_FULL
   - oldest_pending_ingested_at：最早一条 pending 帧的 `frames.ingested_at`（UTC ISO8601）；null 表示队列为空；
     Host 可用此字段判断队列是否卡死（如超过 5 分钟未推进则告警）
@@ -609,14 +503,14 @@ Response:
 #### P1-S1 处理语义：QueueDriver（noop）
 
 P1-S1 的 "processing" 定义为 noop/轻量处理，其目标仅是驱动状态机流转与可观测性闭环。
-本阶段不引入 AX-first/OCR-fallback 与任何模型/推理路径（P1-S3 才启用）。
+本阶段不引入任何模型/推理路径（P1-S3 才启用 OCR 处理）。
 
 - Edge MUST 启动一个后台 QueueDriver（worker），用于异步推进状态：
   pending -> completed
   （允许实现上经过 processing，但 Gate/脚本不得依赖 processing 的可观测性）
 - Edge MUST 在 `/v1/ingest/queue/status` 响应中返回 `processing_mode` 字段：
-  `"noop"` | `"ax_ocr"`。
-  P1-S1 固定为 `"noop"`；P1-S3+ 允许为 `"ax_ocr"`。
+  `"noop"` | `"ocr"`。
+  P1-S1 固定为 `"noop"`；P1-S3+ 允许为 `"ocr"`。
 
 当 `processing_mode="noop"` 时：
 
@@ -875,23 +769,23 @@ data: {"type":"response","success":true}
 
 ### `GET /v1/frames/:frame_id/context` 契约（020B）
 
-用途：获取某一帧的“可读上下文”，用于 URL 提取与后续更细粒度 UI grounding。对齐 screenpipe：a11y 优先，OCR fallback。
+用途：获取某一帧的“可读上下文”，用于 OCR 文本展示、URL 提取与后续 grounding。v3 主线返回 OCR-derived context；更细粒度 accessibility context defer 到 v4。
 
 **Response 200 OK（P1）：**
 
 ```json
 {
   "frame_id": 123,
-  "text": "AX/OCR 文字（可为空）",
+  "text": "OCR 文字（可为空）",
   "urls": ["https://github.com"],
-  "text_source": "accessibility"
+  "text_source": "ocr"
 }
 ```
 
 **字段说明：**
-- `text`：a11y 成功时为 accessibility 文本；否则为 OCR 文本（或为 null）
-- `urls`：仅包含从内容中提取的 URL（a11y link/文本 regex，去重）；不强制并入 `browser_url`
-- `text_source`：`"accessibility"` / `"ocr"`
+- `text`：v3 主线为 OCR 文本（或为 null）
+- `urls`：仅包含从内容中提取的 URL（regex / OCR text extraction，去重）；不强制并入 `browser_url`
+- `text_source`：v3 主线固定为 `"ocr"`
 - `browser_url`：页面主 URL 若需展示，使用 search/metadata 路径中的独立字段，不与 `urls` 语义混用
 
 **P2+ 扩展点（对齐 screenpipe `/frames/{id}/context` 完整语义）：**
@@ -951,8 +845,8 @@ data: {"type":"response","success":true}
   - `denied_or_revoked -> recovering`：检测到权限恢复（首次成功）。
   - `recovering -> granted`：连续成功达到阈值（3 次）。
 - 语义边界：
-- `accessibility_text` 为空不等于权限丢失；空文本属于数据质量分支（后续 OCR fallback），权限状态仍按权限检测链路判定。
-- `accessibility_text=""` 表示“无可用 AX 文本”；`content_hash=null` 表示“无 hash-applicable AX 文本”。两者都不等于权限丢失。
+- 文本提取为空不等于权限丢失；权限状态仍按权限检测链路判定。
+- OCR 结果为空、`browser_url` 缺失或任何 reserved seam 字段为空，都不等于权限丢失。
 
 ### 统一错误响应格式（020A，不对齐 screenpipe）
 
@@ -992,9 +886,9 @@ data: {"type":"response","success":true}
 
 - 已拍板（015A）：embedding 保留为离线实验表 `ocr_text_embeddings`（对齐 screenpipe），不进入线上 search 主路径。
 - 已拍板（016A）：v3 全新数据起点，不做 v2 数据迁移。
-- 需实验：AX-first 在多应用场景下对召回质量的净收益。
+- 需实验：若 v4 恢复 AX 路径，AX 相对 OCR-only 在多应用场景下对召回质量的净收益。
 - 需查证：Debian 上 RapidOCR 与候选本地 VL 模型的稳定组合。
-- 需验证：TTS 分层指标在 P1/P2 场景下的可达性（AX路径<=8s为Hard Gate，OCR路径<=15s为Soft KPI）。
+- 需验证：TTS 指标在 P1/P2 OCR-only 场景下的可达性（OCR 路径 <= 15s 为 Soft KPI；若 v4 恢复 AX，再单独定义 AX 路径口径）。
 
 ## 8. 已拍板决策
 
