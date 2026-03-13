@@ -206,13 +206,13 @@ Restart Host when:
 - Phase 1 topology uses "two processes + single Edge port".
 - Do not require Host to expose an inbound port in Phase 1.
 
-## 10. Permission Fault Drill (P1-S2a prerequisite, P1-S2b inherited verification)
+## 10. Permission Fault Drill (P1-S2a+ owning gate, P1-S2b inherited verification)
 
 目标：验证权限拒绝/撤销/恢复场景在运行态可观测、可恢复、可判定。
 
-阶段要求：本 drill 由 S2a 建立权限前提；若 S2a 验收未执行本 drill，不得长期以 `N/A` 悬置；最迟必须在 S2b Exit 前完成并补记证据。
+阶段要求：本 drill 由 S2a+ 独立关闭并形成 Entry Gate 证据；S2a 不再以此作为 Exit Gate 判定项；若 S2a+ 未完成本 drill，则不得进入 S2b。
 
-归属说明：本 drill 的证据首先用于关闭 S2a 的 permission observability 前提；S2b 仅继承并验证 permission 状态不会阻断 capture completion 证据链；S3 不重复承担 permission capability 验收，只继承其前提状态。
+归属说明：本 drill 的证据首先用于关闭 S2a+ 的 permission stability Gate；S2b 仅继承并验证 permission 状态不会阻断 capture completion 证据链；S3 不重复承担 permission capability 验收，只继承其前提状态。
 
 ### 10.1 演练参数（固定）
 
@@ -223,9 +223,11 @@ Restart Host when:
 
 ### 10.2 场景步骤
 
-1. `startup_denied`：在系统设置中关闭 Accessibility/Input Monitoring 后启动 Host+Edge。
+1. `startup_denied`：在系统设置中关闭 Input Monitoring 后启动 Host+Edge。
 2. `revoked_mid_run`：运行中撤销权限，保持进程不重启，观察状态变化。
 3. `restored`：重新授权，确认状态从 `recovering` 回到 `granted`。
+4. `startup_not_determined`：首次启动或权限状态未定，确认系统进入引导/降级态而非静默成功。
+5. `stale_permission_state`：模拟权限轮询快照超过 60s 未刷新，确认 `/v1/health.status` 为 `degraded` 且 reason 为 `stale_permission_state`。
 
 ### 10.3 判定与证据
 
@@ -234,6 +236,7 @@ Restart Host when:
   - Host/Edge 日志文件（含权限状态变化时间点）
   - `/v1/health` 快照（异常中 + 恢复后）
   - UI 状态截图（引导/降级/恢复）
+  - 执行环境上下文（Terminal mode、git rev、env snapshot）
 
 ### 10.4 Dev vs Production 说明
 

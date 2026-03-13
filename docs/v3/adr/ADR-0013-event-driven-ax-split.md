@@ -89,19 +89,27 @@ openrecall/client/events/
 
 ## P1-S2b 交付范围（AX 采集）
 
-### 功能
+> ⚠️ **重要警告（2026-03-13）**
+> 
+> 本节描述的 **S2b = AX 文本采集** 语义已被 **OQ-043** superseded。v3 主线正式收口为 **OCR-only**，AX 主链路 defer 到 v4。
+>
+> - 当前 roadmap 中的 **P1-S2b 已转型为 "Capture Completion"**：专注 trigger routing、monitor-aware coordination、device binding、spool handoff
+> - 本节内容仅保留为审计历史，不再作为 v3 主线执行依据
+> - 当前执行口径：[open_questions.md OQ-043](../open_questions.md)、[roadmap.md P1-S2b](../roadmap.md)
 
-- macOS AXUIElement 树遍历
-- 文本提取（AXValue, AXTitle, AXDescription）
-- Browser URL 提取（AXDocument + AppleScript fallback）
-- `content_hash` 计算（SHA256, 对齐 screenpipe）
-- 权限检测与 TCC 引导
+### 功能（历史记录，已废弃）
 
-### Gate
+~~- macOS AXUIElement 树遍历~~
+~~- 文本提取（AXValue, AXTitle, AXDescription）~~
+~~- Browser URL 提取（AXDocument + AppleScript fallback）~~
+~~- `content_hash` 计算（SHA256, 对齐 screenpipe）~~
+~~- 权限检测与 TCC 引导~~
 
-- `inter_write_gap_sec` Hard Gate：按 `device_name` 分桶，每设备 `max <= 45s`
-- `content_hash` 覆盖率 >= 90%（`ax_hash_eligible`：raw `accessibility_text` 归一化后非空的已上传帧）
-- AX 树遍历超时 < 500ms（P95）
+### Gate（历史记录，已废弃）
+
+~~- `inter_write_gap_sec` Hard Gate：按 `device_name` 分桶，每设备 `max <= 45s`~~
+~~- `content_hash` 覆盖率 >= 90%~~
+~~- AX 树遍历超时 < 500ms（P95）~~
 
 ### AX 降级策略（与 screenpipe 对齐）
 

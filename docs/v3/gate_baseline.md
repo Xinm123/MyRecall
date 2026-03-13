@@ -11,9 +11,11 @@ references:
 
 # MyRecall-v3 Gate 指标口径基线（SSOT）
 
-- 版本：v1.6
+- 版本：v1.7
 - 生效日期：2026-03-13
-- 变更说明：OQ-043 OCR-only 收口 — `inter_write_gap_sec` 降级为 Soft KPI（原 Hard Gate 移除）
+- 变更说明：
+  - OQ-043 OCR-only 收口 — `inter_write_gap_sec` 移除，由 `capture_to_ingest_latency_ms` 替代
+  - P1 不采集 Browser URL
 - 适用范围：[spec.md](spec.md)、[roadmap.md](roadmap.md)、`adr/`、`acceptance/`
 
 ## 1. 口径优先级
@@ -79,15 +81,20 @@ references:
 - 阈值：`= 100%`
 - 最小样本：四类触发均命中，且每类样本 `>= 20`
 
-3. `inter_write_gap_sec`（Soft KPI，OQ-043 后降级）
-- 公式：相邻两次成功写入时间差（秒）构成样本分布。
-- 类型：**Soft KPI only**（OQ-043 OCR-only 收口后，不再设 Hard Gate）
-- 观测口径：按 `device_name` 分桶记录 P50/P90/P99 分布
-- 最小样本：每设备 >= 100
+3. `capture_to_ingest_latency_ms`（Soft KPI，P1-S2b 新增，替代 `inter_write_gap_sec`）
+- 公式：`latency_ms = (frames.ingested_at - capture_completed_ts) * 1000`
+  - `capture_completed_ts`：Host 侧 capture worker 完成截图并写入 spool 的时间戳
+  - `ingested_at`：Edge 侧该 capture 完成 SQLite 持久化的时间点
+- 类型：**Soft KPI only**（non-blocking，用于 S2b 质量观测）
+- 分桶维度：`device_name`
+- 观测口径：按 `device_name` 分桶记录 P50/P90/P95/P99 分布
+- 最小样本：每设备 >= 50 captures
 - 说明：
-  - OCR-only 主线下 content-based dedup 暂不活跃，该指标仅用于观测与回归
-  - 若 v4 恢复 AX path 并引入 Host-side dedup，可重新评估 Hard Gate 需求
+  - 该指标衡量 S2b 核心链路效率：spool handoff → upload → ingest
+  - 若某设备 P95 显著高于其他，提示该 monitor worker 或 spool 分区存在瓶颈
 - 窗口有效性：仅使用无 Host/Edge 重启的连续窗口；窗口内若发生 Host 或 Edge 重启，标记 `broken_window=true`
+
+~~3. `inter_write_gap_sec`（已移除，OCR-only 下由 `capture_to_ingest_latency_ms` 替代）~~
 
 4. `queue_saturation_ratio`（Hard Gate）
 - 公式：`queue_saturation_ratio = (queue_depth >= 0.9 * queue_capacity 的采样数 / 总采样数) * 100%`

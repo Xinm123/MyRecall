@@ -153,14 +153,13 @@ flowchart LR
 - `primary_monitor_only` 仅控制启用的 monitor worker 集合，不改变 trigger 语义。
 - P1 仅承诺 capture-cycle coherence，不承诺 screenshot / URL 的全局原子同瞬时快照。
 
-**Browser URL best-effort semantics（SSOT）**：
-- `browser_url` 获取成功不等于可写入；写入前必须完成与同轮 `focused_context` 的一致性校验。
-- 仅当 URL 与同轮 `focused_context` 校验一致时，才允许写入 `browser_url`。
-- 若命中 stale 检测、标题不匹配、来源不可信或无法确认一致性，必须写 `None`。
-- 对 Arc / AppleScript 路径，标题匹配失败必须按 stale reject 处理，不得保守猜测写入。
+**Browser URL 语义（修订）**：
+- P1：`browser_url` 字段保留为 `NULL`，不采集。
+- P2+：评估是否启用，若启用则执行 OQ-032 定义的分层提取策略（含 Arc stale URL 检测）。
 
 **OCR-only 主线约束（P1）**：
-- Host 主线 payload 仅要求截图与基础上下文（`timestamp`、`capture_trigger`、`device_name`、`app_name/window_name`、best-effort `browser_url`）。
+- Host 主线 payload 仅要求截图与基础上下文（`timestamp`、`capture_trigger`、`device_name`、`app_name/window_name`）。
+- ~~best-effort `browser_url`~~（P1 不采集）。
 - v3 主线不以 `accessibility_text`、AX timeout/empty、AX dedup 或 AX URL 规则作为 ingest / processing / Gate 前提。
 - 若后续为兼容或实验保留 AX 相关字段，它们仅作为 reserved seam，不得改变 v3 OCR-only 主线语义。
 

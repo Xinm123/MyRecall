@@ -136,6 +136,7 @@ tests/
 | startup_denied | 启动前已拒绝权限 | `denied_or_revoked` | `degraded` | 明确提示权限缺失 + 设置入口 |
 | revoked_mid_run | 运行中撤销权限 | `granted -> transient_failure -> denied_or_revoked` | `degraded` | 记录权限丢失事件，进入降级 |
 | restored_after_denied | 用户恢复授权 | `denied_or_revoked -> recovering -> granted` | `degraded -> ok` | 恢复提示与自动恢复日志 |
+| stale_permission_state | 权限快照超过 60s 未刷新 | 保留上次状态或等价内部态 | `degraded` | health 返回 `stale_permission_state` |
 
 - 参数口径（与文档契约一致）：`REQUIRED_CONSECUTIVE_FAILURES=2`、`REQUIRED_CONSECUTIVE_SUCCESSES=3`、`EMIT_COOLDOWN_SEC=300`、`permission_poll_interval_sec=10`。
 - 自动化边界：TCC 状态切换为手测主路径；状态机与健康接口可通过集成测试验证。
@@ -143,10 +144,12 @@ tests/
   - Host/Edge 日志片段（含时间戳与权限状态变化）
   - `/v1/health` 响应快照（至少两次：异常中、恢复后）
   - UI 状态截图（引导/降级/恢复）
+  - 执行环境上下文（Terminal mode、git rev、env snapshot）
 
 阶段归属说明：
-- P1-S2a：负责 permission state machine / degraded-recovering-ok 闭环与健康态可观测性。
-- P1-S2b：继承并验证 permission 状态不会阻断 capture completion，同时负责 browser_url stale rejection、routing / device binding / topology rebuild 等采集闭环验证。
+- P1-S2a：负责事件驱动 trigger、去抖、背压与基础 health 契约暴露；不再作为 permission fault drill 的 owning Gate。
+- P1-S2a+：负责 permission state machine / degraded-recovering-ok 闭环、health 权限语义、stale permission snapshot 语义与手测证据闭环。
+- P1-S2b：继承并验证 permission 状态不会阻断 capture completion，同时负责 routing / device binding / topology rebuild 等采集闭环验证。
 - P1-S3：负责 OCR success / failure / failed status 的 processing semantic tests。
 
 ### 需要的测试文件
@@ -155,6 +158,7 @@ tests/
 |--------|------|------|
 | S2a | `test_p1_s2a_trigger_coverage.py` | SQL 校验 trigger_coverage = 100% |
 | S2a | `test_p1_s2a_debounce.py` | SQL 校验去抖违规数 = 0 |
+| S2a+ | `test_p1_s2a_plus_permission_fsm.py` | 权限状态机、health 语义、stale snapshot、恢复闭环校验 |
 | S2b | `test_p1_s2b_routing.py` | trigger routing / duplicate capture / topology rebuild 校验 |
 | S2b | `test_p1_s2b_device_binding.py` | `device_name` binding 与 focused-context coherence 校验 |
 

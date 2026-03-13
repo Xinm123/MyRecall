@@ -127,13 +127,10 @@ references:
 
 ### 已拍板结论（2026-03-09，续）
 
-33. OQ-032 = A：Browser URL 提取完全对齐 screenpipe，包含 Arc Stale URL 检测机制。关键决策：
-    - **问题识别**：AppleScript 有 ~107ms 延迟，期间用户切换 tab 会导致 URL 与截图不匹配（stale URL）
-    - **解决方案**：Arc 专用 title cross-check — 同时获取 title + URL，与 window_title 比对，不匹配时返回 None
-    - **Title 匹配算法**：去除 badge 计数（`(45) WhatsApp` → `WhatsApp`）、大小写不敏感、包含匹配（处理截断）
-    - **设计原则**：Better None than wrong URL
-    - **失败分类统计**：`browser_url_success` / `browser_url_rejected_stale` / `browser_url_failed_all_tiers` / `browser_url_skipped`
-    - 详见 `p1-s2b.md` §1.0 与 ADR-0013 §Browser URL 提取策略
+33. OQ-032 = A → **Deferred to P2+**（Browser URL 提取策略）
+    - P1 不采集 `browser_url`，相关技术方案保留供 P2+ 参考
+    - 原方案：Arc 专用 title cross-check，Better None than wrong URL 原则
+    - 详见 `p1-s2b.md` §1.0 与 ADR-0013 §Browser URL 提取策略（历史记录）
 
 34. OQ-033 = A：AX/OCR 决策契约采用“`ocr_preferred_apps` 优先、其后按归一化 AX 文本非空判定、否则 OCR fallback”的单一口径（P1-S3 SSOT）。
     - **优先级**：`app_name in ocr_preferred_apps` → `text_source='ocr'`；否则计算 `ax_text_normalized = TRIM(COALESCE(accessibility_text, ''))`。
@@ -167,7 +164,9 @@ references:
 
 38. OQ-037 = A：`collapse_trigger_count` 从 P1-S2a Exit Hard Gate 移出，降级为观测/调试指标；S2a 背压放行仅以 `queue_saturation_ratio <= 10%` 与 `overflow_drop_count = 0` 为准。若权限异常闭环未在 S2a 执行，必须在 S2b Exit 前关闭，不允许长期 `N/A` 悬置。
 
-39. OQ-038 = A：Arc Browser AppleScript URL 提取在 P1-S2b 中定义为 timeboxed optional heuristic sub-scope，而非正式 Gate 分支。若 Day 3 仍不稳定，则 defer Arc-specific support；S2b required browser evidence 仍以 Chrome/Safari/Edge 为准，Arc stale-url 测试仅作为 conditional evidence。
+39. OQ-038 = A → **Deferred to P2+**（Arc Browser AppleScript URL 提取）
+    - P1 不采集 Browser URL，Arc 支持推迟到 P2+ 评估
+    - 原方案：timeboxed optional heuristic sub-scope，若 Day 3 不稳定则 defer
 
 40. OQ-039 = A：S2b / S3 的 failure-class ownership 以 handoff 边界划分——S2b 负责 capability / frozen metadata / raw handoff correctness（permission denied/revoked/recovered、browser_url stale、Arc deferred、empty-AX no-drop）；S3 负责 semantic outcome / final persistence correctness（AX empty、AX timeout、ocr_preferred_apps、OCR fallback success/failure、failed 语义）。
 

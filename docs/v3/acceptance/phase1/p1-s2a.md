@@ -148,10 +148,10 @@
 4. 对账触发日志与 Edge 持久化记录，计算 `capture_latency_p95` 与 Capture 丢失率。
 5. 抽样核验触发字段（app/window/timestamp/trigger）完整性。
 6. 制造触发通道 lag（短时突发 > 处理能力，5 分钟），统计 `collapse_trigger_count`、`queue_saturation_ratio` 与 `overflow_drop_count`。
-7. 执行权限异常演练（强制）：
-   - 启动前拒绝 Accessibility 或 Input Monitoring；
-   - 运行中撤销权限（revoked_mid_run）；
-   - 用户重新授权后验证系统进入恢复流程并最终回到 `granted`。
+7. 记录权限能力前提（强制）：
+   - P1-S2a 不再作为 permission fault drill 的 owning Gate；
+   - 本阶段仅要求：权限相关 health 字段已暴露、事件驱动主链路不因文档口径缺失而失真；
+   - 完整的 startup denied / revoked mid-run / restored / stale drill 统一移交 P1-S2a+ 执行并判定。
 8. 执行 SQL 校验：
    - `capture_latency_p95`（观测记录，non-blocking）：
       - 以同一 capture 的 `event_ts` 与 `frames.ingested_at` 计算 `capture_latency_ms` 样本分布（其中 `ingested_at` 对应口径中的 `edge_db_persisted_ts`）；
@@ -295,7 +295,7 @@
   - ✓ UI 证据: Grid/Timeline 状态可见
   - ✓ trigger_coverage: 100% (四类触发全部满足最低样本要求)
 - 阻塞项（若 Fail 必填）：**无**
-- 延期关闭项：权限异常闭环（startup denied / mid-run revoked / recovered）需在 S2b Exit 前完成并补记证据。
+- 延期关闭项：权限异常闭环已从 S2a Exit Gate 拆出，统一由 P1-S2a+ 关闭并作为 S2b Entry prerequisite。
 
 ## 6. 风险与后续动作
 

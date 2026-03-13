@@ -6,7 +6,7 @@
 - 版本/提交：待定
 - 状态：`Planned`
 - ADR：[ADR-0013](../../adr/ADR-0013-event-driven-ax-split.md)
-- 依赖：P1-S2a（事件驱动 trigger 生成）
+- 依赖：P1-S2a（事件驱动 trigger 生成） + P1-S2a+（权限稳定性收口 Pass）
 
 ## 0. screenpipe 对照与对齐
 
@@ -17,22 +17,22 @@
 
 ## 1. 范围与目标
 
-- 范围：trigger routing、monitor-aware capture coordination、`device_name` binding、focused context 冻结、best-effort `browser_url`、spool/ingest handoff、一致性与恢复语义。
+- 范围：trigger routing、monitor-aware capture coordination、`device_name` binding、focused context 冻结、spool/ingest handoff、一致性与恢复语义。
 - 目标：确保一条 trigger 能稳定收敛到正确 capture，而不是把错误 monitor、重复 capture 或不一致 metadata 带入后续 OCR 主线。
 - 对应 Gate 条件：
   - `trigger_target_routing_correctness = 100%`
   - `device_binding_correctness = 100%`
   - `single_monitor_duplicate_capture_rate = 0%`
   - `topology_rebuild_correctness = 100%`
-  - `inter_write_gap_sec`：Soft KPI（按 `device_name` 分桶，记录 P50/P90/P99；OCR-only 后暂不设 Hard Gate）
+  - `capture_to_ingest_latency_ms`：Soft KPI（按 `device_name` 分桶，记录 P50/P90/P95/P99）
 
 ### 1.0 In-scope outcomes（本阶段必须交付）
 
 - trigger scope 语义冻结：`specific-monitor` / `active-monitor` / `global-reevaluation`
 - coordinator 责任冻结：fan-out / 目标 monitor 选择发生在 worker 之前，worker 只消费 monitor-bound work item
 - `device_name` 绑定冻结：由实际完成截图的 monitor worker 负责最终绑定
-- `focused_context = {app_name, window_name, browser_url}` 冻结：同一 capture 周期内一次性产出，允许部分缺失，但禁止字段级混拼
-- `browser_url` 语义冻结：best-effort metadata；命中 stale 或无法确认一致性时必须写 `None`
+- `focused_context = {app_name, window_name}` 冻结：同一 capture 周期内一次性产出，允许部分缺失，但禁止字段级混拼
+- ~~`browser_url` 语义冻结：best-effort metadata；命中 stale 或无法确认一致性时必须写 `None`~~（P1 不采集 Browser URL）
 - topology rebuild：monitor 增减、primary 切换、monitor 不可用恢复后，worker 集合与路由状态可恢复
 - spool handoff correctness：capture 完成后，metadata / image / `capture_trigger` / `device_name` 一致入 spool，再进入 `/v1/ingest`
 
@@ -47,9 +47,10 @@
 ### 1.0c S2b -> S3 handoff contract（进入 P1-S3 前冻结）
 
 - S2b 只负责 capture completion，不负责 OCR 处理与 `text_source` 判定。
-- 上传主契约：`POST /v1/ingest` 在 v3 主线必须携带截图与 capture metadata：`capture_id`、`timestamp`、`event_ts`（建议）、`capture_trigger`、`device_name`、`app_name`、`window_name`、best-effort `browser_url`。
-- proof sample canonical key 契约：进入 S2b Gate proof 的 payload 必须使用 canonical keys `app_name`、`window_name`、`browser_url`、`device_name`；`active_app`、`active_window` 等 alias 仅允许用于 compatibility observation，不得作为 proof sample 真值。
-- 上下文一致性契约：`app_name/window_name/browser_url` 必须由同一轮 focused-context snapshot 一次性产出；允许整体缺失/部分为 `None`，但不允许字段级跨来源混拼。
+- 上传主契约：`POST /v1/ingest` 在 v3 主线必须携带截图与 capture metadata：`capture_id`、`timestamp`、`event_ts`（建议）、`capture_trigger`、`device_name`、`app_name`、`window_name`。
+- proof sample canonical key 契约：进入 S2b Gate proof 的 payload 必须使用 canonical keys `app_name`、`window_name`、`device_name`；`active_app`、`active_window` 等 alias 仅允许用于 compatibility observation，不得作为 proof sample 真值。
+- 上下文一致性契约：`app_name/window_name` 必须由同一轮 focused-context snapshot 一次性产出；允许整体缺失/部分为 `None`，但不允许字段级跨来源混拼。
+- **P1 不采集 `browser_url`**：字段保留为 `NULL`，P2+ 评估是否启用分层提取策略。
 - device-binding 契约：`device_name` 表示实际被截取的 monitor，要求与本次 capture cycle 一致；若内部仍存在事件源预绑定 device 的实现，其只能作为 `event_device_hint`，不得直接作为最终验收真值。
 - outcome 契约：S2b evidence 必须能区分 `capture_completed`、`routing_filtered`、`permission_blocked`、`spool_failed`、`schema_rejected`、`topology_rebuilt`。
 
@@ -148,12 +149,9 @@
 - `device_binding_correctness`（目标 = 100%）：
 - `single_monitor_duplicate_capture_rate`（目标 = 0%）：
 - `topology_rebuild_correctness`（目标 = 100%）：
-- `inter_write_gap_sec`（Soft KPI）：
-  - 记录 P50/P90/P99 分布（按 `device_name` 分桶，样本 >= 100）
-- Browser URL observation：
-  - `browser_url_success`：
-  - `browser_url_failed_best_effort`：
-  - `browser_url_skipped`：
+- `capture_to_ingest_latency_ms`（Soft KPI）：
+  - 记录 P50/P90/P95/P99 分布（按 `device_name` 分桶，样本 >= 50）
+- ~~Browser URL observation~~（P1 不采集）
 - 备注（是否满足最小样本数要求）：是 | 否（不足项：...）
 
 ### 4.2 功能完成度指标（强制）
@@ -164,7 +162,8 @@
 
 ### 4.3 完善度指标（强制）
 
-- capture completion 异常与降级场景通过率（目标 >= 95%）：覆盖 routing filtered、stale URL reject、topology rebuild、permission blocked、spool failed。
+- capture completion 异常与降级场景通过率（目标 >= 95%）：覆盖 routing filtered、topology rebuild、permission blocked、spool failed。
+- ~~权限异常闭环~~（移至 P1-S2a+ 专项验收）
 - proof-sample exclusion 正确率（目标 100%）：legacy、alias-only、mixed-version、`broken_window` 样本全部被正确排除。
 - 可观测性检查项完成率（目标 100%，日志/指标/错误码）：
 - 文档与验收记录完整率（目标 100%）：
@@ -185,6 +184,6 @@
 ## 6. 风险与后续动作
 
 - 风险：routing / worker ownership 设计错误会导致错 monitor capture 或重复 capture。
-- 风险：browser_url 在某些浏览器或快速切换场景下可能频繁降级为 `None`。
+
 - 风险：monitor topology 变化处理不完整会导致 `device_name` 漂移或 capture 漏采。
 - 后续动作：若多屏 routing 不稳定，优先收紧 coordinator 归属规则；若 topology rebuild 失败，先修复 worker 生命周期，再复跑本阶段。 

@@ -44,7 +44,7 @@ CREATE TABLE frames (
     timestamp             TIMESTAMP NOT NULL,
     app_name              TEXT DEFAULT NULL,
     window_name           TEXT DEFAULT NULL,
-    browser_url           TEXT DEFAULT NULL,
+    browser_url           TEXT DEFAULT NULL,       -- P1: 不采集，保留为 NULL；P2+: 评估是否启用分层提取
     focused               BOOLEAN DEFAULT NULL,
     device_name           TEXT NOT NULL DEFAULT 'monitor_0',
     snapshot_path         TEXT DEFAULT NULL,       -- JPEG 快照路径（主链路，推荐 .jpg）

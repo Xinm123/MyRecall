@@ -86,23 +86,42 @@ references:
     - 本机 Gate 验收脚本可执行且证据产物齐全（日志/指标汇总/健康快照/UI 证据索引）
     - Gate 校验测试文件已落地并通过：`tests/test_p1_s2a_trigger_coverage.py`、`tests/test_p1_s2a_debounce.py`
 
-- P1-S2b（Capture Completion / Monitor-Aware Coordination，2026-03-10 ~ 2026-03-14）
+- P1-S2a+（权限稳定性收口，2026-03-10，1-2 天）
+  - **说明**：紧接 S2a 的独立收口阶段，非完整功能阶段
+  - 范围修订：
+    - **必须验证**：Input Monitoring 权限闭环（startup denied / mid-run revoked / recovered）
+    - **必须验证**：`startup_not_determined` 与 `stale_permission_state` 的 health 语义
+    - **可选验证**：Accessibility 权限降级行为（CoreGraphics 已满足基础需求）
+    - **不在范围**：Browser URL、AX tree walk
+  - 依赖：P1-S2a Pass
+  - Gate：
+    - Input Monitoring 异常闭环通过率 = 100%
+    - /v1/health 权限状态机语义正确率 = 100%
+    - S2a+ Gate 证据齐全（日志/health 快照/UI 证据/环境上下文）
+  - 交付：
+    - `docs/v3/acceptance/phase1/p1-s2a-plus.md` 完成并 Pass
+    - `tests/test_p1_s2a_plus_permission_fsm.py` 落地并通过
+    - 独立的 S2a+ 本机 Gate 执行入口落地
+    - S2b Entry Gate 前置条件满足
+
+- P1-S2b（Capture Completion / Monitor-Aware Coordination，2026-03-11 ~ 2026-03-14）
   - 交付：
     - Trigger routing 语义冻结：`specific-monitor` / `active-monitor` / `global-reevaluation` 三类触发的目标 monitor 归属规则明确
     - TriggerSource -> TriggerRouter -> CaptureCoordinator -> MonitorWorker[target] 拓扑收口；`MonitorWorker` 只执行 monitor-bound capture work，不承担 fan-out 策略
     - `device_name` 绑定语义冻结：由实际完成截图的 monitor capture worker 负责最终绑定，保证与截图 monitor 同 cycle
     - monitor topology rebuild：monitor 增减、`primary_monitor_only` 变化、worker 集合重建与分区状态恢复
-    - `focused_context = {app_name, window_name, browser_url}` 与 `device_name` 的 capture completion 语义冻结；`browser_url` 保持 best-effort metadata，不阻断主链路
+    - `focused_context = {app_name, window_name}` 与 `device_name` 的 capture completion 语义冻结；~~`browser_url`~~ P1 不采集
     - spool handoff correctness：capture completion 后入 spool 的 metadata、图像与 `capture_trigger`/`device_name` 一致
   - 平台策略：macOS-only（P1 仅实现 macOS，Windows/Linux 推迟 P2）
   - 实现语言：Python（详见 ADR-0013）
-  - 依赖：P1-S2a 的触发机制（S2b 在事件触发后完成 monitor-aware capture coordination）
+  - 依赖：P1-S2a 的触发机制 + P1-S2a+ 的权限稳定性收口（S2b 在事件触发后完成 monitor-aware capture coordination）
   - Gate：
     - trigger -> target monitor routing correctness = 100%（click/app_switch/manual/idle 的目标 monitor 行为与冻结语义一致）
     - `device_name` binding correctness = 100%（capture metadata 中 `device_name` 与实际截图 monitor 一致）
     - single-monitor trigger duplicate capture rate = 0（单个 monitor 作用域的 trigger 不得生成重复 capture）
     - monitor topology rebuild correctness = 100%（monitor 增减、不可用、切换 primary 后仍能恢复正确分发）
-    - `inter_write_gap_sec`：Soft KPI（记录 P50/P90/P99）+ Hard Gate（按 `device_name` 分桶，每设备 max <= 45s，样本 >= 100）
+    - `capture_to_ingest_latency_ms`：Soft KPI（记录 P50/P90/P95/P99，按 `device_name` 分桶）
+    - Entry prerequisites：P1-S2a+ 权限稳定性收口通过
     - 窗口有效性：Hard Gate 仅使用无 Host/Edge 重启的连续窗口；若窗口内发生 Host 或 Edge 重启则标记 `broken_window=true`，该窗口仅用于观测
 
 - P1-S3（处理，2026-03-12 ~ 2026-03-15）
