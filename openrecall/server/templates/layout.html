@@ -639,6 +639,10 @@
           return { state: 'degraded', message: '权限状态陈旧' };
         }
 
+        if (permissionStatus === 'transient_failure') {
+          return { state: 'degraded', message: '权限待确认' };
+        }
+
         if (permissionStatus === 'recovering') {
           return { state: 'degraded', message: '权限恢复中' };
         }

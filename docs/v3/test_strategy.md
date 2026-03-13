@@ -123,6 +123,7 @@ tests/
   - `scripts/acceptance/p1_s2b_local.sh`
 - 运行要求：
   - 必须在 macOS 实机执行（不得在 CI 容器替代）；
+  - 执行 `scripts/acceptance/p1_s2a_plus_local.sh` 前必须先启动服务端（`./run_server.sh --debug`），并确保 `http://localhost:8083/v1/health` 可访问；
   - 执行前固定时间窗、配置快照、权限状态，避免样本口径漂移；
   - 每次执行必须产出统一命名的证据包（日志 + 指标汇总 + 健康快照 + UI 截图索引）。
 - 结果判定：

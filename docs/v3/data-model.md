@@ -50,8 +50,8 @@ CREATE TABLE frames (
     snapshot_path         TEXT DEFAULT NULL,       -- JPEG 快照路径（主链路，推荐 .jpg）
     capture_trigger       TEXT DEFAULT NULL,       -- 'idle'|'app_switch'|'manual'|'click' (P1); P2+: 'window_focus'|'typing_pause'|'scroll_stop'|'clipboard'|'visual_change'
     event_ts              TEXT DEFAULT NULL,       -- 触发时刻（UTC ISO8601），用于 capture_latency 计算
-    accessibility_text    TEXT DEFAULT NULL,       -- v4 seam 预留；v3 主线不要求写入
-    text_source           TEXT DEFAULT NULL,       -- v3 主线仅使用 'ocr'；'accessibility' 为 v4 预留
+    accessibility_text    TEXT DEFAULT NULL,       -- v4 seam 预留（OQ-043）；v3 主线 OCR-only，不写入 accessibility_text；保留 DDL 避免 P2+ 重建表
+    text_source           TEXT DEFAULT NULL,       -- v3 主线固定为 'ocr'（OQ-043）；'accessibility' 为 v4 预留 seam
     content_hash          TEXT DEFAULT NULL,       -- 预留字段；v3 主线不作为 payload 必填或 dedup 契约
     simhash               INTEGER DEFAULT NULL,    -- 感知哈希，近似重复检测
 

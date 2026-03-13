@@ -55,12 +55,13 @@ class PermissionStateMachine:
     """
 
     def __init__(self) -> None:
-        self._state: PermissionState = PermissionState.GRANTED
+        self._state: PermissionState = PermissionState.TRANSIENT_FAILURE
         self._consecutive_failures: int = 0
         self._consecutive_successes: int = 0
         self._last_check_ts: str = utc_now_iso()
-        self._reason: str = "granted"
+        self._reason: str = "startup_not_determined"
         self._last_emit_epoch: float = 0.0
+        self._has_confirmed_grant: bool = False
 
     @property
     def state(self) -> PermissionState:
@@ -77,7 +78,10 @@ class PermissionStateMachine:
         return self._state in {
             PermissionState.DENIED_OR_REVOKED,
             PermissionState.RECOVERING,
-        }
+        } or (
+            self._state is PermissionState.TRANSIENT_FAILURE
+            and not self._has_confirmed_grant
+        )
 
     def should_emit(self, now_epoch: float) -> bool:
         if now_epoch - self._last_emit_epoch < EMIT_COOLDOWN_SEC:
@@ -88,10 +92,10 @@ class PermissionStateMachine:
     def record_check(self, result: PermissionCheckResult) -> PermissionSnapshot:
         checked_at = result.checked_at or utc_now_iso()
         self._last_check_ts = checked_at
-        self._reason = result.reason
 
         if result.ok:
             self._consecutive_failures = 0
+            self._has_confirmed_grant = True
             self._consecutive_successes += 1
             if self._state is PermissionState.DENIED_OR_REVOKED:
                 self._state = PermissionState.RECOVERING
@@ -113,6 +117,13 @@ class PermissionStateMachine:
             else:
                 self._state = PermissionState.TRANSIENT_FAILURE
 
+        if self._state is PermissionState.RECOVERING:
+            self._reason = "input_monitoring_recovering"
+        elif self._state is PermissionState.GRANTED:
+            self._reason = "granted"
+        else:
+            self._reason = result.reason
+
         return self.snapshot()
 
 
@@ -127,22 +138,64 @@ def detect_permissions() -> PermissionCheckResult:
             )
         return PermissionCheckResult(ok=True, reason="dev_mode_bypass")
 
-    if ApplicationServices is None or Quartz is None:
+    if Quartz is None:
         return PermissionCheckResult(ok=True, reason="permission_check_unavailable")
 
-    ax_is_process_trusted = getattr(ApplicationServices, "AXIsProcessTrusted", None)
-    screen_capture_access = getattr(Quartz, "CGPreflightScreenCaptureAccess", None)
-    if ax_is_process_trusted is None or screen_capture_access is None:
+    event_tap_create = getattr(Quartz, "CGEventTapCreate", None)
+    event_mask_bit = getattr(Quartz, "CGEventMaskBit", None)
+    session_event_tap = getattr(Quartz, "kCGSessionEventTap", None)
+    head_insert_event_tap = getattr(Quartz, "kCGHeadInsertEventTap", None)
+    tap_option_listen_only = getattr(Quartz, "kCGEventTapOptionListenOnly", None)
+    left_mouse_down = getattr(Quartz, "kCGEventLeftMouseDown", None)
+    right_mouse_down = getattr(Quartz, "kCGEventRightMouseDown", None)
+    other_mouse_down = getattr(Quartz, "kCGEventOtherMouseDown", None)
+    if None in {
+        event_tap_create,
+        event_mask_bit,
+        session_event_tap,
+        head_insert_event_tap,
+        tap_option_listen_only,
+        left_mouse_down,
+        right_mouse_down,
+        other_mouse_down,
+    }:
         return PermissionCheckResult(ok=True, reason="permission_check_unavailable")
 
-    accessibility_ok = bool(ax_is_process_trusted())
-    screen_capture_ok = bool(screen_capture_access())
+    assert event_tap_create is not None
+    assert event_mask_bit is not None
+    assert session_event_tap is not None
+    assert head_insert_event_tap is not None
+    assert tap_option_listen_only is not None
+    assert left_mouse_down is not None
+    assert right_mouse_down is not None
+    assert other_mouse_down is not None
 
-    if accessibility_ok and screen_capture_ok:
-        return PermissionCheckResult(ok=True, reason="granted")
-    if not accessibility_ok:
-        return PermissionCheckResult(ok=False, reason="accessibility_denied")
-    return PermissionCheckResult(ok=False, reason="screen_recording_denied")
+    event_mask = (
+        event_mask_bit(left_mouse_down)
+        | event_mask_bit(right_mouse_down)
+        | event_mask_bit(other_mouse_down)
+    )
+
+    def _handle_event(_proxy, _event_type, event, _refcon):
+        return event
+
+    try:
+        event_tap = event_tap_create(
+            session_event_tap,
+            head_insert_event_tap,
+            tap_option_listen_only,
+            event_mask,
+            _handle_event,
+            None,
+        )
+    except Exception:
+        logger.exception("Input Monitoring probe failed")
+        return PermissionCheckResult(ok=False, reason="tcc_transient_failure")
+
+    if event_tap is None:
+        return PermissionCheckResult(ok=False, reason="input_monitoring_denied")
+
+    return PermissionCheckResult(ok=True, reason="granted")
 
 
 def permission_poll_interval_sec() -> int:

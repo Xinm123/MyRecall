@@ -436,7 +436,7 @@ def test_health_degrades_for_stale_permission_snapshot(monkeypatch) -> None:
 @pytest.mark.parametrize(
     ("permission_status", "permission_reason", "expected_message"),
     [
-        ("recovering", "granted", "权限恢复中"),
+        ("recovering", "input_monitoring_recovering", "权限恢复中"),
         ("denied_or_revoked", "screen_recording_denied", "权限异常"),
     ],
 )
@@ -462,7 +462,7 @@ def test_health_degrades_for_permission_recovery_states(
     with runtime_settings._lock:
         runtime_settings.capture_permission_status = permission_status
         runtime_settings.capture_permission_reason = permission_reason
-        runtime_settings.last_permission_check_ts = "2026-03-10T12:00:00Z"
+        runtime_settings.last_permission_check_ts = iso_seconds_ago(1)
         runtime_settings.last_permission_snapshot_epoch = time.time()
 
     monkeypatch.setattr(api_v1, "_get_frames_store", lambda: _FakeStore())

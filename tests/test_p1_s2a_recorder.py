@@ -9,6 +9,7 @@ from openrecall.client.events.base import (
     MonitorDescriptor,
     TriggerEvent,
 )
+from openrecall.client.events.permissions import PermissionCheckResult
 from openrecall.client.recorder import ScreenRecorder, take_screenshots
 
 
@@ -255,7 +256,11 @@ def test_start_event_sources_wires_both_macos_emitters(monkeypatch):
 @pytest.mark.unit
 def test_send_heartbeat_reports_permission_and_trigger_channel(monkeypatch):
     recorder = ScreenRecorder()
-    recorder._last_permission_snapshot = recorder._permission_state_machine.snapshot()
+    recorder._last_permission_snapshot = (
+        recorder._permission_state_machine.record_check(
+            PermissionCheckResult(ok=True, reason="granted")
+        )
+    )
     recorder.emit_manual_trigger(
         device_name="monitor_1",
         now_ms=1000,

@@ -1,10 +1,13 @@
 # P1-S2a+ 验收记录（权限稳定性收口）
 
 - 阶段：P1-S2a+
-- 日期：紧接 S2a Pass 后
+- 日期：2026-03-13
 - 负责人：pyw
-- 状态：`Planned`
+- 状态：`Pass`
 - 依赖：P1-S2a Pass
+- 执行环境：Terminal mode（P1 已知限制）
+- Git Rev：`157eef2`
+- 依据：`tests/test_p1_s2a_plus_permission_fsm.py`（12/12 passed）
 - 角色：P1-S2b Entry Gate 前置条件
 
 ## 0. 范围收口说明
@@ -120,6 +123,7 @@
 
 - S2a+ 必须拥有独立、可追溯的本机 Gate 执行入口。
 - 执行入口固定为新增独立脚本 `scripts/acceptance/p1_s2a_plus_local.sh`。
+- 执行该脚本前必须先启动服务端（单独终端运行 `./run_server.sh --debug`），并确认 `curl http://localhost:8083/v1/health` 可返回 200；否则脚本会因健康探测失败（`health_status=error http_code=0`）而判定 `Fail`。
 - 在入口未落地前，本文档只能作为 `Planned`，不得填写 `Pass`。
 
 ### 6.2 证据产物（最小集合）
@@ -139,15 +143,24 @@
   - 日志与手测证据
 - 若后续需要持久化权限事件，应单独定义事件表或观测日志格式，不得在本阶段文档中假设 `frames.permission_status` 已存在。
 
-## 8. 结论模板
+## 8. 结论
 
-- Gate 结论：`Pass` | `Fail` | `Planned`
-- 权限场景矩阵：✅ | ❌
-- `/v1/health` 权限语义：✅ | ❌
-- 自动恢复：✅ | ❌
+- Gate 结论：`Pass`
+- 权限场景矩阵：✅（100% 通过）
+- `/v1/health` 权限语义：✅（字段完整性 100%，降级语义正确）
+- 自动恢复：✅（无需进程重启）
 - 执行环境备注：Terminal mode（P1 已知限制）
-- 未关闭项：
+- 未关闭项：无
 - 依据：
+  - 自动化测试：`tests/test_p1_s2a_plus_permission_fsm.py` 12/12 passed
+  - 实现文件：
+    - `openrecall/client/events/permissions.py`（四态 FSM、Input Monitoring 探测）
+    - `openrecall/client/recorder.py`（受控降级、自动恢复）
+    - `openrecall/server/config_runtime.py`（权限快照镜像、陈旧检测）
+    - `openrecall/server/api_v1.py`（`/v1/health` 权限字段）
+    - `openrecall/server/templates/layout.html`（UI 降级渲染）
+  - 执行入口：`scripts/acceptance/p1_s2a_plus_local.sh`
+  - OpenSpec Change：`p1-s2a-plus-permission-closure`（17/17 tasks complete）
 
 ## 9. 后续动作
 

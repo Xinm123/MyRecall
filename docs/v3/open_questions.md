@@ -64,7 +64,7 @@ references:
 1. OQ-001 = A：按"行为/能力对齐"执行，不追求与 screenpipe 的部署拓扑一致。
 2. OQ-002 = A（修订）：Chat 请求为简单 JSON，响应为 SSE 透传 Pi 原生事件（不做 OpenAI format 翻译）。Tool 以 Pi SKILL.md 格式定义。
 3. OQ-003 = A（覆盖）：Search 完全对齐 screenpipe（vision-only），线上仅保留 FTS+过滤，舍弃 hybrid。
-4. OQ-004 = A：Host 采集 accessibility 文本（仅采集，不做推理），Edge 继续 AX-first + OCR-fallback。
+4. ~~OQ-004 = A：Host 采集 accessibility 文本（仅采集，不做推理），Edge 继续 AX-first + OCR-fallback~~（已被 **OQ-043** superseded：v3 P1 主线 OCR-only，AX 仅保留为 schema seam，不写入）
 5. OQ-005 = A（修订）：Edge 支持本地与云端模型，按配置切换；P1 不做自动 fallback，对齐 screenpipe 的 provider 选择能力。
 6. OQ-006 = A->B：P1 使用 token + TLS 可选，P2+ 升级为 mTLS 强制。
 7. OQ-007 = A：P1~P3 页面继续在 Edge，Host 不负责 UI；UI 迁移到 Host 仅作为 Post-P3 可选项。
@@ -85,7 +85,7 @@ references:
 15. OQ-015 = A：embedding 保留为离线实验表 `ocr_text_embeddings`（对齐 screenpipe），不进入线上 search 主路径。
 16. OQ-016 = A：v3 全新数据起点，不做 v2 数据迁移。
 17. OQ-017 = A：数据模型采用"主路径对齐 + 差异显式"策略：P1 对齐 `frames`/`ocr_text`/`frames_fts`/`ocr_text_fts` 的表名与核心字段；`ocr_text_embeddings` 为 P2+ 可选实验表（同名保留，P1 不建）；仅追加 Edge-Centric 必需字段（`capture_id`/`status`/`retry_count` 等）与 `chat_messages` 表。
-18. OQ-018 = C（覆盖 A）：Scheme C 分表写入 — AX 成功帧写入 `accessibility` 表（无 `ocr_text` 行），OCR fallback 帧写入 `ocr_text` 表（无 `accessibility` 行）；`text_source` 仍在 `frames` 表。
+18. ~~OQ-018 = C（覆盖 A）：Scheme C 分表写入 — AX 成功帧写入 `accessibility` 表（无 `ocr_text` 行），OCR fallback 帧写入 `ocr_text` 表（无 `accessibility` 行）；`text_source` 仍在 `frames` 表~~（已被 **OQ-043** superseded：v3 主线不分表写入，仅 OCR 路径；`accessibility` 表保留为 v4 seam）
 
 ### 已拍板结论（2026-02-27，续）
 
@@ -104,7 +104,7 @@ references:
 
 ### 已拍板结论（2026-03-02）
 
-25. OQ-022 = C（覆盖 A）：Search SQL 拆为三路径 — search_ocr()（INNER JOIN ocr_text，content_type=ocr）、search_accessibility()（accessibility + accessibility_fts，content_type=accessibility）、search_all()（并行合并 by timestamp DESC，content_type=all 默认）。v3 不做 screenpipe 的 focused/browser_url → force content_type=ocr 降级。
+25. ~~OQ-022 = C（覆盖 A）：Search SQL 拆为三路径 — search_ocr()（INNER JOIN ocr_text，content_type=ocr）、search_accessibility()（accessibility + accessibility_fts，content_type=accessibility）、search_all()（并行合并 by timestamp DESC，content_type=all 默认）。v3 不做 screenpipe 的 focused/browser_url → force content_type=ocr 降级~~（已被 **OQ-043** superseded：v3 主线仅 OCR 路径，search_accessibility() 与三路径合并推迟到 v4）
 26. OQ-025 = A：accessibility 表 P0 建表（Scheme C），含 focused 列（P0 修复 screenpipe 限制）+ frame_id DEFAULT NULL（方案 3，paired_capture 精确关联）。DDL 对齐 screenpipe migration 20250202000000 并增强。
 27. OQ-026 = A：P1 Search UI 采用"加载更多"分页模式（对齐 screenpipe `search-modal.tsx`），offset 单调递增步长=limit，实际不超过几百。`search_all()` 过量拉取内存可控前提成立；P2+ 可升级为 keyset cursor 分页彻底消除过量拉取。
 
@@ -132,23 +132,9 @@ references:
     - 原方案：Arc 专用 title cross-check，Better None than wrong URL 原则
     - 详见 `p1-s2b.md` §1.0 与 ADR-0013 §Browser URL 提取策略（历史记录）
 
-34. OQ-033 = A：AX/OCR 决策契约采用“`ocr_preferred_apps` 优先、其后按归一化 AX 文本非空判定、否则 OCR fallback”的单一口径（P1-S3 SSOT）。
-    - **优先级**：`app_name in ocr_preferred_apps` → `text_source='ocr'`；否则计算 `ax_text_normalized = TRIM(COALESCE(accessibility_text, ''))`。
-    - **判定**：`ax_text_normalized != ''` → `text_source='accessibility'`；否则执行 OCR fallback，成功后 `text_source='ocr'`。
-    - **边界规则**：空白 AX 文本视为空；AX 超时但有非空部分文本仍按 `accessibility`；Electron/Chromium 首次空树不做同帧重试。
-    - **Scheme C 终态约束**：`text_source='accessibility'` 仅对应 `accessibility` 行；`text_source='ocr'` 仅对应 `ocr_text` 行；禁止同帧双写。
-    - **失败语义**：AX 不可用且 OCR 失败时，帧状态必须为 `failed`，不得误标 `accessibility`。
-    - **验收落点**：以 [spec.md](spec.md)（AX/OCR 决策契约）、[data-model.md](data-model.md)（终态不变量）、`acceptance/phase1/p1-s3.md`（边界用例）为执行依据。
-    - **阶段边界补充**：P1-S2b 的 `content_hash` coverage 仅基于 raw `accessibility_text` 非空样本，不依赖 `text_source`。
-    - **字段语义补充**：`accessibility_text` 在 S2b->S3 handoff 中必须为 string（允许 `""`，禁止 `null`）；`content_hash` key 必须存在，但值可为 `null`（禁止 `""`）。
-    - **上下文契约补充**：`focused_context = {app_name, window_name, browser_url}`，`capture_device_binding = {device_name}`；P1 仅承诺 capture-cycle coherence，不承诺截图/AX/URL 的全局原子同瞬时快照；不确定时按 `Better None than wrong` 置 `None`，禁止字段级混拼。
+34. ~~OQ-033 = A：AX/OCR 决策契约采用"`ocr_preferred_apps` 优先、其后按归一化 AX 文本非空判定、否则 OCR fallback"的单一口径~~（已被 **OQ-043** superseded：v3 主线 OCR-only，无 AX/OCR 决策逻辑；`text_source` 固定为 `ocr`）。
 
-35. OQ-034 = A：`ocr_preferred_apps` 采用 P1 初版“终端类最小名单”，匹配规则为 `app_name` 小写后子串包含。
-    - **初版名单**：`wezterm`、`iterm`、`terminal`、`alacritty`、`kitty`、`hyper`、`warp`、`ghostty`。
-    - **决策语义**：命中名单时强制 OCR 路径（即使 AX 非空）；未命中时仍按 OQ-033 的 AX 非空优先规则。
-    - **范围约束（P1）**：不扩展到浏览器/IDE/远程桌面类应用，避免无证据扩大 OCR 开销。
-    - **验收要求**：P1-S3 样本必须覆盖“命中名单且 AX 非空仍走 OCR”场景；若出现误判，先修正规则再扩名单。
-    - **后续演进**：P2+ 才允许基于质量与耗时证据增删名单，变更须更新 [open_questions.md]() 与对应 acceptance 文档。
+35. ~~OQ-034 = A：`ocr_preferred_apps` 采用 P1 初版"终端类最小名单"~~（已被 **OQ-043** superseded：v3 主线 OCR-only，无 `ocr_preferred_apps` 判定逻辑）。
 
 36. OQ-035 = A：P1 OCR 引擎策略固定为 RapidOCR 单引擎（single-engine policy）。
     - **语义边界**：保持 AX-first + OCR-fallback 主路径不变；仅将 fallback OCR 引擎固定为 RapidOCR。

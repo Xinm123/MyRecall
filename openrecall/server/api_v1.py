@@ -506,10 +506,9 @@ def health():
     permission_snapshot = runtime_settings.get_permission_snapshot()
     permission_status = permission_snapshot["capture_permission_status"]
     permission_reason = permission_snapshot["capture_permission_reason"]
-    permission_degraded = permission_snapshot["is_stale"] or permission_status in {
-        "denied_or_revoked",
-        "recovering",
-    }
+    permission_degraded = (
+        permission_snapshot["is_stale"] or permission_status != "granted"
+    )
 
     # P1-S1: status is only "ok" or "degraded"
     if failed_count > 0 or frame_status != "ok" or permission_degraded:
@@ -521,6 +520,8 @@ def health():
         message = "服务健康/队列正常"
     elif permission_reason == "stale_permission_state":
         message = "权限状态陈旧"
+    elif permission_status == "transient_failure":
+        message = "权限待确认"
     elif permission_status == "recovering":
         message = "权限恢复中"
     elif permission_status == "denied_or_revoked":

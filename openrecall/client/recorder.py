@@ -377,6 +377,14 @@ class ScreenRecorder:
             self._app_switch_monitor.start()
 
     def _handle_external_trigger(self, event: TriggerEvent) -> None:
+        if self._permission_state_machine.is_degraded():
+            logger.debug(
+                "Ignoring external trigger while permission is degraded: status=%s reason=%s trigger=%s",
+                self._last_permission_snapshot.status.value,
+                self._last_permission_snapshot.reason,
+                event.capture_trigger.value,
+            )
+            return
         self._emit_trigger(event)
 
     def _poll_permissions(self, *, now_epoch: float) -> None:
@@ -476,7 +484,6 @@ class ScreenRecorder:
             return
 
         self._warned_blank_devices.add(event.device_name)
-        self._record_permission_issue("blank_frame_detected")
         logger.warning(
             "Captured frames look blank for %s. permission_status=%s permission_reason=%s",
             event.device_name,

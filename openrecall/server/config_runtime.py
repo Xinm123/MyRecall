@@ -12,6 +12,23 @@ def _utc_now_iso() -> str:
     return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
 
 
+def _parse_iso_utc_epoch(value: str) -> float | None:
+    normalized = value.strip()
+    if not normalized:
+        return None
+    if normalized.endswith("Z"):
+        normalized = f"{normalized[:-1]}+00:00"
+    elif "+" not in normalized and "-" not in normalized[10:]:
+        normalized = f"{normalized}+00:00"
+    try:
+        parsed = datetime.fromisoformat(normalized)
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed.timestamp()
+
+
 def _coerce_int(value: object) -> int | None:
     if isinstance(value, bool):
         return int(value)
@@ -167,9 +184,10 @@ class RuntimeSettings:
     ) -> dict[str, object]:
         now = time.time() if now_epoch is None else now_epoch
         with self._lock:
+            last_check_epoch = _parse_iso_utc_epoch(self.last_permission_check_ts)
             is_stale = (
-                self.last_permission_snapshot_epoch <= 0
-                or (now - self.last_permission_snapshot_epoch) > self.PERMISSION_TTL_SEC
+                last_check_epoch is None
+                or (now - last_check_epoch) > self.PERMISSION_TTL_SEC
             )
             reason = (
                 "stale_permission_state" if is_stale else self.capture_permission_reason
