@@ -73,10 +73,9 @@ references:
 10. OQ-010 = A：每个阶段/子阶段验收都必须有 Markdown 详细记录，并作为 Gate 输入。
 11. OQ-011 = A：Gate 采用双轨策略：数值阈值适度放宽，功能完成度/完善度指标强化。
 12. OQ-012 = A：UI Gate 采用"最小可用集"，在 P1 按子阶段强化 UI 可用性/可解释性验收，不做 UI 重构。
-13. OQ-013 = A：引用覆盖率采用 soft KPI（P1-S5>=85%，P1-S7/P2/P3>=92%，Stretch 95%），不作为 Gate Fail 条件；DA-8=A 口径为 deep link：
+13. OQ-013 = A：引用覆盖率采用 soft KPI（P1-S5>=85%，P1-S7/P2/P3>=92%，Stretch 95%），不作为 Gate Fail 条件；当前 v3 active deep link 口径为：
    - OCR 结果：`myrecall://frame/{frame_id}`
-   - UI 结果：优先 `myrecall://frame/{accessibility.frame_id}`（v3 改进，外键精确关联），无 frame_id 时回退 `myrecall://timeline?timestamp=...`
-   - P1 阶段正常 paired_capture 路径下 UI 结果 frame_id 应为非 NULL（paired_capture 写入），此回退仅未来独立 walker 场景触发
+   - UI / `accessibility.frame_id` 优先级表述已被 **OQ-043** superseded，回退为 v4 议题
    - DA-8=B 结构化 citations 为可选增强；统一口径以 [gate_baseline.md](gate_baseline.md) 为准。
 
 ### 已拍板结论（2026-02-27）
@@ -116,12 +115,12 @@ references:
 
 29. OQ-028 = A：Host spool 采用磁盘持久化，不使用内存队列。spool 落盘为 JPEG（`.jpg`/`.jpeg` + `.json`，原子写入）；兼容读取历史（`.webp` + `.json`）仅用于 drain 清空，新写入不再产生 `.webp`。理由：进程重启/断电/断网场景下内存方案会丢数据，与 P1-S1 "断网恢复可自动重传" Gate 不兼容。
 
-> **补充（2026-03-05，按议题 1 收口更新）**：`capture_id` 幂等由 Edge `/v1/ingest` 实现；`content_hash` 内容去重由 Host 在 capture 前执行。Edge 仅接收并存储 `content_hash` 用于观测，不承担 dedup 判定职责。
+> **补充（2026-03-05，历史记录）**：该条 `content_hash` 主线语义已被 **OQ-043** superseded；v3 OCR-only 主线仅保留 `capture_id` 幂等与 trigger/capture coordination，不以 `content_hash` 作为 active dedup 契约。
 
 ### 已拍板结论（2026-03-09）
 
-30. OQ-029 = A：P1-S2 拆分为 S2a（事件驱动 capture，Week 1-2）+ S2b（AX 文本采集，Week 3-4），串行开发，独立验收。实现语言为 Python（与现有 codebase 一致，开发周期 3-4 周）。平台策略 macOS-first，Win/Linux 推迟 P2。`dedup_skip_rate` 不再作为正式验收指标；dedup 效果由 `inter_write_gap_sec` Hard Gate 覆盖。详见 ADR-0013。
-    - 阶段边界（强制）：P1-S2a 不判定 `content_hash` / `inter_write_gap_sec`；上述指标从 P1-S2b（`content_hash` 交付后）开始记录与评审。
+30. OQ-029 = A：P1-S2 拆分为 S2a（事件驱动 capture，Week 1-2）+ S2b（capture completion / monitor-aware coordination，Week 3-4），串行开发，独立验收。实现语言为 Python（与现有 codebase 一致，开发周期 3-4 周）。平台策略 macOS-first，Win/Linux 推迟 P2。详见 ADR-0013。
+    - 阶段边界（强制）：P1-S2a 不判定 routing / topology / device-binding 的收口正确性；这些 Hard Gate 由 P1-S2b 承担。
 
 31. OQ-030 = A：P2 频率目标维持 1Hz（有意偏离 screenpipe 5Hz）。理由：Python 实现在 1Hz 频率下安全余量充足；若未来需要更高频率需重新评估。
 
@@ -137,7 +136,7 @@ references:
 35. ~~OQ-034 = A：`ocr_preferred_apps` 采用 P1 初版"终端类最小名单"~~（已被 **OQ-043** superseded：v3 主线 OCR-only，无 `ocr_preferred_apps` 判定逻辑）。
 
 36. OQ-035 = A：P1 OCR 引擎策略固定为 RapidOCR 单引擎（single-engine policy）。
-    - **语义边界**：保持 AX-first + OCR-fallback 主路径不变；仅将 fallback OCR 引擎固定为 RapidOCR。
+    - **语义边界**：v3 主线为 OCR-only；RapidOCR 是唯一 active OCR 处理路径，不存在 AX-first + OCR-fallback 的 P1 主线判定。
     - **验收口径**：P1 阶段 OCR 指标均按 RapidOCR 路径统计，不做跨引擎归一化/切换对比。
     - **演进策略**：多引擎切换能力推迟到 P2+，需以质量与运维证据驱动再开放。
 
@@ -154,19 +153,17 @@ references:
     - P1 不采集 Browser URL，Arc 支持推迟到 P2+ 评估
     - 原方案：timeboxed optional heuristic sub-scope，若 Day 3 不稳定则 defer
 
-40. OQ-039 = A：S2b / S3 的 failure-class ownership 以 handoff 边界划分——S2b 负责 capability / frozen metadata / raw handoff correctness（permission denied/revoked/recovered、browser_url stale、Arc deferred、empty-AX no-drop）；S3 负责 semantic outcome / final persistence correctness（AX empty、AX timeout、ocr_preferred_apps、OCR fallback success/failure、failed 语义）。
+40. OQ-039 = A：S2b / S3 的 failure-class ownership 以 handoff 边界划分——S2b 负责 capability / frozen metadata / raw handoff correctness（permission denied/revoked/recovered、routing_filtered、device binding、topology rebuild、spool handoff）；S3 负责 semantic outcome / final persistence correctness（OCR success/failure、`failed` 语义、`text_source='ocr'` 持久化）。
 
-41. OQ-040 = A：P1-S2b trigger / focused-context / dedup / URL stale 规则冻结为单一口径。
-    - **Trigger 语义**：event source 仅发出 `capture_trigger`，不得绑定 `device_name`；`device_name` 由 monitor worker 在消费 trigger、执行实际截图时绑定。
-    - **Focused-context 语义**：`app_name/window_name/browser_url` 必须由同一轮 focused-context snapshot 一次性产出；允许部分为 `None`，但禁止字段级混拼。
-    - **Hash 语义**：`content_hash` 仅基于最终上报的 `accessibility_text` 计算；canonicalization 采用 Unicode NFC、换行统一为 `\n`、每行去尾部空白、整体 `strip()`；空字符串对应 `null`，partial AX text 仍正常计算。
-    - **Dedup 语义**：Host 在 capture 完成并生成 `accessibility_text/content_hash` 后、upload 前执行 dedup；`last_write_time` 固定为最近一次成功写入 Host 本地 spool 的时间。
-    - **URL stale 语义**：`browser_url` 获取成功不等于可写入；必须先完成与同轮 `focused_context` 的一致性校验，失败则写 `None`；Arc / AppleScript 路径标题匹配失败必须按 stale reject 处理。
+41. OQ-040 = A：P1-S2b trigger / focused-context / duplicate-capture 规则冻结为单一口径。
+    - **Trigger 语义**：event source 发出 `capture_trigger`；target monitor 的最终判定由 routing/coordinator 语义决定，`device_name` 以实际截图 monitor 为准。
+    - **Focused-context 语义**：P1 active `focused_context = {app_name, window_name}`，必须由同一轮 snapshot 一次性产出；允许部分为 `None`，但禁止字段级混拼。`browser_url` 在 P1 保持 reserved/NULL。
+    - **Duplicate 语义**：S2b 的重复 capture 判定仅基于同 monitor、同一 user action、同一 `min_capture_interval_ms` 窗口内出现 >1 个持久化 frame 的机械定义；不依赖 `content_hash`/simhash。
     - **落点**：`spec.md` 作为规则 SSOT，`acceptance/phase1/p1-s2b.md` 作为阶段验收口径，`data-model.md` 仅承载数据契约结果。
 
 42. OQ-041 = A：P1-S2b 的测试与 Gate 交付采用“TDD 开发 + 收口脚本”模式。
     - **开发方式**：S2b 核心能力采用 TDD；每推进一个冻结规则或核心能力，先写失败测试，再实现最小代码通过。
-    - **测试产物语义**：`tests/test_p1_s2b_content_hash.py`、`tests/test_p1_s2b_ax_timeout.py` 等属于 S2b 阶段正式交付物，但应在开发过程中随功能自然落地，而不是要求在开工前一次性手工补齐。
+    - **测试产物语义**：S2b 阶段正式交付物聚焦 routing / device binding / topology / spool handoff；任何 `content_hash` / AX timeout / browser URL stale 测试均不属于 v3 active S2b 交付物。
     - **阶段收口方式**：`scripts/acceptance/p1_s2b_local.sh` 属于 S2b Exit Gate 交付物；其职责是编排已存在的测试、指标导出、health snapshot 与证据产物，而不是承担最早期规则发现责任。
     - **实施顺序**：先用 TDD 落实最小契约测试与必要集成测试，再在阶段收口时补齐并执行 Gate 编排层。
     - **目的**：避免过早写死验收脚本导致返工，同时避免把契约测试拖到功能完成后才补。
@@ -174,7 +171,7 @@ references:
 43. OQ-042 = A：P1-S2b 采用 v3-only 主链路；legacy `/api/*` 与旧 worker 仅保留兼容职责。
     - **主链路**：S2b 新语义仅允许沿 `Host capture -> spool/uploader -> POST /v1/ingest -> v3 queue/status -> S3 handoff` 生长。
     - **legacy 边界**：`/api/*` 仅用于渐进废弃与兼容回归检查；旧 worker / 旧处理心智模型不得承载新的 S2b 语义、字段规则或验收责任。
-    - **语义范围**：`accessibility_text`、`content_hash`、browser URL stale rejection、Host dedup、`device_name` binding、`focused_context` frozen bundle 等规则仅属于 v3 主链路。
+    - **语义范围**：`device_name` binding、`focused_context` frozen bundle、routing_filtered、topology rebuild、spool/ingest handoff 等规则仅属于 v3 主链路；`accessibility_text`、`content_hash`、browser URL stale rejection 属于 reserved seam / v4 议题。
     - **实施方式**：如确需复用 legacy 代码，只允许通过 adapter 接入，不允许反向把 legacy 语义带回 v3 主链路。
     - **验收原则**：S2b 测试、Gate 脚本、runbook 与人工验证只认 `/v1/*` + v3 runtime/store；legacy 路径仅做兼容检查，不作为功能正确性的证明链路。
 
@@ -185,5 +182,5 @@ references:
     - **保留 seam**：已存在的 `accessibility` / `accessibility_fts` 表、`frames.accessibility_text`、`frames.content_hash`、`frames.text_source` 等 schema 预留保持不删，作为 v4 恢复 AX 的兼容边界；其中 v3 active path 的 `text_source` 仅允许收口到 `'ocr'`。
     - **覆盖范围**：对 v3 active semantics 而言，OQ-004 / OQ-018 / OQ-022 / OQ-029 / OQ-033 / OQ-034 / OQ-035 / OQ-039 / OQ-040 / OQ-041 / OQ-042 中涉及 AX 主链路的表述均由本决议 supersede；这些条目保留为历史记录或 v4 设计输入，不再作为 v3 主线执行依据。
     - **引用口径收口**：OQ-013 中 UI 结果优先 `myrecall://frame/{accessibility.frame_id}` 的口径不再属于 v3 active path；v3 仅承诺 OCR/frame 结果 `myrecall://frame/{frame_id}`，UI/AX citation 回退到 v4 重新定义。
-    - **S2b 阶段语义**：P1-S2b 不再作为 v3 主线的必经阶段；凡依赖 `accessibility_text`、AX timeout/empty、browser URL stale、Host AX dedup 的规则与 Gate，统一降级为 deferred AX scope，待 v4 重新收口。
+    - **S2b 阶段语义**：P1-S2b 仍是 v3 主线必经阶段，但其语义已收口为 capture completion / monitor-aware coordination；凡依赖 `accessibility_text`、AX timeout/empty、browser URL stale、Host AX dedup 的规则与 Gate，统一降级为 deferred AX scope，待 v4 重新收口。
     - **OQ-025 解释补充**：`accessibility` 表 P0 建表的决定仍保留，但其语义从“v3 active path”调整为“v4 reserved seam”；保留该表不构成 v3 必须实现 AX 采集或 AX 搜索的承诺。

@@ -522,7 +522,7 @@ WHERE 1=1
 class CapturePayload(BaseModel):
     """Host → Edge 上传的单条 capture 数据。
     
-    注：此为 API 契约层定义。Host 端内部 metadata 结构略有不同：
+    注：此为 API 契约层 definition。Host 端内部 metadata 结构略有不同：
     - API payload 的 `timestamp` 类型为 float（UNIX epoch 秒）
     - Host 端 metadata 的 `timestamp` 为 ISO8601 字符串（由 `utc_now_iso()` 生成）
     - 服务端在 `claim_frame()` 时将 ISO8601 字符串写入 `frames.timestamp`
@@ -565,13 +565,17 @@ class CapturePayload(BaseModel):
 - `accessibility_text` 若提供，允许为 string 或 `null`；`content_hash` 若提供，允许为 `sha256:[0-9a-f]{64}` 或 `null`。
 - `content_hash` 的具体来源与 canonicalization 规则在 v3 不作为 active contract 固化；若 v4 恢复 AX / content-based dedup，再单独收口。
 
-**上下文字段一致性契约（P1-S2b+）**：
-- `focused_context = {app_name, window_name, browser_url}`：表示同一 capture 的 focused UI 上下文。
+**上下文字段一致性契约（P1-S2b 及后续阶段）**：
+- P1 active `focused_context = {app_name, window_name}`：表示同一 capture 的 focused UI 上下文；`browser_url` 在 P1 为 reserved/NULL。
 - `capture_device_binding = {device_name}`：表示该次 capture cycle 中实际被截取的 monitor。
-- `app_name/window_name/browser_url` 若提供，必须由同一轮 focused-context snapshot 一次性产出；禁止字段级混拼。
-- `browser_url` 若提供，必须与该 `focused_context` 校验一致；若无法确认一致性或命中 stale 检测，必须写 `null`。
+- `app_name/window_name` 若提供，必须由同一轮 focused-context snapshot 一次性产出；禁止字段级混拼。
+- `browser_url` 若未来恢复采集，必须与 focused_context 校验一致；若无法确认一致性或命中 stale 检测，必须写 `null`。
 - `device_name` 必须与实际截图 monitor 一致；它要求 same-cycle coherence，不承担同源 focused-context 语义。
-- 不确定时遵循：`Better None than wrong window` / `Better None than wrong URL`。
+- **非焦点显示器帧**：采集时若无法确定当前显示的 app/window（例如非活动显示器），`app_name` 与 `window_name` 必须写入 `null`。
+- **严禁复用**：禁止复用该 monitor 历史看到的旧 app/window 记录作为当前真相。
+- 不确定时遵循：`Better None than wrong window`；`browser_url` 的 `Better None than wrong URL` 语义保留给 P2+/v4。
+- **优先规则**：`routing_filtered` 优先级最高，直接导致系统不产生持久化帧或 Payload 样本；非焦点 `null`仅在 capture 发生时适用于 payload 字段内容。
+- **过滤结果**：当触发器路由至已禁用的显示器（`routing_filtered`）时，系统不产生持久化帧或 Payload 样本。
 
 **图片格式语义（P1）**：
 - 主采集/主读取链路统一 JPEG：`POST /v1/ingest` 主契约 `image/jpeg`，`frames.snapshot_path` 持久化为 JPEG，`GET /v1/frames/:frame_id` 返回 `image/jpeg`。

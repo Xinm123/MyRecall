@@ -36,7 +36,7 @@ references:
 ### Phase 1：本机模拟 Edge（进程级隔离）
 - 时间：2026-03-02 ~ 2026-03-20
 - 目标：将当前单机闭环（client+server）按 Edge-Centric 职责拆为 Host/Edge 两进程，并在本机完成全功能闭环。
-- 执行规则：P1-S1 -> P1-S2a -> P1-S2a+ -> P1-S2b -> P1-S3 -> P1-S4 -> P1-S5 -> P1-S6 -> P1-S7 串行推进；每阶段必须先通过验收 Gate。
+- 执行规则：P1-S1 -> P1-S2a -> P1-S2a+ -> P1-S2b -> P1-S3 -> P1-S4 -> P1-S5 -> P1-S6 -> P1-S7 串行推进；每阶段必须先通过验收 Gate。`P1-S2b+` 为 S2b 后可选增强，不占主线串行阻塞位。
 - 阶段说明：P1-S2a 负责 trigger generation；P1-S2a+ 负责 permission stability closure；P1-S2b 负责 capture completion（trigger routing、monitor-aware coordination、device binding freeze、spool handoff）；P1-S3 起进入 OCR processing 主线。
 - P1-S1（基础链路，2026-03-02 ~ 2026-03-05）
   - 交付：
@@ -104,9 +104,9 @@ references:
     - 独立的 S2a+ 本机 Gate 执行入口落地
     - S2b Entry Gate 前置条件满足
 
-- P1-S2b（Capture Completion / Monitor-Aware Coordination，2026-03-11 ~ 2026-03-14）
+- P1-S2b（Capture Completion / Monitor-Aware Coordination，2026-03-11 ~ 2026-03-13）
   - 交付：
-    - Trigger routing 语义冻结：`specific-monitor` / `active-monitor` / `global-reevaluation` 三类触发的目标 monitor 归属规则明确
+    - Trigger routing 语义冻结：`specific-monitor` / `active-monitor` / `per-monitor-idle` / `coordinator-defined` 四类触发的目标 monitor 归属规则明确
     - TriggerSource -> TriggerRouter -> CaptureCoordinator -> MonitorWorker[target] 拓扑收口；`MonitorWorker` 只执行 monitor-bound capture work，不承担 fan-out 策略
     - `device_name` 绑定语义冻结：由实际完成截图的 monitor capture worker 负责最终绑定，保证与截图 monitor 同 cycle
     - monitor topology rebuild：monitor 增减、`primary_monitor_only` 变化、worker 集合重建与分区状态恢复
@@ -118,19 +118,46 @@ references:
   - Gate：
     - trigger -> target monitor routing correctness = 100%（click/app_switch/manual/idle 的目标 monitor 行为与冻结语义一致）
     - `device_name` binding correctness = 100%（capture metadata 中 `device_name` 与实际截图 monitor 一致）
-    - single-monitor trigger duplicate capture rate = 0（单个 monitor 作用域的 trigger 不得生成重复 capture）
+    - single-monitor trigger duplicate capture rate = 0（同一 monitor 在同一 user action / `min_capture_interval_ms` 窗口内不得产生重复持久化 capture）
     - monitor topology rebuild correctness = 100%（monitor 增减、不可用、切换 primary 后仍能恢复正确分发）
     - `capture_to_ingest_latency_ms`：Soft KPI（记录 P50/P90/P95/P99，按 `device_name` 分桶）
     - Entry prerequisites：P1-S2a+ 权限稳定性收口通过
     - 窗口有效性：Hard Gate 仅使用无 Host/Edge 重启的连续窗口；若窗口内发生 Host 或 Edge 重启则标记 `broken_window=true`，该窗口仅用于观测
+  - Exit to：P1-S3（主线必经）；P1-S2b+（可选增强）
 
-- P1-S3（处理，2026-03-12 ~ 2026-03-15）
+- P1-S2b+（感知哈希实现，2026-03-13 ~ 2026-03-14）
+  - **说明**：S2b 之后的可选增强阶段；用于补充内容相似度观测/工具能力，不阻塞 OCR-only 主线进入 S3
+  - 范围：
+    - 感知哈希（simhash）计算实现（DHash 算法）
+    - Spool 层集成：capture 入队时计算 simhash，失败阻断
+    - `frames.simhash` 字段写入（schema 已预留）
+    - 相似帧检测逻辑：基于汉明距离的相似性检测与观测
+  - 不在范围：
+    - **不修改 S2b 已冻结语义**：routing、device_name binding、topology 等核心逻辑不变
+    - **不替代 capture_id 幂等**：`capture_id` 仍是主去重键，simhash 为内容级辅助
+    - **不引入新依赖**：仅用 Pillow，不引入 SciPy 或其他重型库
+  - 平台策略：macOS-only（P1 仅实现 macOS；Windows/Linux 推迟 P2）
+  - 依赖：P1-S2b Pass
+  - Hard Gate（仅阶段内自洽，不构成 S3 Entry Gate）：
+    - simhash 计算实现率 = 100%
+    - spool 集成成功率 = 100%
+    - 相似帧检测准确率 >= 95%
+    - 计算耗时 P95 <= 10ms
+  - Soft KPI：
+    - 内存占用增加 <= 5MB
+  - 交付：
+    - `docs/v3/acceptance/phase1/p1-s2b-plus.md` 完成并 Pass
+    - `tests/test_p1_s2b_plus_simhash.py` 落地并通过
+    - 相似帧检测逻辑可用
+  - 与 S3 关系：S3 主线只依赖 S2b Pass；S2b+ 若执行，不得反向改变 S2b/S3 的 OCR-only 主契约
+
+- P1-S3（处理，2026-03-15 ~ 2026-03-18）
   - 交付：
     - Edge OCR processing（RapidOCR，single-engine policy）
     - OCR 成功 → `ocr_text` 表；`frames.text_source='ocr'`
     - OCR 失败语义冻结：失败帧进入 `failed`，不得伪造 UI/accessibility 结果
     - S2b->S3 handoff 语义冻结：S3 仅依赖截图、`capture_trigger`、`device_name`、`focused_context` 等 capture-completion 产物
-    - 上下文字段语义冻结：`focused_context = {app_name, window_name, browser_url}`；`device_name` 为 same-cycle 的实际采样 monitor 绑定字段
+    - 上下文字段语义冻结：`focused_context = {app_name, window_name}`；`browser_url` 在 P1 保持 reserved/NULL，不作为 S2b->S3 active handoff 字段；`device_name` 为 same-cycle 的实际采样 monitor 绑定字段
     - 索引时零 AI 增强：不生成 `caption/keywords/fusion_text`，不写入 `ocr_text_embeddings`
     - Frame 详情可见 OCR 处理来源与处理时间戳（在 `/timeline` 内呈现，不新增 `/frame/:id` 页面）
   - Gate：
@@ -144,7 +171,7 @@ references:
   - 交付：
     - `/v1/search`（含 keyword 检索语义，FTS+过滤完整能力）
     - OCR-only 搜索路径：FTS + 元数据过滤 + OCR/frame citation 返回结构
-    - `focused`、`browser_url`、时间范围、应用/窗口过滤在 OCR 结果上正确生效
+    - `focused`（若启用）、时间范围、应用/窗口过滤在 OCR 结果上正确生效；`browser_url` 在 P1 仅保留兼容参数，不作为 Hard Gate 过滤能力
     - 返回结构包含 frame/citation 关键字段；v3 主线不暴露 UI/accessibility result type
     - Search 页过滤项与 API 参数 1:1 映射，结果可回溯到 frame/citation
   - Gate：
@@ -256,6 +283,7 @@ references:
 - P1-S2a：事件驱动 capture（macOS-only，Python 实现）
 - P1-S2a+：权限稳定性收口（Input Monitoring FSM、health 语义、受控降级/自动恢复）
 - P1-S2b：Capture Completion / Monitor-Aware Coordination（macOS-only，Python 实现）
+- P1-S2b+：感知哈希实现（可选增强阶段；不阻塞 S3 主线）
 - P1-S3：OCR-only processing 能力闭环
 - P1-S4：Search（FTS+过滤，OCR-only）能力闭环
 - P1-S5：Chat Grounding 与引用闭环

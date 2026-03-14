@@ -72,8 +72,8 @@ flowchart LR
 
 ### 2.1 Host 职责（严格）
 - 采集：截图 + 基础上下文（app/window/monitor/timestamp/trigger）。
-- 语义约束：上下文字段分为两组：`focused_context = {app_name, window_name, browser_url}` 与 `capture_device_binding = {device_name}`。
-- `focused_context` 契约：`app_name/window_name` 必须来自同一次 capture 的同源上下文快照；`browser_url` 仅可在与该 focused context 校验一致时附带写入；禁止字段级独立查询后混拼。
+- 语义约束：上下文字段分为两组：P1 active `focused_context = {app_name, window_name}` 与 `capture_device_binding = {device_name}`。
+- `focused_context` 契约：`app_name/window_name` 必须来自同一次 capture 的同源上下文快照；P1 不采集 `browser_url`，该字段仅保留为 reserved/NULL；禁止字段级独立查询后混拼。
 - `capture_device_binding` 契约：`device_name` 必须标识本次 capture cycle 中实际被截取的 monitor；它要求 same-cycle coherence，不要求与 `focused_context` 同源。
 - 反承诺（P1）：不承诺 screenshot + URL 查询形成全局原子同瞬时快照；仅承诺 capture-cycle coherence 与 best-effort metadata coherence。
 - 轻处理：压缩、基础元数据打包、spool 持久化与幂等上传准备。
@@ -121,37 +121,77 @@ flowchart LR
 ### 验证
 - 需求验收仅用 vision 数据集；audio 用例全部排除。
 
-### 4.2 Capture pipeline（Host/Edge 边界）
+### 4.2 Capture pipeline (Host/Edge 边界)
 
 ### screenpipe 怎么做
 - `event_driven_capture.rs`：事件驱动触发（app switch/click/typing/idle）。
 - `paired_capture.rs`：截图 + accessibility 同步采集，必要时 OCR fallback。
 
 ### MyRecall-v3 决策
-- Phase 1：完成事件驱动 capture（app switch/click/idle）+ manual trigger + idle fallback，并补齐 trigger 字段与采集事件总线（触发枚举以 `capture_trigger` P1 契约为准：`idle/app_switch/manual/click`）。`window_focus` 不纳入 P1；若 P2+ 启用，按 screenpipe `capture_window_focus` 语义对齐（默认关闭，高频场景按需开启）。
-- P1-S2a+ ingest 约束：新上报 capture 的 `capture_trigger` 必填且不得为 `null`；缺失/null/非法值返回 `400 INVALID_PARAMS`。
-- 历史兼容边界：`frames.capture_trigger` 列保留 `NULL` 以承载 P1-S1 历史数据；该兼容仅限存量数据，不适用于 S2a+ 新上报。
-- 语义约束（P1）：禁止将固定频率轮询作为主触发机制；固定频率仅可用于 `idle` fallback 或兼容/实验路径。
-- 参数契约（P1，有意偏离 screenpipe Performance 模式）：
-  - `min_capture_interval_ms`（默认 `1000`，有意偏离 screenpipe Performance 200ms）：全触发共享最小间隔去抖。
-  - `idle_capture_interval_ms`（默认 `30000`）：无事件时触发 `idle` fallback 的最大空窗。
-  - 兼容映射：若未显式设置 `idle_capture_interval_ms` 且存在 `OPENRECALL_CAPTURE_INTERVAL`（秒），则按 `idle_capture_interval_ms = OPENRECALL_CAPTURE_INTERVAL * 1000` 解释；该映射仅用于兼容路径。
-- idle 语义约束（P1-S2a+）：`idle` fallback 必须仅由 `idle_capture_interval_ms` 超时触发，不依赖用户活跃判定。
-- Phase 2/3：capture 功能冻结，不新增采集能力，只做 LAN/Debian 稳定性验证与参数调优。
-- 上传协议改为"幂等 + 可续传"：`capture_id` 唯一、chunk ACK、断点续传。
-- 已拍板（OQ-043=A）：v3 主线收口为 OCR-only；Host 不以 accessibility 采集作为主线要求，仍不做 OCR/embedding 推理。
-- 事件风暴抑制（有意偏离 screenpipe Performance 模式）：
-  - 全触发共享最小间隔去抖（`min_capture_interval_ms`，默认 1000ms，有意偏离 screenpipe Performance 200ms）；
-  - 非 `idle/manual` 触发允许后续接入内容去重，但不得成为 v3 OCR-only 主线 Gate 前提；
-  - 保留 30s 强制落盘保底，避免 timeline 出现长时间空洞；
-  - 触发通道有界，lag 时折叠为一次兜底触发，避免高频事件拖垮处理链路。
 
-**P1 capture semantics（SSOT）**：
-- event source 仅负责发出 `capture_trigger`，不得绑定 `device_name`。
-- `device_name` 必须由 monitor worker 在消费 trigger、执行实际截图时绑定；其语义固定为“本次 capture cycle 中实际被截取的 monitor”。
-- `focused_context = {app_name, window_name, browser_url}` 必须由同一轮 focused-context snapshot 一次性产出；允许部分缺失为 `None`，但禁止字段级跨来源混拼。
-- `primary_monitor_only` 仅控制启用的 monitor worker 集合，不改变 trigger 语义。
-- P1 仅承诺 capture-cycle coherence，不承诺 screenshot / URL 的全局原子同瞬时快照。
+#### P1-S2b 路由与重叠语义 (SSOT)
+
+**Current implementation (Gap Notes)**:
+- 采集事件（`macos.py`）仍将 `device_name` 与事件源绑定。
+- 使用全局单一 idle 定时器，未实现按已启用 monitor 独立计时。
+- `app_switch` 触发偏向主显示器，次要显示器事件路由尚不完整。
+- `OPENRECALL_PRIMARY_MONITOR_ONLY` 在部分代码路径下可能影响触发产生而非仅过滤 worker。
+
+**P1-S2b target semantics**:
+
+1. **两层模型 (Two-Layer Model)**:
+   - **第一层：路由 (Routing)**: 触发器根据分类选择“目标 Monitor”。
+   - **第二层：采集 (Capture)**: 对应的 monitor worker 执行截图并产出 `focused_context` (app/window) 与 `capture_device_binding` (device_name)。
+
+2. **路由分类 (Routing Taxonomy)**:
+
+| Trigger | Routing Type | `PRIMARY_MONITOR_ONLY=false` | `PRIMARY_MONITOR_ONLY=true` |
+| :--- | :--- | :--- | :--- |
+| `click` | **specific-monitor** | 坐标所属 monitor 响应 | 仅主显坐标响应；次显坐标结果为 `routing_filtered` |
+| `app_switch` | **active-monitor** | 焦点 app 所属 monitor 响应 | 仅主显 app 响应；次显 app 结果为 `routing_filtered` |
+| `idle` | **per-monitor-idle** | 各 monitor 独立 30s 计时响应 | 仅主显维护独立计时；次显不计时且无响应 |
+| `manual` | **coordinator-defined** | 默认路由到当前 primary monitor（除非显式指定 monitor） | 仅主显响应；次显结果为 `routing_filtered` |
+
+3. **运行时控制与过滤 (`OPENRECALL_PRIMARY_MONITOR_ONLY`)**:
+   - 该开关**仅改变已启用的 worker 集合**，不得重写触发器的语义。
+   - **优先级规则 (Precedence)**: `routing_filtered` 优先级高于一切采集行为。若结果为 filtered，则不启动截图循环，不产出任何持久化帧。
+   - 当 `OPENRECALL_PRIMARY_MONITOR_ONLY=true` 时，任何路由到次要显示器的触发结果均为 `routing_filtered` (不产生入库帧)。
+
+4. **重叠与去抖规则 (Overlap & Debounce Rule)**:
+   - 一个用户动作（如点击任务栏切换应用）允许同时发出 `click` 和 `app_switch` 触发。
+   - **同 Monitor 去抖**: 若两者路由到同一 monitor，采集循环在 `min_capture_interval_ms` 窗口内执行去抖。后到的触发任务将被丢弃，系统必须确保至少保留一帧具有确定性的持久化记录。
+   - **跨 Monitor 并行**: 若路由到不同 monitor，允许并行产生帧。
+   - 最终持久化的 `app_name/window_name` 可能相同，但 `capture_trigger` 必须反映各自的触发路径。
+
+5. **上下文一致性与空值 (`Better None than wrong`)**:
+   - **非焦点显示器帧**: 仅当帧被实际捕获且无法确定当前显示的 app/window（例如非活动显示器）时，`app_name` 与 `window_name` 必须写入 `null`。
+   - **严禁复用**: 禁止复用该 monitor 历史看到的旧 app/window 记录作为当前真相。
+
+---
+
+### Phase 1：完成事件驱动 capture (app switch/click/idle) + manual trigger + idle fallback
+- 补齐 trigger 字段与采集事件总线（触发枚举以 `capture_trigger` P1 契约为准：`idle/app_switch/manual/click`）。`window_focus` 不纳入 P1。
+- P1-S2a+ ingest 约束：新上报 capture 的 `capture_trigger`必填且不得为 `null`；缺失/null/非法值返回 `400 INVALID_PARAMS`。
+- 历史兼容边界：`frames.capture_trigger` 列保留 `NULL` 以承载 P1-S1 历史数据。
+- 语义约束（P1）：禁止将固定频率轮询作为主触发机制；固定频率仅可用于 `idle` fallback。
+- 参数契约（P1）：
+  - `min_capture_interval_ms`（默认 `1000`）：全触发共享最小间隔去抖。
+  - `idle_capture_interval_ms`（默认 `30000`）：无事件时触发 `idle` fallback 的最大空窗。
+- Phase 2/3：capture 功能冻结，不新增采集能力。
+- 上传协议改为"幂等 + 可续传"：`capture_id` 唯一、chunk ACK、断点续传。
+- 已拍板（OQ-043=A）：v3 主线收口为 OCR-only；Host 不以 accessibility 采集作为主线要求。
+- 事件风暴抑制：
+  - 全触发共享最小间隔去抖（`min_capture_interval_ms`，默认 1000ms）。
+  - 保留 30s 强制落盘保底（`idle` fallback）。
+  - 触发通道有界，lag 时折叠。
+
+**P1 capture semantics（SSOT 已迁移至上文 §4.2 路由与重叠语义）**：
+- event source 仅负责发出 `capture_trigger`，不再强制绑定 `device_name`。
+- `device_name` 必须由 monitor worker 在执行实际截图时绑定。
+- `focused_context = {app_name, window_name}` 必须由同一轮 snapshot 一次性产出；`browser_url` 在 P1 固定为 `NULL`。
+- `primary_monitor_only` 仅控制启用的 monitor worker 集合。
+
+
 
 **Browser URL 语义（修订）**：
 - P1：`browser_url` 字段保留为 `NULL`，不采集。
@@ -161,7 +201,7 @@ flowchart LR
 - Host 主线 payload 仅要求截图与基础上下文（`timestamp`、`capture_trigger`、`device_name`、`app_name/window_name`）。
 - ~~best-effort `browser_url`~~（P1 不采集）。
 - v3 主线不以 `accessibility_text`、AX timeout/empty、AX dedup 或 AX URL 规则作为 ingest / processing / Gate 前提。
-- 若后续为兼容或实验保留 AX 相关字段，它们仅作为 reserved seam，不得改变 v3 OCR-only 主线语义。
+- 若后续为兼容 or 实验保留 AX 相关字段，它们仅作为 reserved seam，不得改变 v3 OCR-only 主线语义。
 
 **Edge 端 ingest 简化处理**：
 ```
@@ -177,7 +217,7 @@ def handle_ingest(payload):
 ```
 
 ### 对齐结论
-- 对齐级别：高度对齐（P1 即达到行为对齐）。
+- 对齐级别：语义对齐（P1-S2b 目标规范与 screenpipe 行为逻辑对齐）；当前代码仍存在上述 Implementation Gaps，待后续阶段补齐。
 
 ### 风险
 - 事件风暴导致过采样与 LAN 拥塞。
@@ -283,7 +323,7 @@ processing worker 处理一帧:
   - `chat_messages`（Chat 会话记录）← v3 独有
   - `ocr_text_embeddings`（P2+ 可选离线实验表，P1 不建）← 参考 screenpipe 预留
 - Host 仅保留短期 spool，不做长期索引。
-- 详细 DDL 见 [data-model.md §3.0.3](data-model.md#303-ddledge-sqlite)。
+- 详细 DDL见 [data-model.md §3.0.3](data-model.md#303-ddledge-sqlite)。
 
 ### 对齐结论
 - 对齐级别：主路径高对齐（P1 已落地主链为 `frames` + `ocr_text` + `frames_fts/ocr_text_fts`；`accessibility` 相关表仅作 v4 预留）；`ocr_text_embeddings` 为 P2+ 可选，不计入 P1"100% 对齐"定义。
@@ -785,7 +825,7 @@ data: {"type":"response","success":true}
 - `text`：v3 主线为 OCR 文本（或为 null）
 - `urls`：仅包含从内容中提取的 URL（regex / OCR text extraction，去重）；不强制并入 `browser_url`
 - `text_source`：v3 主线固定为 `"ocr"`
-- `browser_url`：页面主 URL 若需展示，使用 search/metadata 路径中的独立字段，不与 `urls` 语义混用
+- `browser_url`：P1 主线固定为 `null`；若 P2+ 恢复采集，页面主 URL 仍作为独立字段展示，不与 `urls` 语义混用
 
 **P2+ 扩展点（对齐 screenpipe `/frames/{id}/context` 完整语义）：**
 - 增加 `nodes`（role/text/depth/bounds）需要先引入 accessibility tree 存储（数据模型与采集链路扩展）
@@ -802,6 +842,15 @@ data: {"type":"response","success":true}
   "capture_permission_status": "granted",
   "capture_permission_reason": "granted",
   "last_permission_check_ts": "2026-02-26T10:00:00Z",
+  "capture_runtime": {
+    "topology_epoch": 3,
+    "primary_monitor_only": true,
+    "active_monitors": [
+      {"device_name": "monitor_69732928", "is_primary": true, "enabled": true}
+    ],
+    "last_topology_rebuild_ts": "2026-02-26T10:00:00Z",
+    "last_capture_outcome": "capture_completed"
+  },
   "message": "服务健康/队列正常",
   "queue": {
     "pending": 0,
@@ -819,6 +868,12 @@ data: {"type":"response","success":true}
 - `capture_permission_reason`：权限状态原因；正常时为 `"granted"`，异常时为具体原因（例如 `input_monitoring_denied`、`input_monitoring_revoked`、`tcc_transient_failure`）；v3 P1 不再以 Accessibility reason code 作为主线权限语义
 - `last_permission_check_ts`：最近一次权限轮询时间（UTC ISO8601）
 - 权限字段完整性约束：响应 MUST 同时包含 `capture_permission_status`、`capture_permission_reason`、`last_permission_check_ts`
+- `capture_runtime`：P1-S2b+ 的 capture runtime 观测块；用于 topology / routing / outcome 证据收口，不替代 queue/permission 主判定
+- `capture_runtime.topology_epoch`：monitor 集合或启用状态发生变化后的单调递增版本号
+- `capture_runtime.primary_monitor_only`：当前 monitor enablement 策略
+- `capture_runtime.active_monitors`：当前启用 monitor 列表；每项至少包含 `device_name`、`is_primary`、`enabled`
+- `capture_runtime.last_topology_rebuild_ts`：最近一次 topology rebuild 完成时间
+- `capture_runtime.last_capture_outcome`：最近一次 capture completion outcome（如 `capture_completed`、`routing_filtered`、`permission_blocked`、`spool_failed`、`schema_rejected`、`topology_rebuilt`）
 - `message`：面向 UI 的可读状态文案（P1-S1 推荐值：`服务健康/队列正常`、`等待首帧`、`队列异常`、`数据延迟`、`服务异常`）
 - P1-S1 判定约束：`status="ok"` 当且仅当 `queue.failed == 0` 且 `frame_status == "ok"`；否则 `status="degraded"`
 - 空库判定约束：当 `frames` 为空（`last_frame_timestamp=null`）时，`frame_status="stale"`，并据上条规则返回 `status="degraded"`

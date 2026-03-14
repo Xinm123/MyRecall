@@ -4,6 +4,7 @@
 - 日期：2026-03-01
 - 适用范围：Chat 功能架构评审，与 [spec.md](../../spec.md)、`ADR-0004`、[roadmap.md](../../roadmap.md)、[gate_baseline.md](../../gate_baseline.md) 联动
 - 用途：作为 Chat 对齐/不对齐分析的 MyRecall-v3 侧基线锚点
+- 状态：**历史基线（pre-OQ-043 / pre-P1-S2b 收口）**；文中若出现 `accessibility.frame_id`、UI/AX citation 优先级等表述，仅作历史对照，不属于 v3 OCR-only active contract。
 
 ---
 
@@ -50,4 +51,3 @@
 | ---- | ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
 | v1.0 | 2026-03-01 | 初始基线，从 spec.md / ADR-0004 / roadmap.md / gate_baseline.md 提取                                                                                   |
 | v1.1 | 2026-03-01 | DA-2/DA-3/DA-5/DA-7/DA-8 决策落地：B2 改为 Pi Sidecar + SSE 透传；B4 改为 SKILL.md 工具格式；B5 补充 DA-8=A citation 留空说明；B7 去除自动 fallback；Decision 表更新 002A/005A |
-

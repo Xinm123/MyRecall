@@ -1,31 +1,35 @@
 schema: spec-driven
 context: |
   Project: MyRecall-v3 (Edge-centric, vision-only, OCR-only). Reference repo: _ref/screenpipe
-  Current substage: P1-S2a+ (权限稳定性收口)
-  ADR: docs/v3/adr/ADR-0013-event-driven-ax-split.md (S2a+ as post-S2a closing stage per OQ-043)
+  Current substage: P1-S2b (Capture Completion / Monitor-Aware Coordination)
+  ADR: docs/v3/adr/ADR-0013-event-driven-ax-split.md (historical split record; OQ-043 freezes v3 mainline as OCR-only and keeps P1-S2b as the active capture-completion stage)
 
   Source precedence (MUST follow; do not invent local reinterpretation):
   - docs/v3/spec.md - 架构与 frozen behavior SSOT
   - docs/v3/data-model.md - payload/data contract consequences
   - docs/v3/open_questions.md - 已冻结决策与 ownership boundary (OQ-043 OCR-only)
-  - docs/v3/acceptance/phase1/p1-s2a-plus.md - S2a+ Gate、证据、运行步骤
+  - docs/v3/acceptance/phase1/p1-s2b.md - current substage contract, evidence, executable scenarios
   - docs/v3/gate_baseline.md - Gate/SLO formulas, thresholds, sample rules
 
   Supplemental references (use only for their own scope):
-  - docs/v3/acceptance/phase1/p1-s2a.md - S2a 前置阶段契约继承
-  - docs/v3/acceptance/phase1/p1-s2b.md - S2b Entry prerequisite enforcement
+  - docs/v3/acceptance/phase1/p1-s2a-plus.md - S2b entry prerequisite only
+  - docs/v3/acceptance/phase1/p1-s3.md - downstream handoff boundary
   - docs/v3/http_contract_ledger.md - external HTTP delta
   - docs/v3/roadmap.md - planning context only; not behavior SSOT
 
   Precedence rule: higher-priority docs win over lower-priority docs; all docs win over this config.
   Conflict rule: if sources conflict, cite the higher-priority source and surface the conflict; do not synthesize a new rule.
 
-  Scope invariants (P1-S2a+):
+  Scope invariants (P1-S2b):
   - Vision-only for P1-P3 (no audio); macOS-only for P1 (Windows/Linux deferred to P2).
   - Python implementation (ADR-0013).
   - OCR-only mainline (OQ-043): v3主线收口为OCR-only, AX主链路defer到v4。
-  - S2a+ is a post-S2a closing stage (not a full feature stage): 专注Input Monitoring权限稳定性收口。
-  - S2a+ is P1-S2b Entry Gate prerequisite: 权限稳定性必须通过才能进入S2b (Capture Completion)。
+  - P1-S2b owns capture completion only: trigger routing, monitor-aware coordination, device_name binding, focused-context freeze, topology rebuild, spool/ingest handoff.
+  - P1 active focused_context = {app_name, window_name}; browser_url is reserved/NULL in the active capture contract.
+  - P1-S2a+ is an already-closed entry prerequisite for S2b, not the current feature scope.
+  - P1-S3 is the next mainline stage after S2b.
+  - P1-S2b+ is optional enhancement, not a blocker for S3 mainline.
+  - Do not revive pre-OQ-043 AX/browser/content-hash semantics from historical baselines unless a higher-priority source explicitly marks them active.
 
 
 rules:

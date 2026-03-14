@@ -120,9 +120,18 @@ references:
 - 最小样本：`>= 100 captures`
 
 9. `single_monitor_duplicate_capture_rate`（Hard Gate，P1-S2b）
-- 公式：`duplicate_capture_rate = (单 monitor 作用域 trigger 产生重复 capture 的次数 / 单 monitor 作用域 trigger 总数) * 100%`
+- 公式：`duplicate_capture_rate = (单 monitor 作用域产生重复 capture 的 frame 数 / 单 monitor 作用域入库 frame 总数) * 100%`
+- **"重复 capture" 定义**：需同时满足以下条件：
+  1. 同一 `device_name`（单 monitor 作用域）
+  2. 实际产生了 >1 个持久化 frame（被 debounce 丢弃的不计入）
+  3. 这些 frames 归属于同一 user action，且落在同一 `min_capture_interval_ms` 窗口内
+- **不计入情形**：
+  - Debounce 阶段被丢弃的 trigger（未产生 frame，见 `p1-s2b.md` §3.2 第 3 点）
+  - 不同 user action 产生的 frame（即使时间接近）
+  - 同一 user action 产生的多帧但明确属于跨 monitor 并行 capture
 - 阈值：`= 0%`
 - 最小样本：`>= 100` 个单 monitor 作用域 trigger
+- **实现说明**：正常情况下 debounce 机制（`min_capture_interval_ms` 窗口）确保同一 monitor 窗口期内只保留第一个 trigger，后续 trigger 被丢弃且不截图。本指标是机械性的 coordination Gate，不依赖 simhash / content_hash / 图像相似度算法。
 
 10. `topology_rebuild_correctness`（Hard Gate，P1-S2b）
 - 公式：`topology_rebuild_correctness = (monitor topology 变化后恢复正确分发的场景数 / monitor topology 变化场景总数) * 100%`

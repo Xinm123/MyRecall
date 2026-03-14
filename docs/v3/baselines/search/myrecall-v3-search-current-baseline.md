@@ -3,6 +3,7 @@
 > 生成日期：2026-03-02
 > SSOT：[../../spec.md](../../spec.md) + [../../adr/ADR-0005-search-screenpipe-vision-only.md](../../adr/ADR-0005-search-screenpipe-vision-only.md) + 当前代码库
 > 链路标记：仅屏幕
+> 状态：**历史基线（pre-OQ-043 / pre-P1-S2b 收口）**。其中 `content_type=accessibility`、`search_accessibility()`、`accessibility.frame_id`、active `browser_url` 等表述不再属于 v3 OCR-only active contract，仅保留为对比背景。
 
 ## 1. 设计层（v3 spec = 目标态）
 

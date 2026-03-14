@@ -73,9 +73,9 @@ tests/
 - **最小集成测试**（补充）：
   - capture-completion 协调逻辑（可单元测）
   - 队列状态 API
-  - S2b metadata/handoff 字段矩阵：`capture_trigger`、`device_name`、`app_name/window_name/browser_url` 的 canonical key 与一致性规则
-  - focused-context 一致性矩阵：禁止 mixed-source `app_name/window_name`、stale `browser_url` 必须 rejected to `null`、`device_name` 必须对应实际截图 monitor
-  - Arc stale-url 场景仅在 Arc support 未 defer 时执行；若 Arc deferred，不计入 required browser success 判定
+  - S2b metadata/handoff 字段矩阵：`capture_trigger`、`device_name`、`app_name/window_name` 的 canonical key 与一致性规则
+  - focused-context 一致性矩阵：禁止 mixed-source `app_name/window_name`、`device_name` 必须对应实际截图 monitor
+  - `browser_url` 在 P1 仅验证 reserved/NULL 语义，不作为 S2b active 交付测试目标
 
 > 注：P1-S2 测试依赖 macOS CGEventTap 真实事件，需本机手动跑，不强制 CI 自动化
 

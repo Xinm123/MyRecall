@@ -10,7 +10,9 @@
 > - **S2b 转型为 "Capture Completion"**（专注 trigger routing、monitor-aware coordination、device binding、spool handoff），不再负责 AX 文本采集
 > - 本 ADR 的 S2b=AX 语义仅保留为审计历史，不再作为 v3 主线执行依据
 >
-> 当前执行口径：[open_questions.md OQ-043](../open_questions.md)、[roadmap.md P1-S2b](../roadmap.md)
+> 当前执行口径：[open_questions.md OQ-043](../open_questions.md)、[roadmap.md P1-S2b](../roadmap.md)、[acceptance/phase1/p1-s2b.md](../acceptance/phase1/p1-s2b.md)
+>
+> **执行限制**：若本 ADR 下文与上述现行文档冲突，一律以后者为准；不得依据本 ADR 的历史 S2b=AX 范围编写实现、测试或 Gate 结论。
 
 ## Context
 
@@ -141,8 +143,8 @@ openrecall/client/events/
 - 设计原则：**Better None than wrong URL**
 - 阶段化适配（MyRecall 特有）：Arc support 在运行时行为上对齐 screenpipe，但 Day 3 defer 规则属于 MyRecall 的 timeboxed scope-cut fallback，不是 screenpipe 原生 gate 设计。
 
-**上下文 formalization（MyRecall P1）**：
-- `focused_context = {app_name, window_name, browser_url}`：要求 capture-cycle 内的一致性与交叉校验，不允许字段级混拼。
+**上下文 formalization（历史记录，含已 defer 的 URL 语义）**：
+- `focused_context = {app_name, window_name, browser_url}`：该表述保留为原始设计记录；v3 OCR-only active path 已收口为 `focused_context = {app_name, window_name}`，`browser_url` defer 到 P2+/v4。
 - `capture_device_binding = {device_name}`：由 monitor worker 在消费 trigger 时绑定，要求与实际截图 monitor 同一 capture cycle，一致但不要求同源。
 - P1 不承诺 screenshot + AX + URL 查询是全局原子同瞬时快照；采用 screenpipe 风格的 bundled best-effort coherence + stale rejection。
 
