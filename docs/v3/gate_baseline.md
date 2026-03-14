@@ -84,6 +84,7 @@ references:
 3. `capture_to_ingest_latency_ms`（Soft KPI，P1-S2b 新增，替代 `inter_write_gap_sec`）
 - 公式：`latency_ms = (frames.ingested_at - capture_completed_ts) * 1000`
   - `capture_completed_ts`：Host 侧 capture worker 完成截图并写入 spool 的时间戳
+    - 在 P1-S2b 主链路中，`capture_completed_ts` 对应持久化 metadata 中的 `timestamp` 字段（即 Host 侧 capture-completion / spool-write completion time）
   - `ingested_at`：Edge 侧该 capture 完成 SQLite 持久化的时间点
 - 类型：**Soft KPI only**（non-blocking，用于 S2b 质量观测）
 - 分桶维度：`device_name`
