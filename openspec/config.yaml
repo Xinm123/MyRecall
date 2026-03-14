@@ -25,11 +25,6 @@ context: |
   - Python implementation (ADR-0013).
   - OCR-only mainline (OQ-043): v3主线收口为OCR-only, AX主链路defer到v4。
   - P1-S2b owns capture completion only: trigger routing, monitor-aware coordination, device_name binding, focused-context freeze, topology rebuild, spool/ingest handoff.
-  - P1 active focused_context = {app_name, window_name}; browser_url is reserved/NULL in the active capture contract.
-  - P1-S2a+ is an already-closed entry prerequisite for S2b, not the current feature scope.
-  - P1-S3 is the next mainline stage after S2b.
-  - P1-S2b+ is optional enhancement, not a blocker for S3 mainline.
-  - Do not revive pre-OQ-043 AX/browser/content-hash semantics from historical baselines unless a higher-priority source explicitly marks them active.
 
 
 rules:

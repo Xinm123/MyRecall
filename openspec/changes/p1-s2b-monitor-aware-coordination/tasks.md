@@ -54,24 +54,24 @@
 
 ## Acceptance Verification
 
-### 11. Automated verification
+### 6. Automated verification
 
-- [ ] 11.1 Run `pytest tests/test_p1_s2b_routing.py` and fix failures until the routing suite passes.
-- [ ] 11.2 Run `pytest tests/test_p1_s2b_device_binding.py` and fix failures until the binding suite passes.
-- [ ] 11.3 Run the affected ingest/runtime regression tests that validate metadata mapping and `/v1/health` runtime fields.
-- [ ] 11.4 Verify that automated tests assert both functional outcomes and health/log evidence for filtered routing and topology rebuild.
+- [ ] 6.1 Run `pytest tests/test_p1_s2b_routing.py` and fix failures until the routing suite passes.
+- [ ] 6.2 Run `pytest tests/test_p1_s2b_device_binding.py` and fix failures until the binding suite passes.
+- [ ] 6.3 Run the affected ingest/runtime regression tests that validate metadata mapping and `/v1/health` runtime fields.
+- [ ] 6.4 Verify that automated tests assert both functional outcomes and health/log evidence for filtered routing and topology rebuild.
 
-### 12. Local gate script and evidence bundle
+### 7. Local gate script and evidence bundle
 
-- [ ] 12.1 Add `scripts/acceptance/p1_s2b_local.sh` as the dedicated S2b local gate entrypoint.
-- [ ] 12.2 Add helper coverage for topology verification using deterministic injection/mocking, operator-driven physical steps, or both.
-- [ ] 12.3 Make the S2b gate script emit the required evidence bundle: logs, health snapshots, spool checks, topology-change method, and execution context.
-- [ ] 12.4 Verify the gate script records `broken_window`, `alias-only payload`, and `mixed-version` exclusions when present.
+- [ ] 7.1 Add `scripts/acceptance/p1_s2b_local.sh` as the dedicated S2b local gate entrypoint.
+- [ ] 7.2 Add helper coverage for topology verification using deterministic injection/mocking, operator-driven physical steps, or both.
+- [ ] 7.3 Make the S2b gate script emit the required evidence bundle: logs, health snapshots, spool checks, topology-change method, and execution context.
+- [ ] 7.4 Verify the gate script records `broken_window`, `alias-only payload`, and `mixed-version` exclusions when present.
 
-### 13. Scenario and metric closure
+### 8. Scenario and metric closure
 
-- [ ] 13.1 Verify SC-R1, SC-R2, SC-F1, SC-I1, SC-I2, and SC-O1 evidence against the frozen routing and context rules.
-- [ ] 13.2 Verify SC-T1, SC-T2, SC-T3, and SC-T4 evidence against topology rebuild and active-monitor parity rules.
-- [ ] 13.3 Verify that each topology scenario includes dual evidence: functional result plus Host registry/log and `/v1/health` parity for the same epoch.
-- [ ] 13.4 Compute and record `trigger_target_routing_correctness`, `device_binding_correctness`, `single_monitor_duplicate_capture_rate`, and `topology_rebuild_correctness` using the S2b proof-sample rules.
-- [ ] 13.5 Record `capture_to_ingest_latency_ms` by `device_name` as the required non-blocking S2b Soft KPI.
+- [ ] 8.1 Verify SC-R1, SC-R2, SC-F1, SC-I1, SC-I2, and SC-O1 evidence against the frozen routing and context rules.
+- [ ] 8.2 Verify SC-T1, SC-T2, SC-T3, and SC-T4 evidence against topology rebuild and active-monitor parity rules.
+- [ ] 8.3 Verify that each topology scenario includes dual evidence: functional result plus Host registry/log and `/v1/health` parity for the same epoch.
+- [ ] 8.4 Compute and record `trigger_target_routing_correctness`, `device_binding_correctness`, `single_monitor_duplicate_capture_rate`, and `topology_rebuild_correctness` using the S2b proof-sample rules.
+- [ ] 8.5 Record `capture_to_ingest_latency_ms` by `device_name` as the required non-blocking S2b Soft KPI.
