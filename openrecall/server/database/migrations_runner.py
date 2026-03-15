@@ -92,7 +92,7 @@ def run_migrations(conn: sqlite3.Connection, migrations_dir: Path) -> None:
                 )
 
             try:
-                conn.executescript("\n".join(["BEGIN IMMEDIATE;", script]))
+                conn.executescript(f"BEGIN IMMEDIATE;\n{script}")
                 conn.execute(
                     "INSERT INTO schema_migrations(version, description) VALUES (?, ?)",
                     (version, sql_file.stem),

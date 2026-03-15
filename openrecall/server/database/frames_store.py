@@ -97,6 +97,8 @@ class Frame:
     ingested_at: str
     image_size_bytes: Optional[int]
     error_message: Optional[str]
+    last_known_app: Optional[str] = None
+    last_known_window: Optional[str] = None
 
 
 class FramesStore:
@@ -115,6 +117,7 @@ class FramesStore:
         return conn
 
     def _row_to_frame(self, row: sqlite3.Row) -> Frame:
+        columns = row.keys() if hasattr(row, "keys") else []
         return Frame(
             id=row["id"],
             capture_id=row["capture_id"],
@@ -126,11 +129,17 @@ class FramesStore:
             ingested_at=row["ingested_at"],
             image_size_bytes=row["image_size_bytes"],
             error_message=row["error_message"],
+            last_known_app=row["last_known_app"]
+            if "last_known_app" in columns
+            else None,
+            last_known_window=row["last_known_window"]
+            if "last_known_window" in columns
+            else None,
         )
 
     def _extract_metadata_fields(
         self, metadata: dict[str, object]
-    ) -> tuple[object, object, object, object, object, object, object, object, object]:
+    ) -> tuple[object, ...]:
         raw_timestamp = metadata.get("timestamp") or metadata.get("capture_time")
         timestamp = _to_utc_iso8601(raw_timestamp) or ""
         app_name = (
@@ -149,6 +158,8 @@ class FramesStore:
         capture_trigger = metadata.get("capture_trigger")
         event_ts = _to_utc_iso8601(metadata.get("event_ts"))
         image_size_bytes = metadata.get("image_size_bytes")
+        last_known_app = metadata.get("last_known_app")
+        last_known_window = metadata.get("last_known_window")
         return (
             timestamp,
             app_name,
@@ -159,6 +170,8 @@ class FramesStore:
             capture_trigger,
             event_ts,
             image_size_bytes,
+            last_known_app,
+            last_known_window,
         )
 
     def claim_frame(
@@ -174,6 +187,8 @@ class FramesStore:
             capture_trigger,
             event_ts,
             image_size_bytes,
+            last_known_app,
+            last_known_window,
         ) = self._extract_metadata_fields(metadata)
 
         try:
@@ -183,8 +198,8 @@ class FramesStore:
                     INSERT OR IGNORE INTO frames
                         (capture_id, timestamp, app_name, window_name, browser_url,
                          focused, device_name, capture_trigger, event_ts, snapshot_path,
-                         image_size_bytes, status)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')
+                         image_size_bytes, status, last_known_app, last_known_window)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)
                     """,
                     (
                         capture_id,
@@ -198,6 +213,8 @@ class FramesStore:
                         event_ts,
                         None,
                         image_size_bytes,
+                        last_known_app,
+                        last_known_window,
                     ),
                 )
                 conn.commit()
@@ -222,6 +239,8 @@ class FramesStore:
                     (capture_id,),
                 ).fetchone()
                 if row is None:
+                    # In high concurrency, this row could theoretically have been deleted
+                    # between INSERT OR IGNORE and this SELECT, though extremely unlikely.
                     raise sqlite3.IntegrityError(
                         f"INSERT OR IGNORE rowcount=0 but row not found capture_id={capture_id}"
                     )
@@ -289,7 +308,8 @@ class FramesStore:
                 row = conn.execute(
                     """
                     SELECT id, capture_id, timestamp, app_name, window_name,
-                           snapshot_path, status, ingested_at, image_size_bytes, error_message
+                           snapshot_path, status, ingested_at, image_size_bytes, error_message,
+                           last_known_app, last_known_window
                     FROM frames WHERE id = ?
                     """,
                     (frame_id,),
@@ -305,7 +325,8 @@ class FramesStore:
                 row = conn.execute(
                     """
                     SELECT id, capture_id, timestamp, app_name, window_name,
-                           snapshot_path, status, ingested_at, image_size_bytes, error_message
+                           snapshot_path, status, ingested_at, image_size_bytes, error_message,
+                           last_known_app, last_known_window
                     FROM frames WHERE capture_id = ?
                     """,
                     (capture_id,),
@@ -484,7 +505,7 @@ class FramesStore:
                 rows = conn.execute(
                     """
                     SELECT id, capture_id, timestamp, app_name, window_name,
-                           snapshot_path, status, ingested_at
+                           snapshot_path, status, ingested_at, last_known_app, last_known_window
                     FROM frames
                     ORDER BY timestamp DESC
                     LIMIT ?
@@ -506,6 +527,8 @@ class FramesStore:
                             "filename": f"{ts}.png",
                             "app_name": row["app_name"] or "",
                             "window_title": row["window_name"] or "",
+                            "last_known_app": row["last_known_app"] or "",
+                            "last_known_window": row["last_known_window"] or "",
                         }
                     )
         except sqlite3.Error as e:
@@ -529,7 +552,7 @@ class FramesStore:
                 rows = conn.execute(
                     """
                     SELECT id, capture_id, timestamp, app_name, window_name,
-                           snapshot_path, status, ingested_at
+                           snapshot_path, status, ingested_at, last_known_app, last_known_window
                     FROM frames
                     ORDER BY timestamp DESC
                     LIMIT ?
@@ -551,6 +574,8 @@ class FramesStore:
                             "filename": f"{ts}.png",
                             "app_name": row["app_name"] or "",
                             "window_title": row["window_name"] or "",
+                            "last_known_app": row["last_known_app"] or "",
+                            "last_known_window": row["last_known_window"] or "",
                         }
                     )
         except sqlite3.Error as e:
@@ -572,7 +597,7 @@ class FramesStore:
                 rows = conn.execute(
                     """
                     SELECT id, capture_id, timestamp, app_name, window_name,
-                           snapshot_path, status, ingested_at
+                           snapshot_path, status, ingested_at, last_known_app, last_known_window
                     FROM frames
                     WHERE timestamp > ?
                     ORDER BY timestamp DESC
@@ -594,6 +619,8 @@ class FramesStore:
                             "filename": f"{ts}.png",
                             "app_name": row["app_name"] or "",
                             "window_title": row["window_name"] or "",
+                            "last_known_app": row["last_known_app"] or "",
+                            "last_known_window": row["last_known_window"] or "",
                         }
                     )
         except sqlite3.Error as e:

@@ -139,6 +139,15 @@ class TriggerEvent:
         )
 
 
+@dataclass(frozen=True)
+class RoutedCaptureTask:
+    capture_trigger: CaptureTrigger
+    target_device_name: str
+    routing_topology_epoch: int
+    event_ts: str
+    routing_hints: EventPayload
+
+
 class TriggerDebouncer:
     def __init__(self, min_interval_ms: int) -> None:
         self._min_interval_ms: int = min_interval_ms

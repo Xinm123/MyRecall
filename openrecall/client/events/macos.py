@@ -225,6 +225,32 @@ class MacOSEventTap:
         return event
 
 
+def get_mouse_location() -> tuple[float, float] | None:
+    """Get current mouse cursor position."""
+    if Quartz is None:
+        return None
+    try:
+        create_source = getattr(Quartz, "CGEventSourceCreate", None)
+        hid_state = getattr(Quartz, "kCGEventSourceStateHIDSystemState", None)
+        create_event = getattr(Quartz, "CGEventCreate", None)
+        get_location = getattr(Quartz, "CGEventGetLocation", None)
+
+        if None in (create_source, hid_state, create_event, get_location):
+            return None
+
+        event_source = create_source(hid_state)  # type: ignore[misc]
+        if event_source is None:
+            return None
+        event = create_event(event_source)  # type: ignore[misc]
+        if event is None:
+            return None
+        point = get_location(event)  # type: ignore[misc]
+        return (float(point.x), float(point.y))
+    except Exception:
+        logger.debug("Failed to get mouse location")
+        return None
+
+
 def emit_app_switch(
     callback: Callable[[TriggerEvent], None], monitor: MonitorDescriptor
 ) -> None:
@@ -241,10 +267,10 @@ class MacOSAppSwitchMonitor:
     def __init__(
         self,
         callback: Callable[[TriggerEvent], None],
-        monitor_provider: Callable[[], MonitorDescriptor | None],
+        monitor_lookup: Callable[[float, float], MonitorDescriptor | None],
     ) -> None:
         self._callback = callback
-        self._monitor_provider = monitor_provider
+        self._monitor_lookup = monitor_lookup
         self._stop_event = threading.Event()
         self._thread: threading.Thread | None = None
         self._last_frontmost_app: str = ""
@@ -282,14 +308,22 @@ class MacOSAppSwitchMonitor:
             self._stop_event.wait(0.2)
 
     def _emit_app_switch(self, active_app: str) -> None:
-        monitor = self._monitor_provider()
-        if monitor is None:
-            return
+        # Use mouse position to determine which monitor has focus
+        # This fixes the issue where app_switch events were always
+        # attributed to the primary monitor even when focus was on another monitor
+        mouse_pos = get_mouse_location()
+        if mouse_pos is not None:
+            monitor = self._monitor_lookup(mouse_pos[0], mouse_pos[1])
+        else:
+            monitor = None
+
+        device_name = monitor.device_name if monitor else ""
+
         active_window = get_active_window_title() or None
         self._callback(
             TriggerEvent(
                 capture_trigger=CaptureTrigger.APP_SWITCH,
-                device_name=monitor.device_name,
+                device_name=device_name,
                 event_ts=utc_now_iso(),
                 active_app=active_app,
                 active_window=active_window,
@@ -311,3 +345,49 @@ def get_frontmost_app_name() -> str:
     except Exception:
         logger.exception("Failed to query frontmost application")
         return ""
+
+
+def get_active_app_monitor(
+    monitors: list[MonitorDescriptor],
+) -> MonitorDescriptor | None:
+    if Quartz is None:
+        return None
+
+    active_app = get_active_app_name() or get_frontmost_app_name()
+    if not active_app:
+        return None
+
+    try:
+        cg_window_list = getattr(Quartz, "CGWindowListCopyWindowInfo", None)
+        on_screen_only = getattr(Quartz, "kCGWindowListOptionOnScreenOnly", None)
+        null_window_id = getattr(Quartz, "kCGNullWindowID", None)
+
+        if None in (cg_window_list, on_screen_only, null_window_id):
+            return None
+
+        window_list = cg_window_list(on_screen_only, null_window_id)  # type: ignore[misc]
+
+        for window in window_list:
+            owner_name = window.get("kCGWindowOwnerName")
+            if owner_name != active_app:
+                continue
+
+            layer = window.get("kCGWindowLayer")
+            if layer != 0:
+                continue
+
+            bounds = window.get("kCGWindowBounds")
+            if bounds is None:
+                continue
+
+            center_x = bounds.get("X", 0) + bounds.get("Width", 0) / 2
+            center_y = bounds.get("Y", 0) + bounds.get("Height", 0) / 2
+
+            for monitor in monitors:
+                if monitor.contains_point(center_x, center_y):
+                    return monitor
+
+        return None
+    except Exception:
+        logger.debug("Failed to get active app monitor")
+        return None

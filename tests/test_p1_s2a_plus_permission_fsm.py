@@ -216,11 +216,8 @@ def test_blank_frame_warning_is_observational_only() -> None:
     before = recorder._last_permission_snapshot
 
     recorder._warn_if_blank_frame(
-        TriggerEvent(
-            capture_trigger=CaptureTrigger.CLICK,
-            device_name="monitor_1",
-            event_ts="2026-03-10T12:00:00Z",
-        ),
+        "monitor_1",
+        CaptureTrigger.CLICK,
         np.zeros((4, 4, 3), dtype=np.uint8),
     )
 

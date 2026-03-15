@@ -1,0 +1,70 @@
+[INFO] P1-S2b local gate started
+[INFO] run_ts=2026-03-15T08:55:07Z
+[INFO] window_id=p1-s2b-20260315T085507Z
+[INFO] edge_pid=unknown
+[INFO] base_url=http://localhost:8083
+[INFO] evidence_dir=docs/v3/acceptance/phase1/evidence
+[INFO] edge_db=/Users/pyw/MRS/db/edge.db
+[INFO] sample_seconds=8
+[INFO] topology_method=injected
+[INFO] git_rev=2f24af9
+[INFO] hostname=wangyipengdeMacBook-Pro.local
+..............                                                           [100%]
+14 passed in 0.38s
+....                                                                     [100%]
+4 passed in 0.27s
+...............................                                          [100%]
+31 passed in 4.13s
+.                                                                        [100%]
+1 passed in 0.36s
+.                                                                        [100%]
+1 passed in 0.33s
+.                                                                        [100%]
+1 passed in 0.36s
+.                                                                        [100%]
+1 passed in 0.28s
+.                                                                        [100%]
+1 passed in 0.38s
+.                                                                        [100%]
+1 passed in 0.38s
+.                                                                        [100%]
+1 passed in 0.35s
+.                                                                        [100%]
+1 passed in 0.28s
+.                                                                        [100%]
+1 passed in 0.31s
+.                                                                        [100%]
+1 passed in 0.31s
+{
+  "generated_at": "2026-03-15T08:55:26Z",
+  "method": "injected",
+  "notes": null,
+  "scenarios": {
+    "SC-T1": {
+      "name": "monitor_add",
+      "status": "pass"
+    },
+    "SC-T2": {
+      "name": "monitor_remove",
+      "status": "pass"
+    },
+    "SC-T3": {
+      "name": "primary_switch",
+      "status": "pass"
+    },
+    "SC-T4": {
+      "name": "monitor_recovery",
+      "status": "pass"
+    }
+  }
+}
+[INFO] Result: Pass
+[INFO] Evidence files:
+  - docs/v3/acceptance/phase1/evidence/p1-s2b-local-gate.log
+  - docs/v3/acceptance/phase1/evidence/p1-s2b-metrics.json
+  - docs/v3/acceptance/phase1/evidence/p1-s2b-health-snapshots.json
+  - docs/v3/acceptance/phase1/evidence/p1-s2b-spool-check.json
+  - docs/v3/acceptance/phase1/evidence/p1-s2b-context.json
+  - docs/v3/acceptance/phase1/evidence/p1-s2b-topology-evidence.json
+  - docs/v3/acceptance/phase1/evidence/p1-s2b-proof-samples.json
+  - docs/v3/acceptance/phase1/evidence/p1-s2b-ui-proof.md

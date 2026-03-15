@@ -370,7 +370,7 @@
         <template x-for="(entry, i) in entries" :key="entry.id ?? (entry.timestamp + '-' + i)">
           <article class="memory-card">
             <div class="card-header">
-              <span class="card-app" x-text="entry.app || 'Unknown'"></span>
+              <span class="card-app" x-text="entry.app || (entry.last_known_app ? entry.last_known_app + ' (idle)' : 'Unknown')" :title="entry.last_known_app ? 'Last known: ' + entry.last_known_app + (entry.last_known_window ? ' (' + entry.last_known_window + ')' : '') : ''"></span>
               <span class="card-time" x-text="formatTime(entry.timestamp)"></span>
             </div>
 

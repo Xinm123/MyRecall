@@ -355,14 +355,25 @@
     <article class="result-card">
       <!-- Card Header -->
       <div class="card-header">
-        <span class="card-app">{{ entry.app or 'Unknown' }}</span>
+        {% if entry.app %}
+          <span class="card-app">{{ entry.app }}</span>
+        {% elif entry.last_known_app %}
+          <span class="card-app" title="Last known app: {{ entry.last_known_app }} ({{ entry.last_known_window or 'Unknown' }})">{{ entry.last_known_app }} (idle)</span>
+        {% else %}
+          <span class="card-app">Unknown</span>
+        {% endif %}
         <span class="card-time">{{ entry.timestamp | datetime }}</span>
       </div>
       
       <!-- Card Image -->
+      {% if entry.frame_id %}
+      <img 
+        src="/v1/frames/{{ entry.frame_id }}" 
+      {% else %}
       {% set filename = entry.filename if entry.filename else ((entry.timestamp | int) ~ '.png') %}
       <img 
         src="/screenshots/{{ filename }}" 
+      {% endif %}
         alt="Screenshot" 
         class="card-image js-open-modal"
         loading="lazy"

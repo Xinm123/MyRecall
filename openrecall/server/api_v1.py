@@ -177,6 +177,7 @@ def ingest():
 
     # MIME type must be image/jpeg
     content_type = file_storage.content_type or ""
+
     # Strip parameters, e.g. "image/jpeg; charset=..."
     mime_type = content_type.split(";")[0].strip().lower()
     if mime_type != _ALLOWED_MIME_TYPE:
@@ -504,6 +505,7 @@ def health():
 
     failed_count = counts.get("failed", 0)
     permission_snapshot = runtime_settings.get_permission_snapshot()
+    capture_runtime_snapshot = runtime_settings.get_capture_runtime_snapshot()
     permission_status = permission_snapshot["capture_permission_status"]
     permission_reason = permission_snapshot["capture_permission_reason"]
     permission_degraded = (
@@ -548,5 +550,6 @@ def health():
                 "processing": counts.get("processing", 0),
                 "failed": failed_count,
             },
+            "capture_runtime": capture_runtime_snapshot,
         }
     )

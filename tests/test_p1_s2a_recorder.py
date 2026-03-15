@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import queue
+import time
 
 import pytest
 
@@ -40,58 +41,45 @@ def test_emit_manual_trigger_uses_shared_debounce_gate(monkeypatch):
 @pytest.mark.unit
 def test_wait_for_trigger_returns_idle_after_timeout(monkeypatch):
     recorder = ScreenRecorder()
+    # S2b: per-monitor idle scheduling - populate idle deadlines first
+    recorder._enabled_monitor_devices = {"monitor_1"}
+    recorder._idle_deadlines["monitor_1"] = time.time() - 1  # already due
 
     calls = {"n": 0}
 
     def _raise_empty(timeout: float):
-        assert timeout == 30.0
         calls["n"] += 1
-        if calls["n"] == 1:
-            raise queue.Empty
-        return recorder._trigger_channel.get_nowait()
+        raise queue.Empty
 
     monkeypatch.setattr(recorder._trigger_channel, "get", _raise_empty)
 
-    event = recorder._wait_for_trigger(
-        timeout_seconds=30.0, fallback_device_name="monitor_1"
-    )
+    event = recorder._wait_for_trigger(timeout_seconds=30.0)
 
     assert event.capture_trigger is CaptureTrigger.IDLE
     assert event.device_name == "monitor_1"
 
 
 @pytest.mark.unit
-def test_wait_for_trigger_applies_shared_debounce_to_idle(monkeypatch):
+def test_wait_for_trigger_applies_per_monitor_idle_scheduling(monkeypatch):
+    """S2b: per-monitor idle scheduling replaces global shared debounce."""
     recorder = ScreenRecorder()
 
-    recorder.emit_manual_trigger(
-        device_name="monitor_1",
-        now_ms=1000,
-        event_ts="2026-03-10T00:00:00Z",
-    )
-    _ = recorder._trigger_channel.get_nowait()
-
-    calls = {"n": 0}
+    # Setup: enable two monitors with different idle deadlines
+    recorder._enabled_monitor_devices = {"monitor_1", "monitor_2"}
+    now = time.time()
+    recorder._idle_deadlines["monitor_1"] = now - 1  # already due
+    recorder._idle_deadlines["monitor_2"] = now + 30  # not due yet
 
     def _raise_empty(timeout: float):
-        calls["n"] += 1
-        if calls["n"] == 1:
-            monkeypatch.setattr("openrecall.client.recorder.time.time", lambda: 1.5)
-            raise queue.Empty
-        if calls["n"] == 2:
-            monkeypatch.setattr("openrecall.client.recorder.time.time", lambda: 2.0)
-            raise queue.Empty
-        return recorder._trigger_channel.get_nowait()
+        raise queue.Empty
 
     monkeypatch.setattr(recorder._trigger_channel, "get", _raise_empty)
 
-    event = recorder._wait_for_trigger(
-        timeout_seconds=30.0, fallback_device_name="monitor_1"
-    )
+    event = recorder._wait_for_trigger(timeout_seconds=30.0)
 
+    # Should return IDLE for monitor_1 (the only due monitor)
     assert event.capture_trigger is CaptureTrigger.IDLE
     assert event.device_name == "monitor_1"
-    assert calls["n"] == 3
 
 
 @pytest.mark.unit
@@ -223,9 +211,9 @@ def test_start_event_sources_wires_both_macos_emitters(monkeypatch):
             started.append("tap")
 
     class _FakeSwitchMonitor:
-        def __init__(self, callback, monitor_provider):
+        def __init__(self, callback, monitor_lookup):
             self.callback = callback
-            self.monitor_provider = monitor_provider
+            self.monitor_lookup = monitor_lookup
 
         def start(self):
             started.append("switch")

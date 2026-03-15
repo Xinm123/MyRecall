@@ -1,6 +1,7 @@
 import logging
 import os
 import queue
+import threading
 import time
 from collections.abc import Callable
 
@@ -14,14 +15,20 @@ from openrecall.client.events.base import (
     CaptureTrigger,
     MonitorDescriptor,
     MonitorRegistry,
+    RoutedCaptureTask,
     TriggerDebouncer,
     TriggerEvent,
     TriggerEventChannel,
     TriggerEventSnapshot,
     utc_now_iso,
 )
-from openrecall.client.events.macos import get_frontmost_app_name, list_monitors
-from openrecall.client.events.macos import MacOSAppSwitchMonitor, MacOSEventTap
+from openrecall.client.events.macos import (
+    get_active_app_monitor,
+    get_frontmost_app_name,
+    list_monitors,
+    MacOSAppSwitchMonitor,
+    MacOSEventTap,
+)
 from openrecall.client.events.permissions import (
     PermissionCheckResult,
     PermissionSnapshot,
@@ -208,6 +215,22 @@ class ScreenRecorder:
         self._trigger_queue_peak: int = 0
         self._spool_peak: int = 0
 
+        self._topology_epoch: int = 0
+        self._enabled_monitor_devices: set[str] = set()
+        self._idle_deadlines: dict[str, float] = {}
+        self._idle_deadlines_lock: threading.Lock = threading.Lock()
+        self._idle_interval_seconds: float = settings.idle_capture_interval_ms / 1000.0
+        self._monitor_last_context: dict[str, tuple[str, str, float]] = {}
+        self._last_capture_outcome: dict[str, object] = {
+            "outcome": "init",
+            "trigger": None,
+            "target_device_name": None,
+            "reason": "startup",
+            "routing_topology_epoch": 0,
+            "event_ts": None,
+            "timestamp": utc_now_iso(),
+        }
+
     def start(self) -> None:
         """Start the consumer thread."""
         if self.consumer is not None and not self.consumer.is_alive():
@@ -247,6 +270,12 @@ class ScreenRecorder:
                         "overflow_drop_count": snapshot.overflow_drop_count,
                     }
                 )
+            payload["capture_runtime"] = {
+                "topology_epoch": self._topology_epoch,
+                "primary_monitor_only": settings.primary_monitor_only,
+                "active_monitors": sorted(self._enabled_monitor_devices),
+                "last_capture_outcome": dict(self._last_capture_outcome),
+            }
 
             response = requests.post(
                 url,
@@ -317,15 +346,25 @@ class ScreenRecorder:
 
     def emit_manual_trigger(
         self,
-        device_name: str,
+        device_name: str | None = None,
         *,
         now_ms: int | None = None,
         event_ts: str | None = None,
     ) -> bool:
+        """Emit a manual capture trigger.
+
+        Args:
+            device_name: Target monitor name. None (default) uses primary monitor.
+            now_ms: Optional timestamp in milliseconds.
+            event_ts: Optional ISO timestamp string.
+
+        Returns:
+            True if trigger was accepted, False if debounced.
+        """
         return self._emit_trigger(
             TriggerEvent(
                 capture_trigger=CaptureTrigger.MANUAL,
-                device_name=device_name,
+                device_name=device_name or "",
                 event_ts=event_ts or utc_now_iso(),
             ),
             now_ms=now_ms,
@@ -345,13 +384,43 @@ class ScreenRecorder:
             self._spool_uploader.join(timeout=2.0)
 
     def _refresh_monitors(self) -> list[MonitorDescriptor]:
-        previous_snapshot = self._monitor_registry.snapshot()
         monitors = list_monitors(settings.primary_monitor_only)
+        self._refresh_routing_state(monitors)
+        return monitors
+
+    def _refresh_routing_state(
+        self,
+        monitors: list[MonitorDescriptor],
+        *,
+        now_epoch: float | None = None,
+    ) -> None:
+        now = time.time() if now_epoch is None else now_epoch
+        previous_snapshot = self._monitor_registry.snapshot()
         self._monitor_registry.refresh(monitors)
-        if previous_snapshot != self._monitor_registry.snapshot():
+        current_snapshot = self._monitor_registry.snapshot()
+
+        if previous_snapshot != current_snapshot:
+            self._topology_epoch += 1
             self._trigger_debouncer.reset_all()
             self._warned_blank_devices.clear()
-        return monitors
+
+        previous_devices = set(self._enabled_monitor_devices)
+        current_devices = {monitor.device_name for monitor in monitors}
+        removed = previous_devices - current_devices
+        added = current_devices - previous_devices
+
+        for device_name in removed:
+            self._idle_deadlines.pop(device_name, None)
+
+        for device_name in added:
+            self._idle_deadlines[device_name] = now + self._idle_interval_seconds
+
+        for device_name in current_devices & previous_devices:
+            self._idle_deadlines.setdefault(
+                device_name, now + self._idle_interval_seconds
+            )
+
+        self._enabled_monitor_devices = current_devices
 
     def _primary_monitor(self) -> MonitorDescriptor | None:
         monitors = self._monitor_registry.list_monitors()
@@ -372,7 +441,7 @@ class ScreenRecorder:
         if self._app_switch_monitor is None:
             self._app_switch_monitor = MacOSAppSwitchMonitor(
                 callback=self._handle_external_trigger,
-                monitor_provider=self._primary_monitor,
+                monitor_lookup=self._monitor_registry.match_point,
             )
             self._app_switch_monitor.start()
 
@@ -411,19 +480,58 @@ class ScreenRecorder:
         self,
         *,
         timeout_seconds: float,
-        fallback_device_name: str,
     ) -> TriggerEvent:
         while True:
             try:
                 return self._trigger_channel.get(timeout=timeout_seconds)
             except queue.Empty:
-                idle_event = TriggerEvent(
+                due_monitors = self._next_idle_due_monitors(now_epoch=time.time())
+                if not due_monitors:
+                    timeout_seconds = self._get_next_idle_timeout(now_epoch=time.time())
+                    continue
+                first_monitor = due_monitors[0]
+                for device_name in due_monitors[1:]:
+                    idle_event = TriggerEvent(
+                        capture_trigger=CaptureTrigger.IDLE,
+                        device_name=device_name,
+                        event_ts=utc_now_iso(),
+                    )
+                    _ = self._emit_trigger(idle_event)
+                return TriggerEvent(
                     capture_trigger=CaptureTrigger.IDLE,
-                    device_name=fallback_device_name,
+                    device_name=first_monitor,
                     event_ts=utc_now_iso(),
                 )
-                _ = self._emit_trigger(idle_event)
-                continue
+
+    def _next_idle_due_monitors(self, *, now_epoch: float) -> list[str]:
+        due: list[tuple[str, float]] = []
+        with self._idle_deadlines_lock:
+            for device_name in sorted(self._enabled_monitor_devices):
+                deadline = self._idle_deadlines.get(device_name)
+                if deadline is None:
+                    self._idle_deadlines[device_name] = (
+                        now_epoch + self._idle_interval_seconds
+                    )
+                    continue
+                if deadline <= now_epoch:
+                    due.append((device_name, deadline))
+        if not due:
+            return []
+        due.sort(key=lambda item: item[1])
+        return [item[0] for item in due]
+
+    def _get_next_idle_timeout(self, *, now_epoch: float) -> float:
+        min_deadline: float | None = None
+        with self._idle_deadlines_lock:
+            for device_name in self._enabled_monitor_devices:
+                deadline = self._idle_deadlines.get(device_name)
+                if deadline is not None:
+                    if min_deadline is None or deadline < min_deadline:
+                        min_deadline = deadline
+        if min_deadline is None:
+            return self._idle_interval_seconds
+        timeout = min_deadline - now_epoch
+        return max(0.1, min(timeout, self._idle_interval_seconds))
 
     def _snapshot_active_context(self) -> tuple[str, str]:
         active_app = get_active_app_name() or get_frontmost_app_name()
@@ -432,25 +540,186 @@ class ScreenRecorder:
 
     def _build_capture_metadata(
         self,
-        event: TriggerEvent,
+        routed_task: RoutedCaptureTask | TriggerEvent,
         *,
         context_active_app: str,
         context_active_window: str,
-    ) -> dict[str, str]:
-        if event.capture_trigger is CaptureTrigger.APP_SWITCH:
-            active_app = event.active_app or context_active_app
-            active_window = event.active_window or context_active_window
-        else:
-            active_app = context_active_app or event.active_app
-            active_window = context_active_window or event.active_window
+        focused_monitor_device_name: str | None = None,
+    ) -> dict[str, str | None]:
+        if isinstance(routed_task, TriggerEvent):
+            if routed_task.capture_trigger is CaptureTrigger.APP_SWITCH:
+                active_app = routed_task.active_app or context_active_app
+                active_window = routed_task.active_window or context_active_window
+            else:
+                active_app = context_active_app or routed_task.active_app
+                active_window = context_active_window or routed_task.active_window
+            return {
+                "timestamp": utc_now_iso(),
+                "capture_trigger": routed_task.capture_trigger.value,
+                "device_name": routed_task.device_name,
+                "event_ts": routed_task.event_ts,
+                "active_app": active_app,
+                "active_window": active_window,
+                "app_name": active_app,
+                "window_name": active_window,
+            }
+
+        app_name: str | None = None
+        window_name: str | None = None
+        if focused_monitor_device_name == routed_task.target_device_name:
+            app_name = context_active_app or None
+            window_name = context_active_window or None
+
+        last_known_app: str | None = None
+        last_known_window: str | None = None
+        if (
+            routed_task.capture_trigger is CaptureTrigger.IDLE
+            and routed_task.target_device_name in self._monitor_last_context
+        ):
+            last_ctx = self._monitor_last_context[routed_task.target_device_name]
+            if time.time() - last_ctx[2] < 300:
+                last_known_app = last_ctx[0]
+                last_known_window = last_ctx[1]
+
         return {
             "timestamp": utc_now_iso(),
-            "capture_trigger": event.capture_trigger.value,
-            "device_name": event.device_name,
-            "event_ts": event.event_ts,
-            "active_app": active_app or "Unknown App",
-            "active_window": active_window or "Unknown Title",
+            "capture_trigger": routed_task.capture_trigger.value,
+            "device_name": routed_task.target_device_name,
+            "event_ts": routed_task.event_ts,
+            "app_name": app_name,
+            "window_name": window_name,
+            "active_app": app_name,
+            "active_window": window_name,
+            "last_known_app": last_known_app,
+            "last_known_window": last_known_window,
         }
+
+    def _route_targets(
+        self,
+        *,
+        capture_trigger: CaptureTrigger,
+        target_device_names: list[str],
+        event_ts: str,
+        hints: dict[str, object],
+    ) -> list[RoutedCaptureTask]:
+        routed: list[RoutedCaptureTask] = []
+        for target_device_name in target_device_names:
+            if target_device_name not in self._enabled_monitor_devices:
+                self._last_capture_outcome = {
+                    "outcome": "routing_filtered",
+                    "trigger": capture_trigger.value,
+                    "target_device_name": target_device_name,
+                    "reason": str(hints.get("reason") or "target_not_enabled"),
+                    "routing_topology_epoch": self._topology_epoch,
+                    "event_ts": event_ts,
+                    "timestamp": utc_now_iso(),
+                }
+                logger.info(
+                    "routing_filtered trigger=%s target_device=%s reason=%s",
+                    capture_trigger.value,
+                    target_device_name,
+                    self._last_capture_outcome["reason"],
+                )
+                continue
+            routed.append(
+                RoutedCaptureTask(
+                    capture_trigger=capture_trigger,
+                    target_device_name=target_device_name,
+                    routing_topology_epoch=self._topology_epoch,
+                    event_ts=event_ts,
+                    routing_hints=dict(hints),  # Copy to prevent external mutation
+                )
+            )
+        return routed
+
+    def _route_trigger(self, event: TriggerEvent) -> list[RoutedCaptureTask]:
+        if not self._enabled_monitor_devices:
+            return []
+
+        primary_monitor = self._primary_monitor()
+        if primary_monitor is None:
+            return []
+
+        if event.capture_trigger is CaptureTrigger.CLICK:
+            targets = [event.device_name]
+        elif event.capture_trigger is CaptureTrigger.APP_SWITCH:
+            targets = [event.device_name or primary_monitor.device_name]
+        elif event.capture_trigger is CaptureTrigger.IDLE:
+            targets = [event.device_name]
+        else:
+            targets = [event.device_name or primary_monitor.device_name]
+
+        if event.capture_trigger is CaptureTrigger.IDLE:
+            all_monitors = self._monitor_registry.list_monitors()
+            active_app_monitor = get_active_app_monitor(all_monitors)
+            focused_device_name = (
+                active_app_monitor.device_name
+                if active_app_monitor
+                else primary_monitor.device_name
+            )
+        else:
+            focused_device_name = event.device_name or primary_monitor.device_name
+
+        return self._route_targets(
+            capture_trigger=event.capture_trigger,
+            target_device_names=[target for target in targets if target],
+            event_ts=event.event_ts,
+            hints={
+                "active_app": event.active_app,
+                "active_window": event.active_window,
+                "focused_device_name": focused_device_name,
+                "reason": "primary_monitor_only"
+                if settings.primary_monitor_only
+                else "multi_monitor_mode",
+            },
+        )
+
+    def _validate_routed_task(self, routed_task: RoutedCaptureTask) -> bool:
+        if routed_task.routing_topology_epoch != self._topology_epoch:
+            self._last_capture_outcome = {
+                "outcome": "stale_routed_task",
+                "trigger": routed_task.capture_trigger.value,
+                "target_device_name": routed_task.target_device_name,
+                "reason": "topology_epoch_mismatch",
+                "routing_topology_epoch": routed_task.routing_topology_epoch,
+                "active_topology_epoch": self._topology_epoch,
+                "event_ts": routed_task.event_ts,
+                "timestamp": utc_now_iso(),
+            }
+            return False
+
+        if routed_task.target_device_name not in self._enabled_monitor_devices:
+            self._last_capture_outcome = {
+                "outcome": "stale_routed_task",
+                "trigger": routed_task.capture_trigger.value,
+                "target_device_name": routed_task.target_device_name,
+                "reason": "target_not_enabled",
+                "routing_topology_epoch": routed_task.routing_topology_epoch,
+                "active_topology_epoch": self._topology_epoch,
+                "event_ts": routed_task.event_ts,
+                "timestamp": utc_now_iso(),
+            }
+            return False
+
+        return True
+
+    def _capture_single_monitor(self, monitor: MonitorDescriptor) -> ImageArray:
+        captures = self._capture_monitors([monitor])
+        screenshot = captures.get(monitor.device_name)
+        if screenshot is None:
+            raise RuntimeError(
+                f"capture missing for target monitor {monitor.device_name}"
+            )
+        return screenshot
+
+    def _on_capture_completed(
+        self, target_device_name: str, *, now_epoch: float
+    ) -> None:
+        with self._idle_deadlines_lock:
+            if target_device_name in self._enabled_monitor_devices:
+                self._idle_deadlines[target_device_name] = (
+                    now_epoch + self._idle_interval_seconds
+                )
 
     def _capture_monitors(
         self,
@@ -477,16 +746,29 @@ class ScreenRecorder:
             PermissionCheckResult(ok=False, reason=reason)
         )
 
-    def _warn_if_blank_frame(self, event: TriggerEvent, screenshot: ImageArray) -> None:
-        if event.device_name in self._warned_blank_devices:
+    def _warn_if_blank_frame(
+        self, device_name: str, trigger: CaptureTrigger, screenshot: ImageArray
+    ) -> None:
+        """Warn if the captured frame appears blank (possible permission issue).
+
+        Args:
+            device_name: The name of the target device
+            trigger: The capture trigger enum
+            screenshot: The captured screenshot as numpy array
+        """
+        if not device_name:
+            device_name = "unknown"
+
+        if device_name in self._warned_blank_devices:
             return
         if float(np.mean(screenshot)) >= 1.0 or float(np.std(screenshot)) >= 1.0:
             return
 
-        self._warned_blank_devices.add(event.device_name)
+        self._warned_blank_devices.add(device_name)
         logger.warning(
-            "Captured frames look blank for %s. permission_status=%s permission_reason=%s",
-            event.device_name,
+            "Captured frames look blank for %s. trigger=%s permission_status=%s permission_reason=%s",
+            device_name,
+            trigger.value,
             self._last_permission_snapshot.status.value,
             self._last_permission_snapshot.reason,
         )
@@ -552,26 +834,37 @@ class ScreenRecorder:
                 time.sleep(1)
                 continue
 
-            fallback_device_name = monitors[0].device_name
+            idle_timeout = self._get_next_idle_timeout(now_epoch=time.time())
             event = self._wait_for_trigger(
-                timeout_seconds=settings.idle_capture_interval_ms / 1000.0,
-                fallback_device_name=fallback_device_name,
+                timeout_seconds=idle_timeout,
             )
 
-            screenshots = self._capture_monitors(monitors)
-            screenshot = screenshots.get(event.device_name)
-            if screenshot is None:
-                logger.warning(
-                    "Skipping trigger %s because device_name %s is unavailable",
-                    event.capture_trigger.value,
-                    event.device_name,
-                )
-                self._monitor_registry.drop(event.device_name)
-                self._trigger_debouncer.reset_device(event.device_name)
+            routed_tasks = self._route_trigger(event)
+            if not routed_tasks:
+                continue
+
+            routed_task = routed_tasks[0]
+            if not self._validate_routed_task(routed_task):
+                continue
+
+            monitor = self._monitor_registry.get(routed_task.target_device_name)
+            if monitor is None:
+                self._monitor_registry.drop(routed_task.target_device_name)
+                self._trigger_debouncer.reset_device(routed_task.target_device_name)
+                self._last_capture_outcome = {
+                    "outcome": "routing_filtered",
+                    "trigger": routed_task.capture_trigger.value,
+                    "target_device_name": routed_task.target_device_name,
+                    "reason": "monitor_not_available",
+                    "routing_topology_epoch": routed_task.routing_topology_epoch,
+                    "event_ts": routed_task.event_ts,
+                    "timestamp": utc_now_iso(),
+                }
                 continue
 
             try:
                 capture_start_time = time.time()
+                screenshot = self._capture_single_monitor(monitor)
                 image = Image.fromarray(screenshot)
                 if settings.client_save_local_screenshots:
                     file_tag = int(time.time())
@@ -582,17 +875,50 @@ class ScreenRecorder:
                     self._snapshot_active_context()
                 )
                 metadata = self._build_capture_metadata(
-                    event,
+                    routed_task,
                     context_active_app=context_active_app,
                     context_active_window=context_active_window,
+                    focused_monitor_device_name=str(
+                        routed_task.routing_hints.get("focused_device_name") or ""
+                    ),
                 )
                 self._spool.enqueue(image, metadata)
-                self._warn_if_blank_frame(event, screenshot)
+
+                if routed_task.capture_trigger in (
+                    CaptureTrigger.CLICK,
+                    CaptureTrigger.APP_SWITCH,
+                ):
+                    app_name = metadata.get("app_name")
+                    window_name = metadata.get("window_name")
+                    if app_name and window_name:
+                        self._monitor_last_context[routed_task.target_device_name] = (
+                            str(app_name),
+                            str(window_name),
+                            time.time(),
+                        )
+
+                self._warn_if_blank_frame(
+                    routed_task.target_device_name,
+                    routed_task.capture_trigger,
+                    screenshot,
+                )
+                self._on_capture_completed(
+                    routed_task.target_device_name,
+                    now_epoch=time.time(),
+                )
+                self._last_capture_outcome = {
+                    "outcome": "capture_completed",
+                    "trigger": routed_task.capture_trigger.value,
+                    "target_device_name": routed_task.target_device_name,
+                    "reason": "ok",
+                    "routing_topology_epoch": routed_task.routing_topology_epoch,
+                    "event_ts": routed_task.event_ts,
+                    "timestamp": metadata.get("timestamp"),
+                }
 
                 latency_ms = int((time.time() - capture_start_time) * 1000)
                 trigger_queue_depth = self.trigger_channel_snapshot().queue_depth
                 spool_depth = self._spool.count()
-                monitor = self._monitor_registry.get(event.device_name)
                 monitor_info = (
                     f"primary {monitor.width}x{monitor.height}"
                     if monitor and monitor.is_primary
@@ -601,7 +927,7 @@ class ScreenRecorder:
                     else "unknown"
                 )
 
-                self._capture_counts[event.capture_trigger] += 1
+                self._capture_counts[routed_task.capture_trigger] += 1
                 self._latency_samples.append(latency_ms)
                 self._trigger_queue_peak = max(
                     self._trigger_queue_peak, trigger_queue_depth
@@ -610,10 +936,10 @@ class ScreenRecorder:
 
                 logger.debug(
                     "📸 trigger=%s device=%s app=%s window=%s latency_ms=%d trigger_queue=%d spool=%d monitor=%s",
-                    event.capture_trigger.value,
-                    event.device_name,
-                    metadata.get("active_app", "Unknown"),
-                    metadata.get("active_window", "Unknown"),
+                    routed_task.capture_trigger.value,
+                    routed_task.target_device_name,
+                    metadata.get("app_name"),
+                    metadata.get("window_name"),
                     latency_ms,
                     trigger_queue_depth,
                     spool_depth,

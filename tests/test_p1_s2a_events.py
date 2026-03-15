@@ -243,7 +243,7 @@ def test_app_switch_monitor_emits_when_frontmost_app_changes(monkeypatch):
 
     monitor_thread = macos.MacOSAppSwitchMonitor(
         callback=lambda event: events.append(event),
-        monitor_provider=lambda: monitor,
+        monitor_lookup=lambda _x, _y: monitor,
     )
 
     monkeypatch.setattr(macos, "get_active_app_name", _next_app)

@@ -549,3 +549,57 @@ def test_layout_health_polling_handles_permission_payload() -> None:
     assert "capture_permission_reason" in content
     assert "stale_permission_state" in content
     assert "权限异常" in content or "权限恢复中" in content
+
+
+@pytest.mark.unit
+def test_heartbeat_capture_runtime_is_mirrored_to_health(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class _FakeStore:
+        @staticmethod
+        def get_last_frame_timestamp() -> str | None:
+            return "2026-03-10T12:00:00Z"
+
+        @staticmethod
+        def get_last_frame_ingested_at() -> str | None:
+            return iso_seconds_ago(1)
+
+        @staticmethod
+        def get_queue_counts() -> dict[str, int]:
+            return {"pending": 0, "processing": 0, "failed": 0}
+
+    app = Flask(__name__)
+    app.register_blueprint(api.api_bp)
+    app.register_blueprint(api_v1.v1_bp)
+    client = app.test_client()
+
+    heartbeat = client.post(
+        "/api/heartbeat",
+        json={
+            "capture_runtime": {
+                "topology_epoch": 3,
+                "primary_monitor_only": True,
+                "active_monitors": ["monitor_display-a"],
+                "last_capture_outcome": {
+                    "outcome": "routing_filtered",
+                    "trigger": "app_switch",
+                    "target_device_name": "monitor_display-b",
+                    "reason": "primary_monitor_only",
+                },
+            }
+        },
+    )
+    assert heartbeat.status_code == 200
+
+    monkeypatch.setattr(api_v1, "_get_frames_store", lambda: _FakeStore())
+    health = client.get("/v1/health")
+
+    assert health.status_code == 200
+    payload = health.get_json()
+    assert payload["capture_runtime"]["topology_epoch"] == 3
+    assert payload["capture_runtime"]["primary_monitor_only"] is True
+    assert payload["capture_runtime"]["active_monitors"] == ["monitor_display-a"]
+    assert (
+        payload["capture_runtime"]["last_capture_outcome"]["outcome"]
+        == "routing_filtered"
+    )

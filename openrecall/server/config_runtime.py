@@ -93,6 +93,13 @@ class RuntimeSettings:
         self.overflow_drop_count: int = 0
         self._trigger_channel_samples: deque[dict[str, object]] = deque()
 
+        self.capture_runtime_topology_epoch: int = 0
+        self.capture_runtime_primary_monitor_only: bool = False
+        self.capture_runtime_active_monitors: list[str] = []
+        self.capture_runtime_last_capture_outcome: dict[str, object] = {
+            "outcome": "init"
+        }
+
         self._lock: threading.RLock = threading.RLock()
         self._change_event: threading.Event = threading.Event()
 
@@ -117,6 +124,7 @@ class RuntimeSettings:
                 "queue_capacity": self.queue_capacity,
                 "collapse_trigger_count": self.collapse_trigger_count,
                 "overflow_drop_count": self.overflow_drop_count,
+                "capture_runtime": self.get_capture_runtime_snapshot(),
             }
 
     def _prune_trigger_channel_samples(self, now_epoch: float) -> None:
@@ -179,6 +187,29 @@ class RuntimeSettings:
                 )
                 self._prune_trigger_channel_samples(now)
 
+            capture_runtime = payload.get("capture_runtime")
+            if isinstance(capture_runtime, dict):
+                topology_epoch = _coerce_int(capture_runtime.get("topology_epoch"))
+                if topology_epoch is not None:
+                    self.capture_runtime_topology_epoch = topology_epoch
+
+                primary_only = capture_runtime.get("primary_monitor_only")
+                self.capture_runtime_primary_monitor_only = bool(primary_only)
+
+                active_monitors = capture_runtime.get("active_monitors")
+                if isinstance(active_monitors, list):
+                    self.capture_runtime_active_monitors = [
+                        str(device_name)
+                        for device_name in active_monitors
+                        if str(device_name).strip()
+                    ]
+
+                last_capture_outcome = capture_runtime.get("last_capture_outcome")
+                if isinstance(last_capture_outcome, dict):
+                    self.capture_runtime_last_capture_outcome = dict(
+                        last_capture_outcome
+                    )
+
     def get_permission_snapshot(
         self, *, now_epoch: float | None = None
     ) -> dict[str, object]:
@@ -219,6 +250,15 @@ class RuntimeSettings:
         with self._lock:
             self._prune_trigger_channel_samples(now)
             return list(self._trigger_channel_samples)
+
+    def get_capture_runtime_snapshot(self) -> dict[str, object]:
+        with self._lock:
+            return {
+                "topology_epoch": self.capture_runtime_topology_epoch,
+                "primary_monitor_only": self.capture_runtime_primary_monitor_only,
+                "active_monitors": list(self.capture_runtime_active_monitors),
+                "last_capture_outcome": dict(self.capture_runtime_last_capture_outcome),
+            }
 
     def notify_change(self) -> None:
         self._change_event.set()
