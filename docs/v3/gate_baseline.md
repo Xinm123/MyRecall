@@ -140,8 +140,66 @@ references:
 - 最小场景集：至少覆盖 monitor 增加、移除、primary 切换、monitor 不可用恢复各 `>= 1` 次
 
 11. `Host CPU`（Soft KPI，non-blocking）
-- 说明：CPU 使用率仅用于趋势观测与容量评估，不作为跨设备 Gate 判定条件。
-- 记录要求：验收报告需附硬件基线（机型/芯片/核心数）与负载背景（后台任务、显示器配置）。
+ - 说明：CPU 使用率仅用于趋势观测与容量评估，不作为跨设备 Gate 判定条件。
+ - 记录要求：验收报告需附硬件基线（机型/芯片/核心数）与负载背景（后台任务、显示器配置）。
+
+## 3.2.1 相似帧丢弃与检测（P1-S2b+）
+
+- 目的：定义 P1-S2b+ 阶段 simhash 计算、相似帧检测与丢弃的 Gate 指标口径。
+- 适用范围：P1-S2b+ 为可选增强阶段，其 Hard Gate 仅在阶段内自洽判定，不构成 S3 Entry Gate。
+
+判定类型与阈值（P1-S2b+）：
+
+1. `simhash_computation_rate`（Hard Gate）
+- 公式：`simhash_computation_rate = (成功计算 simhash 的 capture 数 / 尝试计算的 capture 总数) * 100%`
+- 阈值：`= 100%`
+- 说明：计算失败不得阻断 capture 流程，但需记录错误日志
+
+2. `spool_integration_rate`（Hard Gate）
+- 公式：`spool_integration_rate = (simhash 成功集成到 spool 流程的 capture 数 / capture 总数) * 100%`
+- 阈值：`= 100%`
+- 验证方式：入库帧的 `frames.simhash` 字段非空
+
+3. `simhash_detection_accuracy`（Hard Gate）
+- 公式：`accuracy = (TP + TN) / (TP + TN + FP + FN) * 100%`
+- 定义：
+  - TP: 实际相似且判定为相似（汉明距离 <= 8 bits）
+  - TN: 实际不相似且判定为不相似（汉明距离 > 8 bits）
+  - FP: 实际不相似但判定为相似（误报）
+  - FN: 实际相似但判定为不相似（漏报）
+- 阈值：`>= 95%`
+- 最小样本：相似样本 >= 20 对，不相似样本 >= 20 对
+
+4. `similar_frame_skip_accuracy`（Hard Gate）
+- 公式：`skip_accuracy = (正确丢弃的相似帧数 / 判定为相似并丢弃的帧总数) * 100%`
+- 阈值：`>= 95%`
+- 验证方式：构造已知相似的帧序列，验证被正确丢弃
+
+5. `dissimilar_frame_misdrop_rate`（Hard Gate）
+- 公式：`misdrop_rate = (被误丢弃的不相似帧数 / 不相似帧总数) * 100%`
+- 阈值：`<= 5%`
+- 验证方式：构造已知不相似的帧序列，验证未被误丢弃
+
+6. `simhash_cache_correctness`（Hard Gate）
+- 公式：`cache_correctness = (入库帧的 simhash 正确写入缓存的次数 / 入库帧总数) * 100%`
+- 阈值：`= 100%`
+- 验证方式：检查 SimhashCache 状态与入库帧的 simhash 一致性
+
+配置参数（SSOT）：
+
+| 参数 | 默认值 | 环境变量 | 说明 |
+|------|--------|----------|------|
+| `simhash_dedup_enabled` | `true` | `OPENRECALL_SIMHASH_DEDUP_ENABLED` | 是否启用相似帧丢弃 |
+| `simhash_dedup_threshold` | `8` | `OPENRECALL_SIMHASH_DEDUP_THRESHOLD` | 汉明距离阈值（<= 此值判定为相似） |
+| `simhash_cache_size_per_device` | `1` | `OPENRECALL_SIMHASH_CACHE_SIZE` | 每个 device 保留的最近帧数 |
+
+Soft KPI（non-blocking）：
+
+| 指标 | 说明 |
+|------|------|
+| `simhash_compute_latency_p95` | simhash 计算耗时分布（P50/P90/P95/P99） |
+| `storage_saving_rate` | 存储节省率 = 丢弃帧数 / 总触发帧数 |
+| `memory_overhead` | SciPy 加载 + SimhashCache 内存增量 |
 
 ## 3.3 UI 健康态/错误态展示通过率（P1-S1）
 

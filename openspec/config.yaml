@@ -1,18 +1,17 @@
 schema: spec-driven
 context: |
   Project: MyRecall-v3 (Edge-centric, vision-only, OCR-only). Reference repo: _ref/screenpipe
-  Current substage: P1-S2b (Capture Completion / Monitor-Aware Coordination)
-  ADR: docs/v3/adr/ADR-0013-event-driven-ax-split.md (historical split record; OQ-043 freezes v3 mainline as OCR-only and keeps P1-S2b as the active capture-completion stage)
+  Current substage: P1-S2b+ (Simhash Similarity Detection / 感知哈希辅助检测)
 
   Source precedence (MUST follow; do not invent local reinterpretation):
-  - docs/v3/spec.md - 架构与 frozen behavior SSOT
+  - docs/v3/spec.md - 架构与 frozen behavior SSOT (includes Two-layer Discard Logic)
   - docs/v3/data-model.md - payload/data contract consequences
-  - docs/v3/open_questions.md - 已冻结决策与 ownership boundary (OQ-043 OCR-only)
-  - docs/v3/acceptance/phase1/p1-s2b.md - current substage contract, evidence, executable scenarios
+  - docs/v3/open_questions.md - 已冻结决策与 ownership boundary
+  - docs/v3/acceptance/phase1/p1-s2b-plus.md - current substage contract, evidence, executable scenarios
   - docs/v3/gate_baseline.md - Gate/SLO formulas, thresholds, sample rules
 
   Supplemental references (use only for their own scope):
-  - docs/v3/acceptance/phase1/p1-s2a-plus.md - S2b entry prerequisite only
+  - docs/v3/acceptance/phase1/p1-s2b.md - S2b+ entry prerequisite and frozen capture baseline
   - docs/v3/acceptance/phase1/p1-s3.md - downstream handoff boundary
   - docs/v3/http_contract_ledger.md - external HTTP delta
   - docs/v3/roadmap.md - planning context only; not behavior SSOT
@@ -20,12 +19,12 @@ context: |
   Precedence rule: higher-priority docs win over lower-priority docs; all docs win over this config.
   Conflict rule: if sources conflict, cite the higher-priority source and surface the conflict; do not synthesize a new rule.
 
-  Scope invariants (P1-S2b):
-  - Vision-only for P1-P3 (no audio); macOS-only for P1 (Windows/Linux deferred to P2).
+  Scope invariants (P1-S2b+):
+  - Vision-only for P1-P3; macOS-only for P1.
   - Python implementation (ADR-0013).
-  - OCR-only mainline (OQ-043): v3主线收口为OCR-only, AX主链路defer到v4。
-  - P1-S2b owns capture completion only: trigger routing, monitor-aware coordination, device_name binding, focused-context freeze, topology rebuild, spool/ingest handoff.
-
+  - OCR-only mainline (OQ-043).
+  - P1-S2b+ owns: PHash-based simhash computation, in-memory SimhashCache, similarity detection, pre-spool frame dropping, and heartbeat fallback.
+  - Architectural boundary: Simhash frame drop happens BEFORE spool enqueue and capture_id generation.
 
 rules:
   proposal:

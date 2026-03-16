@@ -126,29 +126,36 @@ references:
   - Exit to：P1-S3（主线必经）；P1-S2b+（可选增强）
 
 - P1-S2b+（感知哈希实现，2026-03-13 ~ 2026-03-14）
-  - **说明**：S2b 之后的可选增强阶段；用于补充内容相似度观测/工具能力，不阻塞 OCR-only 主线进入 S3
+  - **说明**：S2b 之后的可选增强阶段；用于实现相似帧丢弃以节省存储空间，不阻塞 OCR-only 主线进入 S3
   - 范围：
-    - 感知哈希（simhash）计算实现（DHash 算法）
-    - Spool 层集成：capture 入队时计算 simhash，失败阻断
-    - `frames.simhash` 字段写入（schema 已预留）
-    - 相似帧检测逻辑：基于汉明距离的相似性检测与观测
+    - 感知哈希（simhash）计算实现（PHash 算法）
+    - **相似帧丢弃**：Host Spool 入队前检测相似性，相似帧跳过入库以节省存储空间
+    - SimhashCache：Host 端内存缓存，按 device_name 分组存储最近 1 帧
+    - Spool 层集成：capture 入队时计算 simhash 并判定是否丢弃
+    - `frames.simhash` 字段写入（仅入库帧；schema 已预留）
+    - 相似帧检测逻辑：基于汉明距离的相似性判定
   - 不在范围：
     - **不修改 S2b 已冻结语义**：routing、device_name binding、topology 等核心逻辑不变
-    - **不替代 capture_id 幂等**：`capture_id` 仍是主去重键，simhash 为内容级辅助
-    - **不引入新依赖**：仅用 Pillow，不引入 SciPy 或其他重型库
+    - **不替代 capture_id 幂等**：`capture_id` 仍是 Edge 端主去重键，simhash 为 Host 端内容级辅助
+    - **不做 Edge 端去重**：simhash 丢弃仅发生在 Host 端
+    - **引入 SciPy 依赖**：用于 PHash DCT 计算（性能不作为 Hard Gate）
   - 平台策略：macOS-only（P1 仅实现 macOS；Windows/Linux 推迟 P2）
   - 依赖：P1-S2b Pass
   - Hard Gate（仅阶段内自洽，不构成 S3 Entry Gate）：
     - simhash 计算实现率 = 100%
     - spool 集成成功率 = 100%
     - 相似帧检测准确率 >= 95%
-    - 计算耗时 P95 <= 10ms
-  - Soft KPI：
-    - 内存占用增加 <= 5MB
+    - 相似帧丢弃正确率 >= 95%
+    - 不相似帧误丢弃率 <= 5%
+  - Soft KPI（观测记录，non-blocking）：
+    - 计算耗时 P50/P90/P95/P99 分布
+    - 内存占用增加
+    - capture latency 增加
+    - 存储节省率（丢弃帧数 / 总触发帧数）
   - 交付：
     - `docs/v3/acceptance/phase1/p1-s2b-plus.md` 完成并 Pass
     - `tests/test_p1_s2b_plus_simhash.py` 落地并通过
-    - 相似帧检测逻辑可用
+    - 相似帧丢弃逻辑可用
   - 与 S3 关系：S3 主线只依赖 S2b Pass；S2b+ 若执行，不得反向改变 S2b/S3 的 OCR-only 主契约
 
 - P1-S3（处理，2026-03-15 ~ 2026-03-18）

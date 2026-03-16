@@ -1,7 +1,7 @@
 ---
 status: draft
 owner: pyw
-last_updated: 2026-03-13
+last_updated: 2026-03-15
 depends_on:
   - data-model.md
   - roadmap.md
@@ -15,6 +15,31 @@ depends_on:
 - 目标：在 vision-only 范围内，与 screenpipe 的视觉能力对齐，并强制落地 Edge-Centric 架构（Host 轻、Edge 重）。
 - 范围：capture -> processing -> search -> chat（不含 audio）。
 - 部署边界：Host 与 Edge 当前默认同一局域网（LAN），但必须保持可远端化。
+
+> ================================================================================
+> 📋 **主线策略声明：OCR-only（自 OQ-043 起）**
+> ================================================================================
+>
+> **生效日期**：2026-03-13  
+> **决策依据**：[open_questions.md OQ-043](open_questions.md)
+>
+> **v3 主线承诺**：
+> - ✅ **OCR-only Processing**：S3 仅执行 OCR（RapidOCR），不执行 AX-first 判定
+> - ✅ **单一处理路径**：`frames` → `ocr_text` → `frames.text_source='ocr'`
+> - ✅ **索引时零 AI**：不生成 caption/keywords/fusion_text/embedding
+> - ❌ **AX 采集 defer**：Host 不采集 accessibility_text，AX 主链路 defer 到 v4
+>
+> **Schema 预留**：`accessibility` / `accessibility_fts` 表保留为 **v4 seam**，不参与 v3 主线数据流
+>
+> ================================================================================
+>
+> **⚠️ 阅读提示**：
+> - 本文档中涉及 AX/accessibility 的内容已标记为 ~~删除线~~ 或明确标注为 "v4 seam"
+> - 实现时请以 OCR-only 口径为准，不得混入 AX-first 逻辑
+>
+> ================================================================================
+
+## 0. 文档导航
 
 ## 0. 文档导航
 
@@ -157,13 +182,17 @@ flowchart LR
    - **优先级规则 (Precedence)**: `routing_filtered` 优先级高于一切采集行为。若结果为 filtered，则不启动截图循环，不产出任何持久化帧。
    - 当 `OPENRECALL_PRIMARY_MONITOR_ONLY=true` 时，任何路由到次要显示器的触发结果均为 `routing_filtered` (不产生入库帧)。
 
-4. **重叠与去抖规则 (Overlap & Debounce Rule)**:
+4. **两层丢弃逻辑 (Two-layer Discard Logic)**:
+   - **第一层 (Debounce)**: 基于事件和时间的去抖（P1-S2a/b）。采集循环在 `min_capture_interval_ms` 窗口内执行去抖，或同 Monitor 的冗余触发会被去抖。被去抖的 trigger 直接丢弃，不启动截图，不产生 frame。
+   - **第二层 (Simhash)**: 基于视觉内容相似度的丢弃（P1-S2b+，可选增强）。在截图完成但入库（spool）前，若计算的 simhash 与缓存中最近一帧高度相似（汉明距离 <= 阈值），则丢弃该帧。**被 Simhash 丢弃的捕获将不会产生 `capture_id`，也不会流转到 Edge 端。** 这意味着 Trigger-to-Frame 的比例可以从严格的 1:1 变为 1:0。
+
+5. **重叠规则 (Overlap Rule)**:
    - 一个用户动作（如点击任务栏切换应用）允许同时发出 `click` 和 `app_switch` 触发。
    - **同 Monitor 去抖**: 若两者路由到同一 monitor，采集循环在 `min_capture_interval_ms` 窗口内执行去抖。后到的触发任务将被丢弃，系统必须确保至少保留一帧具有确定性的持久化记录。
    - **跨 Monitor 并行**: 若路由到不同 monitor，允许并行产生帧。
    - 最终持久化的 `app_name/window_name` 可能相同，但 `capture_trigger` 必须反映各自的触发路径。
 
-5. **上下文一致性与空值 (`Better None than wrong`)**:
+6. **上下文一致性与空值 (`Better None than wrong`)**:
    - **非焦点显示器帧**: 仅当帧被实际捕获且无法确定当前显示的 app/window（例如非活动显示器）时，`app_name` 与 `window_name` 必须写入 `null`。
    - **严禁复用**: 禁止复用该 monitor 历史看到的旧 app/window 记录作为当前真相。
 

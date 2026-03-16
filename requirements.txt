@@ -1,1 +1,2 @@
 rapidocr_onnxruntime
+scipy>=1.11.0

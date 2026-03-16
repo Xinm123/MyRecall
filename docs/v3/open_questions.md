@@ -184,3 +184,26 @@ references:
     - **引用口径收口**：OQ-013 中 UI 结果优先 `myrecall://frame/{accessibility.frame_id}` 的口径不再属于 v3 active path；v3 仅承诺 OCR/frame 结果 `myrecall://frame/{frame_id}`，UI/AX citation 回退到 v4 重新定义。
     - **S2b 阶段语义**：P1-S2b 仍是 v3 主线必经阶段，但其语义已收口为 capture completion / monitor-aware coordination；凡依赖 `accessibility_text`、AX timeout/empty、browser URL stale、Host AX dedup 的规则与 Gate，统一降级为 deferred AX scope，待 v4 重新收口。
     - **OQ-025 解释补充**：`accessibility` 表 P0 建表的决定仍保留，但其语义从“v3 active path”调整为“v4 reserved seam”；保留该表不构成 v3 必须实现 AX 采集或 AX 搜索的承诺。
+
+### 已拍板结论（2026-03-16）
+
+45. OQ-044 = A：P1-S2b+ simhash 相似帧丢弃策略
+    - **丢弃阶段**：Host Spool 入队前（在图像写入 spool 目录之前）
+    - **丢弃目的**：节省存储空间
+    - **默认启用**：`simhash_dedup_enabled = true`
+    - **缓存策略**：每个 device_name 保留最近 1 帧的 simhash（`simhash_cache_size_per_device = 1`）
+    - **判定阈值**：汉明距离 <= 8 bits 判定为相似
+    - **与 capture_id 幂等关系**：
+      - `capture_id` 幂等是 Edge 端主去重机制
+      - simhash 丢弃是 Host 端内容级辅助去重
+      - 两者互不干扰：Host 端 simhash 丢弃先于 `capture_id` 生成
+    - **边界条件**：
+      - 首帧（缓存为空）：正常入库
+      - 进程重启（缓存丢失）：正常入库，重新构建缓存
+      - simhash 计算失败：不丢弃，正常入库
+    - **Hard Gate**：
+      - simhash 计算实现率 = 100%
+      - 相似帧检测准确率 >= 95%
+      - 相似帧丢弃正确率 >= 95%
+      - 不相似帧误丢弃率 <= 5%
+    - **SSOT**：详细设计见 `acceptance/phase1/p1-s2b-plus.md` §1.0d，指标口径见 `gate_baseline.md` §3.2.1
