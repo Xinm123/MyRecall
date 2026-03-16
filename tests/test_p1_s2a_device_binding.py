@@ -96,7 +96,7 @@ def test_recorder_skips_cross_device_pairing_when_trigger_device_is_unavailable(
         recorder,
         "_wait_for_trigger",
         lambda **kwargs: (
-            setattr(recorder, "_stop_requested", True)
+            recorder._stop_event.set()
             or TriggerEvent(
                 capture_trigger=CaptureTrigger.CLICK,
                 device_name="monitor_display-b",
@@ -106,7 +106,7 @@ def test_recorder_skips_cross_device_pairing_when_trigger_device_is_unavailable(
     )
 
     def _capture_monitors(_monitors):
-        recorder._stop_requested = True
+        recorder._stop_event.set()
         return {monitor.device_name: np.zeros((2, 2, 3), dtype=np.uint8)}
 
     monkeypatch.setattr(recorder, "_capture_monitors", _capture_monitors)

@@ -192,7 +192,7 @@ Key settings (see `openrecall/shared/config.py`):
 - `OPENRECALL_DEBUG`: Enable debug logging
 - `OPENRECALL_AI_PROVIDER`: AI provider (local/dashscope/openai)
 - `OPENRECALL_DEVICE`: Inference device (cpu/cuda/mps)
-- `OPENRECALL_MIN_CAPTURE_INTERVAL_MS`: Debounce interval (default: 1000)
+- `OPENRECALL_MIN_CAPTURE_INTERVAL_MS`: Debounce interval (default: 2000)
 - `OPENRECALL_IDLE_CAPTURE_INTERVAL_MS`: Idle fallback (default: 30000)
 
 ## Testing Strategy

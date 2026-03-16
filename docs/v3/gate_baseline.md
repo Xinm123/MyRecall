@@ -201,6 +201,56 @@ Soft KPI（non-blocking）：
 | `storage_saving_rate` | 存储节省率 = 丢弃帧数 / 总触发帧数 |
 | `memory_overhead` | SciPy 加载 + SimhashCache 内存增量 |
 
+## 3.4 OCR Processing Gate 指标（P1-S3）
+
+- 目的：定义 P1-S3 OCR-only 处理阶段的 Gate 指标口径，确保 OCR 成功/失败语义、text_source 标记、零 AI 增强等核心要求可验证。
+
+### 判定类型与阈值（P1-S3）
+
+1. `ocr_success_write_rate`（Hard Gate）
+- 公式：`ocr_success_write_rate = (成功写入 ocr_text 的 completed 帧数 / frames.status='completed' AND text_source='ocr' 的总帧数) * 100%`
+- 阈值：`= 100%`
+- 最小样本：>= 100 条 completed 帧
+- 验证方式：`SELECT COUNT(*) FROM frames f LEFT JOIN ocr_text ot ON ot.frame_id=f.id WHERE f.status='completed' AND f.text_source='ocr' AND ot.id IS NULL;` 结果必须为 0
+
+2. `text_source_mark_accuracy`（Hard Gate）
+- 公式：`text_source_mark_accuracy = (text_source='ocr' 标记正确的 completed 帧数 / completed 帧总数) * 100%`
+- 阈值：`= 100%`
+- 说明：OCR 成功帧必须标记 `text_source='ocr'`，失败帧不得伪造 `text_source='accessibility'`
+
+3. `ocr_failed_semantic_correctness`（Hard Gate）
+- 公式：`ocr_failed_semantic_correctness = (failed 状态且无 ocr_text 行的帧数 / failed 帧总数) * 100%`
+- 阈值：`= 100%`
+- 验证方式：`SELECT COUNT(*) FROM frames f JOIN ocr_text ot ON ot.frame_id=f.id WHERE f.status='failed';` 结果必须为 0
+- 失败处理策略：P1-S3 OCR 失败**不自动重试**，直接标记 `failed` 并记录错误信息
+
+4. `zero_ai_enhancement_check`（Hard Gate，防守性）
+- 公式：`(ocr_text_embeddings 表不存在) AND (未生成 caption/keywords/fusion_text)`
+- 阈值：`Pass`
+- 验证方式：`SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='ocr_text_embeddings';` 结果必须为 0
+
+5. `processing_source_ui_completeness_rate`（Hard Gate）
+- 公式：Grid `/` 页面 frame 卡片展示完整率 = 100%
+- 字段清单（12 个，按组件分组）：
+  - Card Header：`app_name`, `window_name`, `device_name`
+  - Card Footer - 触发信息：`capture_trigger`, `timestamp`
+  - Card Footer - 状态区分：`status`（视觉可区分 pending/processing/completed/failed）
+  - Card Footer - OCR 信息：`ocr_engine`, `processed_at`, `text_length`
+  - Card Footer - 文本预览：`ocr_text_preview`（前 100 字符）
+  - Card Footer - 错误信息：`error_message`（failed 状态时显示）
+- 阈值：`= 100%`
+- 验证方式：人工/自动化抽检（详见 `acceptance/phase1/p1-s3.md` §3.9）
+- 说明：`text_source` 在 v3 OCR-only 下固定为 `'ocr'`，不作为 UI 必展示字段；`frame_id` 为内部标识，不要求卡片展示
+
+### Soft KPI（non-blocking）
+
+| 指标 | 说明 |
+|------|------|
+| `ocr_processing_latency_p95` | OCR 处理耗时分布（P50/P90/P95/P99），目标 <= 10s |
+| `ocr_engine_consistency` | RapidOCR 引擎运行时一致性检查 |
+
+---
+
 ## 3.3 UI 健康态/错误态展示通过率（P1-S1）
 
 - 目的：将 P1-S1 的 UI 健康态/错误态从描述性要求收敛为可脚本化判定，避免主观评审。

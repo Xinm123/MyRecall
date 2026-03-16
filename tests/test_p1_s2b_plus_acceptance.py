@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import logging
-import time
 
 import numpy as np
 import pytest
@@ -21,13 +20,19 @@ def _run_two_frame_capture(
     monkeypatch: pytest.MonkeyPatch,
     caplog: pytest.LogCaptureFixture,
     *,
-    heartbeat_interval_sec: float,
-    inter_event_sleep_sec: float,
+    trigger_type: CaptureTrigger = CaptureTrigger.MANUAL,
 ) -> list[dict[str, object]]:
+    """Run a two-frame capture simulation for testing.
+
+    Args:
+        monkeypatch: pytest monkeypatch fixture
+        caplog: pytest log capture fixture
+        trigger_type: The capture trigger type to simulate
+    """
     recorder = ScreenRecorder()
     monitor = MonitorDescriptor("monitor_display-a", 0, 0, 100, 100, is_primary=True)
     routed_task = RoutedCaptureTask(
-        capture_trigger=CaptureTrigger.MANUAL,
+        capture_trigger=trigger_type,
         target_device_name=monitor.device_name,
         routing_topology_epoch=1,
         event_ts="2026-03-16T00:00:00Z",
@@ -39,12 +44,8 @@ def _run_two_frame_capture(
 
     monkeypatch.setattr(settings, "simhash_dedup_enabled", True, raising=False)
     monkeypatch.setattr(settings, "simhash_dedup_threshold", 8, raising=False)
-    monkeypatch.setattr(
-        settings,
-        "simhash_heartbeat_interval_sec",
-        heartbeat_interval_sec,
-        raising=False,
-    )
+    # Note: simhash_enabled_for_click and simhash_enabled_for_app_switch
+    # should be set by the caller before invoking this function
     monkeypatch.setattr(settings, "client_save_local_screenshots", False, raising=False)
 
     monkeypatch.setattr(recorder, "start", lambda: None)
@@ -65,12 +66,10 @@ def _run_two_frame_capture(
     def _wait_for_trigger(**kwargs: object) -> TriggerEvent:
         idx = event_count["value"]
         event_count["value"] += 1
-        if idx == 1 and inter_event_sleep_sec > 0:
-            time.sleep(inter_event_sleep_sec)
         if idx >= 1:
-            recorder._stop_requested = True
+            recorder._stop_event.set()
         return TriggerEvent(
-            capture_trigger=CaptureTrigger.MANUAL,
+            capture_trigger=trigger_type,
             device_name=monitor.device_name,
             event_ts="2026-03-16T00:00:00Z",
         )
@@ -105,34 +104,63 @@ def test_acceptance_4_1_similar_frames_are_skipped_and_logged(
     monkeypatch: pytest.MonkeyPatch,
     caplog: pytest.LogCaptureFixture,
 ) -> None:
+    """Test that similar frames are skipped and logged for CLICK trigger with simhash enabled."""
+    monkeypatch.setattr(settings, "simhash_enabled_for_click", True, raising=False)
+    monkeypatch.setattr(settings, "simhash_enabled_for_app_switch", True, raising=False)
+
     enqueued = _run_two_frame_capture(
         monkeypatch,
         caplog,
-        heartbeat_interval_sec=300.0,
-        inter_event_sleep_sec=0.0,
+        trigger_type=CaptureTrigger.CLICK,
     )
 
+    # First frame enqueued, second skipped due to similarity
     assert len(enqueued) == 1
     assert "MRV3 similar_frame_skipped device_name=monitor_display-a" in caplog.text
 
 
 @pytest.mark.unit
-def test_acceptance_4_2_heartbeat_timeout_forces_enqueue(
+def test_acceptance_4_2_idle_always_enqueues(
     monkeypatch: pytest.MonkeyPatch,
     caplog: pytest.LogCaptureFixture,
 ) -> None:
+    """Test that IDLE trigger always enqueues, skipping simhash check."""
+    monkeypatch.setattr(settings, "simhash_enabled_for_click", True, raising=False)
+    monkeypatch.setattr(settings, "simhash_enabled_for_app_switch", True, raising=False)
+
     enqueued = _run_two_frame_capture(
         monkeypatch,
         caplog,
-        heartbeat_interval_sec=0.001,
-        inter_event_sleep_sec=0.02,
+        trigger_type=CaptureTrigger.IDLE,
     )
 
+    # Both frames should be enqueued because IDLE skips simhash
     assert len(enqueued) == 2
 
 
 @pytest.mark.unit
-def test_acceptance_4_3_gate_slo_thresholds_for_detection_and_volume() -> None:
+def test_acceptance_4_3_simhash_disabled_for_trigger(
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Test that frames are enqueued when simhash is disabled for the trigger type."""
+    # Disable simhash for CLICK
+    monkeypatch.setattr(settings, "simhash_enabled_for_click", False, raising=False)
+    monkeypatch.setattr(settings, "simhash_enabled_for_app_switch", True, raising=False)
+
+    enqueued = _run_two_frame_capture(
+        monkeypatch,
+        caplog,
+        trigger_type=CaptureTrigger.CLICK,
+    )
+
+    # Both frames should be enqueued because simhash is disabled for CLICK
+    assert len(enqueued) == 2
+
+
+@pytest.mark.unit
+def test_acceptance_4_4_gate_slo_thresholds_for_detection_and_volume() -> None:
+    """Test simhash detection accuracy meets SLO thresholds."""
     threshold = 8
 
     similar_pairs = [(0, 1 << (i % 8)) for i in range(20)]
@@ -159,25 +187,30 @@ def test_acceptance_4_3_gate_slo_thresholds_for_detection_and_volume() -> None:
     assert skip_accuracy >= 0.95
     assert misdrop_rate <= 0.05
 
+
+@pytest.mark.unit
+def test_acceptance_4_5_storage_saving_rate() -> None:
+    """Test that simhash achieves reasonable storage saving rate."""
     cache = SimhashCache(cache_size_per_device=1)
     event_times = [0.0, 1.0, 2.0, 3.0, 4.0, 6.0, 7.0, 8.0, 12.0, 13.0]
-    heartbeat_interval = 5.0
+    threshold = 8
     accepted = 0
     dropped = 0
 
     for now in event_times:
-        phash = 0xABC
+        phash = 0xABC  # Same hash each time
         similar = cache.is_similar_to_cache("monitor_display-a", phash, threshold)
-        last_enqueue = cache.get_last_enqueue_time("monitor_display-a")
-        heartbeat_timed_out = last_enqueue is None or (
-            now - last_enqueue >= heartbeat_interval
-        )
-        should_enqueue = (not similar) or heartbeat_timed_out
+
+        # Without heartbeat, we only enqueue when not similar
+        should_enqueue = not similar
         if should_enqueue:
             accepted += 1
             cache.add("monitor_display-a", phash, timestamp=now)
         else:
             dropped += 1
 
+    # First event is accepted, rest are dropped (same hash)
     storage_saving_rate = dropped / (accepted + dropped)
-    assert storage_saving_rate > 0.5
+    assert storage_saving_rate >= 0.8  # At least 80% storage saved
+    assert accepted == 1  # Only the first frame is accepted
+    assert dropped == 9  # All subsequent similar frames are dropped

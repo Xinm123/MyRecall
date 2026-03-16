@@ -1,14 +1,18 @@
 from __future__ import annotations
 
 import logging
+import queue
 import threading
+import time
 from typing import Callable
 
 import mss
 
 from openrecall.client.events.base import (
     CaptureTrigger,
+    EventTapMetrics,
     MonitorDescriptor,
+    RawClickEvent,
     TriggerEvent,
     utc_now_iso,
 )
@@ -87,6 +91,18 @@ def list_monitors(primary_only: bool = False) -> list[MonitorDescriptor]:
 
 
 class MacOSEventTap:
+    """macOS event tap for click detection with lock-free callback.
+
+    Architecture:
+    - CGEventTap callback (in CGEventTap thread): Only captures coordinates
+      and puts RawClickEvent into a queue - NO LOCKS, completely non-blocking.
+    - Processor thread: Pulls raw events, does monitor lookup (which may need
+      locks), and invokes the callback with full TriggerEvent.
+
+    This prevents the system lag caused by blocking operations in the CGEventTap
+    callback, which runs on a high-priority system thread.
+    """
+
     def __init__(
         self,
         callback: Callable[[TriggerEvent], None],
@@ -96,48 +112,170 @@ class MacOSEventTap:
         self._monitor_lookup = monitor_lookup
         self._event_tap = None
         self._run_loop_source = None
-        self._thread: threading.Thread | None = None
+        self._run_loop = None
+        self._event_tap_thread: threading.Thread | None = None
+
+        # Lock-free raw event queue (put_nowait is non-blocking)
+        # Increased from 256 to 1024 to reduce event drops during high-frequency operations
+        self._raw_click_queue: queue.Queue[RawClickEvent] = queue.Queue(maxsize=1024)
+        self._stop_event = threading.Event()
+        self._processor_thread: threading.Thread | None = None
+
+        # Observability metrics
+        self._metrics = EventTapMetrics()
+
+        # Cache Quartz constants to avoid getattr in callback
+        if Quartz is not None:
+            self._quartz_left_mouse_up = getattr(Quartz, "kCGEventLeftMouseUp", None)
+            self._quartz_right_mouse_up = getattr(Quartz, "kCGEventRightMouseUp", None)
+            self._quartz_other_mouse_up = getattr(Quartz, "kCGEventOtherMouseUp", None)
+            self._quartz_event_get_location = getattr(Quartz, "CGEventGetLocation", None)
+        else:
+            self._quartz_left_mouse_up = None
+            self._quartz_right_mouse_up = None
+            self._quartz_other_mouse_up = None
+            self._quartz_event_get_location = None
+
+    @property
+    def metrics(self) -> EventTapMetrics:
+        """Access to observability metrics."""
+        return self._metrics
 
     def start(self) -> None:
-        if self._thread is not None and self._thread.is_alive():
+        """Start the event tap and processor thread."""
+        if self._processor_thread is not None and self._processor_thread.is_alive():
             return
-        self._thread = threading.Thread(
-            target=self._run, daemon=True, name="MacOSEventTap"
+
+        # Start processor thread first (handles raw events)
+        self._stop_event.clear()
+        self._processor_thread = threading.Thread(
+            target=self._process_raw_events,
+            daemon=True,
+            name="ClickEventProcessor",
         )
-        self._thread.start()
+        self._processor_thread.start()
+
+        # Then start CGEventTap thread
+        self._event_tap_thread = threading.Thread(
+            target=self._run_event_tap, daemon=True, name="MacOSEventTap"
+        )
+        self._event_tap_thread.start()
 
     def stop(self) -> None:
-        """停止事件监听并清理资源"""
-        # 禁用CGEventTap
-        if Quartz is not None and self._event_tap is not None:
+        """Stop event tap and processor thread gracefully.
+
+        Cleanup order (critical for macOS):
+        1. Signal stop to threads
+        2. Disable CGEventTap BEFORE removing from RunLoop
+        3. Stop RunLoop
+        4. Remove RunLoop source
+        5. Invalidate (release) the CFMachPort
+        6. Wait for threads
+        """
+        self._stop_event.set()
+
+        if Quartz is not None:
+            # Step 1: Disable event tap FIRST to stop receiving new events
+            if self._event_tap is not None:
+                try:
+                    cg_event_tap_enable = getattr(Quartz, "CGEventTapEnable", None)
+                    if cg_event_tap_enable is not None:
+                        cg_event_tap_enable(self._event_tap, False)
+                except Exception as e:
+                    logger.debug("Error disabling CGEventTap: %s", e)
+
+            # Step 2: Stop the RunLoop so it exits the run loop
+            if self._run_loop is not None:
+                try:
+                    cf_run_loop_stop = getattr(Quartz, "CFRunLoopStop", None)
+                    if cf_run_loop_stop is not None:
+                        cf_run_loop_stop(self._run_loop)
+                except Exception as e:
+                    logger.debug("Error stopping RunLoop: %s", e)
+
+            # Step 3: Remove source from RunLoop
+            if self._run_loop is not None and self._run_loop_source is not None:
+                try:
+                    run_loop_remove_source = getattr(Quartz, "CFRunLoopRemoveSource", None)
+                    run_loop_default_mode = getattr(Quartz, "kCFRunLoopDefaultMode", None)
+                    if run_loop_remove_source is not None and run_loop_default_mode is not None:
+                        run_loop_remove_source(
+                            self._run_loop,
+                            self._run_loop_source,
+                            run_loop_default_mode,
+                        )
+                except Exception as e:
+                    logger.debug("Error removing RunLoop source: %s", e)
+
+            # Step 4: Invalidate (release) the CFMachPort - critical for complete cleanup
+            if self._event_tap is not None:
+                try:
+                    cf_mach_port_invalidate = getattr(Quartz, "CFMachPortInvalidate", None)
+                    if cf_mach_port_invalidate is not None:
+                        cf_mach_port_invalidate(self._event_tap)
+                except Exception as e:
+                    logger.debug("Error invalidating CFMachPort: %s", e)
+                finally:
+                    self._event_tap = None
+
+            self._run_loop_source = None
+            self._run_loop = None
+
+        # Step 5: Wait for processor thread (increased timeout)
+        if self._processor_thread is not None and self._processor_thread.is_alive():
+            self._processor_thread.join(timeout=2.0)
+
+        # Step 6: Wait for CGEventTap thread (increased timeout)
+        if self._event_tap_thread is not None and self._event_tap_thread.is_alive():
+            self._event_tap_thread.join(timeout=2.0)
+
+        logger.info("CGEventTap stopped and resources released")
+
+    def _process_raw_events(self) -> None:
+        """Processor thread: handles raw click events from queue.
+
+        This thread does the heavy lifting (monitor lookup, callback invocation)
+        so the CGEventTap callback never blocks.
+        """
+        while not self._stop_event.is_set():
             try:
-                cg_event_tap_enable = getattr(Quartz, "CGEventTapEnable", None)
-                cf_run_loop_stop = getattr(Quartz, "CFRunLoopStop", None)
-                run_loop_get_current = getattr(Quartz, "CFRunLoopGetCurrent", None)
+                # Get raw event with timeout to allow checking stop flag
+                raw_event = self._raw_click_queue.get(timeout=0.05)
+            except queue.Empty:
+                continue
 
-                if cg_event_tap_enable is not None:
-                    cg_event_tap_enable(self._event_tap, False)
+            start_time = time.time()
+            try:
+                # Monitor lookup (lock-free with Copy-on-Write registry)
+                monitor = self._monitor_lookup(raw_event.x, raw_event.y)
+                if monitor is None:
+                    logger.debug(
+                        "dropped click trigger: no monitor for point x=%.1f y=%.1f",
+                        raw_event.x,
+                        raw_event.y,
+                    )
+                    self._metrics.record_monitor_miss()
+                    continue
 
-                # 停止RunLoop（如果在运行）
-                if cf_run_loop_stop is not None and run_loop_get_current is not None:
-                    try:
-                        current_loop = run_loop_get_current()
-                        if current_loop is not None:
-                            cf_run_loop_stop(current_loop)
-                    except Exception:
-                        pass  # RunLoop可能已经停止
+                # Invoke callback with full TriggerEvent
+                self._callback(
+                    TriggerEvent(
+                        capture_trigger=CaptureTrigger.CLICK,
+                        device_name=monitor.device_name,
+                        event_ts=raw_event.event_ts,
+                        active_app=None,
+                        active_window=None,
+                    )
+                )
 
-                self._event_tap = None
-                self._run_loop_source = None
-                logger.debug("已停止CGEventTap并清理资源")
+                # Record processing latency
+                latency_ms = (time.time() - start_time) * 1000
+                self._metrics.record_processed(latency_ms)
             except Exception:
-                logger.exception("停止事件监听时出错")
+                logger.debug("Error processing raw click event", exc_info=True)
 
-        # 等待线程结束（设置超时，因为daemon线程不会阻塞进程退出）
-        if self._thread is not None and self._thread.is_alive():
-            self._thread.join(timeout=0.5)
-
-    def _run(self) -> None:
+    def _run_event_tap(self) -> None:
+        """Run CGEventTap in its own thread."""
         if Quartz is None:
             logger.warning("CGEventTap unavailable; click listener disabled")
             return
@@ -147,13 +285,13 @@ class MacOSEventTap:
         run_loop_source = getattr(Quartz, "CFMachPortCreateRunLoopSource", None)
         run_loop_get_current = getattr(Quartz, "CFRunLoopGetCurrent", None)
         run_loop_add_source = getattr(Quartz, "CFRunLoopAddSource", None)
-        run_loop_run = getattr(Quartz, "CFRunLoopRun", None)
+        run_loop_run_in_mode = getattr(Quartz, "CFRunLoopRunInMode", None)
         session_event_tap = getattr(Quartz, "kCGSessionEventTap", None)
-        head_insert_event_tap = getattr(Quartz, "kCGHeadInsertEventTap", None)
+        tail_append_event_tap = getattr(Quartz, "kCGTailAppendEventTap", None)
         tap_option_listen_only = getattr(Quartz, "kCGEventTapOptionListenOnly", None)
-        left_mouse_down = getattr(Quartz, "kCGEventLeftMouseDown", None)
-        right_mouse_down = getattr(Quartz, "kCGEventRightMouseDown", None)
-        other_mouse_down = getattr(Quartz, "kCGEventOtherMouseDown", None)
+        left_mouse_up = getattr(Quartz, "kCGEventLeftMouseUp", None)
+        right_mouse_up = getattr(Quartz, "kCGEventRightMouseUp", None)
+        other_mouse_up = getattr(Quartz, "kCGEventOtherMouseUp", None)
         run_loop_default_mode = getattr(Quartz, "kCFRunLoopDefaultMode", None)
 
         if None in {
@@ -163,13 +301,13 @@ class MacOSEventTap:
             run_loop_get_current,
             run_loop_add_source,
             session_event_tap,
-            head_insert_event_tap,
+            tail_append_event_tap,
             tap_option_listen_only,
-            left_mouse_down,
-            right_mouse_down,
-            other_mouse_down,
+            left_mouse_up,
+            right_mouse_up,
+            other_mouse_up,
             run_loop_default_mode,
-            run_loop_run,
+            run_loop_run_in_mode,
         }:
             logger.warning(
                 "Quartz event tap symbols unavailable; click listener disabled"
@@ -182,22 +320,22 @@ class MacOSEventTap:
         assert run_loop_get_current is not None
         assert run_loop_add_source is not None
         assert session_event_tap is not None
-        assert head_insert_event_tap is not None
+        assert tail_append_event_tap is not None
         assert tap_option_listen_only is not None
-        assert left_mouse_down is not None
-        assert right_mouse_down is not None
-        assert other_mouse_down is not None
+        assert left_mouse_up is not None
+        assert right_mouse_up is not None
+        assert other_mouse_up is not None
         assert run_loop_default_mode is not None
-        assert run_loop_run is not None
+        assert run_loop_run_in_mode is not None
 
         event_mask = (
-            event_mask_bit(left_mouse_down)
-            | event_mask_bit(right_mouse_down)
-            | event_mask_bit(other_mouse_down)
+            event_mask_bit(left_mouse_up)
+            | event_mask_bit(right_mouse_up)
+            | event_mask_bit(other_mouse_up)
         )
         self._event_tap = event_tap_create(
             session_event_tap,
-            head_insert_event_tap,
+            tail_append_event_tap,
             tap_option_listen_only,
             event_mask,
             self._handle_event,
@@ -212,50 +350,59 @@ class MacOSEventTap:
             self._event_tap,
             0,
         )
+        self._run_loop = run_loop_get_current()
         run_loop_add_source(
-            run_loop_get_current(),
+            self._run_loop,
             self._run_loop_source,
             run_loop_default_mode,
         )
-        run_loop_run()
+        logger.debug("CGEventTap started with TailAppend placement")
+
+        # Run with timeout to allow checking stop flag
+        while not self._stop_event.is_set():
+            run_loop_run_in_mode(run_loop_default_mode, 0.05, False)
 
     def _handle_event(self, _proxy, event_type, event, _refcon):
-        if Quartz is None:
-            return event
+        """CGEventTap callback - MUST be non-blocking.
 
-        left_mouse_down = getattr(Quartz, "kCGEventLeftMouseDown", None)
-        right_mouse_down = getattr(Quartz, "kCGEventRightMouseDown", None)
-        other_mouse_down = getattr(Quartz, "kCGEventOtherMouseDown", None)
-        event_get_location = getattr(Quartz, "CGEventGetLocation", None)
+        This runs on a high-priority system thread. ANY blocking operation
+        (lock acquisition, I/O, sleep) will cause system lag.
 
+        We only capture coordinates and put them in a queue - no locks needed.
+        Metrics are updated inline (simple counter increments are atomic in Python).
+        """
+        # Quick filter for mouse up events
         if event_type not in {
-            left_mouse_down,
-            right_mouse_down,
-            other_mouse_down,
+            self._quartz_left_mouse_up,
+            self._quartz_right_mouse_up,
+            self._quartz_other_mouse_up,
         }:
             return event
-        if event_get_location is None:
+        if self._quartz_event_get_location is None:
             return event
 
-        location = event_get_location(event)
-        monitor = self._monitor_lookup(location.x, location.y)
-        if monitor is None:
-            logger.debug(
-                "dropped click trigger: no registered monitor matched point x=%.1f y=%.1f",
-                location.x,
-                location.y,
-            )
-            return event
+        try:
+            # Get click location
+            location = self._quartz_event_get_location(event)
 
-        self._callback(
-            TriggerEvent(
-                capture_trigger=CaptureTrigger.CLICK,
-                device_name=monitor.device_name,
+            # Create minimal raw event - no locks, no monitor lookup
+            raw_event = RawClickEvent(
+                x=float(location.x),
+                y=float(location.y),
                 event_ts=utc_now_iso(),
-                active_app=None,
-                active_window=None,
             )
-        )
+
+            # Non-blocking put - drops event if queue full rather than block
+            self._raw_click_queue.put_nowait(raw_event)
+            # Simple counter increment - atomic, no lock needed for just incrementing
+            self._metrics.raw_events_received += 1
+        except queue.Full:
+            # Queue full - drop event rather than block
+            self._metrics.raw_events_dropped += 1
+        except Exception:
+            # Never propagate exceptions in callback
+            pass
+
         return event
 
 
@@ -348,7 +495,7 @@ class MacOSAppSwitchMonitor:
             ):
                 self._emit_app_switch(current_app)
             self._last_frontmost_app = current_app or self._last_frontmost_app
-            self._stop_event.wait(0.2)
+            self._stop_event.wait(0.5)  # Polling interval: 500ms (reduced from 200ms for lower CPU)
 
     def _emit_app_switch(self, active_app: str) -> None:
         monitor = None

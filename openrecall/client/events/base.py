@@ -3,7 +3,8 @@ from __future__ import annotations
 import logging
 import queue
 import threading
-from dataclasses import dataclass
+from collections import deque
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
 from typing import TypeAlias
@@ -59,8 +60,21 @@ class MonitorDescriptor:
 
 
 class MonitorRegistry:
+    """Thread-safe monitor registry with Copy-on-Write pattern.
+
+    Uses immutable tuple snapshots for lock-free reads. Writes (refresh, drop)
+    acquire a lock and create new immutable snapshots. Reads (match_point, get,
+    list_monitors) access the snapshot without any locking.
+
+    This is critical for the CGEventTap processor thread which calls match_point()
+    frequently - no lock contention with the main thread.
+    """
+
     def __init__(self) -> None:
-        self._lock: threading.RLock = threading.RLock()
+        self._lock: threading.Lock = threading.Lock()  # Simple Lock, not RLock
+        # Immutable snapshot - updated atomically on write
+        self._monitors_snapshot: tuple[MonitorDescriptor, ...] = ()
+        # Mapping for dict-like operations (also immutable)
         self._monitors_by_device: dict[str, MonitorDescriptor] = {}
 
     def refresh(
@@ -84,34 +98,56 @@ class MonitorRegistry:
                     device_name,
                 )
 
+            # Atomically update both snapshot and mapping
+            self._monitors_snapshot = tuple(monitors)
             self._monitors_by_device = new_mapping
             return dict(self._monitors_by_device)
 
     def snapshot(self) -> dict[str, str]:
-        with self._lock:
-            return {
-                device_name: monitor.stable_id
-                for device_name, monitor in self._monitors_by_device.items()
-            }
+        # Read from immutable snapshot - no lock needed
+        return {
+            monitor.device_name: monitor.stable_id
+            for monitor in self._monitors_snapshot
+        }
 
     def list_monitors(self) -> list[MonitorDescriptor]:
-        with self._lock:
-            return list(self._monitors_by_device.values())
+        # Read from immutable snapshot - no lock needed
+        return list(self._monitors_snapshot)
 
     def get(self, device_name: str) -> MonitorDescriptor | None:
-        with self._lock:
-            return self._monitors_by_device.get(device_name)
+        # Read from immutable mapping - no lock needed
+        return self._monitors_by_device.get(device_name)
 
     def match_point(self, x: float, y: float) -> MonitorDescriptor | None:
-        with self._lock:
-            for monitor in self._monitors_by_device.values():
-                if monitor.contains_point(x, y):
-                    return monitor
+        """Lock-free point matching using immutable snapshot.
+
+        This is the hot path called from the processor thread.
+        """
+        for monitor in self._monitors_snapshot:
+            if monitor.contains_point(x, y):
+                return monitor
         return None
 
     def drop(self, device_name: str) -> None:
         with self._lock:
-            _ = self._monitors_by_device.pop(device_name, None)
+            if device_name not in self._monitors_by_device:
+                return
+            new_mapping = dict(self._monitors_by_device)
+            del new_mapping[device_name]
+            self._monitors_by_device = new_mapping
+            self._monitors_snapshot = tuple(new_mapping.values())
+
+
+@dataclass(frozen=True)
+class RawClickEvent:
+    """Minimal click event for lock-free CGEventTap callback queue.
+
+    Contains only coordinates and timestamp - no locks needed in callback.
+    The processor thread will enrich this with monitor lookup.
+    """
+    x: float
+    y: float
+    event_ts: str
 
 
 @dataclass(frozen=True)
@@ -148,10 +184,69 @@ class RoutedCaptureTask:
     routing_hints: EventPayload
 
 
+@dataclass
+class EventTapMetrics:
+    """Observability metrics for CGEventTap and processor thread.
+
+    Tracks counts and latency for monitoring and debugging.
+    All fields are mutable for in-place updates.
+    """
+    raw_events_received: int = 0
+    raw_events_dropped: int = 0  # queue full
+    events_processed: int = 0
+    monitor_lookup_misses: int = 0
+    processing_latency_samples: deque[float] = field(default_factory=lambda: deque(maxlen=100))
+
+    def record_raw_event(self) -> None:
+        """Called when a raw click event is received in the callback."""
+        self.raw_events_received += 1
+
+    def record_dropped(self) -> None:
+        """Called when a raw event is dropped due to queue full."""
+        self.raw_events_dropped += 1
+
+    def record_processed(self, latency_ms: float) -> None:
+        """Called when an event is fully processed."""
+        self.events_processed += 1
+        # deque with maxlen automatically handles size limit - O(1) append
+        self.processing_latency_samples.append(latency_ms)
+
+    def record_monitor_miss(self) -> None:
+        """Called when monitor lookup fails for a click coordinate."""
+        self.monitor_lookup_misses += 1
+
+    def snapshot(self) -> dict[str, object]:
+        """Return a snapshot of current metrics."""
+        samples = list(self.processing_latency_samples)  # Convert for JSON serialization
+        avg_latency = sum(samples) / len(samples) if samples else 0.0
+        max_latency = max(samples) if samples else 0.0
+        return {
+            "raw_events_received": self.raw_events_received,
+            "raw_events_dropped": self.raw_events_dropped,
+            "events_processed": self.events_processed,
+            "monitor_lookup_misses": self.monitor_lookup_misses,
+            "avg_processing_latency_ms": round(avg_latency, 2),
+            "max_processing_latency_ms": round(max_latency, 2),
+        }
+
+    def reset(self) -> None:
+        """Reset all counters (keeps latency samples bounded)."""
+        self.raw_events_received = 0
+        self.raw_events_dropped = 0
+        self.events_processed = 0
+        self.monitor_lookup_misses = 0
+        self.processing_latency_samples.clear()
+
+
 class TriggerDebouncer:
+    """Per-device debounce gate for capture triggers.
+
+    Uses simple Lock (not RLock) since no re-entrant locking is needed.
+    """
+
     def __init__(self, min_interval_ms: int) -> None:
         self._min_interval_ms: int = min_interval_ms
-        self._lock: threading.RLock = threading.RLock()
+        self._lock: threading.Lock = threading.Lock()  # Simple Lock
         self._last_fire_ms: dict[str, int] = {}
         self._debounced_count: int = 0
 
@@ -188,35 +283,50 @@ class TriggerEventSnapshot:
 
 
 class TriggerEventChannel:
+    """Thread-safe channel for trigger events.
+
+    Uses queue.Queue which is already thread-safe for put/get operations.
+    A simple Lock protects only the stats counters.
+    """
+
     def __init__(self, capacity: int) -> None:
         self._queue: queue.Queue[TriggerEvent] = queue.Queue(maxsize=capacity)
         self._capacity: int = capacity
         self._collapse_trigger_count: int = 0
         self._overflow_drop_count: int = 0
-        self._lock: threading.RLock = threading.RLock()
+        self._stats_lock: threading.Lock = threading.Lock()
 
     def put(self, event: TriggerEvent) -> bool:
-        with self._lock:
-            try:
-                self._queue.put_nowait(event)
-                return True
-            except queue.Full:
-                pass
+        """Put event into channel, non-blocking with collapse on full.
 
-            try:
-                _ = self._queue.get_nowait()
-            except queue.Empty:
-                self._overflow_drop_count += 1
-                return False
-
-            try:
-                self._queue.put_nowait(event)
-            except queue.Full:
-                self._overflow_drop_count += 1
-                return False
-
-            self._collapse_trigger_count += 1
+        Returns True if event was queued, False if dropped.
+        """
+        try:
+            self._queue.put_nowait(event)
             return True
+        except queue.Full:
+            pass
+
+        # Queue is full - try to collapse (drop oldest, add newest)
+        try:
+            _ = self._queue.get_nowait()
+        except queue.Empty:
+            # Queue emptied between put_nowait and get_nowait - rare race
+            with self._stats_lock:
+                self._overflow_drop_count += 1
+            return False
+
+        try:
+            self._queue.put_nowait(event)
+        except queue.Full:
+            # Queue filled again - extremely rare race
+            with self._stats_lock:
+                self._overflow_drop_count += 1
+            return False
+
+        with self._stats_lock:
+            self._collapse_trigger_count += 1
+        return True
 
     def get(self, timeout: float) -> TriggerEvent:
         return self._queue.get(timeout=timeout)
@@ -225,7 +335,7 @@ class TriggerEventChannel:
         return self._queue.get_nowait()
 
     def snapshot(self) -> TriggerEventSnapshot:
-        with self._lock:
+        with self._stats_lock:
             return TriggerEventSnapshot(
                 queue_depth=self._queue.qsize(),
                 queue_capacity=self._capacity,

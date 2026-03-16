@@ -180,7 +180,7 @@ class ScreenRecorder:
         Args:
             consumer: UploaderConsumer instance. Creates new if not provided.
         """
-        self._stop_requested: bool = False
+        self._stop_event = threading.Event()
 
         # Phase 8.2: Runtime configuration state
         self.recording_enabled: bool = True
@@ -215,6 +215,11 @@ class ScreenRecorder:
             cache_size_per_device=settings.simhash_cache_size_per_device
         )
 
+        # MSS instance reuse for screenshot capture
+        self._mss_instance: mss.mss | None = None
+        self._mss_monitors_signature: tuple | None = None  # For hot-plug detection (hashable)
+        self._mss_last_check_time: float = 0.0  # Throttle signature checks
+
         # Capture stats for periodic logging
         self._capture_counts: dict[CaptureTrigger, int] = {t: 0 for t in CaptureTrigger}
         self._latency_samples: list[float] = []
@@ -230,6 +235,7 @@ class ScreenRecorder:
         self._idle_deadlines_lock: threading.Lock = threading.Lock()
         self._idle_interval_seconds: float = settings.idle_capture_interval_ms / 1000.0
         self._monitor_last_context: dict[str, tuple[str, str, float]] = {}
+        self._monitor_last_context_max_size: int = 100  # Bound memory growth
         self._last_capture_outcome: dict[str, object] = {
             "outcome": "init",
             "trigger": None,
@@ -239,6 +245,14 @@ class ScreenRecorder:
             "event_ts": None,
             "timestamp": utc_now_iso(),
         }
+        # Max skip duration safety valve - track last successful capture per device
+        self._last_successful_capture_time: dict[str, float] = {}
+        self._pipeline_stall_count: int = 0  # Forced captures due to max_skip_duration
+
+    @property
+    def _stop_requested(self) -> bool:
+        """Backward-compatible property for stop flag."""
+        return self._stop_event.is_set()
 
     def start(self) -> None:
         """Start the consumer thread."""
@@ -380,19 +394,50 @@ class ScreenRecorder:
         )
 
     def stop(self) -> None:
-        """Stop the recorder and consumer thread gracefully."""
-        self._stop_requested = True
+        """Stop the recorder and consumer thread gracefully.
+
+        Shutdown order:
+        1. Set stop event (signals all threads to stop)
+        2. Stop event sources (they may produce events)
+        3. Drain trigger channel (unblocks waiting threads)
+        4. Stop consumers
+        5. Wait for threads with timeout
+        """
+        # Signal stop to all threads
+        self._stop_event.set()
+
+        # Stop event sources first (they produce events)
         if self._event_tap is not None:
             self._event_tap.stop()
         if self._app_switch_monitor is not None:
             self._app_switch_monitor.stop()
+
+        # Drain trigger channel to unblock any waiting get()
+        while True:
+            try:
+                self._trigger_channel.get_nowait()
+            except queue.Empty:
+                break
+
+        # Stop consumers
         if self.consumer is not None:
             self.consumer.stop()
         self._spool_uploader.stop()
+
+        # Wait for threads with timeout
         if self.consumer is not None and self.consumer.is_alive():
             self.consumer.join(timeout=2.0)
         if self._spool_uploader.is_alive():
             self._spool_uploader.join(timeout=2.0)
+
+        # Clean up MSS instance
+        if self._mss_instance is not None:
+            try:
+                self._mss_instance.close()
+            except Exception:
+                pass
+            self._mss_instance = None
+            self._mss_monitors_signature = None
 
     def _refresh_monitors(self) -> list[MonitorDescriptor]:
         monitors = list_monitors(settings.primary_monitor_only)
@@ -763,24 +808,104 @@ class ScreenRecorder:
                     now_epoch + self._idle_interval_seconds
                 )
 
+    def _update_monitor_context(
+        self,
+        device_name: str,
+        app_name: str,
+        window_name: str,
+    ) -> None:
+        """Update monitor context with size limit protection.
+
+        Args:
+            device_name: Target monitor device name
+            app_name: Active application name
+            window_name: Active window title
+        """
+        # If over max size, remove oldest entry to bound memory
+        if len(self._monitor_last_context) >= self._monitor_last_context_max_size:
+            oldest_device = min(
+                self._monitor_last_context.keys(),
+                key=lambda d: self._monitor_last_context[d][2],
+            )
+            del self._monitor_last_context[oldest_device]
+
+        self._monitor_last_context[device_name] = (
+            app_name,
+            window_name,
+            time.time(),
+        )
+
+    def _get_mss_signature(self) -> tuple:
+        """Get current monitor signature for hot-plug detection.
+
+        Returns a hashable tuple for efficient comparison.
+        """
+        try:
+            with mss.mss() as sct:
+                return tuple((m["width"], m["height"]) for m in sct.monitors[1:])
+        except Exception:
+            return ()
+
+    def _ensure_mss_instance(self) -> mss.mss:
+        """Get or create MSS instance, with throttled hot-plug detection.
+
+        Hot-plug detection is throttled to once per second to avoid
+        creating temporary MSS instances on every screenshot.
+
+        Returns:
+            MSS instance ready for use.
+        """
+        current_time = time.time()
+
+        # Throttle: only check signature every 1 second
+        if self._mss_instance is not None:
+            if current_time - self._mss_last_check_time < 1.0:
+                return self._mss_instance
+
+            self._mss_last_check_time = current_time
+            current_signature = self._get_mss_signature()
+
+            if current_signature == self._mss_monitors_signature:
+                return self._mss_instance
+
+            # Monitor changed, recreate
+            logger.debug(
+                "MSS instance recreating due to monitor change: %s -> %s",
+                self._mss_monitors_signature,
+                current_signature,
+            )
+            try:
+                self._mss_instance.close()
+            except Exception:
+                pass
+            self._mss_instance = mss.mss()
+            self._mss_monitors_signature = current_signature
+            return self._mss_instance
+
+        # First time or after cleanup
+        self._mss_last_check_time = current_time
+        self._mss_instance = mss.mss()
+        self._mss_monitors_signature = self._get_mss_signature()
+        return self._mss_instance
+
     def _capture_monitors(
         self,
         monitors: list[MonitorDescriptor],
     ) -> dict[str, ImageArray]:
         captures: dict[str, ImageArray] = {}
-        with mss.mss() as sct:
-            for monitor in monitors:
-                screenshot = np.array(
-                    sct.grab(
-                        {
-                            "left": monitor.left,
-                            "top": monitor.top,
-                            "width": monitor.width,
-                            "height": monitor.height,
-                        }
-                    )
-                )[:, :, [2, 1, 0]]
-                captures[monitor.device_name] = screenshot
+        sct = self._ensure_mss_instance()
+        for monitor in monitors:
+            screenshot = np.array(
+                sct.grab(
+                    {
+                        "left": monitor.left,
+                        "top": monitor.top,
+                        "width": monitor.width,
+                        "height": monitor.height,
+                    }
+                )
+            )[:, :, [2, 1, 0]]
+            captures[monitor.device_name] = screenshot
         return captures
 
     def _record_permission_issue(self, reason: str) -> None:
@@ -838,7 +963,7 @@ class ScreenRecorder:
         while not self._stop_requested:
             # Phase 8.2: Sync runtime configuration every 5 seconds
             current_time = time.time()
-            include_trigger = current_time - self._last_trigger_report_time >= 1
+            include_trigger = current_time - self._last_trigger_report_time >= 5
             include_permission = current_time - self._last_permission_report_time >= 5
             if include_trigger or include_permission:
                 self._send_heartbeat(
@@ -917,65 +1042,69 @@ class ScreenRecorder:
                 phash_value: int | None = None
                 should_drop_frame = False
 
+                # Max skip duration safety valve
+                # Force capture if too much time has passed since last successful capture
+                current_time = time.time()
+                last_capture = self._last_successful_capture_time.get(
+                    routed_task.target_device_name
+                )
+                force_capture = (
+                    last_capture is not None
+                    and (current_time - last_capture) >= settings.max_skip_duration_sec
+                )
+
                 if settings.simhash_dedup_enabled:
-                    try:
-                        # Compute PHash
-                        phash_value = compute_phash(image)
-
-                        # Check similarity against cache
-                        is_similar_frame = self._simhash_cache.is_similar_to_cache(
+                    # Determine if simhash should be checked based on trigger type
+                    # IDLE always skips simhash (ensures periodic frame capture)
+                    if routed_task.capture_trigger == CaptureTrigger.IDLE:
+                        should_check_simhash = False
+                    elif force_capture:
+                        # Safety valve: skip simhash to guarantee frame capture
+                        should_check_simhash = False
+                        self._pipeline_stall_count += 1
+                        time_since_last = current_time - last_capture if last_capture else 0.0
+                        logger.debug(
+                            "Force-capturing frame for device=%s after %.1fs of skips (max_skip_duration=%ds)",
                             routed_task.target_device_name,
-                            phash_value,
-                            threshold=settings.simhash_dedup_threshold,
+                            time_since_last,
+                            settings.max_skip_duration_sec,
                         )
+                    elif routed_task.capture_trigger == CaptureTrigger.CLICK:
+                        should_check_simhash = settings.simhash_enabled_for_click
+                    elif routed_task.capture_trigger == CaptureTrigger.APP_SWITCH:
+                        should_check_simhash = settings.simhash_enabled_for_app_switch
+                    else:
+                        should_check_simhash = False
 
-                        if is_similar_frame:
-                            # Check heartbeat timeout
-                            last_enqueue_time = (
-                                self._simhash_cache.get_last_enqueue_time(
-                                    routed_task.target_device_name
-                                )
+                    if should_check_simhash:
+                        try:
+                            # Compute PHash
+                            phash_value = compute_phash(image)
+
+                            # Check similarity against cache
+                            is_similar_frame = self._simhash_cache.is_similar_to_cache(
+                                routed_task.target_device_name,
+                                phash_value,
+                                threshold=settings.simhash_dedup_threshold,
                             )
-                            current_time = time.time()
 
-                            if last_enqueue_time is not None:
-                                time_since_last_enqueue = (
-                                    current_time - last_enqueue_time
-                                )
-                                if (
-                                    time_since_last_enqueue
-                                    < settings.simhash_heartbeat_interval_sec
-                                ):
-                                    # Drop the frame - similar and no heartbeat timeout
-                                    should_drop_frame = True
-                                    logger.info(
-                                        "MRV3 similar_frame_skipped device_name=%s hamming_distance_threshold=%d trigger_type=%s",
-                                        routed_task.target_device_name,
-                                        settings.simhash_dedup_threshold,
-                                        routed_task.capture_trigger.value,
-                                    )
-                                else:
-                                    logger.info(
-                                        "MRV3 heartbeat_force_enqueue device_name=%s elapsed_sec=%.3f threshold_sec=%d trigger_type=%s",
-                                        routed_task.target_device_name,
-                                        time_since_last_enqueue,
-                                        settings.simhash_heartbeat_interval_sec,
-                                        routed_task.capture_trigger.value,
-                                    )
-                            else:
+                            if is_similar_frame:
+                                # Drop the frame - similar to cached frame
+                                should_drop_frame = True
                                 logger.info(
-                                    "MRV3 initial_frame_enqueue device_name=%s trigger_type=%s",
+                                    "MRV3 similar_frame_skipped device_name=%s hamming_distance_threshold=%d trigger_type=%s",
                                     routed_task.target_device_name,
+                                    settings.simhash_dedup_threshold,
                                     routed_task.capture_trigger.value,
                                 )
-                    except Exception as e:
-                        # On error, don't drop - continue with enqueue
-                        logger.warning(
-                            "PHash computation failed for device=%s, continuing with enqueue: %s",
-                            routed_task.target_device_name,
-                            e,
-                        )
-                        phash_value = None
+                        except Exception as e:
+                            # On error, don't drop - continue with enqueue
+                            logger.warning(
+                                "PHash computation failed for device=%s, continuing with enqueue: %s",
+                                routed_task.target_device_name,
+                                e,
+                            )
+                            phash_value = None
 
                 if should_drop_frame:
                     # Clean up image resources before dropping frame
@@ -1018,6 +1147,9 @@ class ScreenRecorder:
 
                 self._spool.enqueue(image, metadata)
 
+                # Update last successful capture time for max_skip_duration safety valve
+                self._last_successful_capture_time[routed_task.target_device_name] = time.time()
+
                 # Update SimhashCache after successful enqueue
                 if phash_value is not None:
                     self._simhash_cache.add(
@@ -1033,10 +1165,10 @@ class ScreenRecorder:
                     app_name = metadata.get("app_name")
                     window_name = metadata.get("window_name")
                     if app_name and window_name:
-                        self._monitor_last_context[routed_task.target_device_name] = (
+                        self._update_monitor_context(
+                            routed_task.target_device_name,
                             str(app_name),
                             str(window_name),
-                            time.time(),
                         )
 
                 self._warn_if_blank_frame(

@@ -98,6 +98,7 @@ class SimhashCache:
         cache_size_per_device: Maximum number of hashes to store per device
         _caches: Dictionary mapping device_name -> OrderedDict of (phash, timestamp)
         _last_enqueue_time: Dictionary mapping device_name -> timestamp
+        _hash_hits: Count of exact hash matches (Hash early exit)
 
     Example:
         >>> cache = SimhashCache(cache_size_per_device=10)
@@ -119,6 +120,9 @@ class SimhashCache:
         self.cache_size_per_device = cache_size_per_device
         self._caches: dict[str, OrderedDict[int, float]] = {}
         self._last_enqueue_time: dict[str, float] = {}
+        # Hash early exit statistics
+        self._hash_hits: int = 0
+        self._total_checks: int = 0
 
     def add(self, device_name: str, phash: int, timestamp: float) -> None:
         """
@@ -182,6 +186,9 @@ class SimhashCache:
         """
         Check if a PHash is similar to any cached PHash for a device.
 
+        Uses Hash early exit optimization: if the hash is exactly present in
+        the cache, returns True immediately without computing Hamming distance.
+
         Args:
             device_name: Device identifier
             phash: 64-bit PHash value to check
@@ -198,16 +205,46 @@ class SimhashCache:
             >>> cache.is_similar_to_cache("monitor_0", 0xFFF, threshold=8)
             False
         """
+        self._total_checks += 1
+
         if device_name not in self._caches:
             return False
 
         cache = self._caches[device_name]
 
+        # Hash early exit: O(1) check for exact match
+        # This avoids computing Hamming distance for identical frames
+        if phash in cache:
+            self._hash_hits += 1
+            return True
+
+        # No exact match: check Hamming distance against all cached hashes
         for cached_hash in cache.keys():
             if is_similar(phash, cached_hash, threshold):
                 return True
 
         return False
+
+    def get_stats(self) -> dict[str, int | float]:
+        """
+        Get hash early exit statistics.
+
+        Returns:
+            Dictionary with hash_hits, total_checks, and hit_rate
+        """
+        hit_rate = (
+            self._hash_hits / self._total_checks if self._total_checks > 0 else 0.0
+        )
+        return {
+            "hash_hits": self._hash_hits,
+            "total_checks": self._total_checks,
+            "hit_rate": round(hit_rate, 4),
+        }
+
+    def reset_stats(self) -> None:
+        """Reset hash early exit statistics."""
+        self._hash_hits = 0
+        self._total_checks = 0
 
     def clear_device(self, device_name: str) -> None:
         """

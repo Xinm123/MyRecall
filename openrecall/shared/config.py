@@ -43,12 +43,12 @@ class Settings(BaseSettings):
     debug: bool = Field(default=True, alias="OPENRECALL_DEBUG")
     capture_interval: int = Field(default=10, alias="OPENRECALL_CAPTURE_INTERVAL")
     min_capture_interval_ms: int = Field(
-        default=1000,
+        default=3000,
         alias="OPENRECALL_MIN_CAPTURE_INTERVAL_MS",
-        description="Minimum debounce interval shared by capture_trigger values idle/app_switch/manual/click",
+        description="Minimum debounce interval for all capture triggers (ms)",
     )
     idle_capture_interval_ms: int = Field(
-        default=30000,
+        default=60000,
         alias="OPENRECALL_IDLE_CAPTURE_INTERVAL_MS",
         description="Idle fallback interval in milliseconds for capture_trigger=idle",
     )
@@ -58,12 +58,12 @@ class Settings(BaseSettings):
         description="Polling interval for capture permission state checks",
     )
     trigger_queue_capacity: int = Field(
-        default=64,
+        default=1000,
         alias="OPENRECALL_TRIGGER_QUEUE_CAPACITY",
-        description="Capacity of the bounded trigger event queue",
+        description="Capacity of the bounded trigger event queue (aligned with screenpipe max_buffer_size scale)",
     )
     stats_interval_sec: int = Field(
-        default=60,
+        default=120,
         alias="OPENRECALL_STATS_INTERVAL_SEC",
         description="Statistics logging interval in seconds",
     )
@@ -326,10 +326,20 @@ class Settings(BaseSettings):
         alias="OPENRECALL_SIMHASH_CACHE_SIZE",
         description="Number of recent PHash values to cache per device for similarity checks",
     )
-    simhash_heartbeat_interval_sec: int = Field(
-        default=300,
-        alias="OPENRECALL_SIMHASH_HEARTBEAT_SEC",
-        description="Force capture if no frames spooled for this duration (seconds)",
+    simhash_enabled_for_click: bool = Field(
+        default=True,
+        alias="OPENRECALL_SIMHASH_ENABLED_FOR_CLICK",
+        description="Enable simhash dedup for click triggers (idle always skips simhash)",
+    )
+    simhash_enabled_for_app_switch: bool = Field(
+        default=False,
+        alias="OPENRECALL_SIMHASH_ENABLED_FOR_APP_SWITCH",
+        description="Enable simhash dedup for app_switch triggers (idle always skips simhash)",
+    )
+    max_skip_duration_sec: int = Field(
+        default=30,
+        alias="OPENRECALL_MAX_SKIP_DURATION_SEC",
+        description="Force capture after this many seconds of skipped frames (safety valve for simhash)",
     )
     client_save_local_screenshots: bool = Field(
         default=False,

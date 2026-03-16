@@ -86,7 +86,14 @@ tests/
 > P1-S2b 开发方式（已冻结）：S2b 采用 TDD 开发；`test_p1_s2b_routing.py`、`test_p1_s2b_device_binding.py` 等测试文件是随功能演进自然沉淀的阶段交付物，不要求在开工前一次性补齐。`scripts/acceptance/p1_s2b_local.sh` 属于 Exit Gate 编排层，应在阶段收口时补齐并执行。
 
 ### P1-S3（处理）
-- `test_ocr_pipeline.py` — OCR-only 处理、`ocr_text` 写入与失败语义
+
+> **详细测试清单**：参见 `acceptance/phase1/p1-s3.md` §1.3，本文件为高层映射
+
+- `test_p1_s3_ocr_pipeline.py` — OCR-only 处理端到端流程
+- `test_p1_s3_ocr_text_write.py` — `ocr_text` 表写入逻辑
+- `test_p1_s3_text_source_mark.py` — `frames.text_source='ocr'` 标记逻辑
+- `test_p1_s3_failed_semantic.py` — OCR 失败帧 `failed` 状态语义
+- `test_p1_s3_ui_*.py` — UI 展示验收测试（E2E）
 
 ### P1-S4（检索）
 - `test_search_api.py` — FTS、过滤参数、OCR-only 搜索契约

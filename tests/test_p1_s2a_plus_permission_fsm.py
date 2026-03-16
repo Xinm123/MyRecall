@@ -324,7 +324,7 @@ def test_degraded_capture_loop_blocks_idle_fallback_until_recovered(
 
     def _degraded_sleep() -> None:
         calls["degraded_sleep"] += 1
-        recorder._stop_requested = True
+        recorder._stop_event.set()
 
     monkeypatch.setattr(recorder, "_degraded_sleep", _degraded_sleep)
     monkeypatch.setattr("openrecall.client.recorder.time.time", lambda: 100.0)

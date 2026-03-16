@@ -18,7 +18,7 @@ MyRecall-v3 operates primarily as an OCR-only, vision-only application. As defin
 - Maintain an in-memory `SimhashCache` to keep track of the most recent frame PHash values.
 - Introduce similarity detection logic that compares new frames' PHash values to cached ones based on a Hamming distance threshold.
 - Drop frames deemed "similar" before they enter the spool queue (and before `capture_id` generation).
-- Implement a heartbeat fallback: if frames are dropped consecutively for a specific period, force capture a frame to ensure the timeline remains continuous.
+- Ensure timeline continuity via IDLE triggers which always skip simhash dedup (guaranteed periodic frame capture).
 
 **Non-Goals:**
 - Offloading the similarity check or PHash computation to the Server/Edge.
@@ -61,11 +61,12 @@ MyRecall-v3 operates primarily as an OCR-only, vision-only application. As defin
 - **Rationale**: Complies with the architectural boundary defined for P1-S2b+. Dropping early saves disk space (spool queue) and avoids unnecessary event processing downstream.
 - **Alternatives Considered**: Post-spool dropping (wastes disk I/O).
 
-**4. Heartbeat Fallback Mechanism**
-- **Decision**: If frames are continuously dropped for a duration exceeding the heartbeat threshold, force the next frame to be captured and enqueued regardless of similarity.
-- **Rationale**: Prevents long gaps in the capture timeline which might be misinterpreted as client crashes or inactivity by the server.
-- **Alternatives Considered**: Generating empty "heartbeat" events without frames (complicates data contracts and spool consumer logic).
-- **Screenpipe pattern**: 'aligned'.
+**4. IDLE Trigger Always Bypasses Simhash**
+- **Decision**: IDLE triggers always skip simhash dedup and are enqueued directly. This ensures timeline continuity even when the screen is static.
+- **Rationale**: The IDLE trigger fires every `idle_capture_interval_ms` (default: 30 seconds), guaranteeing periodic frame capture. This eliminates the need for a separate heartbeat mechanism while ensuring no long gaps in the capture timeline.
+- **Configuration**: Simhash dedup can be independently enabled/disabled for CLICK and APP_SWITCH triggers via `simhash_enabled_for_click` and `simhash_enabled_for_app_switch`.
+- **Alternatives Considered**: Heartbeat fallback mechanism (added complexity, required additional configuration).
+- **Screenpipe pattern**: 'aligned' (Screenpipe uses periodic capture as timeline anchor).
 
 ## Configuration Management
 
@@ -76,7 +77,10 @@ All PHash-related parameters are defined in `openrecall/shared/config.py` and ca
 | `simhash_dedup_enabled` | `true` | `OPENRECALL_SIMHASH_DEDUP_ENABLED` | Host process | No (restart required) |
 | `simhash_dedup_threshold` | `8` | `OPENRECALL_SIMHASH_DEDUP_THRESHOLD` | Host process | No (restart required) |
 | `simhash_cache_size_per_device` | `1` | `OPENRECALL_SIMHASH_CACHE_SIZE` | Host process | No (restart required) |
-| `simhash_heartbeat_interval_sec` | `300` | `OPENRECALL_SIMHASH_HEARTBEAT_SEC` | Host process | No (restart required) |
+| `simhash_enabled_for_click` | `true` | `OPENRECALL_SIMHASH_ENABLED_FOR_CLICK` | Host process | No (restart required) |
+| `simhash_enabled_for_app_switch` | `true` | `OPENRECALL_SIMHASH_ENABLED_FOR_APP_SWITCH` | Host process | No (restart required) |
+
+**Note**: IDLE triggers always skip simhash dedup regardless of configuration, ensuring timeline continuity.
 
 **Configuration Priority**: Environment variable > Default value
 

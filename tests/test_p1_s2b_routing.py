@@ -274,7 +274,7 @@ def test_filtered_routing_produces_outcome_without_spool_enqueue(
         recorder,
         "_wait_for_trigger",
         lambda **kwargs: (
-            setattr(recorder, "_stop_requested", True)
+            recorder._stop_event.set()
             or TriggerEvent(
                 capture_trigger=CaptureTrigger.APP_SWITCH,
                 device_name="monitor_display-b",

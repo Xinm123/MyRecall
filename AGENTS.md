@@ -155,11 +155,19 @@ Common vars:
 - `OPENRECALL_DEVICE`
 
 Event-Driven Capture (P1-S2a+):
-- `OPENRECALL_MIN_CAPTURE_INTERVAL_MS` — Debounce interval (default: 1000)
+- `OPENRECALL_MIN_CAPTURE_INTERVAL_MS` — Debounce interval (default: 2000)
 - `OPENRECALL_IDLE_CAPTURE_INTERVAL_MS` — Idle fallback interval (default: 30000)
 - `OPENRECALL_PERMISSION_POLL_INTERVAL_SEC` — Permission check interval (default: 10)
 - `OPENRECALL_TRIGGER_QUEUE_CAPACITY` — Trigger queue size (default: 64)
 - `OPENRECALL_STATS_INTERVAL_SEC` — Stats logging interval (default: 60)
+
+Simhash Dedup (P1-S2b+):
+- `OPENRECALL_SIMHASH_DEDUP_ENABLED` — Enable PHash-based dedup (default: true)
+- `OPENRECALL_SIMHASH_DEDUP_THRESHOLD` — Hamming distance threshold (default: 8)
+- `OPENRECALL_SIMHASH_CACHE_SIZE` — Hashes cached per device (default: 1)
+- `OPENRECALL_SIMHASH_ENABLED_FOR_CLICK` — Dedup for click triggers (default: true)
+- `OPENRECALL_SIMHASH_ENABLED_FOR_APP_SWITCH` — Dedup for app_switch triggers (default: true)
+- Note: IDLE triggers always skip simhash (ensures periodic frame capture)
 
 ## Agent Rules from Cursor / Copilot
 

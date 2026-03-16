@@ -166,9 +166,9 @@ def test_manual_and_idle_share_the_same_debounce_gate() -> None:
         TriggerEvent(
             capture_trigger=CaptureTrigger.IDLE,
             device_name="monitor_1",
-            event_ts="2026-03-10T00:00:01.100Z",
+            event_ts="2026-03-10T00:00:03.100Z",
         ),
-        now_ms=2100,
+        now_ms=3100,
     )
 
     assert accepted_manual is True

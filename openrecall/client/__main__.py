@@ -34,9 +34,7 @@ def main():
     logger.info(f"Server API: {settings.api_url}")
     logger.info(f"Min capture interval: {settings.min_capture_interval_ms}ms")
     logger.info(f"Idle capture interval: {settings.idle_capture_interval_ms}ms")
-    logger.info(
-        f"Simhash heartbeat interval: {settings.simhash_heartbeat_interval_sec}s"
-    )
+    logger.info(f"Simhash dedup: click={settings.simhash_enabled_for_click}, app_switch={settings.simhash_enabled_for_app_switch}")
     logger.info(f"Trigger queue capacity: {settings.trigger_queue_capacity}")
     logger.info(f"Upload timeout: {settings.upload_timeout}s")
     logger.info(f"Primary monitor only: {settings.primary_monitor_only}")
