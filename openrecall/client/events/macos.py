@@ -1,21 +1,23 @@
 from __future__ import annotations
 
 import logging
-import queue
 import threading
 import time
-from typing import Callable
+from typing import TYPE_CHECKING, Callable
 
 import mss
 
 from openrecall.client.events.base import (
     CaptureTrigger,
-    EventTapMetrics,
+    LockFreeDebouncer,
     MonitorDescriptor,
-    RawClickEvent,
     TriggerEvent,
+    TriggerEventChannel,
     utc_now_iso,
 )
+
+if TYPE_CHECKING:
+    pass
 
 logger = logging.getLogger(__name__)
 
@@ -91,38 +93,43 @@ def list_monitors(primary_only: bool = False) -> list[MonitorDescriptor]:
 
 
 class MacOSEventTap:
-    """macOS event tap for click detection with lock-free callback.
+    """macOS event tap for click detection with single-layer architecture.
 
-    Architecture:
-    - CGEventTap callback (in CGEventTap thread): Only captures coordinates
-      and puts RawClickEvent into a queue - NO LOCKS, completely non-blocking.
-    - Processor thread: Pulls raw events, does monitor lookup (which may need
-      locks), and invokes the callback with full TriggerEvent.
+    Architecture (simplified from v3.1):
+    - CGEventTap callback (in CGEventTap thread): Directly creates TriggerEvent
+      and puts to TriggerEventChannel - uses lock-free debouncer and monitor lookup.
+    - No intermediate queue or processor thread.
 
-    This prevents the system lag caused by blocking operations in the CGEventTap
-    callback, which runs on a high-priority system thread.
+    Key optimizations:
+    - Lock-free debouncer (LockFreeDebouncer) - no lock acquisition in callback
+    - Lock-free monitor lookup (MonitorRegistry.match_point uses Copy-on-Write)
+    - Non-blocking put to TriggerEventChannel (put_nowait)
+
+    CRITICAL: The callback MUST check _stop_event before processing to prevent
+    events from being processed after stop() is called.
     """
 
     def __init__(
         self,
-        callback: Callable[[TriggerEvent], None],
+        trigger_channel: "TriggerEventChannel",
+        debouncer: "LockFreeDebouncer",
         monitor_lookup: Callable[[float, float], MonitorDescriptor | None],
     ) -> None:
-        self._callback = callback
+        self._trigger_channel = trigger_channel
+        self._debouncer = debouncer
         self._monitor_lookup = monitor_lookup
         self._event_tap = None
         self._run_loop_source = None
         self._run_loop = None
         self._event_tap_thread: threading.Thread | None = None
-
-        # Lock-free raw event queue (put_nowait is non-blocking)
-        # Increased from 256 to 1024 to reduce event drops during high-frequency operations
-        self._raw_click_queue: queue.Queue[RawClickEvent] = queue.Queue(maxsize=1024)
         self._stop_event = threading.Event()
-        self._processor_thread: threading.Thread | None = None
+        self._callback_active = threading.Event()  # Track callback execution
 
-        # Observability metrics
-        self._metrics = EventTapMetrics()
+        # Observability metrics (atomic counters, no locks)
+        self._events_received: int = 0
+        self._events_dropped: int = 0
+        self._events_debounced: int = 0
+        self._monitor_misses: int = 0
 
         # Cache Quartz constants to avoid getattr in callback
         if Quartz is not None:
@@ -136,46 +143,44 @@ class MacOSEventTap:
             self._quartz_other_mouse_up = None
             self._quartz_event_get_location = None
 
-    @property
-    def metrics(self) -> EventTapMetrics:
-        """Access to observability metrics."""
-        return self._metrics
+    def get_metrics(self) -> dict[str, int]:
+        """Return current metrics snapshot."""
+        return {
+            "events_received": self._events_received,
+            "events_dropped": self._events_dropped,
+            "events_debounced": self._events_debounced,
+            "monitor_misses": self._monitor_misses,
+        }
 
     def start(self) -> None:
-        """Start the event tap and processor thread."""
-        if self._processor_thread is not None and self._processor_thread.is_alive():
+        """Start the event tap thread."""
+        if self._event_tap_thread is not None and self._event_tap_thread.is_alive():
             return
 
-        # Start processor thread first (handles raw events)
         self._stop_event.clear()
-        self._processor_thread = threading.Thread(
-            target=self._process_raw_events,
-            daemon=True,
-            name="ClickEventProcessor",
-        )
-        self._processor_thread.start()
 
-        # Then start CGEventTap thread
+        # Start CGEventTap thread (no separate processor thread needed)
         self._event_tap_thread = threading.Thread(
             target=self._run_event_tap, daemon=True, name="MacOSEventTap"
         )
         self._event_tap_thread.start()
 
     def stop(self) -> None:
-        """Stop event tap and processor thread gracefully.
+        """Stop event tap gracefully.
 
         Cleanup order (critical for macOS):
-        1. Signal stop to threads
+        1. Signal stop to thread (callback will check this)
         2. Disable CGEventTap BEFORE removing from RunLoop
         3. Stop RunLoop
         4. Remove RunLoop source
         5. Invalidate (release) the CFMachPort
-        6. Wait for threads
+        6. Wait for thread AND for any in-progress callback to complete
         """
+        # Step 1: Signal stop - callback checks _stop_event
         self._stop_event.set()
 
         if Quartz is not None:
-            # Step 1: Disable event tap FIRST to stop receiving new events
+            # Step 2: Disable event tap FIRST to stop receiving new events
             if self._event_tap is not None:
                 try:
                     cg_event_tap_enable = getattr(Quartz, "CGEventTapEnable", None)
@@ -184,7 +189,7 @@ class MacOSEventTap:
                 except Exception as e:
                     logger.debug("Error disabling CGEventTap: %s", e)
 
-            # Step 2: Stop the RunLoop so it exits the run loop
+            # Step 3: Stop the RunLoop so it exits the run loop
             if self._run_loop is not None:
                 try:
                     cf_run_loop_stop = getattr(Quartz, "CFRunLoopStop", None)
@@ -193,7 +198,7 @@ class MacOSEventTap:
                 except Exception as e:
                     logger.debug("Error stopping RunLoop: %s", e)
 
-            # Step 3: Remove source from RunLoop
+            # Step 4: Remove source from RunLoop
             if self._run_loop is not None and self._run_loop_source is not None:
                 try:
                     run_loop_remove_source = getattr(Quartz, "CFRunLoopRemoveSource", None)
@@ -207,7 +212,7 @@ class MacOSEventTap:
                 except Exception as e:
                     logger.debug("Error removing RunLoop source: %s", e)
 
-            # Step 4: Invalidate (release) the CFMachPort - critical for complete cleanup
+            # Step 5: Invalidate (release) the CFMachPort - critical for complete cleanup
             if self._event_tap is not None:
                 try:
                     cf_mach_port_invalidate = getattr(Quartz, "CFMachPortInvalidate", None)
@@ -221,58 +226,17 @@ class MacOSEventTap:
             self._run_loop_source = None
             self._run_loop = None
 
-        # Step 5: Wait for processor thread (increased timeout)
-        if self._processor_thread is not None and self._processor_thread.is_alive():
-            self._processor_thread.join(timeout=2.0)
-
-        # Step 6: Wait for CGEventTap thread (increased timeout)
+        # Step 6: Wait for CGEventTap thread with longer timeout
         if self._event_tap_thread is not None and self._event_tap_thread.is_alive():
-            self._event_tap_thread.join(timeout=2.0)
+            self._event_tap_thread.join(timeout=3.0)
+
+        # Step 7: Wait for any in-progress callback to complete
+        # This prevents events from being processed after stop() returns
+        wait_start = time.time()
+        while self._callback_active.is_set() and (time.time() - wait_start) < 1.0:
+            time.sleep(0.01)
 
         logger.info("CGEventTap stopped and resources released")
-
-    def _process_raw_events(self) -> None:
-        """Processor thread: handles raw click events from queue.
-
-        This thread does the heavy lifting (monitor lookup, callback invocation)
-        so the CGEventTap callback never blocks.
-        """
-        while not self._stop_event.is_set():
-            try:
-                # Get raw event with timeout to allow checking stop flag
-                raw_event = self._raw_click_queue.get(timeout=0.05)
-            except queue.Empty:
-                continue
-
-            start_time = time.time()
-            try:
-                # Monitor lookup (lock-free with Copy-on-Write registry)
-                monitor = self._monitor_lookup(raw_event.x, raw_event.y)
-                if monitor is None:
-                    logger.debug(
-                        "dropped click trigger: no monitor for point x=%.1f y=%.1f",
-                        raw_event.x,
-                        raw_event.y,
-                    )
-                    self._metrics.record_monitor_miss()
-                    continue
-
-                # Invoke callback with full TriggerEvent
-                self._callback(
-                    TriggerEvent(
-                        capture_trigger=CaptureTrigger.CLICK,
-                        device_name=monitor.device_name,
-                        event_ts=raw_event.event_ts,
-                        active_app=None,
-                        active_window=None,
-                    )
-                )
-
-                # Record processing latency
-                latency_ms = (time.time() - start_time) * 1000
-                self._metrics.record_processed(latency_ms)
-            except Exception:
-                logger.debug("Error processing raw click event", exc_info=True)
 
     def _run_event_tap(self) -> None:
         """Run CGEventTap in its own thread."""
@@ -368,9 +332,15 @@ class MacOSEventTap:
         This runs on a high-priority system thread. ANY blocking operation
         (lock acquisition, I/O, sleep) will cause system lag.
 
-        We only capture coordinates and put them in a queue - no locks needed.
-        Metrics are updated inline (simple counter increments are atomic in Python).
+        Single-layer architecture: directly create TriggerEvent and put to channel.
+        Uses lock-free debouncer and lock-free monitor lookup.
+
+        CRITICAL: Check _stop_event FIRST to prevent processing after stop().
         """
+        # CRITICAL: Check stop flag FIRST - prevents processing after stop()
+        if self._stop_event.is_set():
+            return event
+
         # Quick filter for mouse up events
         if event_type not in {
             self._quartz_left_mouse_up,
@@ -381,27 +351,56 @@ class MacOSEventTap:
         if self._quartz_event_get_location is None:
             return event
 
+        # Mark callback as active for stop() synchronization
+        self._callback_active.set()
+
         try:
+            # Double-check stop flag after setting active
+            if self._stop_event.is_set():
+                return event
+
             # Get click location
             location = self._quartz_event_get_location(event)
+            x = float(location.x)
+            y = float(location.y)
 
-            # Create minimal raw event - no locks, no monitor lookup
-            raw_event = RawClickEvent(
-                x=float(location.x),
-                y=float(location.y),
+            # Lock-free monitor lookup (Copy-on-Write registry)
+            monitor = self._monitor_lookup(x, y)
+            if monitor is None:
+                self._monitor_misses += 1
+                return event
+
+            # Lock-free debounce check
+            now_ms = int(time.time() * 1000)
+            if not self._debouncer.should_fire(monitor.device_name, now_ms):
+                self._events_debounced += 1
+                return event
+
+            # Final check before creating event
+            if self._stop_event.is_set():
+                return event
+
+            # Create TriggerEvent directly
+            trigger_event = TriggerEvent(
+                capture_trigger=CaptureTrigger.CLICK,
+                device_name=monitor.device_name,
                 event_ts=utc_now_iso(),
+                active_app=None,
+                active_window=None,
             )
 
-            # Non-blocking put - drops event if queue full rather than block
-            self._raw_click_queue.put_nowait(raw_event)
-            # Simple counter increment - atomic, no lock needed for just incrementing
-            self._metrics.raw_events_received += 1
-        except queue.Full:
-            # Queue full - drop event rather than block
-            self._metrics.raw_events_dropped += 1
+            # Non-blocking put to TriggerEventChannel
+            if self._trigger_channel.put(trigger_event):
+                self._events_received += 1
+            else:
+                self._events_dropped += 1
+
         except Exception:
             # Never propagate exceptions in callback
             pass
+        finally:
+            # Always clear active flag
+            self._callback_active.clear()
 
         return event
 

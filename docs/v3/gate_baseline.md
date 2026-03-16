@@ -239,15 +239,20 @@ Soft KPI（non-blocking）：
   - Card Footer - 文本预览：`ocr_text_preview`（前 100 字符）
   - Card Footer - 错误信息：`error_message`（failed 状态时显示）
 - 阈值：`= 100%`
-- 验证方式：人工/自动化抽检（详见 `acceptance/phase1/p1-s3.md` §3.9）
+- 验证方式：人工/自动化抽检（详见 `acceptance/phase1/p1-s3.md` §3.11）
 - 说明：`text_source` 在 v3 OCR-only 下固定为 `'ocr'`，不作为 UI 必展示字段；`frame_id` 为内部标识，不要求卡片展示
+
+6. `ocr_engine_consistency`（Hard Gate）
+- 公式：`ocr_engine_consistency = (ocr_engine='rapidocr' 的 ocr_text 行数 / completed 帧关联的 ocr_text 总行数) * 100%`
+- 阈值：`= 100%`
+- 说明：P1 OCR 引擎固定为 RapidOCR（single-engine policy），引擎不一致应阻塞
+- 验证方式：`SELECT COUNT(*) FROM ocr_text ot JOIN frames f ON ot.frame_id=f.id WHERE f.status='completed' AND (ot.ocr_engine IS NULL OR ot.ocr_engine != 'rapidocr');` 结果必须为 0
 
 ### Soft KPI（non-blocking）
 
 | 指标 | 说明 |
 |------|------|
 | `ocr_processing_latency_p95` | OCR 处理耗时分布（P50/P90/P95/P99），目标 <= 10s |
-| `ocr_engine_consistency` | RapidOCR 引擎运行时一致性检查 |
 
 ---
 

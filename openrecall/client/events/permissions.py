@@ -149,6 +149,8 @@ def detect_permissions() -> PermissionCheckResult:
     left_mouse_down = getattr(Quartz, "kCGEventLeftMouseDown", None)
     right_mouse_down = getattr(Quartz, "kCGEventRightMouseDown", None)
     other_mouse_down = getattr(Quartz, "kCGEventOtherMouseDown", None)
+    cf_mach_port_invalidate = getattr(Quartz, "CFMachPortInvalidate", None)
+
     if None in {
         event_tap_create,
         event_mask_bit,
@@ -179,6 +181,7 @@ def detect_permissions() -> PermissionCheckResult:
     def _handle_event(_proxy, _event_type, event, _refcon):
         return event
 
+    event_tap = None
     try:
         event_tap = event_tap_create(
             session_event_tap,
@@ -194,6 +197,14 @@ def detect_permissions() -> PermissionCheckResult:
 
     if event_tap is None:
         return PermissionCheckResult(ok=False, reason="input_monitoring_denied")
+
+    # CRITICAL: Release the event tap to prevent resource leak
+    # The tap is created but never added to a RunLoop, so we just need to invalidate it
+    if cf_mach_port_invalidate is not None:
+        try:
+            cf_mach_port_invalidate(event_tap)
+        except Exception:
+            pass  # Ignore cleanup errors
 
     return PermissionCheckResult(ok=True, reason="granted")
 

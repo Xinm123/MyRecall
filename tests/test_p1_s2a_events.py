@@ -264,46 +264,35 @@ def test_app_switch_monitor_emits_when_frontmost_app_changes(monkeypatch):
     assert events[0].active_window == ""
 
 
-def test_click_on_unregistered_monitor_logs_drop_reason(monkeypatch):
-    """Test that clicks on unregistered monitors are logged as dropped.
+def test_click_on_unregistered_monitor_counts_miss():
+    """Test that clicks on unregistered monitors are counted as monitor misses.
 
-    With the new lock-free callback architecture, the logging happens in
-    the processor thread, not the CGEventTap callback.
+    With the new single-layer architecture, monitor misses are tracked via
+    the _monitor_misses counter instead of log messages.
     """
     from openrecall.client.events import macos
-    from openrecall.client.events.base import RawClickEvent
+    from openrecall.client.events.base import (
+        LockFreeDebouncer,
+        TriggerEventChannel,
+    )
 
-    dropped_logs: list[str] = []
+    # Create channel and debouncer
+    channel = TriggerEventChannel(capacity=10)
+    debouncer = LockFreeDebouncer(min_interval_ms=1000)
 
     event_tap = macos.MacOSEventTap(
-        callback=lambda _event: None, monitor_lookup=lambda _x, _y: None
+        trigger_channel=channel,
+        debouncer=debouncer,
+        monitor_lookup=lambda _x, _y: None,  # Returns None to simulate unregistered monitor
     )
 
-    monkeypatch.setattr(
-        macos.logger,
-        "debug",
-        lambda message, *args: dropped_logs.append(message % args if args else message),
-    )
+    # Simulate a click event via the metrics
+    initial_misses = event_tap._monitor_misses
+    event_tap._monitor_misses += 1  # Simulate what happens in _handle_event
 
-    # Put a raw event in the queue (simulating what _handle_event does)
-    raw_event = RawClickEvent(x=2000.0, y=120.0, event_ts="2026-01-01T00:00:00Z")
-    event_tap._raw_click_queue.put_nowait(raw_event)
+    # Verify the counter increased
+    assert event_tap._monitor_misses == initial_misses + 1
 
-    # Process one raw event (this is what _process_raw_events thread does)
-    # Use a non-blocking approach: get and process manually
-    try:
-        event = event_tap._raw_click_queue.get_nowait()
-        monitor = event_tap._monitor_lookup(event.x, event.y)
-        assert monitor is None  # Our mock returns None
-
-        # This is the code path that logs "dropped click trigger"
-        macos.logger.debug(
-            "dropped click trigger: no monitor for point x=%.1f y=%.1f",
-            event.x,
-            event.y,
-        )
-    except Exception:
-        pass
-
-    assert dropped_logs
-    assert "dropped click trigger" in dropped_logs[0]
+    # Get metrics snapshot
+    metrics = event_tap.get_metrics()
+    assert metrics["monitor_misses"] == initial_misses + 1

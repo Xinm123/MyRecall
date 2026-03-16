@@ -13,6 +13,7 @@ from numpy.typing import NDArray
 
 from openrecall.client.events.base import (
     CaptureTrigger,
+    LockFreeDebouncer,
     MonitorDescriptor,
     MonitorRegistry,
     RoutedCaptureTask,
@@ -195,7 +196,12 @@ class ScreenRecorder:
         self._trigger_channel: TriggerEventChannel = TriggerEventChannel(
             settings.trigger_queue_capacity
         )
+        # Debouncer for IDLE and APP_SWITCH events (used in _emit_trigger)
         self._trigger_debouncer: TriggerDebouncer = TriggerDebouncer(
+            settings.min_capture_interval_ms
+        )
+        # Lock-free debouncer for CLICK events (used in CGEventTap callback)
+        self._click_debouncer: LockFreeDebouncer = LockFreeDebouncer(
             settings.min_capture_interval_ms
         )
         self._monitor_registry: MonitorRegistry = MonitorRegistry()
@@ -458,6 +464,7 @@ class ScreenRecorder:
         if previous_snapshot != current_snapshot:
             self._topology_epoch += 1
             self._trigger_debouncer.reset_all()
+            self._click_debouncer.reset_all()  # Also reset click debouncer on topology change
             self._warned_blank_devices.clear()
 
         previous_devices = set(self._enabled_monitor_devices)
@@ -489,25 +496,32 @@ class ScreenRecorder:
 
     def _start_event_sources(self) -> None:
         if self._event_tap is None:
+            # New single-layer architecture: pass trigger_channel and lock-free debouncer
             self._event_tap = MacOSEventTap(
-                callback=self._handle_external_trigger,
+                trigger_channel=self._trigger_channel,
+                debouncer=self._click_debouncer,
                 monitor_lookup=self._monitor_registry.match_point,
             )
             self._event_tap.start()
         if self._app_switch_monitor is None:
+            # App switch still uses callback pattern (runs in regular Python thread)
             self._app_switch_monitor = MacOSAppSwitchMonitor(
-                callback=self._handle_external_trigger,
+                callback=self._handle_app_switch_trigger,
                 monitor_lookup=self._monitor_registry.match_point,
             )
             self._app_switch_monitor.start()
 
-    def _handle_external_trigger(self, event: TriggerEvent) -> None:
+    def _handle_app_switch_trigger(self, event: TriggerEvent) -> None:
+        """Handle APP_SWITCH triggers from MacOSAppSwitchMonitor.
+
+        Note: CLICK events now go directly to trigger_channel via MacOSEventTap.
+        This callback only handles APP_SWITCH events.
+        """
         if self._permission_state_machine.is_degraded():
             logger.debug(
-                "Ignoring external trigger while permission is degraded: status=%s reason=%s trigger=%s",
+                "Ignoring app switch trigger while permission is degraded: status=%s reason=%s",
                 self._last_permission_snapshot.status.value,
                 self._last_permission_snapshot.reason,
-                event.capture_trigger.value,
             )
             return
         self._emit_trigger(event)

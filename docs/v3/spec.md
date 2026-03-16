@@ -309,7 +309,7 @@ def handle_ingest(payload):
 1. 截图持久化独立于 OCR 结果，OCR 成功或失败均不得阻塞截图落盘。
 2. Edge 对进入处理队列的帧执行 RapidOCR。
 3. OCR 成功时：写入 `ocr_text` 行，并将 `frames.text_source='ocr'`。
-4. OCR 失败时：该帧标记为 `failed`；不得伪造 `text_source='accessibility'` 或写入伪 UI 结果。
+4. OCR 失败时（含异常、返回 None、返回空文本 `""`）：该帧标记为 `failed`；不得伪造 `text_source='accessibility'` 或写入伪 UI 结果。空文本返回的 `error_message` 为 `'OCR_EMPTY_TEXT'`。
 5. `accessibility` / `accessibility_fts` 与相关列保留为 v4 seam，但不参与 v3 主线数据流与 Gate。
 
 #### 写入路径（v3 OCR-only）

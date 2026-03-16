@@ -232,8 +232,9 @@ def test_start_event_sources_wires_both_macos_emitters(monkeypatch):
     started: list[str] = []
 
     class _FakeTap:
-        def __init__(self, callback, monitor_lookup):
-            self.callback = callback
+        def __init__(self, trigger_channel, debouncer, monitor_lookup):
+            self.trigger_channel = trigger_channel
+            self.debouncer = debouncer
             self.monitor_lookup = monitor_lookup
 
         def start(self):

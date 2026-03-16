@@ -3,8 +3,7 @@ from __future__ import annotations
 import logging
 import queue
 import threading
-from collections import deque
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from enum import Enum
 from typing import TypeAlias
@@ -139,18 +138,6 @@ class MonitorRegistry:
 
 
 @dataclass(frozen=True)
-class RawClickEvent:
-    """Minimal click event for lock-free CGEventTap callback queue.
-
-    Contains only coordinates and timestamp - no locks needed in callback.
-    The processor thread will enrich this with monitor lookup.
-    """
-    x: float
-    y: float
-    event_ts: str
-
-
-@dataclass(frozen=True)
 class TriggerEvent:
     capture_trigger: CaptureTrigger
     device_name: str
@@ -182,60 +169,6 @@ class RoutedCaptureTask:
     routing_topology_epoch: int
     event_ts: str
     routing_hints: EventPayload
-
-
-@dataclass
-class EventTapMetrics:
-    """Observability metrics for CGEventTap and processor thread.
-
-    Tracks counts and latency for monitoring and debugging.
-    All fields are mutable for in-place updates.
-    """
-    raw_events_received: int = 0
-    raw_events_dropped: int = 0  # queue full
-    events_processed: int = 0
-    monitor_lookup_misses: int = 0
-    processing_latency_samples: deque[float] = field(default_factory=lambda: deque(maxlen=100))
-
-    def record_raw_event(self) -> None:
-        """Called when a raw click event is received in the callback."""
-        self.raw_events_received += 1
-
-    def record_dropped(self) -> None:
-        """Called when a raw event is dropped due to queue full."""
-        self.raw_events_dropped += 1
-
-    def record_processed(self, latency_ms: float) -> None:
-        """Called when an event is fully processed."""
-        self.events_processed += 1
-        # deque with maxlen automatically handles size limit - O(1) append
-        self.processing_latency_samples.append(latency_ms)
-
-    def record_monitor_miss(self) -> None:
-        """Called when monitor lookup fails for a click coordinate."""
-        self.monitor_lookup_misses += 1
-
-    def snapshot(self) -> dict[str, object]:
-        """Return a snapshot of current metrics."""
-        samples = list(self.processing_latency_samples)  # Convert for JSON serialization
-        avg_latency = sum(samples) / len(samples) if samples else 0.0
-        max_latency = max(samples) if samples else 0.0
-        return {
-            "raw_events_received": self.raw_events_received,
-            "raw_events_dropped": self.raw_events_dropped,
-            "events_processed": self.events_processed,
-            "monitor_lookup_misses": self.monitor_lookup_misses,
-            "avg_processing_latency_ms": round(avg_latency, 2),
-            "max_processing_latency_ms": round(max_latency, 2),
-        }
-
-    def reset(self) -> None:
-        """Reset all counters (keeps latency samples bounded)."""
-        self.raw_events_received = 0
-        self.raw_events_dropped = 0
-        self.events_processed = 0
-        self.monitor_lookup_misses = 0
-        self.processing_latency_samples.clear()
 
 
 class TriggerDebouncer:
@@ -272,6 +205,52 @@ class TriggerDebouncer:
             count = self._debounced_count
             self._debounced_count = 0
             return count
+
+
+class LockFreeDebouncer:
+    """Lock-free debouncer for use in CGEventTap callback.
+
+    Designed for the high-priority CGEventTap thread where blocking on locks
+    would cause system lag. Uses atomic dict operations and accepts minor
+    race conditions (worst case: an extra event fires or one is debounced).
+
+    IMPORTANT: Only use should_fire() from the callback. Use reset_* methods
+    from normal Python threads (they use locks for consistency).
+    """
+
+    def __init__(self, min_interval_ms: int) -> None:
+        self._min_interval_ms: int = min_interval_ms
+        # No lock for should_fire - relies on GIL atomicity for dict operations
+        self._last_fire_ms: dict[str, int] = {}
+        self._lock: threading.Lock = threading.Lock()  # Only for reset/get operations
+
+    def should_fire(self, device_name: str, now_ms: int) -> bool:
+        """Lock-free check - safe to call from CGEventTap callback.
+
+        Uses atomic dict operations under GIL. Accepts minor race conditions:
+        - Two threads might both pass the check simultaneously (rare)
+        - This is acceptable for debouncing (just means an extra event)
+        """
+        last_fire_ms = self._last_fire_ms.get(device_name, 0)
+        if now_ms - last_fire_ms >= self._min_interval_ms:
+            # Atomic dict assignment under GIL
+            self._last_fire_ms[device_name] = now_ms
+            return True
+        return False
+
+    def reset_device(self, device_name: str) -> None:
+        """Thread-safe reset - call from normal Python thread."""
+        with self._lock:
+            self._last_fire_ms.pop(device_name, None)
+
+    def reset_all(self) -> None:
+        """Thread-safe reset - call from normal Python thread."""
+        with self._lock:
+            self._last_fire_ms.clear()
+
+    def update_interval(self, min_interval_ms: int) -> None:
+        """Update the minimum interval."""
+        self._min_interval_ms = min_interval_ms
 
 
 @dataclass(frozen=True)

@@ -1,30 +1,33 @@
 schema: spec-driven
 context: |
   Project: MyRecall-v3 (Edge-centric, vision-only, OCR-only). Reference repo: _ref/screenpipe
-  Current substage: P1-S2b+ (Simhash Similarity Detection / 感知哈希辅助检测)
+  Current substage: P1-S3 (OCR Processing / OCR-only 处理链路)
 
   Source precedence (MUST follow; do not invent local reinterpretation):
-  - docs/v3/spec.md - 架构与 frozen behavior SSOT (includes Two-layer Discard Logic)
+  - docs/v3/spec.md - 架构与 frozen behavior SSOT (includes OCR-only processing contract §4.3)
   - docs/v3/data-model.md - payload/data contract consequences
   - docs/v3/open_questions.md - 已冻结决策与 ownership boundary
-  - docs/v3/acceptance/phase1/p1-s2b-plus.md - current substage contract, evidence, executable scenarios
+  - docs/v3/acceptance/phase1/p1-s3.md - current substage contract, evidence, executable scenarios
   - docs/v3/gate_baseline.md - Gate/SLO formulas, thresholds, sample rules
+  - docs/v3/test_strategy.md - test classification and TDD guidance
 
   Supplemental references (use only for their own scope):
-  - docs/v3/acceptance/phase1/p1-s2b.md - S2b+ entry prerequisite and frozen capture baseline
-  - docs/v3/acceptance/phase1/p1-s3.md - downstream handoff boundary
+  - docs/v3/acceptance/phase1/p1-s2b.md - S2b frozen capture baseline
+  - docs/v3/acceptance/phase1/p1-s2b-plus.md - upstream entry prerequisite (simhash baseline)
   - docs/v3/http_contract_ledger.md - external HTTP delta
   - docs/v3/roadmap.md - planning context only; not behavior SSOT
 
   Precedence rule: higher-priority docs win over lower-priority docs; all docs win over this config.
   Conflict rule: if sources conflict, cite the higher-priority source and surface the conflict; do not synthesize a new rule.
 
-  Scope invariants (P1-S2b+):
+  Scope invariants (P1-S3):
   - Vision-only for P1-P3; macOS-only for P1.
   - Python implementation (ADR-0013).
   - OCR-only mainline (OQ-043).
-  - P1-S2b+ owns: PHash-based simhash computation, in-memory SimhashCache, similarity detection, pre-spool frame dropping, and heartbeat fallback.
-  - Architectural boundary: Simhash frame drop happens BEFORE spool enqueue and capture_id generation.
+  - P1-S3 owns: V3ProcessingWorker, OCR execution (RapidOCR), ocr_text persistence, frames.text_source='ocr' marking, failed semantics, processing_mode=ocr switching, UI card display.
+  - Architectural boundary: S3 processes frames already ingested (status='pending'); does NOT capture or modify capture-phase fields.
+  - Zero AI enhancement: No caption/keywords/fusion_text/embedding generation (OQ-014/OQ-015 deferred).
+  - OCR empty text = failed (error_message='OCR_EMPTY_TEXT'), no retry in P1.
 
 rules:
   proposal:
@@ -36,6 +39,8 @@ rules:
     - "Design must be codebase-grounded."
     - "For each material decision, if screenpipe has a comparable pattern, cite the screenpipe file path and label it as 'aligned', 'intentional divergence', or 'no comparable pattern'."
     - Must not invent retry policies, semantic states, or processing-stage meaning not present in the cited docs.
+    - "processing_mode switching must follow spec.md §4.7 three-way branch (noop/ocr/legacy); do not introduce new modes."
+    - "ocr_text writes must include app_name/window_name from the same frame's metadata (data-model.md Table 2 note)."
   tasks:
     - 'tasks.md must be split into two top-level sections: "## Implementation Tasks" (code changes) and "## Acceptance Verification" (verification actions).'
     - Every implementation task must be atomic.
