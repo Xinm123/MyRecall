@@ -348,18 +348,6 @@ class MacOSAppSwitchMonitor:
             ):
                 self._emit_app_switch(current_app)
             self._last_frontmost_app = current_app or self._last_frontmost_app
-            self._stop_event.wait(0.2)  # 200ms polling interval
-        """Fallback polling mode (original implementation)."""
-        self._last_frontmost_app = get_active_app_name() or get_frontmost_app_name()
-        while not self._stop_event.is_set():
-            current_app = get_active_app_name() or get_frontmost_app_name()
-            if (
-                current_app
-                and self._last_frontmost_app
-                and current_app != self._last_frontmost_app
-            ):
-                self._emit_app_switch(current_app)
-            self._last_frontmost_app = current_app or self._last_frontmost_app
             self._stop_event.wait(0.2)
 
     def _emit_app_switch(self, active_app: str) -> None:
