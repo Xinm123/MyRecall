@@ -298,6 +298,13 @@ def emit_app_switch(
 
 
 class MacOSAppSwitchMonitor:
+    """Monitor for application switches using polling.
+
+    Note: NSWorkspace notifications require an active NSApplication event loop
+    to dispatch notifications. For background daemon processes without a GUI,
+    polling is the most reliable approach with minimal CPU overhead.
+    """
+
     def __init__(
         self,
         callback: Callable[[TriggerEvent], None],
@@ -319,6 +326,7 @@ class MacOSAppSwitchMonitor:
             name="MacOSAppSwitchMonitor",
         )
         self._thread.start()
+        logger.info("App switch monitor started in polling mode")
 
     def stop(self) -> None:
         self._stop_event.set()
@@ -329,6 +337,19 @@ class MacOSAppSwitchMonitor:
         if AppKit is None:
             logger.warning("NSWorkspace unavailable; app switch listener disabled")
             return
+
+        self._last_frontmost_app = get_active_app_name() or get_frontmost_app_name()
+        while not self._stop_event.is_set():
+            current_app = get_active_app_name() or get_frontmost_app_name()
+            if (
+                current_app
+                and self._last_frontmost_app
+                and current_app != self._last_frontmost_app
+            ):
+                self._emit_app_switch(current_app)
+            self._last_frontmost_app = current_app or self._last_frontmost_app
+            self._stop_event.wait(0.2)  # 200ms polling interval
+        """Fallback polling mode (original implementation)."""
         self._last_frontmost_app = get_active_app_name() or get_frontmost_app_name()
         while not self._stop_event.is_set():
             current_app = get_active_app_name() or get_frontmost_app_name()
