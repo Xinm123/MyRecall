@@ -166,7 +166,7 @@ references:
     - S2b->S3 handoff 语义冻结：S3 仅依赖截图、`capture_trigger`、`device_name`、`focused_context` 等 capture-completion 产物
     - 上下文字段语义冻结：`focused_context = {app_name, window_name}`；`browser_url` 在 P1 保持 reserved/NULL，不作为 S2b->S3 active handoff 字段；`device_name` 为 same-cycle 的实际采样 monitor 绑定字段
     - 索引时零 AI 增强：不生成 `caption/keywords/fusion_text`，不写入 `ocr_text_embeddings`
-    - Frame 详情可见 OCR 处理来源与处理时间戳（在 `/timeline` 内呈现，不新增 `/frame/:id` 页面）
+    - Frame 详情可见 OCR 处理来源与处理时间戳（在 Grid `/` 的 frame 卡片下方呈现，不新增 `/frame/:id` 页面）
   - Gate：
     - OCR 成功帧写入 `ocr_text` 的正确率 = 100%
     - `frames.text_source='ocr'` 标记正确率 = 100%

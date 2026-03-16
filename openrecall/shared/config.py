@@ -307,6 +307,30 @@ class Settings(BaseSettings):
         alias="OPENRECALL_DISABLE_SIMILARITY_FILTER",
         description="Disable similarity-based deduplication and capture every cycle",
     )
+
+    # PHash-based Similarity Detection (P1-S2b+)
+    simhash_dedup_enabled: bool = Field(
+        default=True,
+        alias="OPENRECALL_SIMHASH_DEDUP_ENABLED",
+        description="Enable PHash-based similarity detection to drop redundant frames",
+    )
+    simhash_dedup_threshold: int = Field(
+        default=8,
+        ge=0,
+        le=64,
+        alias="OPENRECALL_SIMHASH_DEDUP_THRESHOLD",
+        description="Maximum Hamming distance for PHash similarity (0-64 bits)",
+    )
+    simhash_cache_size_per_device: int = Field(
+        default=1,
+        alias="OPENRECALL_SIMHASH_CACHE_SIZE",
+        description="Number of recent PHash values to cache per device for similarity checks",
+    )
+    simhash_heartbeat_interval_sec: int = Field(
+        default=300,
+        alias="OPENRECALL_SIMHASH_HEARTBEAT_SEC",
+        description="Force capture if no frames spooled for this duration (seconds)",
+    )
     client_save_local_screenshots: bool = Field(
         default=False,
         alias="OPENRECALL_CLIENT_SAVE_LOCAL_SCREENSHOTS",

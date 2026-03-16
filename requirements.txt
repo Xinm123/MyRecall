@@ -1,2 +1,3 @@
 rapidocr_onnxruntime
 scipy>=1.11.0
+imagehash>=4.3

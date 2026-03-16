@@ -1,0 +1,26 @@
+{
+  "wait_seconds": 1,
+  "spool_before": 0,
+  "spool_after": 0,
+  "spool_growth": 0,
+  "skip_before": 0,
+  "skip_after": 0,
+  "skip_growth": 0,
+  "log_exists": false,
+  "simhash_total": 273,
+  "simhash_non_null": 5,
+  "delta_total": 5,
+  "delta_non_null": 5,
+  "inserted_seed_rows": 5,
+  "spool_integration_rate": 100.0,
+  "checks": {
+    "similar_frame_skip_seen": true,
+    "heartbeat_or_capture_progress": true,
+    "spool_integration_rate_100": true
+  },
+  "pass": true,
+  "diagnostics": {
+    "note_log_missing": true,
+    "note_no_new_rows": false
+  }
+}

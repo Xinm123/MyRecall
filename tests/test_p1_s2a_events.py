@@ -260,7 +260,7 @@ def test_app_switch_monitor_emits_when_frontmost_app_changes(monkeypatch):
     assert len(events) == 1
     assert events[0].capture_trigger is CaptureTrigger.APP_SWITCH
     assert events[0].active_app == "Finder"
-    assert events[0].active_window == "Finder"
+    assert events[0].active_window is None
 
 
 def test_click_on_unregistered_monitor_logs_drop_reason(monkeypatch):

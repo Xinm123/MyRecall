@@ -36,6 +36,10 @@ from openrecall.client.events.permissions import (
     detect_permissions,
 )
 from openrecall.client.consumer import UploaderConsumer
+from openrecall.client.hash_utils import (
+    SimhashCache,
+    compute_phash,
+)
 from openrecall.client.spool import SpoolQueue, get_spool
 from openrecall.client.v3_uploader import SpoolUploader
 from openrecall.shared.config import settings
@@ -206,6 +210,11 @@ class ScreenRecorder:
         self._event_tap: MacOSEventTap | None = None
         self._app_switch_monitor: MacOSAppSwitchMonitor | None = None
 
+        # PHash-based similarity detection (P1-S2b+)
+        self._simhash_cache: SimhashCache = SimhashCache(
+            cache_size_per_device=settings.simhash_cache_size_per_device
+        )
+
         # Capture stats for periodic logging
         self._capture_counts: dict[CaptureTrigger, int] = {t: 0 for t in CaptureTrigger}
         self._latency_samples: list[float] = []
@@ -373,6 +382,8 @@ class ScreenRecorder:
     def stop(self) -> None:
         """Stop the recorder and consumer thread gracefully."""
         self._stop_requested = True
+        if self._event_tap is not None:
+            self._event_tap.stop()
         if self._app_switch_monitor is not None:
             self._app_switch_monitor.stop()
         if self.consumer is not None:
@@ -533,10 +544,17 @@ class ScreenRecorder:
         timeout = min_deadline - now_epoch
         return max(0.1, min(timeout, self._idle_interval_seconds))
 
-    def _snapshot_active_context(self) -> tuple[str, str]:
+    def _snapshot_active_context(self) -> tuple[str, str, str | None]:
         active_app = get_active_app_name() or get_frontmost_app_name()
         active_window = get_active_window_title_for_app(active_app)
-        return active_app, active_window
+
+        all_monitors = self._monitor_registry.list_monitors()
+        active_monitor = get_active_app_monitor(all_monitors)
+        active_monitor_device_name = (
+            active_monitor.device_name if active_monitor else None
+        )
+
+        return active_app, active_window, active_monitor_device_name
 
     def _build_capture_metadata(
         self,
@@ -544,29 +562,53 @@ class ScreenRecorder:
         *,
         context_active_app: str,
         context_active_window: str,
+        context_active_monitor_device_name: str | None = None,
         focused_monitor_device_name: str | None = None,
-    ) -> dict[str, str | None]:
-        if isinstance(routed_task, TriggerEvent):
-            if routed_task.capture_trigger is CaptureTrigger.APP_SWITCH:
-                active_app = routed_task.active_app or context_active_app
-                active_window = routed_task.active_window or context_active_window
-            else:
-                active_app = context_active_app or routed_task.active_app
-                active_window = context_active_window or routed_task.active_window
-            return {
-                "timestamp": utc_now_iso(),
-                "capture_trigger": routed_task.capture_trigger.value,
-                "device_name": routed_task.device_name,
-                "event_ts": routed_task.event_ts,
-                "active_app": active_app,
-                "active_window": active_window,
-                "app_name": active_app,
-                "window_name": active_window,
-            }
+    ) -> dict[str, str | int | None]:
+        # Identify target monitor name
+        target_device_name = (
+            routed_task.device_name
+            if isinstance(routed_task, TriggerEvent)
+            else routed_task.target_device_name
+        )
+
+        # Rule: Assign app/window metadata only if the active app is actually on this monitor
+        # or if we couldn't determine the monitor (fallback to focused monitor logic).
+        app_is_on_target_monitor = True
+        if (
+            context_active_monitor_device_name is not None
+            and context_active_monitor_device_name != target_device_name
+        ):
+            app_is_on_target_monitor = False
 
         app_name: str | None = None
         window_name: str | None = None
-        if focused_monitor_device_name == routed_task.target_device_name:
+
+        if isinstance(routed_task, TriggerEvent):
+            if routed_task.capture_trigger is CaptureTrigger.APP_SWITCH:
+                # For APP_SWITCH, the event already carries the correct monitor context
+                app_name = routed_task.active_app or context_active_app
+                window_name = routed_task.active_window or context_active_window
+            elif app_is_on_target_monitor:
+                app_name = context_active_app or routed_task.active_app
+                window_name = context_active_window or routed_task.active_window
+
+            return {
+                "timestamp": utc_now_iso(),
+                "capture_trigger": routed_task.capture_trigger.value,
+                "device_name": target_device_name,
+                "event_ts": routed_task.event_ts,
+                "active_app": app_name,
+                "active_window": window_name,
+                "app_name": app_name,
+                "window_name": window_name,
+            }
+
+        # RoutedCaptureTask branch
+        if (
+            app_is_on_target_monitor
+            and focused_monitor_device_name == target_device_name
+        ):
             app_name = context_active_app or None
             window_name = context_active_window or None
 
@@ -574,9 +616,9 @@ class ScreenRecorder:
         last_known_window: str | None = None
         if (
             routed_task.capture_trigger is CaptureTrigger.IDLE
-            and routed_task.target_device_name in self._monitor_last_context
+            and target_device_name in self._monitor_last_context
         ):
-            last_ctx = self._monitor_last_context[routed_task.target_device_name]
+            last_ctx = self._monitor_last_context[target_device_name]
             if time.time() - last_ctx[2] < 300:
                 last_known_app = last_ctx[0]
                 last_known_window = last_ctx[1]
@@ -584,7 +626,7 @@ class ScreenRecorder:
         return {
             "timestamp": utc_now_iso(),
             "capture_trigger": routed_task.capture_trigger.value,
-            "device_name": routed_task.target_device_name,
+            "device_name": target_device_name,
             "event_ts": routed_task.event_ts,
             "app_name": app_name,
             "window_name": window_name,
@@ -871,18 +913,118 @@ class ScreenRecorder:
                     filepath = settings.client_screenshots_path / f"{file_tag}.webp"
                     image.save(str(filepath), format="webp", lossless=True)
 
-                context_active_app, context_active_window = (
+                # PHash-based similarity detection (P1-S2b+)
+                phash_value: int | None = None
+                should_drop_frame = False
+
+                if settings.simhash_dedup_enabled:
+                    try:
+                        # Compute PHash
+                        phash_value = compute_phash(image)
+
+                        # Check similarity against cache
+                        is_similar_frame = self._simhash_cache.is_similar_to_cache(
+                            routed_task.target_device_name,
+                            phash_value,
+                            threshold=settings.simhash_dedup_threshold,
+                        )
+
+                        if is_similar_frame:
+                            # Check heartbeat timeout
+                            last_enqueue_time = (
+                                self._simhash_cache.get_last_enqueue_time(
+                                    routed_task.target_device_name
+                                )
+                            )
+                            current_time = time.time()
+
+                            if last_enqueue_time is not None:
+                                time_since_last_enqueue = (
+                                    current_time - last_enqueue_time
+                                )
+                                if (
+                                    time_since_last_enqueue
+                                    < settings.simhash_heartbeat_interval_sec
+                                ):
+                                    # Drop the frame - similar and no heartbeat timeout
+                                    should_drop_frame = True
+                                    logger.info(
+                                        "MRV3 similar_frame_skipped device_name=%s hamming_distance_threshold=%d trigger_type=%s",
+                                        routed_task.target_device_name,
+                                        settings.simhash_dedup_threshold,
+                                        routed_task.capture_trigger.value,
+                                    )
+                                else:
+                                    logger.info(
+                                        "MRV3 heartbeat_force_enqueue device_name=%s elapsed_sec=%.3f threshold_sec=%d trigger_type=%s",
+                                        routed_task.target_device_name,
+                                        time_since_last_enqueue,
+                                        settings.simhash_heartbeat_interval_sec,
+                                        routed_task.capture_trigger.value,
+                                    )
+                            else:
+                                logger.info(
+                                    "MRV3 initial_frame_enqueue device_name=%s trigger_type=%s",
+                                    routed_task.target_device_name,
+                                    routed_task.capture_trigger.value,
+                                )
+                    except Exception as e:
+                        # On error, don't drop - continue with enqueue
+                        logger.warning(
+                            "PHash computation failed for device=%s, continuing with enqueue: %s",
+                            routed_task.target_device_name,
+                            e,
+                        )
+                        phash_value = None
+
+                if should_drop_frame:
+                    # Clean up image resources before dropping frame
+                    image.close()
+                    del screenshot
+                    del image
+
+                    self._on_capture_completed(
+                        routed_task.target_device_name,
+                        now_epoch=time.time(),
+                    )
+                    self._last_capture_outcome = {
+                        "outcome": "simhash_dropped",
+                        "trigger": routed_task.capture_trigger.value,
+                        "target_device_name": routed_task.target_device_name,
+                        "reason": "similar_to_cached_frame",
+                        "routing_topology_epoch": routed_task.routing_topology_epoch,
+                        "event_ts": routed_task.event_ts,
+                        "timestamp": utc_now_iso(),
+                    }
+                    # Frame dropped due to similarity - skip enqueue
+                    continue
+
+                context_active_app, context_active_window, context_active_monitor = (
                     self._snapshot_active_context()
                 )
                 metadata = self._build_capture_metadata(
                     routed_task,
                     context_active_app=context_active_app,
                     context_active_window=context_active_window,
+                    context_active_monitor_device_name=context_active_monitor,
                     focused_monitor_device_name=str(
                         routed_task.routing_hints.get("focused_device_name") or ""
                     ),
                 )
+
+                # Add PHash to metadata if computed
+                if phash_value is not None:
+                    metadata["simhash"] = phash_value
+
                 self._spool.enqueue(image, metadata)
+
+                # Update SimhashCache after successful enqueue
+                if phash_value is not None:
+                    self._simhash_cache.add(
+                        routed_task.target_device_name,
+                        phash_value,
+                        timestamp=time.time(),
+                    )
 
                 if routed_task.capture_trigger in (
                     CaptureTrigger.CLICK,
@@ -945,6 +1087,18 @@ class ScreenRecorder:
                     spool_depth,
                     monitor_info,
                 )
+
+                # Explicitly clean up image resources to prevent memory pressure
+                # Done after all processing, logging, and stats collection
+                try:
+                    if 'image' in locals():
+                        image.close()
+                    if 'screenshot' in locals():
+                        del screenshot
+                    if 'image' in locals():
+                        del image
+                except Exception as cleanup_error:
+                    logger.debug("Error during resource cleanup: %s", cleanup_error)
 
                 if not self.upload_enabled:
                     logger.debug(

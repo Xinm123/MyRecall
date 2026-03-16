@@ -148,6 +148,30 @@ def test_build_capture_metadata_prefers_live_window_for_click() -> None:
 
 
 @pytest.mark.unit
+def test_build_capture_metadata_mismatched_monitor_returns_none() -> None:
+    recorder = ScreenRecorder()
+    event = TriggerEvent(
+        capture_trigger=CaptureTrigger.CLICK,
+        device_name="monitor_1",
+        event_ts="2026-03-10T00:00:00Z",
+    )
+
+    # Scenario: Click on monitor_1, but active app is on monitor_2
+    metadata = recorder._build_capture_metadata(
+        event,
+        context_active_app="Google Chrome",
+        context_active_window="MyRecall",
+        context_active_monitor_device_name="monitor_2",
+    )
+
+    # Monitor 1 should NOT be tagged with Chrome
+    assert metadata["app_name"] is None
+    assert metadata["window_name"] is None
+    assert metadata["active_app"] is None
+    assert metadata["active_window"] is None
+
+
+@pytest.mark.unit
 def test_snapshot_active_context_uses_same_app_for_window_lookup(monkeypatch) -> None:
     recorder = ScreenRecorder()
     captured_app: list[str] = []
@@ -168,10 +192,15 @@ def test_snapshot_active_context_uses_same_app_for_window_lookup(monkeypatch) ->
         _window_for_app,
     )
 
-    active_app, active_window = recorder._snapshot_active_context()
+    monkeypatch.setattr(
+        "openrecall.client.recorder.get_active_app_monitor", lambda monitors: None
+    )
+
+    active_app, active_window, active_monitor = recorder._snapshot_active_context()
 
     assert active_app == "Google Chrome"
     assert active_window == "Stack Overflow - Google Chrome"
+    assert active_monitor is None
     assert captured_app == ["Google Chrome"]
 
 

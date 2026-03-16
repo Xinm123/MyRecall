@@ -25,7 +25,11 @@ try:
 except ImportError:
     Quartz = None
 
-from openrecall.shared.utils import get_active_app_name, get_active_window_title
+from openrecall.shared.utils import (
+    get_active_app_name,
+    get_active_window_title,
+    get_active_window_title_for_app,
+)
 
 
 def list_monitors(primary_only: bool = False) -> list[MonitorDescriptor]:
@@ -101,6 +105,37 @@ class MacOSEventTap:
             target=self._run, daemon=True, name="MacOSEventTap"
         )
         self._thread.start()
+
+    def stop(self) -> None:
+        """停止事件监听并清理资源"""
+        # 禁用CGEventTap
+        if Quartz is not None and self._event_tap is not None:
+            try:
+                cg_event_tap_enable = getattr(Quartz, "CGEventTapEnable", None)
+                cf_run_loop_stop = getattr(Quartz, "CFRunLoopStop", None)
+                run_loop_get_current = getattr(Quartz, "CFRunLoopGetCurrent", None)
+
+                if cg_event_tap_enable is not None:
+                    cg_event_tap_enable(self._event_tap, False)
+
+                # 停止RunLoop（如果在运行）
+                if cf_run_loop_stop is not None and run_loop_get_current is not None:
+                    try:
+                        current_loop = run_loop_get_current()
+                        if current_loop is not None:
+                            cf_run_loop_stop(current_loop)
+                    except Exception:
+                        pass  # RunLoop可能已经停止
+
+                self._event_tap = None
+                self._run_loop_source = None
+                logger.debug("已停止CGEventTap并清理资源")
+            except Exception:
+                logger.exception("停止事件监听时出错")
+
+        # 等待线程结束（设置超时，因为daemon线程不会阻塞进程退出）
+        if self._thread is not None and self._thread.is_alive():
+            self._thread.join(timeout=0.5)
 
     def _run(self) -> None:
         if Quartz is None:
@@ -211,15 +246,14 @@ class MacOSEventTap:
                 location.y,
             )
             return event
-        active_app = get_frontmost_app_name() or None
-        active_window = get_active_window_title() or None
+
         self._callback(
             TriggerEvent(
                 capture_trigger=CaptureTrigger.CLICK,
                 device_name=monitor.device_name,
                 event_ts=utc_now_iso(),
-                active_app=active_app,
-                active_window=active_window,
+                active_app=None,
+                active_window=None,
             )
         )
         return event
@@ -308,18 +342,22 @@ class MacOSAppSwitchMonitor:
             self._stop_event.wait(0.2)
 
     def _emit_app_switch(self, active_app: str) -> None:
-        # Use mouse position to determine which monitor has focus
-        # This fixes the issue where app_switch events were always
-        # attributed to the primary monitor even when focus was on another monitor
-        mouse_pos = get_mouse_location()
-        if mouse_pos is not None:
-            monitor = self._monitor_lookup(mouse_pos[0], mouse_pos[1])
-        else:
-            monitor = None
+        monitor = None
+        
+        # Try to find which monitor actually contains the active app's window
+        all_monitors = list_monitors(primary_only=False)
+        if all_monitors:
+            monitor = get_active_app_monitor(all_monitors, target_app_name=active_app)
+            
+        # Fallback to mouse position if app monitor couldn't be determined
+        if monitor is None:
+            mouse_pos = get_mouse_location()
+            if mouse_pos is not None:
+                monitor = self._monitor_lookup(mouse_pos[0], mouse_pos[1])
 
         device_name = monitor.device_name if monitor else ""
+        active_window = get_active_window_title_for_app(active_app)
 
-        active_window = get_active_window_title() or None
         self._callback(
             TriggerEvent(
                 capture_trigger=CaptureTrigger.APP_SWITCH,
@@ -349,11 +387,14 @@ def get_frontmost_app_name() -> str:
 
 def get_active_app_monitor(
     monitors: list[MonitorDescriptor],
+    target_app_name: str | None = None,
 ) -> MonitorDescriptor | None:
     if Quartz is None:
         return None
 
-    active_app = get_active_app_name() or get_frontmost_app_name()
+    active_app = (
+        target_app_name or get_active_app_name() or get_frontmost_app_name()
+    )
     if not active_app:
         return None
 
