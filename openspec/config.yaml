@@ -3,7 +3,7 @@ context: |
   Project: MyRecall-v3 (Edge-centric, vision-only, OCR-only). Reference repo: _ref/screenpipe
   Current substage: P1-S4 (Search / 检索能力)
 
-  Source precedence (MUST follow; do not invent local reinterpretation):
+  Source precedence (MUST read and follow; do not invent local reinterpretation):
   - docs/v3/spec.md - 架构与 frozen behavior SSOT (includes Search contract §4.5)
   - docs/v3/data-model.md - FTS schema, Search SQL JOIN 策略, query normalization
   - docs/v3/open_questions.md - 已冻结决策与 ownership boundary
