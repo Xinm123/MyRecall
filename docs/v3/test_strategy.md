@@ -98,7 +98,19 @@ tests/
 - `test_p1_s3_ui_*.py` — UI 展示验收测试（E2E）
 
 ### P1-S4（检索）
-- `test_search_api.py` — FTS、过滤参数、OCR-only 搜索契约
+
+> **详细测试清单**：参见 `acceptance/phase1/p1-s4.md` §1.3，本文件为高层映射
+
+- `test_p1_s4_search_fts.py` — FTS 召回正确性（OCR-only，关键词命中）
+- `test_p1_s4_sql_path.py` — SQL 路径验证（frames INNER JOIN ocr_text，条件追加逻辑）
+- `test_p1_s4_fts_clear_safe.py` — FTS 清空一致性（字段清空后 token 不再命中）
+- `test_p1_s4_v4_seam.py` — v4 seam 保护（accessibility 表空值验证）
+- `test_p1_s4_reference_fields.py` — 引用字段完整率（frame_id + timestamp 非空 = 100%）
+- `test_p1_s4_ui_filter_mapping.py` — UI 过滤项映射（UI 参数 → API 参数 1:1）
+- `test_p1_s4_citation_backtrace.py` — 回溯成功率（搜索结果 → frame/timeline）
+- `test_p1_s4_legacy_api.py` — 旧 API 废弃验证（`/api/*` 返回 410 Gone）
+
+> **命名规范**：P1-S4 测试统一使用 `test_p1_s4_*` 前缀（与 test_strategy.md §3 基础名称 `test_search_api.py` 对应关系：`test_search_api.py` → `test_p1_s4_search_fts.py`）
 
 ### P1-S5~S6（Chat）
 - `test_chat_manager.py` — Pi 进程管理

@@ -55,6 +55,8 @@ references:
 1. `Search 引用字段完整率`（Hard Gate）
 - 公式：`search_ref_completeness = (搜索结果中 frame_id 与 timestamp 同时非空的条数 / 搜索结果总条数) * 100%`
 
+**关联规则**：v4 seam 保护判定逻辑详见 [acceptance/phase1/p1-s4.md §1.4](../acceptance/phase1/p1-s4.md#14-v4-seam-保护规则)
+
 ## 3.2 Capture 去重与背压口径（P1-S2）
 
 - 目的：将 P1-S2 的去重/背压 Gate 从描述性判定收敛为自动化可计算指标。
