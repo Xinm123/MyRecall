@@ -386,9 +386,8 @@ def expand_search_query(query: str) -> str:
 |------|-----------|
 | `q` 非空 → `ocr_text_fts MATCH ?` | `sanitize_fts5_query(q)` |
 | 元数据过滤（app_name/window_name/browser_url/focused）→ `frames_fts MATCH ?` | 直接构造列限定短语（同 screenpipe `search_ocr()`），不经过 expand |
-| 未来 fuzzy_match 场景（P2+） | `expand_search_query(q)` 替代 `sanitize_fts5_query(q)` |
 
-**注**：P1 主路径 `q` 使用 `sanitize_fts5_query`；`expand_search_query` 同步实现但默认不启用，作为 P2 fuzzy_match 的基础设施。
+**注**：P1 主路径 `q` 仅使用 `sanitize_fts5_query`；`expand_search_query` 推迟到 P2+ fuzzy_match 场景再实现。
 
 #### Search SQL JOIN 策略（v3 OCR-only）
 

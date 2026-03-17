@@ -1,30 +1,29 @@
 schema: spec-driven
 context: |
   Project: MyRecall-v3 (Edge-centric, vision-only, OCR-only). Reference repo: _ref/screenpipe
-  Current substage: P1-S3 (OCR Processing / OCR-only 处理链路)
+  Current substage: P1-S4 (Search / 检索能力)
 
   Source precedence (MUST follow; do not invent local reinterpretation):
-  - docs/v3/spec.md - 架构与 frozen behavior SSOT (includes OCR-only processing contract §4.3)
-  - docs/v3/data-model.md - payload/data contract consequences
+  - docs/v3/spec.md - 架构与 frozen behavior SSOT (includes Search contract §4.5)
+  - docs/v3/data-model.md - FTS schema, Search SQL JOIN 策略, query normalization
   - docs/v3/open_questions.md - 已冻结决策与 ownership boundary
-  - docs/v3/acceptance/phase1/p1-s3.md - current substage contract, evidence, executable scenarios
-  - docs/v3/gate_baseline.md - Gate/SLO formulas, thresholds, sample rules
+  - docs/v3/acceptance/phase1/p1-s4.md - current substage contract, evidence, executable scenarios
+  - docs/v3/gate_baseline.md - Gate/SLO formulas, Search P95 口径
   - docs/v3/test_strategy.md - test classification and TDD guidance
 
   Supplemental references (use only for their own scope):
-  - docs/v3/acceptance/phase1/p1-s2b.md - S2b frozen capture baseline
-  - docs/v3/acceptance/phase1/p1-s2b-plus.md - upstream entry prerequisite (simhash baseline)
-  - docs/v3/http_contract_ledger.md - external HTTP delta
+  - docs/v3/acceptance/phase1/p1-s3.md - upstream entry prerequisite (S3→S4 handoff contract)
+  - docs/v3/http_contract_ledger.md - external HTTP delta (GET /v1/search, legacy 410 Gone)
   - docs/v3/roadmap.md - planning context only; not behavior SSOT
 
   Precedence rule: higher-priority docs win over lower-priority docs; all docs win over this config.
   Conflict rule: if sources conflict, cite the higher-priority source and surface the conflict; do not synthesize a new rule.
 
-  Scope invariants (P1-S3):
+  Scope invariants (P1-S4):
   - Vision-only for P1-P3; macOS-only for P1.
   - Python implementation (ADR-0013).
-  - OCR-only mainline (OQ-043).
-  - P1-S3 owns: V3ProcessingWorker, OCR execution (RapidOCR), ocr_text persistence, frames.text_source='ocr' marking, failed semantics, processing_mode=ocr switching, UI card display.
+  - OCR-only mainline (OQ-043); no accessibility/UI search path.
+  - P1-S4 owns: GET /v1/search endpoint, FTS5 + metadata filtering, OCR-only search path, frame/citation response structure, UI filter mapping, legacy API 410 Gone.
 
 rules:
   proposal:
@@ -35,9 +34,12 @@ rules:
   design:
     - "Design must be codebase-grounded."
     - "For each material decision, if screenpipe has a comparable pattern, cite the screenpipe file path and label it as 'aligned', 'intentional divergence', or 'no comparable pattern'."
-    - Must not invent retry policies, semantic states, or processing-stage meaning not present in the cited docs.
-    - "processing_mode switching must follow spec.md §4.7 three-way branch (noop/ocr/legacy); do not introduce new modes."
-    - "ocr_text writes must include app_name/window_name from the same frame's metadata (data-model.md Table 2 note)."
+    - Must not invent search paths not present in the cited docs.
+    - "Search SQL must follow data-model.md §3.0.3 JOIN strategy: frames INNER JOIN ocr_text, with conditional FTS joins."
+    - "Search SQL ORDER BY: use ocr_text_fts.rank (BM25) when q is non-empty; use f.timestamp DESC when browsing (aligned with screenpipe db.rs:2156-2161)."
+    - "Query normalization: sanitize_fts5_query for q in P1."
+    - "Response schema must include frame_id and timestamp (Hard Gate); reserved fields return null rather than omitting keys."
+    - "Legacy /api/* endpoints (upload, search, queue/status, health) must return 410 Gone (not 301/308) starting P1-S4."
   tasks:
     - 'tasks.md must be split into two top-level sections: "## Implementation Tasks" (code changes) and "## Acceptance Verification" (verification actions).'
     - Every implementation task must be atomic.

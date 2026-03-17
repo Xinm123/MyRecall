@@ -20,7 +20,7 @@
 | G-02 | frame_name 参数          | 有（零实际使用）                                  | 无                                 | 有意忽略    | [E-01][E-13] | TBD-02 已关闭，安全忽略 |
 | G-03 | /search/keyword 独立端点   | 有                                         | 合并入 /v1/search                    | 有意合并    | [E-03][E-13] | P1 不暴露独立端点      |
 | G-04 | browser_url 匹配语义       | FTS token 序列匹配                            | ~~前缀匹配~~ → FTS token 序列（TBD-01=A） | 100%    | [E-01][E-13] | spec 措辞已修正      |
-| G-05 | FTS query sanitization | sanitize_fts5_query + expand_search_query | ~~未规定~~ → P1 两个都实现（D1=B）          | 100%    | [E-08]       | data-model.md §3.0.3（FTS 查询规范化） |
+| G-05 | FTS query sanitization | sanitize_fts5_query + expand_search_query | sanitize_fts5_query（expand 推迟 P2+） | P1 部分 | [E-08]       | data-model.md §3.0.3（FTS 查询规范化） |
 | G-06 | COUNT 查询               | 独立 count_search_results()                 | ~~未规定~~ → 独立 COUNT（D3=A）          | 100%    | [E-09]       | data-model.md §3.0.3（COUNT 查询） |
 | G-07 | 搜索缓存                   | LRU cache（全参数哈希）                          | P1 不实现（D2=A），P2 补                 | P2 对齐   | [E-02]       | 无阻塞             |
 | G-08 | 结果聚类/分组                | cluster_search_matches()                  | P1 不实现，P2+                        | P2+ 对齐  | [E-09]       | 无阻塞             |
