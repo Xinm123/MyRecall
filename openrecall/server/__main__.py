@@ -106,6 +106,39 @@ def _start_noop_mode():
     return driver
 
 
+def _preload_ocr_model():
+    """Preload OCR model for processing_mode='ocr'.
+
+    Fail-fast: If RapidOCR initialization fails, exit immediately.
+    Do NOT silently fall back to noop mode.
+
+    Per specs/processing-mode-switch/spec.md:
+    - Only load OCR (RapidOCR), no VL/Embedding models
+    - Log error and call sys.exit(1) on failure
+    """
+    logger.info("Preloading OCR model (RapidOCR)...")
+
+    try:
+        from openrecall.server.ocr.rapid_backend import RapidOCRBackend
+
+        # Initialize the singleton - this triggers model loading
+        _ = RapidOCRBackend()
+        logger.info("✅ OCR model loaded successfully")
+    except Exception as e:
+        logger.error("❌ Failed to load OCR model: %s", e)
+        logger.error("Cannot start in OCR mode without OCR model. Exiting.")
+        sys.exit(1)
+
+
+def _start_ocr_mode():
+    """Start the V3ProcessingWorker for OCR processing."""
+    from openrecall.server.processing.v3_worker import V3ProcessingWorker
+
+    worker = V3ProcessingWorker()
+    worker.start()
+    return worker
+
+
 def main():
     logger.info("=" * 50)
     logger.info("OpenRecall Server Starting")
@@ -130,7 +163,12 @@ def main():
 
     if processing_mode == "noop":
         worker = _start_noop_mode()
+    elif processing_mode == "ocr":
+        _preload_ocr_model()
+        worker = _start_ocr_mode()
+        logger.info("MRV3 processing_mode=ocr")
     else:
+        # Legacy mode: load all AI models
         preload_ai_models()
         from openrecall.server.app import init_background_worker
 
@@ -178,6 +216,7 @@ def main():
 
     atexit.register(_cleanup_worker)
 
+    # Emit processing mode log (already emitted for 'ocr' mode above)
     if processing_mode == "noop":
         logger.info("MRV3 processing_mode=noop")
 

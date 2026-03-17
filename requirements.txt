@@ -1,3 +1,4 @@
-rapidocr_onnxruntime
+rapidocr>=3.0.0  # v3 API with EngineType, OCRVersion, ModelType enums
+onnxruntime>=1.16.0  # Explicit ONNX runtime for RapidOCR v3
 scipy>=1.11.0
 imagehash>=4.3

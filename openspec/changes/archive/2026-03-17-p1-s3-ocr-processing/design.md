@@ -228,6 +228,39 @@ else:
 
 **screenpipe 对齐**：**no comparable pattern** — screenpipe 的 UI 是 Tauri/React 实现。
 
+### D9: RapidOCR v3 API Migration
+
+**决策**：迁移到 RapidOCR v3 API，使用 params dict + 枚举配置，移除本地模型路径管理。
+
+**理由**：
+1. **字典自动匹配**：v3 API 根据 `OCRVersion` 自动选择对应的字典文件，避免手动指定路径导致的乱码问题
+2. **零网络依赖**：PP-OCRv4 模型随 pip 包安装，首次运行无需下载
+3. **简化配置**：移除 8 个配置参数（`use_local`, `model_dir`, `det_model_path` 等）
+4. **类型安全**：使用枚举替代字符串，IDE 自动补全，拼写错误会报错
+
+**配置方式**：
+```python
+from rapidocr import RapidOCR, OCRVersion, ModelType
+
+engine = RapidOCR(params={
+    "Det.ocr_version": OCRVersion.PPOCRV4,  # 默认，pip 自带
+    "Det.model_type": ModelType.MOBILE,
+    "Rec.ocr_version": OCRVersion.PPOCRV4,
+    "Rec.model_type": ModelType.MOBILE,
+    # 质量参数
+    "Det.limit_side_len": 960,
+    "Det.box_thresh": 0.7,
+    "Global.text_score": 0.6,
+})
+```
+
+**保留的环境变量**：
+- `OPENRECALL_OCR_RAPID_OCR_VERSION`: PP-OCRv4（默认）或 PP-OCRv5
+- `OPENRECALL_OCR_RAPID_MODEL_TYPE`: mobile（默认）或 server
+- 质量参数：`OPENRECALL_OCR_DET_*`, `OPENRECALL_OCR_DROP_SCORE`
+
+**screenpipe 对齐**：**intentional divergence** — screenpipe 使用 Rust PaddleOCR binding，模型路径硬编码在编译时；v3 采用 Python pip 包管理。
+
 ## Risks / Trade-offs
 
 | 风险 | 影响 | 缓解 |
@@ -236,3 +269,4 @@ else:
 | 高分辨率截图 OCR 处理慢 | P95 > 10s 影响用户体验 | 观测指标（non-blocking），通过 `elapsed_ms` 结构化日志度量；P2+ 优化 |
 | SQLite WAL 并发下 `ocr_text` 写入冲突 | 重复写入或死锁 | 三层幂等防御（fetch 层 + pre-write 层 + `INSERT OR IGNORE` + `UNIQUE(frame_id)`） |
 | `processing_mode` 配置错误 | 启动后无 OCR 处理 | 启动日志强制输出 `MRV3 processing_mode={value}` |
+| PP-OCRv5 首次运行需下载模型 | 离线环境启动失败 | 默认使用 PP-OCRv4（pip 自带）；如需 v5 需确保网络或预下载 |

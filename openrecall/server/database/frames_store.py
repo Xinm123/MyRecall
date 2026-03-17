@@ -508,6 +508,7 @@ class FramesStore:
 
         Returns:
             List of dicts with frame data formatted for UI consumption.
+            Includes OCR-related fields via LEFT JOIN (P1-S3).
         """
         memories = []
         normalized_limit = max(1, min(int(limit) if limit else 500, 1000))
@@ -516,10 +517,15 @@ class FramesStore:
             with self._connect() as conn:
                 rows = conn.execute(
                     """
-                    SELECT id, capture_id, timestamp, app_name, window_name,
-                           snapshot_path, status, ingested_at, last_known_app, last_known_window
-                    FROM frames
-                    ORDER BY timestamp DESC
+                    SELECT f.id, f.capture_id, f.timestamp, f.app_name, f.window_name,
+                           f.snapshot_path, f.status, f.ingested_at, f.last_known_app,
+                           f.last_known_window, f.text_source, f.processed_at,
+                           f.capture_trigger, f.device_name, f.error_message,
+                           o.text_length, o.ocr_engine, o.text AS ocr_text,
+                           SUBSTR(o.text, 1, 100) AS ocr_text_preview
+                    FROM frames f
+                    LEFT JOIN ocr_text o ON f.id = o.frame_id
+                    ORDER BY f.timestamp DESC
                     LIMIT ?
                     """,
                     (normalized_limit,),
@@ -541,6 +547,16 @@ class FramesStore:
                             "window_title": row["window_name"] or "",
                             "last_known_app": row["last_known_app"] or "",
                             "last_known_window": row["last_known_window"] or "",
+                            # P1-S3 additions
+                            "text_source": row["text_source"] or "",
+                            "text_length": row["text_length"] or 0,
+                            "ocr_text": row["ocr_text"] or "",
+                            "ocr_text_preview": row["ocr_text_preview"] or "",
+                            "ocr_engine": row["ocr_engine"] or "",
+                            "processed_at": row["processed_at"] or "",
+                            "capture_trigger": row["capture_trigger"] or "",
+                            "device_name": row["device_name"] or "",
+                            "error_message": row["error_message"] or "",
                         }
                     )
         except sqlite3.Error as e:
@@ -602,17 +618,23 @@ class FramesStore:
 
         Returns:
             List of dicts with frame data.
+            Includes OCR-related fields via LEFT JOIN (P1-S3).
         """
         memories = []
         try:
             with self._connect() as conn:
                 rows = conn.execute(
                     """
-                    SELECT id, capture_id, timestamp, app_name, window_name,
-                           snapshot_path, status, ingested_at, last_known_app, last_known_window
-                    FROM frames
-                    WHERE timestamp > ?
-                    ORDER BY timestamp DESC
+                    SELECT f.id, f.capture_id, f.timestamp, f.app_name, f.window_name,
+                           f.snapshot_path, f.status, f.ingested_at, f.last_known_app,
+                           f.last_known_window, f.text_source, f.processed_at,
+                           f.capture_trigger, f.device_name, f.error_message,
+                           o.text_length, o.ocr_engine, o.text AS ocr_text,
+                           SUBSTR(o.text, 1, 100) AS ocr_text_preview
+                    FROM frames f
+                    LEFT JOIN ocr_text o ON f.id = o.frame_id
+                    WHERE f.timestamp > ?
+                    ORDER BY f.timestamp DESC
                     """,
                     (timestamp,),
                 ).fetchall()
@@ -633,6 +655,16 @@ class FramesStore:
                             "window_title": row["window_name"] or "",
                             "last_known_app": row["last_known_app"] or "",
                             "last_known_window": row["last_known_window"] or "",
+                            # P1-S3 additions
+                            "text_source": row["text_source"] or "",
+                            "text_length": row["text_length"] or 0,
+                            "ocr_text": row["ocr_text"] or "",
+                            "ocr_text_preview": row["ocr_text_preview"] or "",
+                            "ocr_engine": row["ocr_engine"] or "",
+                            "processed_at": row["processed_at"] or "",
+                            "capture_trigger": row["capture_trigger"] or "",
+                            "device_name": row["device_name"] or "",
+                            "error_message": row["error_message"] or "",
                         }
                     )
         except sqlite3.Error as e:
@@ -730,3 +762,109 @@ class FramesStore:
             "edge_pid": os.getpid(),
             "broken_window": False,
         }
+
+    # ------------------------------------------------------------------
+    # OCR Text Methods (P1-S3)
+    # ------------------------------------------------------------------
+
+    def insert_ocr_text(
+        self,
+        frame_id: int,
+        text: str,
+        text_length: int,
+        ocr_engine: str,
+        app_name: Optional[str],
+        window_name: Optional[str],
+        text_json: Optional[str] = None,
+    ) -> bool:
+        """Insert OCR text result for a frame.
+
+        Uses INSERT OR IGNORE for idempotency (layer 3 of D5 defense).
+        Front-guard assertion prevents accidental empty-text writes.
+
+        Args:
+            frame_id: The frame ID
+            text: Extracted OCR text (must be non-empty)
+            text_length: Length of the text
+            ocr_engine: Engine name (e.g., 'rapidocr')
+            app_name: Application name from frame metadata
+            window_name: Window name from frame metadata
+            text_json: JSON string with bounding boxes for future UI features
+
+        Returns:
+            True if inserted, False if row already existed or error
+        """
+        # Front-guard: prevent empty text writes
+        assert text and len(text) > 0, (
+            f"insert_ocr_text: refusing empty text for frame_id={frame_id}"
+        )
+
+        try:
+            with self._connect() as conn:
+                cursor = conn.execute(
+                    """
+                    INSERT OR IGNORE INTO ocr_text
+                        (frame_id, text, text_length, text_json, ocr_engine, app_name, window_name)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (frame_id, text, text_length, text_json, ocr_engine, app_name, window_name),
+                )
+                conn.commit()
+                inserted = cursor.rowcount > 0
+                if not inserted:
+                    logger.warning(
+                        "insert_ocr_text: row already exists for frame_id=%d",
+                        frame_id,
+                    )
+                return inserted
+        except sqlite3.Error as e:
+            logger.error("insert_ocr_text failed frame_id=%d: %s", frame_id, e)
+            return False
+
+    def update_text_source(self, frame_id: int, text_source: str) -> bool:
+        """Update the text_source field for a frame.
+
+        Args:
+            frame_id: The frame ID
+            text_source: Source identifier (e.g., 'ocr')
+
+        Returns:
+            True if updated, False otherwise
+        """
+        try:
+            with self._connect() as conn:
+                cursor = conn.execute(
+                    "UPDATE frames SET text_source = ? WHERE id = ?",
+                    (text_source, frame_id),
+                )
+                conn.commit()
+                return cursor.rowcount > 0
+        except sqlite3.Error as e:
+            logger.error(
+                "update_text_source failed frame_id=%d: %s", frame_id, e
+            )
+            return False
+
+    def check_ocr_text_exists(self, frame_id: int) -> bool:
+        """Check if an ocr_text row exists for a frame.
+
+        Args:
+            frame_id: The frame ID to check
+
+        Returns:
+            True if ocr_text row exists, False otherwise
+        """
+        try:
+            with self._connect() as conn:
+                cursor = conn.execute(
+                    "SELECT 1 FROM ocr_text WHERE frame_id = ? LIMIT 1",
+                    (frame_id,),
+                )
+                return cursor.fetchone() is not None
+        except sqlite3.Error as e:
+            logger.warning(
+                "check_ocr_text_exists: DB error for frame_id=%d: %s",
+                frame_id,
+                e,
+            )
+            return False

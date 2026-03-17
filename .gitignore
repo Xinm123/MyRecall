@@ -12,3 +12,7 @@ reports
 .aider*
 .worktrees
 .DS_Store
+
+# Environment files (may contain secrets)
+*.env
+!.env.example

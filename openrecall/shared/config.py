@@ -182,35 +182,86 @@ class Settings(BaseSettings):
         alias="OPENRECALL_OCR_API_BASE",
         description="Optional override for OCR API base URL; falls back to ai_api_base when empty",
     )
-    ocr_rapid_use_local: bool = Field(
-        default=False,
-        alias="OPENRECALL_OCR_RAPID_USE_LOCAL",
-        description="Whether to use local models for RapidOCR",
+
+    # RapidOCR v3 API 配置参数
+    # 模型默认随 pip 包安装，首次使用无需下载（PP-OCRv4）
+    ocr_rapid_ocr_version: str = Field(
+        default="PP-OCRv4",
+        alias="OPENRECALL_OCR_RAPID_OCR_VERSION",
+        description="OCR model version: PP-OCRv4 (default, bundled with pip), PP-OCRv5 (requires first-use download)",
     )
-    ocr_rapid_model_dir: Optional[str] = Field(
-        default=None,
-        alias="OPENRECALL_OCR_RAPID_MODEL_DIR",
-        description="Directory containing RapidOCR models (required if use_local is True)",
+    ocr_rapid_model_type: str = Field(
+        default="mobile",
+        alias="OPENRECALL_OCR_RAPID_MODEL_TYPE",
+        description="Model size: mobile (fast, lightweight) or server (accurate, heavier)",
     )
-    ocr_rapid_det_model: Optional[str] = Field(
-        default=None,
-        alias="OPENRECALL_OCR_RAPID_DET_MODEL",
-        description="Path to RapidOCR detection model",
+
+    # OCR 质量调优参数 (P1-S3+ 质量优化)
+    # 文档: https://www.paddleocr.ai/v2.9/en/ppocr/blog/inference_args.html
+    ocr_det_db_thresh: float = Field(
+        default=0.3,
+        alias="OPENRECALL_OCR_DET_DB_THRESH",
+        description=(
+            "DB检测算法的像素级文本概率阈值。"
+            "概率图中仅大于此阈值的像素才被视为文本像素。"
+            "调大：减少误识别（非文字区域被识别为文字），但可能漏检淡色/模糊文字。"
+            "调小：检测更多淡色文字，但增加误识别风险。"
+            "推荐范围: 0.2-0.4，默认 0.3"
+        ),
     )
-    ocr_rapid_rec_model: Optional[str] = Field(
-        default=None,
-        alias="OPENRECALL_OCR_RAPID_REC_MODEL",
-        description="Path to RapidOCR recognition model",
+    ocr_det_db_box_thresh: float = Field(
+        default=0.7,
+        alias="OPENRECALL_OCR_DET_DB_BOX_THRESH",
+        description=(
+            "DB检测算法的文本框置信度阈值。"
+            "检测框内所有像素的平均分数大于此阈值时，才认为是文本区域。"
+            "调大：减少误识别（过滤低置信度框），提高精确率，但可能漏检边缘文字。"
+            "调小：检测更多文本区域，提高召回率，但增加误识别。"
+            "推荐范围: 0.5-0.8，默认 0.7（高于 PaddleOCR 原默认 0.6 以减少误识别）"
+        ),
     )
-    ocr_rapid_cls_model: Optional[str] = Field(
-        default=None,
-        alias="OPENRECALL_OCR_RAPID_CLS_MODEL",
-        description="Path to RapidOCR classification model",
+    ocr_det_db_unclip_ratio: float = Field(
+        default=1.6,
+        alias="OPENRECALL_OCR_DET_DB_UNCLIP_RATIO",
+        description=(
+            "DB检测算法的文本框扩展比例（Vatti clipping 算法）。"
+            "用于扩展检测到的文本框边界，确保文字完整。"
+            "调大：文本框更大，包含更多上下文，适合字间距大的场景，但可能框入相邻文字或非文字区域。"
+            "调小：文本框更紧凑，适合密集文字，但可能截断文字边缘。"
+            "推荐范围: 1.5-2.0，默认 1.6"
+        ),
     )
-    ocr_rapid_use_gpu: bool = Field(
-        default=True,
-        alias="OPENRECALL_OCR_RAPID_USE_GPU",
-        description="Whether to use GPU for RapidOCR (set to False on Apple Silicon)",
+    ocr_det_db_score_mode: str = Field(
+        default="slow",
+        alias="OPENRECALL_OCR_DET_DB_SCORE_MODE",
+        description=(
+            "DB检测算法的置信度计算方式。"
+            "'fast': 使用边界矩形内所有像素计算平均分，速度快但不够精确。"
+            "'slow': 使用原始多边形内所有像素计算平均分，更精确但稍慢。"
+            "推荐使用 'slow' 以获得更准确的文本框过滤，减少误识别。"
+        ),
+    )
+    ocr_drop_score: float = Field(
+        default=0.6,
+        alias="OPENRECALL_OCR_DROP_SCORE",
+        description=(
+            "识别结果置信度过滤阈值。"
+            "识别分数低于此阈值的结果将被丢弃，不返回。"
+            "调大：只保留高置信度识别结果，减少错误识别，但可能丢弃正确但低置信度的文字。"
+            "调小：保留更多识别结果，提高召回率，但增加错误识别。"
+            "推荐范围: 0.4-0.7，默认 0.6（高于 PaddleOCR 原默认 0.5 以减少错误识别）"
+        ),
+    )
+    ocr_det_limit_side_len: int = Field(
+        default=960,
+        alias="OPENRECALL_OCR_DET_LIMIT_SIDE_LEN",
+        description=(
+            "检测图像边长限制。"
+            "图像最长边超过此值时会缩放，以控制计算量。"
+            "调大：检测更精细，适合高分辨率大图，但处理更慢。"
+            "调小：处理更快，但可能漏检小字或细节。"
+            "推荐范围: 640-1920，默认 960"
+        ),
     )
     embedding_provider: str = Field(
         default="",
@@ -250,9 +301,9 @@ class Settings(BaseSettings):
 
     # v3 Ingestion Configuration
     processing_mode: str = Field(
-        default="noop",
+        default="ocr",
         alias="OPENRECALL_PROCESSING_MODE",
-        description="Processing mode for frame ingestion (noop for P1-S1)",
+        description="Processing mode for frame ingestion: 'ocr' (default), 'noop' for testing/debugging, or 'legacy' for old AI pipeline",
     )
     queue_capacity: int = Field(
         default=200,

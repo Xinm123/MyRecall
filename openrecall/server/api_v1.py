@@ -455,6 +455,57 @@ def get_frame(frame_id: int):
 
 
 # ---------------------------------------------------------------------------
+# GET /v1/frames/<frame_id>/ocr-vis
+# ---------------------------------------------------------------------------
+
+
+@v1_bp.route("/frames/<int:frame_id>/ocr-vis", methods=["GET"])
+def get_ocr_visualization(frame_id: int):
+    """Serve the OCR visualization image for a frame.
+
+    The visualization shows the original screenshot with OCR bounding boxes
+    and recognized text overlaid.
+
+    Returns:
+        200 image/jpeg  — JPEG binary with OCR boxes overlaid
+        404 NOT_FOUND   — frame not found, or OCR visualization not available
+    """
+    request_id = str(uuid.uuid4())
+    store = _get_frames_store()
+
+    # Check frame exists and has completed OCR
+    frame = store.get_frame(frame_id)
+    if frame is None:
+        return make_error_response(
+            "frame not found",
+            "NOT_FOUND",
+            404,
+            request_id=request_id,
+        )
+
+    # Check frame status - only completed frames have OCR visualization
+    if frame.status != "completed":
+        return make_error_response(
+            f"OCR visualization not available (status={frame.status})",
+            "NOT_FOUND",
+            404,
+            request_id=request_id,
+        )
+
+    # Build path to visualization image
+    vis_path = settings.server_data_dir / "ocr_vis" / f"{frame_id}.jpg"
+    if not vis_path.exists():
+        return make_error_response(
+            "OCR visualization file not found",
+            "NOT_FOUND",
+            404,
+            request_id=request_id,
+        )
+
+    return send_file(str(vis_path), mimetype="image/jpeg")
+
+
+# ---------------------------------------------------------------------------
 # GET /v1/health
 # ---------------------------------------------------------------------------
 

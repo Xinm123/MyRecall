@@ -158,7 +158,9 @@ references:
     - 相似帧丢弃逻辑可用
   - 与 S3 关系：S3 主线只依赖 S2b Pass；S2b+ 若执行，不得反向改变 S2b/S3 的 OCR-only 主契约
 
-- P1-S3（处理，2026-03-15 ~ 2026-03-18）
+- P1-S3（处理，2026-03-15 ~ 2026-03-17）✅ **Pass**
+  - 验收记录：[`p1-s3.md`](acceptance/phase1/p1-s3.md)
+  - 版本/提交：fn-3-0.99 (4c4563c)
   - 交付：
     - Edge OCR processing（RapidOCR，single-engine policy）
     - OCR 成功 → `ocr_text` 表；`frames.text_source='ocr'`

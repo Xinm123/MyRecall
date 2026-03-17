@@ -395,7 +395,7 @@ processing worker 处理一帧:
 | `end_time` | ISO8601 | null | 时间范围终点（UTC） |
 | `app_name` | string | null | 应用名过滤（精确匹配） |
 | `window_name` | string | null | 窗口名过滤（精确匹配） |
-| `browser_url` | string | null | 浏览器 URL 过滤（FTS token 序列匹配，对齐 screenpipe `frames_fts MATCH`；`unicode61` 按非字母数字字符断词后做短语连续匹配） |
+| `browser_url` | string | null | 浏览器 URL 过滤（FTS token 序列匹配，对齐 screenpipe `frames_fts MATCH`；`unicode61` 按非字母数字字符断词后做短语连续匹配）；**P1 阶段：该参数仅保留兼容，不作为 active 过滤能力 Gate，P1-S4 验收不要求验证其过滤正确性** |
 | `focused` | bool | null | 仅返回前台焦点帧 |
 | `min_length` | uint | null | OCR 文本最小字符数 |
 | `max_length` | uint | null | OCR 文本最大字符数 |

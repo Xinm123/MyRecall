@@ -95,7 +95,8 @@ tests/
 - `test_p1_s3_ocr_text_write.py` — `ocr_text` 表写入逻辑
 - `test_p1_s3_text_source_mark.py` — `frames.text_source='ocr'` 标记逻辑
 - `test_p1_s3_failed_semantic.py` — OCR 失败帧 `failed` 状态语义
-- `test_p1_s3_ui_*.py` — UI 展示验收测试（E2E）
+- `test_p1_s3_v3_worker_lifecycle.py` — Worker 启停与状态流转
+- `test_p1_s3_fts_trigger.py` — FTS 触发器自动写入
 
 ### P1-S4（检索）
 
