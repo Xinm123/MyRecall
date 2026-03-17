@@ -1,0 +1,267 @@
+10:57:43 | DEBUG   | asyncio | Using selector: KqueueSelector
+10:57:46 | INFO    | openrecall.server | ==================================================
+10:57:46 | INFO    | openrecall.server | OpenRecall Server Starting
+10:57:46 | INFO    | openrecall.server | ==================================================
+10:57:46 | INFO    | openrecall.server | Debug mode: ON
+10:57:46 | INFO    | openrecall.server | Data folder: /Users/pyw/MRS
+10:57:46 | INFO    | openrecall.server | Cache folder: /Users/pyw/MRS/cache
+10:57:46 | INFO    | openrecall.server | Screenshots: /Users/pyw/MRS/screenshots
+10:57:46 | INFO    | openrecall.server | Database: /Users/pyw/MRS/db/edge.db
+10:57:46 | INFO    | openrecall.server | Bind: 127.0.0.1:8083
+10:57:46 | INFO    | openrecall.server | API URL: http://127.0.0.1:8083/api
+10:57:46 | INFO    | openrecall.server | Web UI: http://127.0.0.1:8083
+10:57:46 | INFO    | openrecall.server | Device: cpu
+10:57:46 | INFO    | openrecall.server | Processing mode: noop
+10:57:46 | INFO    | openrecall.server | ==================================================
+10:57:46 | INFO    | openrecall.server | v3 schema migrations ensured: db=/Users/pyw/MRS/db/edge.db migrations=/Users/pyw/old/MyRecall/openrecall/server/database/migrations
+10:57:46 | DEBUG   | openrecall.server.queue_driver | NoopQueueDriver._run() entered
+10:57:46 | INFO    | openrecall.server.queue_driver | NoopQueueDriver started (poll_interval=2.0s)
+10:57:46 | INFO    | openrecall.server | MRV3 processing_mode=noop
+ * Serving Flask app 'openrecall.server.app'
+ * Debug mode: on
+10:57:46 | INFO    | werkzeug | [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on http://127.0.0.1:8083
+10:57:46 | INFO    | werkzeug | [33mPress CTRL+C to quit[0m
+10:57:48 | INFO    | werkzeug | 127.0.0.1 - - [17/Mar/2026 10:57:48] "POST /api/heartbeat HTTP/1.1" 200 -
+10:57:49 | INFO    | openrecall.server.database.frames_store | claim_frame: winner capture_id=019cf9ba-6561-771e-a891-0f9ec17a81f0 frame_id=5584
+10:57:49 | INFO    | openrecall.server.api_v1 | ingest: 201 Created capture_id=019cf9ba-6561-771e-a891-0f9ec17a81f0 frame_id=5584 request_id=ed1c623e-bd8e-4164-a3f4-050a60fef37b
+10:57:49 | INFO    | werkzeug | 127.0.0.1 - - [17/Mar/2026 10:57:49] "[35m[1mPOST /v1/ingest HTTP/1.1[0m" 201 -
+10:57:50 | DEBUG   | openrecall.server.queue_driver | NoopQueueDriver: frame_id=5584 completed capture_id=019cf9ba-6561-771e-a891-0f9ec17a81f0
+10:57:53 | INFO    | openrecall.server.database.frames_store | claim_frame: winner capture_id=019cf9ba-76ce-7f30-b89c-5bdbdb7ab176 frame_id=5585
+10:57:53 | INFO    | openrecall.server.api_v1 | ingest: 201 Created capture_id=019cf9ba-76ce-7f30-b89c-5bdbdb7ab176 frame_id=5585 request_id=0c7f2ab3-8dfe-4e7e-ac8f-7c842c5dbab7
+10:57:53 | INFO    | werkzeug | 127.0.0.1 - - [17/Mar/2026 10:57:53] "[35m[1mPOST /v1/ingest HTTP/1.1[0m" 201 -
+10:57:54 | DEBUG   | openrecall.server.queue_driver | NoopQueueDriver: frame_id=5585 completed capture_id=019cf9ba-76ce-7f30-b89c-5bdbdb7ab176
+10:57:58 | INFO    | werkzeug | 127.0.0.1 - - [17/Mar/2026 10:57:58] "POST /api/heartbeat HTTP/1.1" 200 -
+10:58:03 | INFO    | werkzeug | 127.0.0.1 - - [17/Mar/2026 10:58:03] "POST /api/heartbeat HTTP/1.1" 200 -
+10:58:04 | INFO    | openrecall.server.database.frames_store | claim_frame: winner capture_id=019cf9ba-a0d4-7496-bc2f-2e76774d9434 frame_id=5586
+10:58:04 | INFO    | openrecall.server.api_v1 | ingest: 201 Created capture_id=019cf9ba-a0d4-7496-bc2f-2e76774d9434 frame_id=5586 request_id=0a043fdf-9ebf-48a2-8fd0-b0ad6c12c560
+10:58:04 | INFO    | werkzeug | 127.0.0.1 - - [17/Mar/2026 10:58:04] "[35m[1mPOST /v1/ingest HTTP/1.1[0m" 201 -
+10:58:04 | DEBUG   | openrecall.server.queue_driver | NoopQueueDriver: frame_id=5586 completed capture_id=019cf9ba-a0d4-7496-bc2f-2e76774d9434
+10:58:08 | INFO    | openrecall.server.database.frames_store | claim_frame: winner capture_id=019cf9ba-b013-7c2d-8c4f-0d4e46848587 frame_id=5587
+10:58:08 | INFO    | openrecall.server.api_v1 | ingest: 201 Created capture_id=019cf9ba-b013-7c2d-8c4f-0d4e46848587 frame_id=5587 request_id=56fb5f1c-92f9-4309-9bd0-8dd37d0b85ca
+10:58:08 | INFO    | werkzeug | 127.0.0.1 - - [17/Mar/2026 10:58:08] "[35m[1mPOST /v1/ingest HTTP/1.1[0m" 201 -
+10:58:08 | DEBUG   | openrecall.server.queue_driver | NoopQueueDriver: frame_id=5587 completed capture_id=019cf9ba-b013-7c2d-8c4f-0d4e46848587
+10:58:13 | INFO    | werkzeug | 127.0.0.1 - - [17/Mar/2026 10:58:13] "POST /api/heartbeat HTTP/1.1" 200 -
+10:58:14 | INFO    | openrecall.server.database.frames_store | claim_frame: winner capture_id=019cf9ba-c952-72cb-96af-a403453ff00c frame_id=5588
+10:58:14 | INFO    | openrecall.server.api_v1 | ingest: 201 Created capture_id=019cf9ba-c952-72cb-96af-a403453ff00c frame_id=5588 request_id=6106b8f9-a681-41d7-96cb-75715586bd50
+10:58:14 | INFO    | werkzeug | 127.0.0.1 - - [17/Mar/2026 10:58:14] "[35m[1mPOST /v1/ingest HTTP/1.1[0m" 201 -
+10:58:14 | DEBUG   | openrecall.server.queue_driver | NoopQueueDriver: frame_id=5588 completed capture_id=019cf9ba-c952-72cb-96af-a403453ff00c
+10:58:17 | INFO    | openrecall.server.database.frames_store | claim_frame: winner capture_id=019cf9ba-d57d-7c97-888b-943b21141923 frame_id=5589
+10:58:17 | INFO    | openrecall.server.api_v1 | ingest: 201 Created capture_id=019cf9ba-d57d-7c97-888b-943b21141923 frame_id=5589 request_id=ca686cde-a069-4b02-9f79-05d41c479da7
+10:58:17 | INFO    | werkzeug | 127.0.0.1 - - [17/Mar/2026 10:58:17] "[35m[1mPOST /v1/ingest HTTP/1.1[0m" 201 -
+10:58:18 | DEBUG   | openrecall.server.queue_driver | NoopQueueDriver: frame_id=5589 completed capture_id=019cf9ba-d57d-7c97-888b-943b21141923
+10:58:25 | INFO    | werkzeug | 127.0.0.1 - - [17/Mar/2026 10:58:25] "POST /api/heartbeat HTTP/1.1" 200 -
+10:58:25 | INFO    | openrecall.server.database.frames_store | claim_frame: winner capture_id=019cf9ba-f484-7e84-9df2-33c7e2ba5eb9 frame_id=5590
+10:58:25 | INFO    | openrecall.server.api_v1 | ingest: 201 Created capture_id=019cf9ba-f484-7e84-9df2-33c7e2ba5eb9 frame_id=5590 request_id=f1e7f070-8b36-4be4-884d-c18cbc50ee70
+10:58:25 | INFO    | werkzeug | 127.0.0.1 - - [17/Mar/2026 10:58:25] "[35m[1mPOST /v1/ingest HTTP/1.1[0m" 201 -
+10:58:26 | DEBUG   | openrecall.server.queue_driver | NoopQueueDriver: frame_id=5590 completed capture_id=019cf9ba-f484-7e84-9df2-33c7e2ba5eb9
+10:58:32 | INFO    | werkzeug | 127.0.0.1 - - [17/Mar/2026 10:58:32] "POST /api/heartbeat HTTP/1.1" 200 -
+10:58:33 | INFO    | openrecall.server.database.frames_store | claim_frame: winner capture_id=019cf9bb-1372-7325-9cfe-965c51a47c1f frame_id=5591
+10:58:33 | INFO    | openrecall.server.api_v1 | ingest: 201 Created capture_id=019cf9bb-1372-7325-9cfe-965c51a47c1f frame_id=5591 request_id=224acd68-d7f3-4498-9aad-57fc33f3c395
+10:58:33 | INFO    | werkzeug | 127.0.0.1 - - [17/Mar/2026 10:58:33] "[35m[1mPOST /v1/ingest HTTP/1.1[0m" 201 -
+10:58:34 | DEBUG   | openrecall.server.queue_driver | NoopQueueDriver: frame_id=5591 completed capture_id=019cf9bb-1372-7325-9cfe-965c51a47c1f
+10:58:58 | INFO    | werkzeug | 127.0.0.1 - - [17/Mar/2026 10:58:58] "POST /api/heartbeat HTTP/1.1" 200 -
+10:58:58 | INFO    | openrecall.server.database.frames_store | claim_frame: winner capture_id=019cf9bb-76cb-72a0-b8ff-1162f6f15f3b frame_id=5592
+10:58:58 | INFO    | openrecall.server.api_v1 | ingest: 201 Created capture_id=019cf9bb-76cb-72a0-b8ff-1162f6f15f3b frame_id=5592 request_id=f2c35c89-7a5c-45b6-8800-3657cfccd87e
+10:58:58 | INFO    | werkzeug | 127.0.0.1 - - [17/Mar/2026 10:58:58] "[35m[1mPOST /v1/ingest HTTP/1.1[0m" 201 -
+10:59:00 | DEBUG   | openrecall.server.queue_driver | NoopQueueDriver: frame_id=5592 completed capture_id=019cf9bb-76cb-72a0-b8ff-1162f6f15f3b
+10:59:09 | INFO    | werkzeug | 127.0.0.1 - - [17/Mar/2026 10:59:09] "POST /api/heartbeat HTTP/1.1" 200 -
+10:59:28 | INFO    | werkzeug | 127.0.0.1 - - [17/Mar/2026 10:59:28] "POST /api/heartbeat HTTP/1.1" 200 -
+10:59:28 | INFO    | openrecall.server.database.frames_store | claim_frame: winner capture_id=019cf9bb-ec90-7be9-9220-765cea337d6e frame_id=5593
+10:59:28 | INFO    | openrecall.server.api_v1 | ingest: 201 Created capture_id=019cf9bb-ec90-7be9-9220-765cea337d6e frame_id=5593 request_id=6bde7183-893f-4b13-b1bb-a8c1d3067107
+10:59:28 | INFO    | werkzeug | 127.0.0.1 - - [17/Mar/2026 10:59:28] "[35m[1mPOST /v1/ingest HTTP/1.1[0m" 201 -
+10:59:30 | DEBUG   | openrecall.server.queue_driver | NoopQueueDriver: frame_id=5593 completed capture_id=019cf9bb-ec90-7be9-9220-765cea337d6e
+10:59:41 | INFO    | werkzeug | 127.0.0.1 - - [17/Mar/2026 10:59:41] "POST /api/heartbeat HTTP/1.1" 200 -
+11:00:02 | INFO    | werkzeug | 127.0.0.1 - - [17/Mar/2026 11:00:02] "POST /api/heartbeat HTTP/1.1" 200 -
+11:00:02 | INFO    | openrecall.server.database.frames_store | claim_frame: winner capture_id=019cf9bc-7135-781a-9695-27a58ec73873 frame_id=5594
+11:00:02 | INFO    | openrecall.server.api_v1 | ingest: 201 Created capture_id=019cf9bc-7135-781a-9695-27a58ec73873 frame_id=5594 request_id=72a72c7d-ef77-4ecc-bfb2-86ff5051a8a1
+11:00:02 | INFO    | werkzeug | 127.0.0.1 - - [17/Mar/2026 11:00:02] "[35m[1mPOST /v1/ingest HTTP/1.1[0m" 201 -
+11:00:04 | DEBUG   | openrecall.server.queue_driver | NoopQueueDriver: frame_id=5594 completed capture_id=019cf9bc-7135-781a-9695-27a58ec73873
+11:00:09 | INFO    | werkzeug | 127.0.0.1 - - [17/Mar/2026 11:00:09] "POST /api/heartbeat HTTP/1.1" 200 -
+11:00:09 | INFO    | openrecall.server.database.frames_store | claim_frame: winner capture_id=019cf9bc-8bfd-7895-8ec5-c43c3cb08b7a frame_id=5595
+11:00:09 | INFO    | openrecall.server.api_v1 | ingest: 201 Created capture_id=019cf9bc-8bfd-7895-8ec5-c43c3cb08b7a frame_id=5595 request_id=0fe743df-faa9-4fa5-9f8c-d53d9e9dff46
+11:00:09 | INFO    | werkzeug | 127.0.0.1 - - [17/Mar/2026 11:00:09] "[35m[1mPOST /v1/ingest HTTP/1.1[0m" 201 -
+11:00:10 | DEBUG   | openrecall.server.queue_driver | NoopQueueDriver: frame_id=5595 completed capture_id=019cf9bc-8bfd-7895-8ec5-c43c3cb08b7a
+11:00:22 | INFO    | werkzeug | 127.0.0.1 - - [17/Mar/2026 11:00:22] "POST /api/heartbeat HTTP/1.1" 200 -
+11:00:22 | INFO    | openrecall.server.database.frames_store | claim_frame: winner capture_id=019cf9bc-bff7-7e06-b938-63f4d32d7036 frame_id=5596
+11:00:22 | INFO    | openrecall.server.api_v1 | ingest: 201 Created capture_id=019cf9bc-bff7-7e06-b938-63f4d32d7036 frame_id=5596 request_id=a86c4fd5-a12c-438e-82c8-69317f7f58f6
+11:00:22 | INFO    | werkzeug | 127.0.0.1 - - [17/Mar/2026 11:00:22] "[35m[1mPOST /v1/ingest HTTP/1.1[0m" 201 -
+11:00:22 | INFO    | openrecall.server.database.frames_store | claim_frame: winner capture_id=019cf9bc-c059-729d-a7c2-2b0d5e30750e frame_id=5597
+11:00:22 | INFO    | openrecall.server.api_v1 | ingest: 201 Created capture_id=019cf9bc-c059-729d-a7c2-2b0d5e30750e frame_id=5597 request_id=99955e67-232f-4de6-b887-a8c50c917ae0
+11:00:22 | INFO    | werkzeug | 127.0.0.1 - - [17/Mar/2026 11:00:22] "[35m[1mPOST /v1/ingest HTTP/1.1[0m" 201 -
+11:00:24 | DEBUG   | openrecall.server.queue_driver | NoopQueueDriver: frame_id=5596 completed capture_id=019cf9bc-bff7-7e06-b938-63f4d32d7036
+11:00:24 | DEBUG   | openrecall.server.queue_driver | NoopQueueDriver: frame_id=5597 completed capture_id=019cf9bc-c059-729d-a7c2-2b0d5e30750e
+11:00:28 | INFO    | werkzeug | 127.0.0.1 - - [17/Mar/2026 11:00:28] "POST /api/heartbeat HTTP/1.1" 200 -
+11:00:28 | INFO    | openrecall.server.database.frames_store | claim_frame: winner capture_id=019cf9bc-d87b-7b2d-80c1-104be8a14d76 frame_id=5598
+11:00:28 | INFO    | openrecall.server.api_v1 | ingest: 201 Created capture_id=019cf9bc-d87b-7b2d-80c1-104be8a14d76 frame_id=5598 request_id=c1899229-1e34-4840-a846-d73bb13d81b1
+11:00:28 | INFO    | werkzeug | 127.0.0.1 - - [17/Mar/2026 11:00:28] "[35m[1mPOST /v1/ingest HTTP/1.1[0m" 201 -
+11:00:30 | DEBUG   | openrecall.server.queue_driver | NoopQueueDriver: frame_id=5598 completed capture_id=019cf9bc-d87b-7b2d-80c1-104be8a14d76
+11:00:31 | INFO    | openrecall.server.database.frames_store | claim_frame: winner capture_id=019cf9bc-dfb7-7abf-9004-a829bcf94769 frame_id=5599
+11:00:31 | INFO    | openrecall.server.api_v1 | ingest: 201 Created capture_id=019cf9bc-dfb7-7abf-9004-a829bcf94769 frame_id=5599 request_id=5a2de84d-d33b-48b3-92a6-20424397da2a
+11:00:31 | INFO    | werkzeug | 127.0.0.1 - - [17/Mar/2026 11:00:31] "[35m[1mPOST /v1/ingest HTTP/1.1[0m" 201 -
+11:00:32 | DEBUG   | openrecall.server.queue_driver | NoopQueueDriver: frame_id=5599 completed capture_id=019cf9bc-dfb7-7abf-9004-a829bcf94769
+11:00:37 | INFO    | werkzeug | 127.0.0.1 - - [17/Mar/2026 11:00:37] "POST /api/heartbeat HTTP/1.1" 200 -
+11:00:38 | INFO    | openrecall.server.database.frames_store | claim_frame: winner capture_id=019cf9bc-f9b7-76f2-a98e-719bce1283ac frame_id=5600
+11:00:38 | INFO    | openrecall.server.api_v1 | ingest: 201 Created capture_id=019cf9bc-f9b7-76f2-a98e-719bce1283ac frame_id=5600 request_id=f2045c98-1217-4581-ad9d-eaaf78004b4a
+11:00:38 | INFO    | werkzeug | 127.0.0.1 - - [17/Mar/2026 11:00:38] "[35m[1mPOST /v1/ingest HTTP/1.1[0m" 201 -
+11:00:38 | DEBUG   | openrecall.server.queue_driver | NoopQueueDriver: frame_id=5600 completed capture_id=019cf9bc-f9b7-76f2-a98e-719bce1283ac
+11:00:44 | INFO    | werkzeug | 127.0.0.1 - - [17/Mar/2026 11:00:44] "POST /api/heartbeat HTTP/1.1" 200 -
+11:00:46 | INFO    | openrecall.server.database.frames_store | claim_frame: winner capture_id=019cf9bd-18fb-7f4a-ac23-9645573c4997 frame_id=5601
+11:00:46 | INFO    | openrecall.server.api_v1 | ingest: 201 Created capture_id=019cf9bd-18fb-7f4a-ac23-9645573c4997 frame_id=5601 request_id=45f29cb7-df7e-495b-9ec1-a5eeb69789b8
+11:00:46 | INFO    | werkzeug | 127.0.0.1 - - [17/Mar/2026 11:00:46] "[35m[1mPOST /v1/ingest HTTP/1.1[0m" 201 -
+11:00:46 | DEBUG   | openrecall.server.queue_driver | NoopQueueDriver: frame_id=5601 completed capture_id=019cf9bd-18fb-7f4a-ac23-9645573c4997
+11:00:51 | INFO    | werkzeug | 127.0.0.1 - - [17/Mar/2026 11:00:51] "POST /api/heartbeat HTTP/1.1" 200 -
+11:00:52 | INFO    | openrecall.server.database.frames_store | claim_frame: winner capture_id=019cf9bd-2fd6-7c9e-87a7-eb68de3d0b97 frame_id=5602
+11:00:52 | INFO    | openrecall.server.api_v1 | ingest: 201 Created capture_id=019cf9bd-2fd6-7c9e-87a7-eb68de3d0b97 frame_id=5602 request_id=9ad13769-98d5-40b7-82a1-a1eafe433fed
+11:00:52 | INFO    | werkzeug | 127.0.0.1 - - [17/Mar/2026 11:00:52] "[35m[1mPOST /v1/ingest HTTP/1.1[0m" 201 -
+11:00:52 | DEBUG   | openrecall.server.queue_driver | NoopQueueDriver: frame_id=5602 completed capture_id=019cf9bd-2fd6-7c9e-87a7-eb68de3d0b97
+11:00:59 | INFO    | werkzeug | 127.0.0.1 - - [17/Mar/2026 11:00:59] "POST /api/heartbeat HTTP/1.1" 200 -
+11:01:00 | INFO    | openrecall.server.database.frames_store | claim_frame: winner capture_id=019cf9bd-50bc-7d25-8832-7b75fc150ac5 frame_id=5603
+11:01:00 | INFO    | openrecall.server.api_v1 | ingest: 201 Created capture_id=019cf9bd-50bc-7d25-8832-7b75fc150ac5 frame_id=5603 request_id=c330e187-7950-46b3-aecc-6e30533989a7
+11:01:00 | INFO    | werkzeug | 127.0.0.1 - - [17/Mar/2026 11:01:00] "[35m[1mPOST /v1/ingest HTTP/1.1[0m" 201 -
+11:01:01 | DEBUG   | openrecall.server.queue_driver | NoopQueueDriver: frame_id=5603 completed capture_id=019cf9bd-50bc-7d25-8832-7b75fc150ac5
+11:01:55 | INFO    | werkzeug | 127.0.0.1 - - [17/Mar/2026 11:01:55] "POST /api/heartbeat HTTP/1.1" 200 -
+11:01:55 | INFO    | openrecall.server.database.frames_store | claim_frame: winner capture_id=019cf9be-2a19-76c0-8ce0-ad2e582784e6 frame_id=5604
+11:01:55 | INFO    | openrecall.server.api_v1 | ingest: 201 Created capture_id=019cf9be-2a19-76c0-8ce0-ad2e582784e6 frame_id=5604 request_id=88c84606-fb25-4c7e-82af-8622d9b62bb7
+11:01:55 | INFO    | werkzeug | 127.0.0.1 - - [17/Mar/2026 11:01:55] "[35m[1mPOST /v1/ingest HTTP/1.1[0m" 201 -
+11:01:57 | DEBUG   | openrecall.server.queue_driver | NoopQueueDriver: frame_id=5604 completed capture_id=019cf9be-2a19-76c0-8ce0-ad2e582784e6
+11:02:49 | INFO    | werkzeug | 127.0.0.1 - - [17/Mar/2026 11:02:49] "POST /api/heartbeat HTTP/1.1" 200 -
+11:02:50 | INFO    | openrecall.server.database.frames_store | claim_frame: winner capture_id=019cf9be-ff22-7557-a92b-e0dd5c547fe2 frame_id=5605
+11:02:50 | INFO    | openrecall.server.api_v1 | ingest: 201 Created capture_id=019cf9be-ff22-7557-a92b-e0dd5c547fe2 frame_id=5605 request_id=5855d9f2-106d-4a25-bd92-bdbe14422cab
+11:02:50 | INFO    | werkzeug | 127.0.0.1 - - [17/Mar/2026 11:02:50] "[35m[1mPOST /v1/ingest HTTP/1.1[0m" 201 -
+11:02:50 | INFO    | openrecall.server.database.frames_store | claim_frame: winner capture_id=019cf9be-ff8a-7508-9f9f-1bc752fac782 frame_id=5606
+11:02:50 | INFO    | openrecall.server.api_v1 | ingest: 201 Created capture_id=019cf9be-ff8a-7508-9f9f-1bc752fac782 frame_id=5606 request_id=6e4e6527-d8f9-4d30-996a-30a4e56fcc1c
+11:02:50 | INFO    | werkzeug | 127.0.0.1 - - [17/Mar/2026 11:02:50] "[35m[1mPOST /v1/ingest HTTP/1.1[0m" 201 -
+11:02:51 | DEBUG   | openrecall.server.queue_driver | NoopQueueDriver: frame_id=5605 completed capture_id=019cf9be-ff22-7557-a92b-e0dd5c547fe2
+11:02:51 | DEBUG   | openrecall.server.queue_driver | NoopQueueDriver: frame_id=5606 completed capture_id=019cf9be-ff8a-7508-9f9f-1bc752fac782
+11:03:50 | INFO    | werkzeug | 127.0.0.1 - - [17/Mar/2026 11:03:50] "POST /api/heartbeat HTTP/1.1" 200 -
+11:03:50 | INFO    | openrecall.server.database.frames_store | claim_frame: winner capture_id=019cf9bf-ea82-73d9-abc2-2671e0226c15 frame_id=5607
+11:03:50 | INFO    | openrecall.server.api_v1 | ingest: 201 Created capture_id=019cf9bf-ea82-73d9-abc2-2671e0226c15 frame_id=5607 request_id=47730fdd-00cc-40c7-93b8-e8ecf1508d7b
+11:03:50 | INFO    | werkzeug | 127.0.0.1 - - [17/Mar/2026 11:03:50] "[35m[1mPOST /v1/ingest HTTP/1.1[0m" 201 -
+11:03:51 | DEBUG   | openrecall.server.queue_driver | NoopQueueDriver: frame_id=5607 completed capture_id=019cf9bf-ea82-73d9-abc2-2671e0226c15
+11:04:01 | INFO    | werkzeug | 127.0.0.1 - - [17/Mar/2026 11:04:01] "POST /api/heartbeat HTTP/1.1" 200 -
+11:04:07 | INFO    | werkzeug | 127.0.0.1 - - [17/Mar/2026 11:04:07] "POST /api/heartbeat HTTP/1.1" 200 -
+11:04:08 | INFO    | openrecall.server.database.frames_store | claim_frame: winner capture_id=019cf9c0-2ff4-7bf9-a79f-18c4b8f9d43c frame_id=5608
+11:04:08 | INFO    | openrecall.server.api_v1 | ingest: 201 Created capture_id=019cf9c0-2ff4-7bf9-a79f-18c4b8f9d43c frame_id=5608 request_id=de692c74-639a-4e2d-8197-f18586544c7d
+11:04:08 | INFO    | werkzeug | 127.0.0.1 - - [17/Mar/2026 11:04:08] "[35m[1mPOST /v1/ingest HTTP/1.1[0m" 201 -
+11:04:09 | DEBUG   | openrecall.server.queue_driver | NoopQueueDriver: frame_id=5608 completed capture_id=019cf9c0-2ff4-7bf9-a79f-18c4b8f9d43c
+11:05:06 | INFO    | werkzeug | 127.0.0.1 - - [17/Mar/2026 11:05:06] "POST /api/heartbeat HTTP/1.1" 200 -
+11:05:07 | INFO    | openrecall.server.database.frames_store | claim_frame: winner capture_id=019cf9c1-1430-7317-89d5-a65f561add15 frame_id=5609
+11:05:07 | INFO    | openrecall.server.api_v1 | ingest: 201 Created capture_id=019cf9c1-1430-7317-89d5-a65f561add15 frame_id=5609 request_id=1820656f-68c6-4f82-9209-7d2ccff3ae02
+11:05:07 | INFO    | werkzeug | 127.0.0.1 - - [17/Mar/2026 11:05:07] "[35m[1mPOST /v1/ingest HTTP/1.1[0m" 201 -
+11:05:08 | DEBUG   | openrecall.server.queue_driver | NoopQueueDriver: frame_id=5609 completed capture_id=019cf9c1-1430-7317-89d5-a65f561add15
+11:06:01 | INFO    | werkzeug | 127.0.0.1 - - [17/Mar/2026 11:06:01] "POST /api/heartbeat HTTP/1.1" 200 -
+11:06:01 | INFO    | openrecall.server.database.frames_store | claim_frame: winner capture_id=019cf9c1-e9e3-73d8-9c0c-6e09b87efbb0 frame_id=5610
+11:06:01 | INFO    | openrecall.server.api_v1 | ingest: 201 Created capture_id=019cf9c1-e9e3-73d8-9c0c-6e09b87efbb0 frame_id=5610 request_id=ae5825b7-1725-43fb-924f-93585729d1f4
+11:06:01 | INFO    | werkzeug | 127.0.0.1 - - [17/Mar/2026 11:06:01] "[35m[1mPOST /v1/ingest HTTP/1.1[0m" 201 -
+11:06:02 | DEBUG   | openrecall.server.queue_driver | NoopQueueDriver: frame_id=5610 completed capture_id=019cf9c1-e9e3-73d8-9c0c-6e09b87efbb0
+11:06:09 | INFO    | werkzeug | 127.0.0.1 - - [17/Mar/2026 11:06:09] "POST /api/heartbeat HTTP/1.1" 200 -
+11:06:09 | INFO    | openrecall.server.database.frames_store | claim_frame: winner capture_id=019cf9c2-0aac-7ad3-b66b-344bf4d12e2f frame_id=5611
+11:06:09 | INFO    | openrecall.server.api_v1 | ingest: 201 Created capture_id=019cf9c2-0aac-7ad3-b66b-344bf4d12e2f frame_id=5611 request_id=1266f060-faac-44f3-bed5-39c2ff80a13e
+11:06:09 | INFO    | werkzeug | 127.0.0.1 - - [17/Mar/2026 11:06:09] "[35m[1mPOST /v1/ingest HTTP/1.1[0m" 201 -
+11:06:10 | DEBUG   | openrecall.server.queue_driver | NoopQueueDriver: frame_id=5611 completed capture_id=019cf9c2-0aac-7ad3-b66b-344bf4d12e2f
+11:06:10 | INFO    | openrecall.server.database.frames_store | claim_frame: winner capture_id=019cf9c2-0b7c-7298-b7ad-1ffc98defbab frame_id=5612
+11:06:10 | INFO    | openrecall.server.api_v1 | ingest: 201 Created capture_id=019cf9c2-0b7c-7298-b7ad-1ffc98defbab frame_id=5612 request_id=45db0d8f-017f-49a4-9936-98424a37eab6
+11:06:10 | INFO    | werkzeug | 127.0.0.1 - - [17/Mar/2026 11:06:10] "[35m[1mPOST /v1/ingest HTTP/1.1[0m" 201 -
+11:06:12 | DEBUG   | openrecall.server.queue_driver | NoopQueueDriver: frame_id=5612 completed capture_id=019cf9c2-0b7c-7298-b7ad-1ffc98defbab
+11:06:15 | INFO    | werkzeug | 127.0.0.1 - - [17/Mar/2026 11:06:15] "POST /api/heartbeat HTTP/1.1" 200 -
+11:06:15 | INFO    | openrecall.server.database.frames_store | claim_frame: winner capture_id=019cf9c2-2142-78b5-bda0-cb0817ddc575 frame_id=5613
+11:06:15 | INFO    | openrecall.server.api_v1 | ingest: 201 Created capture_id=019cf9c2-2142-78b5-bda0-cb0817ddc575 frame_id=5613 request_id=3e69172f-4954-4417-812b-a12376bdae7c
+11:06:15 | INFO    | werkzeug | 127.0.0.1 - - [17/Mar/2026 11:06:15] "[35m[1mPOST /v1/ingest HTTP/1.1[0m" 201 -
+11:06:16 | DEBUG   | openrecall.server.queue_driver | NoopQueueDriver: frame_id=5613 completed capture_id=019cf9c2-2142-78b5-bda0-cb0817ddc575
+11:06:22 | INFO    | werkzeug | 127.0.0.1 - - [17/Mar/2026 11:06:22] "POST /api/heartbeat HTTP/1.1" 200 -
+11:06:23 | INFO    | openrecall.server.database.frames_store | claim_frame: winner capture_id=019cf9c2-3f82-75cc-89fd-9f6c1eb8000b frame_id=5614
+11:06:23 | INFO    | openrecall.server.api_v1 | ingest: 201 Created capture_id=019cf9c2-3f82-75cc-89fd-9f6c1eb8000b frame_id=5614 request_id=4a26c8e2-ac33-4c43-9c19-b501b056b61c
+11:06:23 | INFO    | werkzeug | 127.0.0.1 - - [17/Mar/2026 11:06:23] "[35m[1mPOST /v1/ingest HTTP/1.1[0m" 201 -
+11:06:24 | DEBUG   | openrecall.server.queue_driver | NoopQueueDriver: frame_id=5614 completed capture_id=019cf9c2-3f82-75cc-89fd-9f6c1eb8000b
+11:07:03 | INFO    | werkzeug | 127.0.0.1 - - [17/Mar/2026 11:07:03] "POST /api/heartbeat HTTP/1.1" 200 -
+11:07:04 | INFO    | openrecall.server.database.frames_store | claim_frame: winner capture_id=019cf9c2-df99-7479-b8a6-8af2bd2e7d3e frame_id=5615
+11:07:04 | INFO    | openrecall.server.api_v1 | ingest: 201 Created capture_id=019cf9c2-df99-7479-b8a6-8af2bd2e7d3e frame_id=5615 request_id=6423aca1-5345-4199-b6f3-d52780534310
+11:07:04 | INFO    | werkzeug | 127.0.0.1 - - [17/Mar/2026 11:07:04] "[35m[1mPOST /v1/ingest HTTP/1.1[0m" 201 -
+11:07:06 | DEBUG   | openrecall.server.queue_driver | NoopQueueDriver: frame_id=5615 completed capture_id=019cf9c2-df99-7479-b8a6-8af2bd2e7d3e
+11:07:17 | INFO    | werkzeug | 127.0.0.1 - - [17/Mar/2026 11:07:17] "POST /api/heartbeat HTTP/1.1" 200 -
+11:07:17 | INFO    | openrecall.server.database.frames_store | claim_frame: winner capture_id=019cf9c3-141e-7b04-952a-32e2322f60c7 frame_id=5616
+11:07:17 | INFO    | openrecall.server.api_v1 | ingest: 201 Created capture_id=019cf9c3-141e-7b04-952a-32e2322f60c7 frame_id=5616 request_id=7de76aa3-8cab-4215-b150-9d2de8506f12
+11:07:17 | INFO    | werkzeug | 127.0.0.1 - - [17/Mar/2026 11:07:17] "[35m[1mPOST /v1/ingest HTTP/1.1[0m" 201 -
+11:07:17 | INFO    | openrecall.server.database.frames_store | claim_frame: winner capture_id=019cf9c3-157e-7498-b61b-e58daeee2250 frame_id=5617
+11:07:17 | INFO    | openrecall.server.api_v1 | ingest: 201 Created capture_id=019cf9c3-157e-7498-b61b-e58daeee2250 frame_id=5617 request_id=cb93e781-7d4d-4f24-b115-3848e86f560b
+11:07:17 | INFO    | werkzeug | 127.0.0.1 - - [17/Mar/2026 11:07:17] "[35m[1mPOST /v1/ingest HTTP/1.1[0m" 201 -
+11:07:18 | DEBUG   | openrecall.server.queue_driver | NoopQueueDriver: frame_id=5616 completed capture_id=019cf9c3-141e-7b04-952a-32e2322f60c7
+11:07:18 | DEBUG   | openrecall.server.queue_driver | NoopQueueDriver: frame_id=5617 completed capture_id=019cf9c3-157e-7498-b61b-e58daeee2250
+11:07:50 | INFO    | werkzeug | 127.0.0.1 - - [17/Mar/2026 11:07:50] "POST /api/heartbeat HTTP/1.1" 200 -
+11:07:51 | INFO    | openrecall.server.database.frames_store | claim_frame: winner capture_id=019cf9c3-950c-7cd3-8535-8e5609838405 frame_id=5618
+11:07:51 | INFO    | openrecall.server.api_v1 | ingest: 201 Created capture_id=019cf9c3-950c-7cd3-8535-8e5609838405 frame_id=5618 request_id=08ff1d6a-c4c7-41c1-9ac3-9a468a656f81
+11:07:51 | INFO    | werkzeug | 127.0.0.1 - - [17/Mar/2026 11:07:51] "[35m[1mPOST /v1/ingest HTTP/1.1[0m" 201 -
+11:07:52 | DEBUG   | openrecall.server.queue_driver | NoopQueueDriver: frame_id=5618 completed capture_id=019cf9c3-950c-7cd3-8535-8e5609838405
+11:08:19 | INFO    | werkzeug | 127.0.0.1 - - [17/Mar/2026 11:08:19] "POST /api/heartbeat HTTP/1.1" 200 -
+11:08:20 | INFO    | openrecall.server.database.frames_store | claim_frame: winner capture_id=019cf9c4-05d9-7fd1-8687-bc73a2f8297d frame_id=5619
+11:08:20 | INFO    | openrecall.server.api_v1 | ingest: 201 Created capture_id=019cf9c4-05d9-7fd1-8687-bc73a2f8297d frame_id=5619 request_id=6b970d29-e4dd-4654-9b32-9d09053e4bde
+11:08:20 | INFO    | werkzeug | 127.0.0.1 - - [17/Mar/2026 11:08:20] "[35m[1mPOST /v1/ingest HTTP/1.1[0m" 201 -
+11:08:20 | DEBUG   | openrecall.server.queue_driver | NoopQueueDriver: frame_id=5619 completed capture_id=019cf9c4-05d9-7fd1-8687-bc73a2f8297d
+11:08:26 | INFO    | werkzeug | 127.0.0.1 - - [17/Mar/2026 11:08:26] "POST /api/heartbeat HTTP/1.1" 200 -
+11:08:27 | INFO    | openrecall.server.database.frames_store | claim_frame: winner capture_id=019cf9c4-2369-7e11-8999-b6078e24783b frame_id=5620
+11:08:27 | INFO    | openrecall.server.api_v1 | ingest: 201 Created capture_id=019cf9c4-2369-7e11-8999-b6078e24783b frame_id=5620 request_id=fcbc7755-2b76-4a19-967c-53b3fc1a53d4
+11:08:27 | INFO    | werkzeug | 127.0.0.1 - - [17/Mar/2026 11:08:27] "[35m[1mPOST /v1/ingest HTTP/1.1[0m" 201 -
+11:08:28 | DEBUG   | openrecall.server.queue_driver | NoopQueueDriver: frame_id=5620 completed capture_id=019cf9c4-2369-7e11-8999-b6078e24783b
+11:08:30 | INFO    | openrecall.server.database.frames_store | claim_frame: winner capture_id=019cf9c4-2f24-7260-a173-73b829cd802d frame_id=5621
+11:08:30 | INFO    | openrecall.server.api_v1 | ingest: 201 Created capture_id=019cf9c4-2f24-7260-a173-73b829cd802d frame_id=5621 request_id=2c9be034-3dc3-4ca6-b0f2-3aa82dc83bca
+11:08:30 | INFO    | werkzeug | 127.0.0.1 - - [17/Mar/2026 11:08:30] "[35m[1mPOST /v1/ingest HTTP/1.1[0m" 201 -
+11:08:30 | DEBUG   | openrecall.server.queue_driver | NoopQueueDriver: frame_id=5621 completed capture_id=019cf9c4-2f24-7260-a173-73b829cd802d
+11:08:31 | INFO    | openrecall.server.database.frames_store | claim_frame: winner capture_id=019cf9c4-31dc-7998-8735-ced4e64c92af frame_id=5622
+11:08:31 | INFO    | openrecall.server.api_v1 | ingest: 201 Created capture_id=019cf9c4-31dc-7998-8735-ced4e64c92af frame_id=5622 request_id=ef93dea2-d12a-4f6b-81bb-8ae914882e66
+11:08:31 | INFO    | werkzeug | 127.0.0.1 - - [17/Mar/2026 11:08:31] "[35m[1mPOST /v1/ingest HTTP/1.1[0m" 201 -
+11:08:32 | DEBUG   | openrecall.server.queue_driver | NoopQueueDriver: frame_id=5622 completed capture_id=019cf9c4-31dc-7998-8735-ced4e64c92af
+11:08:34 | INFO    | werkzeug | 127.0.0.1 - - [17/Mar/2026 11:08:34] "POST /api/heartbeat HTTP/1.1" 200 -
+11:08:35 | INFO    | openrecall.server.database.frames_store | claim_frame: winner capture_id=019cf9c4-4311-7379-8110-6a1617c7fb99 frame_id=5623
+11:08:35 | INFO    | openrecall.server.api_v1 | ingest: 201 Created capture_id=019cf9c4-4311-7379-8110-6a1617c7fb99 frame_id=5623 request_id=01e11f04-8c3f-4e56-9632-47624e05e8e1
+11:08:35 | INFO    | werkzeug | 127.0.0.1 - - [17/Mar/2026 11:08:35] "[35m[1mPOST /v1/ingest HTTP/1.1[0m" 201 -
+11:08:36 | DEBUG   | openrecall.server.queue_driver | NoopQueueDriver: frame_id=5623 completed capture_id=019cf9c4-4311-7379-8110-6a1617c7fb99
+11:08:38 | INFO    | openrecall.server.database.frames_store | claim_frame: winner capture_id=019cf9c4-4ff0-77b0-b93b-42947c6cb5d6 frame_id=5624
+11:08:38 | INFO    | openrecall.server.api_v1 | ingest: 201 Created capture_id=019cf9c4-4ff0-77b0-b93b-42947c6cb5d6 frame_id=5624 request_id=33ffc867-f18c-4a95-b7bb-85a36b7eb643
+11:08:38 | INFO    | werkzeug | 127.0.0.1 - - [17/Mar/2026 11:08:38] "[35m[1mPOST /v1/ingest HTTP/1.1[0m" 201 -
+11:08:38 | DEBUG   | openrecall.server.queue_driver | NoopQueueDriver: frame_id=5624 completed capture_id=019cf9c4-4ff0-77b0-b93b-42947c6cb5d6
+11:08:42 | INFO    | werkzeug | 127.0.0.1 - - [17/Mar/2026 11:08:42] "POST /api/heartbeat HTTP/1.1" 200 -
+11:08:42 | INFO    | openrecall.server.database.frames_store | claim_frame: winner capture_id=019cf9c4-5f0d-7029-b71c-aad0d7975538 frame_id=5625
+11:08:42 | INFO    | openrecall.server.api_v1 | ingest: 201 Created capture_id=019cf9c4-5f0d-7029-b71c-aad0d7975538 frame_id=5625 request_id=4a748297-9e16-4cf6-a8e7-8677a489c2da
+11:08:42 | INFO    | werkzeug | 127.0.0.1 - - [17/Mar/2026 11:08:42] "[35m[1mPOST /v1/ingest HTTP/1.1[0m" 201 -
+11:08:42 | DEBUG   | openrecall.server.queue_driver | NoopQueueDriver: frame_id=5625 completed capture_id=019cf9c4-5f0d-7029-b71c-aad0d7975538
+11:08:50 | INFO    | werkzeug | 127.0.0.1 - - [17/Mar/2026 11:08:50] "POST /api/heartbeat HTTP/1.1" 200 -
+11:08:57 | INFO    | werkzeug | 127.0.0.1 - - [17/Mar/2026 11:08:57] "POST /api/heartbeat HTTP/1.1" 200 -
+11:09:53 | INFO    | werkzeug | 127.0.0.1 - - [17/Mar/2026 11:09:53] "POST /api/heartbeat HTTP/1.1" 200 -
+11:09:53 | INFO    | openrecall.server.database.frames_store | claim_frame: winner capture_id=019cf9c5-767b-7316-b6e9-4b1b52263d1c frame_id=5626
+11:09:53 | INFO    | openrecall.server.api_v1 | ingest: 201 Created capture_id=019cf9c5-767b-7316-b6e9-4b1b52263d1c frame_id=5626 request_id=dfe25ec0-e9c9-4f25-ad0f-c84cba91897f
+11:09:53 | INFO    | werkzeug | 127.0.0.1 - - [17/Mar/2026 11:09:53] "[35m[1mPOST /v1/ingest HTTP/1.1[0m" 201 -
+11:09:54 | INFO    | openrecall.server.database.frames_store | claim_frame: winner capture_id=019cf9c5-783d-74ea-97a9-319fe105f2ba frame_id=5627
+11:09:54 | INFO    | openrecall.server.api_v1 | ingest: 201 Created capture_id=019cf9c5-783d-74ea-97a9-319fe105f2ba frame_id=5627 request_id=ecc329ee-5201-4e09-a29d-3c253fc8c083
+11:09:54 | INFO    | werkzeug | 127.0.0.1 - - [17/Mar/2026 11:09:54] "[35m[1mPOST /v1/ingest HTTP/1.1[0m" 201 -
+11:09:55 | DEBUG   | openrecall.server.queue_driver | NoopQueueDriver: frame_id=5626 completed capture_id=019cf9c5-767b-7316-b6e9-4b1b52263d1c
+11:09:55 | DEBUG   | openrecall.server.queue_driver | NoopQueueDriver: frame_id=5627 completed capture_id=019cf9c5-783d-74ea-97a9-319fe105f2ba
+11:10:09 | INFO    | werkzeug | 127.0.0.1 - - [17/Mar/2026 11:10:09] "POST /api/heartbeat HTTP/1.1" 200 -
+11:10:09 | INFO    | openrecall.server.database.frames_store | claim_frame: winner capture_id=019cf9c5-b30d-7429-92c7-6290614e1fc3 frame_id=5628
+11:10:09 | INFO    | openrecall.server.api_v1 | ingest: 201 Created capture_id=019cf9c5-b30d-7429-92c7-6290614e1fc3 frame_id=5628 request_id=08996675-3620-4ec8-9f59-ee87b46ec77c
+11:10:09 | INFO    | werkzeug | 127.0.0.1 - - [17/Mar/2026 11:10:09] "[35m[1mPOST /v1/ingest HTTP/1.1[0m" 201 -
+11:10:09 | INFO    | openrecall.server.database.frames_store | claim_frame: winner capture_id=019cf9c5-b36c-7e40-b05b-100d6ba19a13 frame_id=5629
+11:10:09 | INFO    | openrecall.server.api_v1 | ingest: 201 Created capture_id=019cf9c5-b36c-7e40-b05b-100d6ba19a13 frame_id=5629 request_id=6a56c06e-3ce0-403e-8499-82fa8271770a
+11:10:09 | INFO    | werkzeug | 127.0.0.1 - - [17/Mar/2026 11:10:09] "[35m[1mPOST /v1/ingest HTTP/1.1[0m" 201 -
+11:10:11 | DEBUG   | openrecall.server.queue_driver | NoopQueueDriver: frame_id=5628 completed capture_id=019cf9c5-b30d-7429-92c7-6290614e1fc3
+11:10:11 | DEBUG   | openrecall.server.queue_driver | NoopQueueDriver: frame_id=5629 completed capture_id=019cf9c5-b36c-7e40-b05b-100d6ba19a13
+11:10:15 | INFO    | werkzeug | 127.0.0.1 - - [17/Mar/2026 11:10:15] "POST /api/heartbeat HTTP/1.1" 200 -
+11:10:21 | INFO    | werkzeug | 127.0.0.1 - - [17/Mar/2026 11:10:21] "POST /api/heartbeat HTTP/1.1" 200 -
+11:10:21 | INFO    | openrecall.server.database.frames_store | claim_frame: winner capture_id=019cf9c5-e2be-76a2-b27d-c2a8d4dc2e11 frame_id=5630
+11:10:21 | INFO    | openrecall.server.api_v1 | ingest: 201 Created capture_id=019cf9c5-e2be-76a2-b27d-c2a8d4dc2e11 frame_id=5630 request_id=1b98cd60-f677-4efb-80f3-173a175c9dd0
+11:10:21 | INFO    | werkzeug | 127.0.0.1 - - [17/Mar/2026 11:10:21] "[35m[1mPOST /v1/ingest HTTP/1.1[0m" 201 -
+11:10:22 | INFO    | openrecall.server.database.frames_store | claim_frame: winner capture_id=019cf9c5-e802-778b-b973-c0de6bc67d3f frame_id=5631
+11:10:22 | INFO    | openrecall.server.api_v1 | ingest: 201 Created capture_id=019cf9c5-e802-778b-b973-c0de6bc67d3f frame_id=5631 request_id=fe30635a-9862-4150-bb1c-c56b7b69ea9a
+11:10:22 | INFO    | werkzeug | 127.0.0.1 - - [17/Mar/2026 11:10:22] "[35m[1mPOST /v1/ingest HTTP/1.1[0m" 201 -
+11:10:23 | DEBUG   | openrecall.server.queue_driver | NoopQueueDriver: frame_id=5630 completed capture_id=019cf9c5-e2be-76a2-b27d-c2a8d4dc2e11
+11:10:23 | DEBUG   | openrecall.server.queue_driver | NoopQueueDriver: frame_id=5631 completed capture_id=019cf9c5-e802-778b-b973-c0de6bc67d3f
+11:10:27 | INFO    | werkzeug | 127.0.0.1 - - [17/Mar/2026 11:10:27] "POST /api/heartbeat HTTP/1.1" 200 -
+11:10:49 | INFO    | werkzeug | 127.0.0.1 - - [17/Mar/2026 11:10:49] "POST /api/heartbeat HTTP/1.1" 200 -
+11:10:50 | INFO    | openrecall.server.database.frames_store | claim_frame: winner capture_id=019cf9c6-4f40-71a0-a6b0-dbaebd12dba7 frame_id=5632
+11:10:50 | INFO    | openrecall.server.api_v1 | ingest: 201 Created capture_id=019cf9c6-4f40-71a0-a6b0-dbaebd12dba7 frame_id=5632 request_id=66b165e3-99a6-4d0d-9a4d-c71dd04afb73
+11:10:50 | INFO    | werkzeug | 127.0.0.1 - - [17/Mar/2026 11:10:50] "[35m[1mPOST /v1/ingest HTTP/1.1[0m" 201 -
+11:10:50 | INFO    | openrecall.server.database.frames_store | claim_frame: winner capture_id=019cf9c6-50ea-70ef-9007-781369150372 frame_id=5633
+11:10:50 | INFO    | openrecall.server.api_v1 | ingest: 201 Created capture_id=019cf9c6-50ea-70ef-9007-781369150372 frame_id=5633 request_id=6e63a3cd-d511-4721-8cf8-5e1768713b84
+11:10:50 | INFO    | werkzeug | 127.0.0.1 - - [17/Mar/2026 11:10:50] "[35m[1mPOST /v1/ingest HTTP/1.1[0m" 201 -
+11:10:51 | DEBUG   | openrecall.server.queue_driver | NoopQueueDriver: frame_id=5632 completed capture_id=019cf9c6-4f40-71a0-a6b0-dbaebd12dba7
+11:10:51 | DEBUG   | openrecall.server.queue_driver | NoopQueueDriver: frame_id=5633 completed capture_id=019cf9c6-50ea-70ef-9007-781369150372

@@ -47,19 +47,13 @@ references:
 - 目的：统一 `/v1/search` OCR-only 结果的引用字段验收口径，避免将 v4 预留 seam 误当成 v3 活跃结果模型。
 - 判定类型：
   - `Search 引用字段完整率`：**Hard Gate**
-  - `Search capture_id 覆盖率`：**Soft KPI**（non-blocking）
 - 阈值（P1-S4）：
   - Search 引用字段完整率 = 100%
-  - Search capture_id 覆盖率目标 >= 99%（未达标需提交整改动作，不触发 Gate Fail）
 
 定义：
 
 1. `Search 引用字段完整率`（Hard Gate）
 - 公式：`search_ref_completeness = (搜索结果中 frame_id 与 timestamp 同时非空的条数 / 搜索结果总条数) * 100%`
-
-2. `Search capture_id 覆盖率`（Soft KPI）
-- 公式：`search_capture_id_coverage = (搜索结果中 capture_id 非空的条数 / 搜索结果总条数) * 100%`
-- 说明：`capture_id` 为 v3 增强可选字段，不属于 Search 对齐硬门槛；该指标仅用于质量观测与回归。
 
 ## 3.2 Capture 去重与背压口径（P1-S2）
 
@@ -323,13 +317,43 @@ Soft KPI（non-blocking）：
 - 测量方法：不分路径，全量capture的TTS分布
 - 用途：端到端体验趋势观测，用于P2 LAN场景的性能基线对比
 
-3. `Search P95`（P1 阶段记录实际值，暂不设硬性阈值）
-- 统计范围：`GET /v1/search`（含 keyword 检索语义）。
-- 起点：Edge API 收到请求。
-- 终点：Edge API 返回最后一个字节。
-- 标准时间窗：查询窗口 <= 24h（超大时间窗单独统计，不纳入统计）。
-- P1 阶段策略：记录实际 P95 分布，暂不设硬性阈值。
-- 阈值确定：参考 screenpipe `timeline_performance_test.rs`（5s 以上被视为问题），在 P1-S7 前根据实测数据确定最终目标。
+### 3.5 Search P95（P1 阶段记录实际值，SLO 在 P1-S7 确定）
+
+#### 3.5.1 定义
+- **指标**：`search_p95_latency_ms`
+- **公式**：`latency_ms = (API 返回最后一个字节时间 - API 收到请求时间)`
+- **百分位**：P95（Nearest-rank）
+- **预热剔除**：每轮测量剔除前 10 个样本
+
+#### 3.5.2 采样规则
+- **采样频率**：每次 Search 请求都记录延迟
+- **时间窗分类**：
+  - **标准查询**：时间范围 <= 24h
+  - **超大查询**：时间范围 > 24h（单独统计，不计入标准 P95）
+  - **空查询**：无时间范围参数（单独统计）
+- **异常值**：> 30s 标记为 timeout，不计入 P95
+
+#### 3.5.3 阈值策略
+
+| 阶段 | 阈值 | 类型 | 说明 |
+|------|------|------|------|
+| P1-S4 | 记录实际分布 | 观测 | 收集基线数据 |
+| P1-S7 | <= 5s | SLO | 参考 screenpipe 问题阈值 |
+| P2 | <= 3s | SLO | LAN 稳定后 |
+| P3 | <= 2s | SLO | 优化后 |
+
+#### 3.5.4 超标处置
+
+| 等级 | P95 范围 | 动作 |
+|------|----------|------|
+| 绿色 | <= 3s | 达标 |
+| 黄色 | 3-5s | 记录观测，优化方向 |
+| 橙色 | 5-10s | 提交整改计划（不阻塞 Gate） |
+| 红色 | > 10s | 阻塞 P1-S7 Exit |
+
+#### 3.5.5 与其他指标的关系
+- **Chat 首 token**：Search P95 应 <= 1s 以满足 Chat 首 token <= 3.5s 目标
+- **TTS P95**：Search 延迟是 TTS（capture→OCR→Search）端到端延迟的一部分
 
 4. `Chat 系统可用率`（P1-S6 主 Gate）
 - 公式：`chat_availability = (1 - 系统错误次数 / 总请求数) * 100%`

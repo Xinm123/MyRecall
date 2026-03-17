@@ -1,0 +1,96 @@
+10:51:23 | INFO    | openrecall.client | ==================================================
+10:51:23 | INFO    | openrecall.client | OpenRecall Client Starting
+10:51:23 | INFO    | openrecall.client | ==================================================
+10:51:23 | INFO    | openrecall.client | Debug mode: ON
+10:51:23 | INFO    | openrecall.client | Buffer path: /Users/pyw/MRC/buffer
+10:51:23 | INFO    | openrecall.client | Client screenshots: /Users/pyw/MRC/screenshots (enabled=False)
+10:51:23 | INFO    | openrecall.client | Cache folder: /Users/pyw/MRS/cache
+10:51:23 | INFO    | openrecall.client | Server API: http://localhost:8083/api
+10:51:23 | INFO    | openrecall.client | Min capture interval: 3000ms
+10:51:23 | INFO    | openrecall.client | Idle capture interval: 60000ms
+10:51:23 | INFO    | openrecall.client | Simhash dedup: click=True, app_switch=True
+10:51:23 | INFO    | openrecall.client | Trigger queue capacity: 1000
+10:51:23 | INFO    | openrecall.client | Upload timeout: 180s
+10:51:23 | INFO    | openrecall.client | Primary monitor only: False
+10:51:23 | INFO    | openrecall.client | ==================================================
+10:51:23 | INFO    | openrecall.client.recorder | 🎥 Recorder started (Producer-Consumer mode)
+10:51:23 | INFO    | openrecall.client.recorder |    Monitors: All
+10:51:23 | INFO    | openrecall.client.v3_uploader | v3_uploader: SpoolUploader started | residual=20
+10:51:23 | ERROR   | openrecall.client.v3_uploader | v3_uploader: unexpected 500 capture_id=019cf9b0-3238-7395-9034-8d9963055949 body='{\n  "code": "INTERNAL_ERROR",\n  "error": "Failed to store frame metadata",\n  "request_id": "ed5701e5-4aa4-40b6-8ffc-806fc985cb7a"\n}\n'
+10:51:23 | DEBUG   | openrecall.client.v3_uploader | v3_uploader: backing off 1s (attempt #1)
+10:51:23 | INFO    | openrecall.client.events.base | device_name binding added: monitor_1; rebuilding partition state
+10:51:23 | INFO    | openrecall.client.events.base | device_name binding added: monitor_2; rebuilding partition state
+10:51:23 | INFO    | openrecall.client.events.macos | App switch monitor started in polling mode
+10:51:23 | INFO    | openrecall.client.recorder |    Tracking 2 monitor(s)
+10:51:23 | DEBUG   | openrecall.client.recorder | Heartbeat synced: recording=True, upload=True
+10:51:23 | DEBUG   | openrecall.client.events.macos | CGEventTap started with TailAppend placement
+10:51:24 | ERROR   | openrecall.client.v3_uploader | v3_uploader: unexpected 500 capture_id=019cf9b0-3238-7395-9034-8d9963055949 body='{\n  "code": "INTERNAL_ERROR",\n  "error": "Failed to store frame metadata",\n  "request_id": "462bebf2-f160-437b-83f5-6ac5e858384f"\n}\n'
+10:51:24 | DEBUG   | openrecall.client.v3_uploader | v3_uploader: backing off 2s (attempt #2)
+10:51:26 | ERROR   | openrecall.client.v3_uploader | v3_uploader: unexpected 500 capture_id=019cf9b0-3238-7395-9034-8d9963055949 body='{\n  "code": "INTERNAL_ERROR",\n  "error": "Failed to store frame metadata",\n  "request_id": "e81ff095-c6ca-4052-b3c6-b1207da127e8"\n}\n'
+10:51:26 | DEBUG   | openrecall.client.v3_uploader | v3_uploader: backing off 4s (attempt #3)
+10:51:30 | ERROR   | openrecall.client.v3_uploader | v3_uploader: unexpected 500 capture_id=019cf9b0-3238-7395-9034-8d9963055949 body='{\n  "code": "INTERNAL_ERROR",\n  "error": "Failed to store frame metadata",\n  "request_id": "a4d8b8c1-691a-4c18-9ed4-3e48a8d8ff4d"\n}\n'
+10:51:30 | DEBUG   | openrecall.client.v3_uploader | v3_uploader: backing off 8s (attempt #4)
+10:51:38 | ERROR   | openrecall.client.v3_uploader | v3_uploader: unexpected 500 capture_id=019cf9b0-3238-7395-9034-8d9963055949 body='{\n  "code": "INTERNAL_ERROR",\n  "error": "Failed to store frame metadata",\n  "request_id": "e9967369-954a-43c0-ab96-e0c0f3bcf70a"\n}\n'
+10:51:38 | DEBUG   | openrecall.client.v3_uploader | v3_uploader: backing off 16s (attempt #5)
+10:51:54 | ERROR   | openrecall.client.v3_uploader | v3_uploader: unexpected 500 capture_id=019cf9b0-3238-7395-9034-8d9963055949 body='{\n  "code": "INTERNAL_ERROR",\n  "error": "Failed to store frame metadata",\n  "request_id": "9208341b-0e2d-4e21-bffa-6500139077a2"\n}\n'
+10:51:54 | DEBUG   | openrecall.client.v3_uploader | v3_uploader: backing off 32s (attempt #6)
+10:51:56 | INFO    | openrecall.client.recorder | DEBUG: Computing phash for capture
+10:51:56 | INFO    | openrecall.client.recorder | DEBUG: phash computed = 11960656929585724098
+10:51:56 | INFO    | openrecall.client.spool | spool: enqueued capture_id=019cf9b5-058c-7faa-92f9-18e3192f1fde size=935350 queue=24
+10:51:56 | DEBUG   | openrecall.client.recorder | 📸 trigger=click device=monitor_1 app=iTerm2 window=OC | MyRecall-v3 P1-S3 config review for O... latency_ms=30240 trigger_queue=2 spool=24 monitor=primary 1512x982
+10:51:56 | DEBUG   | openrecall.client.recorder | Heartbeat synced: recording=True, upload=True
+10:52:26 | DEBUG   | openrecall.client.recorder | Force-capturing frame for device=monitor_1 after 30.1s of skips (max_skip_duration=30s)
+10:52:26 | INFO    | openrecall.client.spool | spool: enqueued capture_id=019cf9b5-7b1a-766c-99cb-7fe8926e3601 size=935350 queue=28
+10:52:26 | DEBUG   | openrecall.client.recorder | 📸 trigger=app_switch device=monitor_1 app=iTerm2 window=OC | MyRecall-v3 P1-S3 config review for O... latency_ms=30086 trigger_queue=2 spool=28 monitor=primary 1512x982
+10:52:26 | DEBUG   | openrecall.client.recorder | Heartbeat synced: recording=True, upload=True
+10:52:26 | ERROR   | openrecall.client.v3_uploader | v3_uploader: unexpected 500 capture_id=019cf9b0-3238-7395-9034-8d9963055949 body='{\n  "code": "INTERNAL_ERROR",\n  "error": "Failed to store frame metadata",\n  "request_id": "6108c2e1-a473-456d-8f5c-ff72b75bb2ff"\n}\n'
+10:52:26 | DEBUG   | openrecall.client.v3_uploader | v3_uploader: backing off 60s (attempt #7)
+10:52:56 | DEBUG   | openrecall.client.recorder | Force-capturing frame for device=monitor_1 after 30.1s of skips (max_skip_duration=30s)
+10:52:56 | INFO    | openrecall.client.spool | spool: enqueued capture_id=019cf9b5-f09a-73a1-84b8-1475a40ae4dc size=622111 queue=32
+10:52:56 | DEBUG   | openrecall.client.recorder | 📸 trigger=click device=monitor_1 app=iTerm2 window=OC | MyRecall-v3 P1-S3 config review for O... latency_ms=30075 trigger_queue=4 spool=32 monitor=primary 1512x982
+10:52:56 | DEBUG   | openrecall.client.recorder | Heartbeat synced: recording=True, upload=True
+3_uploader: unexpected 500 capture_id=019cf9b0-3238-7395-9034-8d9963055949 body='{\n  "code": "INTERNAL_ERROR",\n  "error": "Failed to store frame metadata",\n  "request_id": "69d2532b-c198-4fce-ac7a-d32f3f59cd1c"\n}\n'
+10:52:18 | DEBUG   | openrecall.client.v3_uploader | v3_uploader: backing off 60s (attempt #8)
+10:52:23 | DEBUG   | openrecall.client.recorder | Force-capturing frame for device=monitor_1 after 30.1s of skips (max_skip_duration=30s)
+10:52:23 | INFO    | openrecall.client.spool | spool: enqueued capture_id=019cf9b5-720b-7228-a61d-2ae04f38e071 size=579325 queue=27
+10:52:23 | DEBUG   | openrecall.client.recorder | 📸 trigger=app_switch device=monitor_1 app=iTerm2 window=OC | MyRecall-v3 P1-S3 config review for O... latency_ms=30085 trigger_queue=10 spool=27 monitor=primary 1512x982
+10:52:23 | DEBUG   | openrecall.client.recorder | Heartbeat synced: recording=True, upload=True
+10:52:23 | INFO    | openrecall.client.recorder | 📊 Capture (120s): idle=0 app_switch=1 click=3 manual=0 | debounced=1 | latency avg=30122ms max=30216ms | trigger_queue peak=11 spool peak=27
+10:52:54 | DEBUG   | openrecall.client.recorder | Force-capturing frame for device=monitor_1 after 30.1s of skips (max_skip_duration=30s)
+10:52:54 | INFO    | openrecall.client.spool | spool: enqueued capture_id=019cf9b5-e793-7408-92fc-5b269aec59a3 size=634517 queue=31
+10:52:54 | DEBUG   | openrecall.client.recorder | 📸 trigger=click device=monitor_1 app=iTerm2 window=OC | MyRecall-v3 P1-S3 config review for O... latency_ms=30085 trigger_queue=13 spool=31 monitor=primary 1512x982
+10:52:54 | DEBUG   | openrecall.client.recorder | Heartbeat synced: recording=True, upload=True
+                          10:51:46 | ERROR   | openrecall.client.v3_uploader | v3_uploader: unexpected 500 capture_id=019cf9b0-3238-7395-9034-8d9963055949 body='{\n  "code": "INTERNAL_ERROR",\n  "error": "Failed to store frame metadata",\n  "request_id": "6369fd5e-fc3a-4d7c-b276-35a1b3a93160"\n}\n'
+10:51:46 | DEBUG   | openrecall.client.v3_uploader | v3_uploader: backing off 60s (attempt #9)
+10:51:50 | DEBUG   | openrecall.client.recorder | Force-capturing frame for device=monitor_1 after 30.1s of skips (max_skip_duration=30s)
+10:51:50 | INFO    | openrecall.client.spool | spool: enqueued capture_id=019cf9b4-efbf-7fc1-9c65-d86c8dbe5439 size=667529 queue=22
+10:51:50 | DEBUG   | openrecall.client.recorder | 📸 trigger=click device=monitor_1 app=iTerm2 window=OC | MyRecall-v3 P1-S3 config review for O... latency_ms=30089 trigger_queue=13 spool=22 monitor=primary 1512x982
+10:51:50 | DEBUG   | openrecall.client.recorder | Heartbeat synced: recording=True, upload=True
+10:52:20 | DEBUG   | openrecall.client.recorder | Force-capturing frame for device=monitor_1 after 30.1s of skips (max_skip_duration=30s)
+10:52:20 | INFO    | openrecall.client.spool | spool: enqueued capture_id=019cf9b5-654c-7159-ab46-d9b88aa5ac0e size=935237 queue=26
+10:52:20 | DEBUG   | openrecall.client.recorder | 📸 trigger=click device=monitor_1 app=iTerm2 window=OC | MyRecall-v3 P1-S3 config review for O... latency_ms=30095 trigger_queue=13 spool=26 monitor=primary 1512x982
+10:52:20 | DEBUG   | openrecall.client.recorder | Heartbeat synced: recording=True, upload=True
+10:52:46 | ERROR   | openrecall.client.v3_uploader | v3_uploader: unexpected 500 capture_id=019cf9b0-3238-7395-9034-8d9963055949 body='{\n  "code": "INTERNAL_ERROR",\n  "error": "Failed to store frame metadata",\n  "request_id": "f1f3806e-0406-4d86-a1b9-118d965b8dbd"\n}\n'
+10:52:46 | DEBUG   | openrecall.client.v3_uploader | v3_uploader: backing off 60s (attempt #10)
+10:52:50 | DEBUG   | openrecall.client.recorder | Force-capturing frame for device=monitor_1 after 30.1s of skips (max_skip_duration=30s)
+10:52:50 | INFO    | openrecall.client.spool | spool: enqueued capture_id=019cf9b5-dad9-7bea-b353-8bd811532b22 size=935237 queue=30
+10:52:50 | DEBUG   | openrecall.client.recorder | 📸 trigger=click device=monitor_1 app=iTerm2 window=OC | MyRecall-v3 P1-S3 config review for O... latency_ms=30088 trigger_queue=15 spool=30 monitor=primary 1512x982
+10:52:50 | DEBUG   | openrecall.client.recorder | Heartbeat synced: recording=True, upload=True
+10:52:50 | INFO    | openrecall.client.recorder | 📊 Capture (120s): idle=0 app_switch=0 click=4 manual=0 | debounced=1 | latency avg=30090ms max=30095ms | trigger_queue peak=15 spool peak=30
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         10:51:40 | DEBUG   | openrecall.client.recorder | Force-capturing frame for device=monitor_1 after 30.1s of skips (max_skip_duration=30s)
+10:51:40 | INFO    | openrecall.client.spool | spool: enqueued capture_id=019cf9b4-c84f-783b-90a1-ddd1b8d67274 size=488060 queue=21
+10:51:40 | DEBUG   | openrecall.client.recorder | 📸 trigger=click device=monitor_1 app=iTerm2 window=OC | MyRecall-v3 P1-S3 config review for O... latency_ms=30089 trigger_queue=14 spool=21 monitor=primary 1512x982
+10:51:40 | DEBUG   | openrecall.client.recorder | Heartbeat synced: recording=True, upload=True
+10:51:43 | ERROR   | openrecall.client.v3_uploader | v3_uploader: unexpected 500 capture_id=019cf9b0-3238-7395-9034-8d9963055949 body='{\n  "code": "INTERNAL_ERROR",\n  "error": "Failed to store frame metadata",\n  "request_id": "87308a97-f54f-4683-80c4-ea08f9a82ce2"\n}\n'
+10:51:43 | DEBUG   | openrecall.client.v3_uploader | v3_uploader: backing off 60s (attempt #11)
+10:52:10 | DEBUG   | openrecall.client.recorder | Force-capturing frame for device=monitor_1 after 30.1s of skips (max_skip_duration=30s)
+10:52:10 | INFO    | openrecall.client.spool | spool: enqueued capture_id=019cf9b5-3dd4-7ca4-a300-8c7296ee350e size=616728 queue=25
+10:52:10 | DEBUG   | openrecall.client.recorder | 📸 trigger=click device=monitor_1 app=iTerm2 window=OC | MyRecall-v3 P1-S3 config review for O... latency_ms=30081 trigger_queue=14 spool=25 monitor=primary 1512x982
+10:52:10 | DEBUG   | openrecall.client.recorder | Heartbeat synced: recording=True, upload=True
+10:52:40 | DEBUG   | openrecall.client.recorder | Force-capturing frame for device=monitor_1 after 30.1s of skips (max_skip_duration=30s)
+10:52:40 | INFO    | openrecall.client.spool | spool: enqueued capture_id=019cf9b5-b357-7a86-811c-41954e71bf4c size=603559 queue=29
+10:52:40 | DEBUG   | openrecall.client.recorder | 📸 trigger=click device=monitor_1 app=iTerm2 window=OC | MyRecall-v3 P1-S4 文档审查与改进建议 latency_ms=30082 trigger_queue=15 spool=29 monitor=primary 1512x982
+10:52:40 | DEBUG   | openrecall.client.recorder | Heartbeat synced: recording=True, upload=True
+10:52:40 | INFO    | openrecall.client.recorder | 📊 Capture (120s): idle=0 app_switch=0 click=4 manual=0 | debounced=1 | latency avg=30084ms max=30089ms | trigger_queue peak=15 spool peak=29
+10:52:43 | ERROR   | openrecall.client.v3_uploader | v3_uploader: unexpected 500 capture_id=019cf9b0-3238-7395-9034-8d9963055949 body='{\n  "code": "INTERNAL_ERROR",\n  "error": "Failed to store frame metadata",\n  "request_id": "401ee016-cbb5-4065-9544-922b3dd85f2f"\n}\n'
+10:52:43 | DEBUG   | openrecall.client.v3_uploader | v3_uploader: backing off 60s (attempt #12)

@@ -182,7 +182,7 @@ references:
     - 返回结构包含 frame/citation 关键字段；v3 主线不暴露 UI/accessibility result type
     - Search 页过滤项与 API 参数 1:1 映射，结果可回溯到 frame/citation
   - Gate：
-    - 观测 KPI：Search P95 记录实际分布（P1 阶段暂不设硬性阈值，参考 screenpipe 5s 问题阈值，在 P1-S7 前确定目标）
+    - 观测 KPI：Search P95 记录实际分布（P1 阶段暂不设硬性阈值，详见 [gate_baseline.md#35-search-p95p1-s4](./gate_baseline.md#35-search-p95p1-s4)；在 P1-S7 前根据实测数据确定最终目标）
     - `/v1/search` 过滤参数契约完成率 = 100%
     - OCR 搜索 SQL/返回结构一致性 = 100%
     - `focused` 过滤正确性 = 100%

@@ -1,0 +1,391 @@
+10:57:48 | INFO    | openrecall.client | ==================================================
+10:57:48 | INFO    | openrecall.client | OpenRecall Client Starting
+10:57:48 | INFO    | openrecall.client | ==================================================
+10:57:48 | INFO    | openrecall.client | Debug mode: ON
+10:57:48 | INFO    | openrecall.client | Buffer path: /Users/pyw/MRC/buffer
+10:57:48 | INFO    | openrecall.client | Client screenshots: /Users/pyw/MRC/screenshots (enabled=False)
+10:57:48 | INFO    | openrecall.client | Cache folder: /Users/pyw/MRS/cache
+10:57:48 | INFO    | openrecall.client | Server API: http://localhost:8083/api
+10:57:48 | INFO    | openrecall.client | Min capture interval: 3000ms
+10:57:48 | INFO    | openrecall.client | Idle capture interval: 60000ms
+10:57:48 | INFO    | openrecall.client | Simhash dedup: click=True, app_switch=False
+10:57:48 | INFO    | openrecall.client | Trigger queue capacity: 1000
+10:57:48 | INFO    | openrecall.client | Upload timeout: 180s
+10:57:48 | INFO    | openrecall.client | Primary monitor only: True
+10:57:48 | INFO    | openrecall.client | ==================================================
+10:57:48 | INFO    | openrecall.client.recorder | 🎥 Recorder started (Producer-Consumer mode)
+10:57:48 | INFO    | openrecall.client.recorder |    Monitors: Primary only
+10:57:48 | INFO    | openrecall.client.v3_uploader | v3_uploader: SpoolUploader started | residual=0
+10:57:48 | INFO    | openrecall.client.events.base | device_name binding added: monitor_1; rebuilding partition state
+10:57:48 | INFO    | openrecall.client.events.macos | App switch monitor started in polling mode
+10:57:48 | INFO    | openrecall.client.recorder |    Tracking 1 monitor(s)
+10:57:48 | DEBUG   | openrecall.client.recorder | Heartbeat synced: recording=True, upload=True
+10:57:48 | DEBUG   | openrecall.client.events.macos | CGEventTap started with TailAppend placement
+10:57:48 | INFO    | openrecall.client.recorder | DEBUG: Computing phash for capture
+10:57:48 | INFO    | openrecall.client.recorder | DEBUG: phash computed = 16158219385173697651
+10:57:48 | INFO    | openrecall.client.spool | spool: enqueued capture_id=019cf9ba-6561-771e-a891-0f9ec17a81f0 size=613294 queue=1
+10:57:48 | DEBUG   | openrecall.client.recorder | 📸 trigger=click device=monitor_1 app=iTerm2 window=OC | MyRecall-v3 P1-S3 config review for O... latency_ms=210 trigger_queue=0 spool=1 monitor=primary 1512x982
+10:57:49 | INFO    | openrecall.client.v3_uploader | v3_uploader: 201 queued capture_id=019cf9ba-6561-771e-a891-0f9ec17a81f0 frame_id=5584
+10:57:49 | INFO    | openrecall.client.spool | spool: committed capture_id=019cf9ba-6561-771e-a891-0f9ec17a81f0 remaining=0
+10:57:52 | INFO    | openrecall.client.recorder | DEBUG: Computing phash for capture
+10:57:52 | INFO    | openrecall.client.recorder | DEBUG: phash computed = 16440886301210428601
+10:57:52 | INFO    | openrecall.client.spool | spool: enqueued capture_id=019cf9ba-76ce-7f30-b89c-5bdbdb7ab176 size=516761 queue=1
+10:57:52 | DEBUG   | openrecall.client.recorder | 📸 trigger=click device=monitor_1 app=iTerm2 window=OC | MyRecall-v3 P1-S3 config review for O... latency_ms=124 trigger_queue=0 spool=1 monitor=primary 1512x982
+10:57:53 | INFO    | openrecall.client.v3_uploader | v3_uploader: 201 queued capture_id=019cf9ba-76ce-7f30-b89c-5bdbdb7ab176 frame_id=5585
+10:57:53 | INFO    | openrecall.client.spool | spool: committed capture_id=019cf9ba-76ce-7f30-b89c-5bdbdb7ab176 remaining=0
+10:57:58 | INFO    | openrecall.client.recorder | DEBUG: Computing phash for capture
+10:57:58 | INFO    | openrecall.client.recorder | DEBUG: phash computed = 16440886301210428601
+10:57:58 | INFO    | openrecall.client.recorder | MRV3 similar_frame_skipped device_name=monitor_1 hamming_distance_threshold=8 trigger_type=click
+10:57:58 | DEBUG   | openrecall.client.recorder | Heartbeat synced: recording=True, upload=True
+10:58:03 | INFO    | openrecall.client.recorder | DEBUG: Computing phash for capture
+10:58:03 | INFO    | openrecall.client.recorder | DEBUG: phash computed = 16464529297388585131
+10:58:03 | INFO    | openrecall.client.spool | spool: enqueued capture_id=019cf9ba-a0d4-7496-bc2f-2e76774d9434 size=539670 queue=1
+10:58:03 | DEBUG   | openrecall.client.recorder | 📸 trigger=click device=monitor_1 app=iTerm2 window=OC | MyRecall-v3 P1-S3 config review for O... latency_ms=117 trigger_queue=0 spool=1 monitor=primary 1512x982
+10:58:03 | DEBUG   | openrecall.client.recorder | Heartbeat synced: recording=True, upload=True
+10:58:04 | INFO    | openrecall.client.v3_uploader | v3_uploader: 201 queued capture_id=019cf9ba-a0d4-7496-bc2f-2e76774d9434 frame_id=5586
+10:58:04 | INFO    | openrecall.client.spool | spool: committed capture_id=019cf9ba-a0d4-7496-bc2f-2e76774d9434 remaining=0
+10:58:07 | INFO    | openrecall.client.recorder | DEBUG: Computing phash for capture
+10:58:07 | INFO    | openrecall.client.recorder | DEBUG: phash computed = 16440886026335667449
+10:58:07 | INFO    | openrecall.client.spool | spool: enqueued capture_id=019cf9ba-b013-7c2d-8c4f-0d4e46848587 size=547660 queue=1
+10:58:07 | DEBUG   | openrecall.client.recorder | 📸 trigger=click device=monitor_1 app=iTerm2 window=OC | MyRecall-v3 P1-S3 config review for O... latency_ms=119 trigger_queue=0 spool=1 monitor=primary 1512x982
+10:58:08 | INFO    | openrecall.client.v3_uploader | v3_uploader: 201 queued capture_id=019cf9ba-b013-7c2d-8c4f-0d4e46848587 frame_id=5587
+10:58:08 | INFO    | openrecall.client.spool | spool: committed capture_id=019cf9ba-b013-7c2d-8c4f-0d4e46848587 remaining=0
+10:58:13 | INFO    | openrecall.client.recorder | DEBUG: Computing phash for capture
+10:58:13 | INFO    | openrecall.client.recorder | DEBUG: phash computed = 16463403406063289403
+10:58:13 | INFO    | openrecall.client.spool | spool: enqueued capture_id=019cf9ba-c952-72cb-96af-a403453ff00c size=503021 queue=1
+10:58:13 | DEBUG   | openrecall.client.recorder | 📸 trigger=click device=monitor_1 app=iTerm2 window=OC | MyRecall-v3 P1-S3 config review for O... latency_ms=131 trigger_queue=0 spool=1 monitor=primary 1512x982
+10:58:13 | DEBUG   | openrecall.client.recorder | Heartbeat synced: recording=True, upload=True
+10:58:14 | INFO    | openrecall.client.v3_uploader | v3_uploader: 201 queued capture_id=019cf9ba-c952-72cb-96af-a403453ff00c frame_id=5588
+10:58:14 | INFO    | openrecall.client.spool | spool: committed capture_id=019cf9ba-c952-72cb-96af-a403453ff00c remaining=0
+10:58:17 | INFO    | openrecall.client.recorder | DEBUG: Computing phash for capture
+10:58:17 | INFO    | openrecall.client.recorder | DEBUG: phash computed = 16440886301210428601
+10:58:17 | INFO    | openrecall.client.spool | spool: enqueued capture_id=019cf9ba-d57d-7c97-888b-943b21141923 size=516626 queue=1
+10:58:17 | DEBUG   | openrecall.client.recorder | 📸 trigger=click device=monitor_1 app=iTerm2 window=OC | MyRecall-v3 P1-S3 config review for O... latency_ms=119 trigger_queue=0 spool=1 monitor=primary 1512x982
+10:58:17 | INFO    | openrecall.client.v3_uploader | v3_uploader: 201 queued capture_id=019cf9ba-d57d-7c97-888b-943b21141923 frame_id=5589
+10:58:17 | INFO    | openrecall.client.spool | spool: committed capture_id=019cf9ba-d57d-7c97-888b-943b21141923 remaining=0
+10:58:25 | INFO    | openrecall.client.recorder | DEBUG: Computing phash for capture
+10:58:25 | INFO    | openrecall.client.recorder | DEBUG: phash computed = 16463403397471519961
+10:58:25 | INFO    | openrecall.client.spool | spool: enqueued capture_id=019cf9ba-f484-7e84-9df2-33c7e2ba5eb9 size=542238 queue=1
+10:58:25 | DEBUG   | openrecall.client.recorder | 📸 trigger=click device=monitor_1 app=iTerm2 window=OC | MyRecall-v3 P1-S3 config review for O... latency_ms=155 trigger_queue=0 spool=1 monitor=primary 1512x982
+10:58:25 | DEBUG   | openrecall.client.recorder | Heartbeat synced: recording=True, upload=True
+10:58:25 | INFO    | openrecall.client.v3_uploader | v3_uploader: 201 queued capture_id=019cf9ba-f484-7e84-9df2-33c7e2ba5eb9 frame_id=5590
+10:58:25 | INFO    | openrecall.client.spool | spool: committed capture_id=019cf9ba-f484-7e84-9df2-33c7e2ba5eb9 remaining=0
+10:58:32 | INFO    | openrecall.client.recorder | DEBUG: Computing phash for capture
+10:58:32 | INFO    | openrecall.client.recorder | DEBUG: phash computed = 11906886551799055416
+10:58:32 | INFO    | openrecall.client.spool | spool: enqueued capture_id=019cf9bb-1372-7325-9cfe-965c51a47c1f size=527526 queue=1
+10:58:32 | DEBUG   | openrecall.client.recorder | 📸 trigger=click device=monitor_1 app=iTerm2 window=OC | MyRecall-v3 P1-S4 文档审查与改进建议 latency_ms=106 trigger_queue=0 spool=1 monitor=primary 1512x982
+10:58:32 | DEBUG   | openrecall.client.recorder | Heartbeat synced: recording=True, upload=True
+10:58:33 | INFO    | openrecall.client.v3_uploader | v3_uploader: 201 queued capture_id=019cf9bb-1372-7325-9cfe-965c51a47c1f frame_id=5591
+10:58:33 | INFO    | openrecall.client.spool | spool: committed capture_id=019cf9bb-1372-7325-9cfe-965c51a47c1f remaining=0
+10:58:58 | INFO    | openrecall.client.recorder | DEBUG: Computing phash for capture
+10:58:58 | INFO    | openrecall.client.recorder | DEBUG: phash computed = 16463403397404411129
+10:58:58 | INFO    | openrecall.client.spool | spool: enqueued capture_id=019cf9bb-76cb-72a0-b8ff-1162f6f15f3b size=545116 queue=1
+10:58:58 | DEBUG   | openrecall.client.recorder | 📸 trigger=click device=monitor_1 app=iTerm2 window=OC | MyRecall-v3 P1-S3 config review for O... latency_ms=130 trigger_queue=0 spool=1 monitor=primary 1512x982
+10:58:58 | DEBUG   | openrecall.client.recorder | Heartbeat synced: recording=True, upload=True
+10:58:58 | INFO    | openrecall.client.v3_uploader | v3_uploader: 201 queued capture_id=019cf9bb-76cb-72a0-b8ff-1162f6f15f3b frame_id=5592
+10:58:58 | INFO    | openrecall.client.spool | spool: committed capture_id=019cf9bb-76cb-72a0-b8ff-1162f6f15f3b remaining=0
+10:59:09 | INFO    | openrecall.client.recorder | DEBUG: Computing phash for capture
+10:59:09 | INFO    | openrecall.client.recorder | DEBUG: phash computed = 16463403397404411129
+10:59:09 | INFO    | openrecall.client.recorder | MRV3 similar_frame_skipped device_name=monitor_1 hamming_distance_threshold=8 trigger_type=click
+10:59:09 | DEBUG   | openrecall.client.recorder | Heartbeat synced: recording=True, upload=True
+10:59:28 | DEBUG   | openrecall.client.recorder | Force-capturing frame for device=monitor_1 after 30.1s of skips (max_skip_duration=30s)
+10:59:28 | INFO    | openrecall.client.spool | spool: enqueued capture_id=019cf9bb-ec90-7be9-9220-765cea337d6e size=497343 queue=1
+10:59:28 | DEBUG   | openrecall.client.recorder | 📸 trigger=click device=monitor_1 app=iTerm2 window=OC | MyRecall-v3 P1-S3 config review for O... latency_ms=118 trigger_queue=0 spool=1 monitor=primary 1512x982
+10:59:28 | DEBUG   | openrecall.client.recorder | Heartbeat synced: recording=True, upload=True
+10:59:28 | INFO    | openrecall.client.v3_uploader | v3_uploader: 201 queued capture_id=019cf9bb-ec90-7be9-9220-765cea337d6e frame_id=5593
+10:59:28 | INFO    | openrecall.client.spool | spool: committed capture_id=019cf9bb-ec90-7be9-9220-765cea337d6e remaining=0
+10:59:32 | INFO    | openrecall.client.recorder | DEBUG: Computing phash for capture
+10:59:32 | INFO    | openrecall.client.recorder | DEBUG: phash computed = 11852280328940668153
+10:59:32 | INFO    | openrecall.client.recorder | MRV3 similar_frame_skipped device_name=monitor_1 hamming_distance_threshold=8 trigger_type=click
+10:59:41 | INFO    | openrecall.client.recorder | DEBUG: Computing phash for capture
+10:59:41 | INFO    | openrecall.client.recorder | DEBUG: phash computed = 11834265999211480249
+10:59:41 | INFO    | openrecall.client.recorder | MRV3 similar_frame_skipped device_name=monitor_1 hamming_distance_threshold=8 trigger_type=click
+10:59:41 | DEBUG   | openrecall.client.recorder | Heartbeat synced: recording=True, upload=True
+10:59:44 | INFO    | openrecall.client.recorder | DEBUG: Computing phash for capture
+10:59:44 | INFO    | openrecall.client.recorder | DEBUG: phash computed = 16458904539488027801
+10:59:44 | INFO    | openrecall.client.recorder | MRV3 similar_frame_skipped device_name=monitor_1 hamming_distance_threshold=8 trigger_type=click
+11:00:02 | DEBUG   | openrecall.client.recorder | Force-capturing frame for device=monitor_1 after 33.9s of skips (max_skip_duration=30s)
+11:00:02 | INFO    | openrecall.client.spool | spool: enqueued capture_id=019cf9bc-7135-781a-9695-27a58ec73873 size=586917 queue=1
+11:00:02 | DEBUG   | openrecall.client.recorder | 📸 trigger=click device=monitor_1 app=iTerm2 window=OC | MyRecall-v3 P1-S4 文档审查与改进建议 latency_ms=99 trigger_queue=0 spool=1 monitor=primary 1512x982
+11:00:02 | DEBUG   | openrecall.client.recorder | Heartbeat synced: recording=True, upload=True
+11:00:02 | INFO    | openrecall.client.recorder | 📊 Capture (120s): idle=0 app_switch=0 click=11 manual=0 | debounced=0 | latency avg=129ms max=210ms | trigger_queue peak=0 spool peak=1
+11:00:02 | INFO    | openrecall.client.v3_uploader | v3_uploader: 201 queued capture_id=019cf9bc-7135-781a-9695-27a58ec73873 frame_id=5594
+11:00:02 | INFO    | openrecall.client.spool | spool: committed capture_id=019cf9bc-7135-781a-9695-27a58ec73873 remaining=0
+11:00:06 | INFO    | openrecall.client.recorder | DEBUG: Computing phash for capture
+11:00:06 | INFO    | openrecall.client.recorder | DEBUG: phash computed = 16459462747799405755
+11:00:06 | INFO    | openrecall.client.recorder | MRV3 similar_frame_skipped device_name=monitor_1 hamming_distance_threshold=8 trigger_type=click
+11:00:09 | INFO    | openrecall.client.recorder | DEBUG: Computing phash for capture
+11:00:09 | INFO    | openrecall.client.recorder | DEBUG: phash computed = 11581505825228439769
+11:00:09 | INFO    | openrecall.client.spool | spool: enqueued capture_id=019cf9bc-8bfd-7895-8ec5-c43c3cb08b7a size=618175 queue=1
+11:00:09 | DEBUG   | openrecall.client.recorder | 📸 trigger=click device=monitor_1 app=iTerm2 window=OC | MyRecall-v3 P1-S4 文档审查与改进建议 latency_ms=100 trigger_queue=0 spool=1 monitor=primary 1512x982
+11:00:09 | DEBUG   | openrecall.client.recorder | Heartbeat synced: recording=True, upload=True
+11:00:09 | INFO    | openrecall.client.v3_uploader | v3_uploader: 201 queued capture_id=019cf9bc-8bfd-7895-8ec5-c43c3cb08b7a frame_id=5595
+11:00:09 | INFO    | openrecall.client.spool | spool: committed capture_id=019cf9bc-8bfd-7895-8ec5-c43c3cb08b7a remaining=0
+11:00:22 | INFO    | openrecall.client.recorder | DEBUG: Computing phash for capture
+11:00:22 | INFO    | openrecall.client.recorder | DEBUG: phash computed = 14861794523569771531
+11:00:22 | INFO    | openrecall.client.spool | spool: enqueued capture_id=019cf9bc-bff7-7e06-b938-63f4d32d7036 size=685130 queue=1
+11:00:22 | DEBUG   | openrecall.client.recorder | 📸 trigger=click device=monitor_1 app=Code window=question.md — models latency_ms=170 trigger_queue=1 spool=1 monitor=primary 1512x982
+11:00:22 | DEBUG   | openrecall.client.recorder | Heartbeat synced: recording=True, upload=True
+11:00:22 | INFO    | openrecall.client.spool | spool: enqueued capture_id=019cf9bc-c059-729d-a7c2-2b0d5e30750e size=685105 queue=2
+11:00:22 | DEBUG   | openrecall.client.recorder | 📸 trigger=app_switch device=monitor_1 app=Code window=question.md — models latency_ms=96 trigger_queue=0 spool=2 monitor=primary 1512x982
+11:00:22 | INFO    | openrecall.client.v3_uploader | v3_uploader: 201 queued capture_id=019cf9bc-bff7-7e06-b938-63f4d32d7036 frame_id=5596
+11:00:22 | INFO    | openrecall.client.spool | spool: committed capture_id=019cf9bc-bff7-7e06-b938-63f4d32d7036 remaining=1
+11:00:22 | INFO    | openrecall.client.v3_uploader | v3_uploader: 201 queued capture_id=019cf9bc-c059-729d-a7c2-2b0d5e30750e frame_id=5597
+11:00:22 | INFO    | openrecall.client.spool | spool: committed capture_id=019cf9bc-c059-729d-a7c2-2b0d5e30750e remaining=0
+11:00:28 | INFO    | openrecall.client.recorder | DEBUG: Computing phash for capture
+11:00:28 | INFO    | openrecall.client.recorder | DEBUG: phash computed = 14573560904684258347
+11:00:28 | INFO    | openrecall.client.spool | spool: enqueued capture_id=019cf9bc-d87b-7b2d-80c1-104be8a14d76 size=693787 queue=1
+11:00:28 | DEBUG   | openrecall.client.recorder | 📸 trigger=click device=monitor_1 app=Code window=question.md — models latency_ms=161 trigger_queue=0 spool=1 monitor=primary 1512x982
+11:00:28 | DEBUG   | openrecall.client.recorder | Heartbeat synced: recording=True, upload=True
+11:00:28 | INFO    | openrecall.client.v3_uploader | v3_uploader: 201 queued capture_id=019cf9bc-d87b-7b2d-80c1-104be8a14d76 frame_id=5598
+11:00:28 | INFO    | openrecall.client.spool | spool: committed capture_id=019cf9bc-d87b-7b2d-80c1-104be8a14d76 remaining=0
+11:00:30 | INFO    | openrecall.client.spool | spool: enqueued capture_id=019cf9bc-dfb7-7abf-9004-a829bcf94769 size=531888 queue=1
+11:00:30 | DEBUG   | openrecall.client.recorder | 📸 trigger=app_switch device=monitor_1 app=iTerm2 window=OC | MyRecall-v3 P1-S4 文档审查与改进建议 latency_ms=119 trigger_queue=0 spool=1 monitor=primary 1512x982
+11:00:31 | INFO    | openrecall.client.v3_uploader | v3_uploader: 201 queued capture_id=019cf9bc-dfb7-7abf-9004-a829bcf94769 frame_id=5599
+11:00:31 | INFO    | openrecall.client.spool | spool: committed capture_id=019cf9bc-dfb7-7abf-9004-a829bcf94769 remaining=0
+11:00:37 | INFO    | openrecall.client.recorder | DEBUG: Computing phash for capture
+11:00:37 | INFO    | openrecall.client.recorder | DEBUG: phash computed = 14861792358905791531
+11:00:37 | INFO    | openrecall.client.recorder | MRV3 similar_frame_skipped device_name=monitor_1 hamming_distance_threshold=8 trigger_type=click
+11:00:37 | DEBUG   | openrecall.client.recorder | Heartbeat synced: recording=True, upload=True
+11:00:37 | INFO    | openrecall.client.spool | spool: enqueued capture_id=019cf9bc-f9b7-76f2-a98e-719bce1283ac size=696584 queue=1
+11:00:37 | DEBUG   | openrecall.client.recorder | 📸 trigger=app_switch device=monitor_1 app=Code window=question.md — models latency_ms=90 trigger_queue=0 spool=1 monitor=primary 1512x982
+11:00:38 | INFO    | openrecall.client.v3_uploader | v3_uploader: 201 queued capture_id=019cf9bc-f9b7-76f2-a98e-719bce1283ac frame_id=5600
+11:00:38 | INFO    | openrecall.client.spool | spool: committed capture_id=019cf9bc-f9b7-76f2-a98e-719bce1283ac remaining=0
+11:00:44 | INFO    | openrecall.client.recorder | DEBUG: Computing phash for capture
+11:00:44 | INFO    | openrecall.client.recorder | DEBUG: phash computed = 14861792376085595179
+11:00:44 | INFO    | openrecall.client.recorder | MRV3 similar_frame_skipped device_name=monitor_1 hamming_distance_threshold=8 trigger_type=click
+11:00:44 | DEBUG   | openrecall.client.recorder | Heartbeat synced: recording=True, upload=True
+11:00:45 | INFO    | openrecall.client.spool | spool: enqueued capture_id=019cf9bd-18fb-7f4a-ac23-9645573c4997 size=532255 queue=1
+11:00:45 | DEBUG   | openrecall.client.recorder | 📸 trigger=app_switch device=monitor_1 app=iTerm2 window=OC | MyRecall-v3 P1-S4 文档审查与改进建议 latency_ms=114 trigger_queue=0 spool=1 monitor=primary 1512x982
+11:00:46 | INFO    | openrecall.client.v3_uploader | v3_uploader: 201 queued capture_id=019cf9bd-18fb-7f4a-ac23-9645573c4997 frame_id=5601
+11:00:46 | INFO    | openrecall.client.spool | spool: committed capture_id=019cf9bd-18fb-7f4a-ac23-9645573c4997 remaining=0
+11:00:51 | INFO    | openrecall.client.recorder | DEBUG: Computing phash for capture
+11:00:51 | INFO    | openrecall.client.recorder | DEBUG: phash computed = 13864795643276158015
+11:00:51 | INFO    | openrecall.client.spool | spool: enqueued capture_id=019cf9bd-2fd6-7c9e-87a7-eb68de3d0b97 size=647651 queue=1
+11:00:51 | DEBUG   | openrecall.client.recorder | 📸 trigger=click device=monitor_1 app=iTerm2 window=OC | MyRecall-v3 P1-S3 config review for O... latency_ms=110 trigger_queue=0 spool=1 monitor=primary 1512x982
+11:00:51 | DEBUG   | openrecall.client.recorder | Heartbeat synced: recording=True, upload=True
+11:00:52 | INFO    | openrecall.client.v3_uploader | v3_uploader: 201 queued capture_id=019cf9bd-2fd6-7c9e-87a7-eb68de3d0b97 frame_id=5602
+11:00:52 | INFO    | openrecall.client.spool | spool: committed capture_id=019cf9bd-2fd6-7c9e-87a7-eb68de3d0b97 remaining=0
+11:00:59 | INFO    | openrecall.client.recorder | DEBUG: Computing phash for capture
+11:00:59 | INFO    | openrecall.client.recorder | DEBUG: phash computed = 11834847099623228665
+11:00:59 | INFO    | openrecall.client.spool | spool: enqueued capture_id=019cf9bd-50bc-7d25-8832-7b75fc150ac5 size=551644 queue=1
+11:00:59 | DEBUG   | openrecall.client.recorder | 📸 trigger=click device=monitor_1 app=iTerm2 window=OC | MyRecall-v3 P1-S4 文档审查与改进建议 latency_ms=98 trigger_queue=0 spool=1 monitor=primary 1512x982
+11:00:59 | DEBUG   | openrecall.client.recorder | Heartbeat synced: recording=True, upload=True
+11:01:00 | INFO    | openrecall.client.v3_uploader | v3_uploader: 201 queued capture_id=019cf9bd-50bc-7d25-8832-7b75fc150ac5 frame_id=5603
+11:01:00 | INFO    | openrecall.client.spool | spool: committed capture_id=019cf9bd-50bc-7d25-8832-7b75fc150ac5 remaining=0
+11:01:04 | INFO    | openrecall.client.recorder | DEBUG: Computing phash for capture
+11:01:04 | INFO    | openrecall.client.recorder | DEBUG: phash computed = 11834846549869577433
+11:01:04 | INFO    | openrecall.client.recorder | MRV3 similar_frame_skipped device_name=monitor_1 hamming_distance_threshold=8 trigger_type=click
+11:01:55 | DEBUG   | openrecall.client.recorder | Force-capturing frame for device=monitor_1 after 55.6s of skips (max_skip_duration=30s)
+11:01:55 | INFO    | openrecall.client.spool | spool: enqueued capture_id=019cf9be-2a19-76c0-8ce0-ad2e582784e6 size=504468 queue=1
+11:01:55 | DEBUG   | openrecall.client.recorder | 📸 trigger=click device=monitor_1 app=iTerm2 window=OC | MyRecall-v3 P1-S4 文档审查与改进建议 latency_ms=122 trigger_queue=0 spool=1 monitor=primary 1512x982
+11:01:55 | DEBUG   | openrecall.client.recorder | Heartbeat synced: recording=True, upload=True
+11:01:55 | INFO    | openrecall.client.v3_uploader | v3_uploader: 201 queued capture_id=019cf9be-2a19-76c0-8ce0-ad2e582784e6 frame_id=5604
+11:01:55 | INFO    | openrecall.client.spool | spool: committed capture_id=019cf9be-2a19-76c0-8ce0-ad2e582784e6 remaining=0
+11:01:56 | INFO    | openrecall.client.recorder | routing_filtered trigger=app_switch target_device=monitor_2 reason=primary_monitor_only
+11:02:49 | DEBUG   | openrecall.client.recorder | Force-capturing frame for device=monitor_1 after 54.5s of skips (max_skip_duration=30s)
+11:02:49 | INFO    | openrecall.client.spool | spool: enqueued capture_id=019cf9be-ff22-7557-a92b-e0dd5c547fe2 size=520520 queue=1
+11:02:49 | DEBUG   | openrecall.client.recorder | 📸 trigger=click device=monitor_1 app=iTerm2 window=OC | MyRecall-v3 P1-S4 文档审查与改进建议 latency_ms=108 trigger_queue=1 spool=1 monitor=primary 1512x982
+11:02:49 | DEBUG   | openrecall.client.recorder | Heartbeat synced: recording=True, upload=True
+11:02:49 | INFO    | openrecall.client.recorder | 📊 Capture (120s): idle=0 app_switch=4 click=7 manual=0 | debounced=0 | latency avg=117ms max=170ms | trigger_queue peak=1 spool peak=2
+11:02:50 | INFO    | openrecall.client.spool | spool: enqueued capture_id=019cf9be-ff8a-7508-9f9f-1bc752fac782 size=520154 queue=2
+11:02:50 | DEBUG   | openrecall.client.recorder | 📸 trigger=app_switch device=monitor_1 app=iTerm2 window=OC | MyRecall-v3 P1-S4 文档审查与改进建议 latency_ms=98 trigger_queue=0 spool=2 monitor=primary 1512x982
+11:02:50 | INFO    | openrecall.client.v3_uploader | v3_uploader: 201 queued capture_id=019cf9be-ff22-7557-a92b-e0dd5c547fe2 frame_id=5605
+11:02:50 | INFO    | openrecall.client.spool | spool: committed capture_id=019cf9be-ff22-7557-a92b-e0dd5c547fe2 remaining=1
+11:02:50 | INFO    | openrecall.client.v3_uploader | v3_uploader: 201 queued capture_id=019cf9be-ff8a-7508-9f9f-1bc752fac782 frame_id=5606
+11:02:50 | INFO    | openrecall.client.spool | spool: committed capture_id=019cf9be-ff8a-7508-9f9f-1bc752fac782 remaining=0
+11:03:50 | INFO    | openrecall.client.spool | spool: enqueued capture_id=019cf9bf-ea82-73d9-abc2-2671e0226c15 size=541119 queue=1
+11:03:50 | DEBUG   | openrecall.client.recorder | 📸 trigger=idle device=monitor_1 app=iTerm2 window=OC | MyRecall-v3 P1-S4 文档审查与改进建议 latency_ms=142 trigger_queue=0 spool=1 monitor=primary 1512x982
+11:03:50 | DEBUG   | openrecall.client.recorder | Heartbeat synced: recording=True, upload=True
+11:03:50 | INFO    | openrecall.client.v3_uploader | v3_uploader: 201 queued capture_id=019cf9bf-ea82-73d9-abc2-2671e0226c15 frame_id=5607
+11:03:50 | INFO    | openrecall.client.spool | spool: committed capture_id=019cf9bf-ea82-73d9-abc2-2671e0226c15 remaining=0
+11:04:01 | INFO    | openrecall.client.recorder | DEBUG: Computing phash for capture
+11:04:01 | INFO    | openrecall.client.recorder | DEBUG: phash computed = 11833720649975186649
+11:04:01 | INFO    | openrecall.client.recorder | MRV3 similar_frame_skipped device_name=monitor_1 hamming_distance_threshold=8 trigger_type=click
+11:04:01 | DEBUG   | openrecall.client.recorder | Heartbeat synced: recording=True, upload=True
+11:04:07 | INFO    | openrecall.client.recorder | DEBUG: Computing phash for capture
+11:04:07 | INFO    | openrecall.client.recorder | DEBUG: phash computed = 16442574317856474299
+11:04:07 | INFO    | openrecall.client.spool | spool: enqueued capture_id=019cf9c0-2ff4-7bf9-a79f-18c4b8f9d43c size=544190 queue=1
+11:04:07 | DEBUG   | openrecall.client.recorder | 📸 trigger=click device=monitor_1 app=iTerm2 window=OC | MyRecall-v3 P1-S3 config review for O... latency_ms=136 trigger_queue=0 spool=1 monitor=primary 1512x982
+11:04:07 | DEBUG   | openrecall.client.recorder | Heartbeat synced: recording=True, upload=True
+11:04:08 | INFO    | openrecall.client.v3_uploader | v3_uploader: 201 queued capture_id=019cf9c0-2ff4-7bf9-a79f-18c4b8f9d43c frame_id=5608
+11:04:08 | INFO    | openrecall.client.spool | spool: committed capture_id=019cf9c0-2ff4-7bf9-a79f-18c4b8f9d43c remaining=0
+11:04:12 | INFO    | openrecall.client.recorder | DEBUG: Computing phash for capture
+11:04:12 | INFO    | openrecall.client.recorder | DEBUG: phash computed = 16442574317856474299
+11:04:12 | INFO    | openrecall.client.recorder | MRV3 similar_frame_skipped device_name=monitor_1 hamming_distance_threshold=8 trigger_type=click
+11:05:06 | DEBUG   | openrecall.client.recorder | Force-capturing frame for device=monitor_1 after 58.4s of skips (max_skip_duration=30s)
+11:05:06 | INFO    | openrecall.client.spool | spool: enqueued capture_id=019cf9c1-1430-7317-89d5-a65f561add15 size=634740 queue=1
+11:05:06 | DEBUG   | openrecall.client.recorder | 📸 trigger=click device=monitor_1 app=iTerm2 window=OC | MyRecall-v3 P1-S4 文档审查与改进建议 latency_ms=101 trigger_queue=0 spool=1 monitor=primary 1512x982
+11:05:06 | DEBUG   | openrecall.client.recorder | Heartbeat synced: recording=True, upload=True
+11:05:06 | INFO    | openrecall.client.recorder | 📊 Capture (120s): idle=1 app_switch=1 click=2 manual=0 | debounced=0 | latency avg=119ms max=142ms | trigger_queue peak=0 spool peak=2
+11:05:07 | INFO    | openrecall.client.v3_uploader | v3_uploader: 201 queued capture_id=019cf9c1-1430-7317-89d5-a65f561add15 frame_id=5609
+11:05:07 | INFO    | openrecall.client.spool | spool: committed capture_id=019cf9c1-1430-7317-89d5-a65f561add15 remaining=0
+11:05:10 | INFO    | openrecall.client.recorder | DEBUG: Computing phash for capture
+11:05:10 | INFO    | openrecall.client.recorder | DEBUG: phash computed = 16442578716164079864
+11:05:10 | INFO    | openrecall.client.recorder | MRV3 similar_frame_skipped device_name=monitor_1 hamming_distance_threshold=8 trigger_type=click
+11:06:01 | DEBUG   | openrecall.client.recorder | Force-capturing frame for device=monitor_1 after 54.7s of skips (max_skip_duration=30s)
+11:06:01 | INFO    | openrecall.client.spool | spool: enqueued capture_id=019cf9c1-e9e3-73d8-9c0c-6e09b87efbb0 size=628987 queue=1
+11:06:01 | DEBUG   | openrecall.client.recorder | 📸 trigger=click device=monitor_1 app=iTerm2 window=OC | MyRecall-v3 P1-S4 文档审查与改进建议 latency_ms=100 trigger_queue=0 spool=1 monitor=primary 1512x982
+11:06:01 | DEBUG   | openrecall.client.recorder | Heartbeat synced: recording=True, upload=True
+11:06:01 | INFO    | openrecall.client.v3_uploader | v3_uploader: 201 queued capture_id=019cf9c1-e9e3-73d8-9c0c-6e09b87efbb0 frame_id=5610
+11:06:01 | INFO    | openrecall.client.spool | spool: committed capture_id=019cf9c1-e9e3-73d8-9c0c-6e09b87efbb0 remaining=0
+11:06:09 | INFO    | openrecall.client.recorder | DEBUG: Computing phash for capture
+11:06:09 | INFO    | openrecall.client.recorder | DEBUG: phash computed = 14861792358905791531
+11:06:09 | INFO    | openrecall.client.spool | spool: enqueued capture_id=019cf9c2-0aac-7ad3-b66b-344bf4d12e2f size=696854 queue=1
+11:06:09 | DEBUG   | openrecall.client.recorder | 📸 trigger=click device=monitor_1 app=Code window=question.md — models latency_ms=161 trigger_queue=0 spool=1 monitor=primary 1512x982
+11:06:09 | DEBUG   | openrecall.client.recorder | Heartbeat synced: recording=True, upload=True
+11:06:09 | INFO    | openrecall.client.v3_uploader | v3_uploader: 201 queued capture_id=019cf9c2-0aac-7ad3-b66b-344bf4d12e2f frame_id=5611
+11:06:09 | INFO    | openrecall.client.spool | spool: committed capture_id=019cf9c2-0aac-7ad3-b66b-344bf4d12e2f remaining=0
+11:06:09 | INFO    | openrecall.client.spool | spool: enqueued capture_id=019cf9c2-0b7c-7298-b7ad-1ffc98defbab size=696775 queue=1
+11:06:09 | DEBUG   | openrecall.client.recorder | 📸 trigger=app_switch device=monitor_1 app=Code window=question.md — models latency_ms=111 trigger_queue=0 spool=1 monitor=primary 1512x982
+11:06:10 | INFO    | openrecall.client.v3_uploader | v3_uploader: 201 queued capture_id=019cf9c2-0b7c-7298-b7ad-1ffc98defbab frame_id=5612
+11:06:10 | INFO    | openrecall.client.spool | spool: committed capture_id=019cf9c2-0b7c-7298-b7ad-1ffc98defbab remaining=0
+11:06:12 | INFO    | openrecall.client.recorder | DEBUG: Computing phash for capture
+11:06:12 | INFO    | openrecall.client.recorder | DEBUG: phash computed = 14285330511386235939
+11:06:12 | INFO    | openrecall.client.recorder | MRV3 similar_frame_skipped device_name=monitor_1 hamming_distance_threshold=8 trigger_type=click
+11:06:15 | INFO    | openrecall.client.spool | spool: enqueued capture_id=019cf9c2-2142-78b5-bda0-cb0817ddc575 size=631325 queue=1
+11:06:15 | DEBUG   | openrecall.client.recorder | 📸 trigger=app_switch device=monitor_1 app=iTerm2 window=OC | MyRecall-v3 P1-S4 文档审查与改进建议 latency_ms=140 trigger_queue=0 spool=1 monitor=primary 1512x982
+11:06:15 | DEBUG   | openrecall.client.recorder | Heartbeat synced: recording=True, upload=True
+11:06:15 | INFO    | openrecall.client.v3_uploader | v3_uploader: 201 queued capture_id=019cf9c2-2142-78b5-bda0-cb0817ddc575 frame_id=5613
+11:06:15 | INFO    | openrecall.client.spool | spool: committed capture_id=019cf9c2-2142-78b5-bda0-cb0817ddc575 remaining=0
+11:06:22 | INFO    | openrecall.client.recorder | DEBUG: Computing phash for capture
+11:06:22 | INFO    | openrecall.client.recorder | DEBUG: phash computed = 11829762674428470411
+11:06:22 | INFO    | openrecall.client.spool | spool: enqueued capture_id=019cf9c2-3f82-75cc-89fd-9f6c1eb8000b size=567381 queue=1
+11:06:22 | DEBUG   | openrecall.client.recorder | 📸 trigger=click device=monitor_1 app=iTerm2 window=OC | MyRecall-v3 P1-S3 config review for O... latency_ms=94 trigger_queue=0 spool=1 monitor=primary 1512x982
+11:06:22 | DEBUG   | openrecall.client.recorder | Heartbeat synced: recording=True, upload=True
+11:06:23 | INFO    | openrecall.client.v3_uploader | v3_uploader: 201 queued capture_id=019cf9c2-3f82-75cc-89fd-9f6c1eb8000b frame_id=5614
+11:06:23 | INFO    | openrecall.client.spool | spool: committed capture_id=019cf9c2-3f82-75cc-89fd-9f6c1eb8000b remaining=0
+11:07:03 | DEBUG   | openrecall.client.recorder | Force-capturing frame for device=monitor_1 after 41.0s of skips (max_skip_duration=30s)
+11:07:03 | INFO    | openrecall.client.spool | spool: enqueued capture_id=019cf9c2-df99-7479-b8a6-8af2bd2e7d3e size=594878 queue=1
+11:07:03 | DEBUG   | openrecall.client.recorder | 📸 trigger=click device=monitor_1 app=iTerm2 window=OC | MyRecall-v3 P1-S4 文档审查与改进建议 latency_ms=125 trigger_queue=0 spool=1 monitor=primary 1512x982
+11:07:03 | DEBUG   | openrecall.client.recorder | Heartbeat synced: recording=True, upload=True
+11:07:04 | INFO    | openrecall.client.v3_uploader | v3_uploader: 201 queued capture_id=019cf9c2-df99-7479-b8a6-8af2bd2e7d3e frame_id=5615
+11:07:04 | INFO    | openrecall.client.spool | spool: committed capture_id=019cf9c2-df99-7479-b8a6-8af2bd2e7d3e remaining=0
+11:07:07 | INFO    | openrecall.client.recorder | routing_filtered trigger=app_switch target_device=monitor_2 reason=primary_monitor_only
+11:07:07 | INFO    | openrecall.client.recorder | 📊 Capture (120s): idle=0 app_switch=2 click=4 manual=0 | debounced=0 | latency avg=121ms max=161ms | trigger_queue peak=0 spool peak=1
+11:07:17 | INFO    | openrecall.client.recorder | DEBUG: Computing phash for capture
+11:07:17 | INFO    | openrecall.client.recorder | DEBUG: phash computed = 11834265939081749691
+11:07:17 | INFO    | openrecall.client.spool | spool: enqueued capture_id=019cf9c3-141e-7b04-952a-32e2322f60c7 size=561111 queue=1
+11:07:17 | DEBUG   | openrecall.client.recorder | 📸 trigger=click device=monitor_1 app=iTerm2 window=OC | MyRecall-v3 P1-S3 config review for O... latency_ms=178 trigger_queue=0 spool=1 monitor=primary 1512x982
+11:07:17 | DEBUG   | openrecall.client.recorder | Heartbeat synced: recording=True, upload=True
+11:07:17 | INFO    | openrecall.client.spool | spool: enqueued capture_id=019cf9c3-157e-7498-b61b-e58daeee2250 size=562391 queue=2
+11:07:17 | DEBUG   | openrecall.client.recorder | 📸 trigger=app_switch device=monitor_1 app=iTerm2 window=OC | MyRecall-v3 P1-S3 config review for O... latency_ms=109 trigger_queue=0 spool=2 monitor=primary 1512x982
+11:07:17 | INFO    | openrecall.client.v3_uploader | v3_uploader: 201 queued capture_id=019cf9c3-141e-7b04-952a-32e2322f60c7 frame_id=5616
+11:07:17 | INFO    | openrecall.client.spool | spool: committed capture_id=019cf9c3-141e-7b04-952a-32e2322f60c7 remaining=1
+11:07:17 | INFO    | openrecall.client.v3_uploader | v3_uploader: 201 queued capture_id=019cf9c3-157e-7498-b61b-e58daeee2250 frame_id=5617
+11:07:17 | INFO    | openrecall.client.spool | spool: committed capture_id=019cf9c3-157e-7498-b61b-e58daeee2250 remaining=0
+11:07:50 | DEBUG   | openrecall.client.recorder | Force-capturing frame for device=monitor_1 after 32.6s of skips (max_skip_duration=30s)
+11:07:50 | INFO    | openrecall.client.spool | spool: enqueued capture_id=019cf9c3-950c-7cd3-8535-8e5609838405 size=571713 queue=1
+11:07:50 | DEBUG   | openrecall.client.recorder | 📸 trigger=click device=monitor_1 app=iTerm2 window=OC | MyRecall-v3 P1-S4 文档审查与改进建议 latency_ms=96 trigger_queue=0 spool=1 monitor=primary 1512x982
+11:07:50 | DEBUG   | openrecall.client.recorder | Heartbeat synced: recording=True, upload=True
+11:07:51 | INFO    | openrecall.client.v3_uploader | v3_uploader: 201 queued capture_id=019cf9c3-950c-7cd3-8535-8e5609838405 frame_id=5618
+11:07:51 | INFO    | openrecall.client.spool | spool: committed capture_id=019cf9c3-950c-7cd3-8535-8e5609838405 remaining=0
+11:08:19 | INFO    | openrecall.client.recorder | DEBUG: Computing phash for capture
+11:08:19 | INFO    | openrecall.client.recorder | DEBUG: phash computed = 11829199467011884219
+11:08:19 | INFO    | openrecall.client.spool | spool: enqueued capture_id=019cf9c4-05d9-7fd1-8687-bc73a2f8297d size=574783 queue=1
+11:08:19 | DEBUG   | openrecall.client.recorder | 📸 trigger=click device=monitor_1 app=iTerm2 window=OC | MyRecall-v3 P1-S3 config review for O... latency_ms=97 trigger_queue=0 spool=1 monitor=primary 1512x982
+11:08:19 | DEBUG   | openrecall.client.recorder | Heartbeat synced: recording=True, upload=True
+11:08:20 | INFO    | openrecall.client.v3_uploader | v3_uploader: 201 queued capture_id=019cf9c4-05d9-7fd1-8687-bc73a2f8297d frame_id=5619
+11:08:20 | INFO    | openrecall.client.spool | spool: committed capture_id=019cf9c4-05d9-7fd1-8687-bc73a2f8297d remaining=0
+11:08:26 | INFO    | openrecall.client.recorder | DEBUG: Computing phash for capture
+11:08:26 | INFO    | openrecall.client.recorder | DEBUG: phash computed = 11833725048009245937
+11:08:26 | INFO    | openrecall.client.spool | spool: enqueued capture_id=019cf9c4-2369-7e11-8999-b6078e24783b size=559537 queue=1
+11:08:26 | DEBUG   | openrecall.client.recorder | 📸 trigger=click device=monitor_1 app=iTerm2 window=OC | MyRecall-v3 P1-S4 文档审查与改进建议 latency_ms=102 trigger_queue=0 spool=1 monitor=primary 1512x982
+11:08:26 | DEBUG   | openrecall.client.recorder | Heartbeat synced: recording=True, upload=True
+11:08:27 | INFO    | openrecall.client.v3_uploader | v3_uploader: 201 queued capture_id=019cf9c4-2369-7e11-8999-b6078e24783b frame_id=5620
+11:08:27 | INFO    | openrecall.client.spool | spool: committed capture_id=019cf9c4-2369-7e11-8999-b6078e24783b remaining=0
+11:08:29 | INFO    | openrecall.client.spool | spool: enqueued capture_id=019cf9c4-2f24-7260-a173-73b829cd802d size=648077 queue=1
+11:08:29 | DEBUG   | openrecall.client.recorder | 📸 trigger=app_switch device=monitor_1 app=Antigravity window=MyRecall — config.yaml latency_ms=134 trigger_queue=0 spool=1 monitor=primary 1512x982
+11:08:30 | INFO    | openrecall.client.v3_uploader | v3_uploader: 201 queued capture_id=019cf9c4-2f24-7260-a173-73b829cd802d frame_id=5621
+11:08:30 | INFO    | openrecall.client.spool | spool: committed capture_id=019cf9c4-2f24-7260-a173-73b829cd802d remaining=0
+11:08:30 | INFO    | openrecall.client.recorder | DEBUG: Computing phash for capture
+11:08:30 | INFO    | openrecall.client.recorder | DEBUG: phash computed = 13851839049044575849
+11:08:30 | INFO    | openrecall.client.spool | spool: enqueued capture_id=019cf9c4-31dc-7998-8735-ced4e64c92af size=646895 queue=1
+11:08:30 | DEBUG   | openrecall.client.recorder | 📸 trigger=click device=monitor_1 app=Antigravity window=MyRecall — config.yaml latency_ms=141 trigger_queue=0 spool=1 monitor=primary 1512x982
+11:08:31 | INFO    | openrecall.client.v3_uploader | v3_uploader: 201 queued capture_id=019cf9c4-31dc-7998-8735-ced4e64c92af frame_id=5622
+11:08:31 | INFO    | openrecall.client.spool | spool: committed capture_id=019cf9c4-31dc-7998-8735-ced4e64c92af remaining=0
+11:08:34 | INFO    | openrecall.client.recorder | DEBUG: Computing phash for capture
+11:08:34 | INFO    | openrecall.client.recorder | DEBUG: phash computed = 15882472039412122811
+11:08:34 | INFO    | openrecall.client.spool | spool: enqueued capture_id=019cf9c4-4311-7379-8110-6a1617c7fb99 size=492453 queue=1
+11:08:34 | DEBUG   | openrecall.client.recorder | 📸 trigger=click device=monitor_1 app=Antigravity window=Settings latency_ms=166 trigger_queue=0 spool=1 monitor=primary 1512x982
+11:08:34 | DEBUG   | openrecall.client.recorder | Heartbeat synced: recording=True, upload=True
+11:08:35 | INFO    | openrecall.client.v3_uploader | v3_uploader: 201 queued capture_id=019cf9c4-4311-7379-8110-6a1617c7fb99 frame_id=5623
+11:08:35 | INFO    | openrecall.client.spool | spool: committed capture_id=019cf9c4-4311-7379-8110-6a1617c7fb99 remaining=0
+11:08:38 | INFO    | openrecall.client.recorder | DEBUG: Computing phash for capture
+11:08:38 | INFO    | openrecall.client.recorder | DEBUG: phash computed = 15869525299154370713
+11:08:38 | INFO    | openrecall.client.spool | spool: enqueued capture_id=019cf9c4-4ff0-77b0-b93b-42947c6cb5d6 size=492609 queue=1
+11:08:38 | DEBUG   | openrecall.client.recorder | 📸 trigger=click device=monitor_1 app=Antigravity window=Settings latency_ms=151 trigger_queue=0 spool=1 monitor=primary 1512x982
+11:08:38 | INFO    | openrecall.client.v3_uploader | v3_uploader: 201 queued capture_id=019cf9c4-4ff0-77b0-b93b-42947c6cb5d6 frame_id=5624
+11:08:38 | INFO    | openrecall.client.spool | spool: committed capture_id=019cf9c4-4ff0-77b0-b93b-42947c6cb5d6 remaining=0
+11:08:42 | INFO    | openrecall.client.recorder | DEBUG: Computing phash for capture
+11:08:42 | INFO    | openrecall.client.recorder | DEBUG: phash computed = 13847315658745824889
+11:08:42 | INFO    | openrecall.client.spool | spool: enqueued capture_id=019cf9c4-5f0d-7029-b71c-aad0d7975538 size=674055 queue=1
+11:08:42 | DEBUG   | openrecall.client.recorder | 📸 trigger=click device=monitor_1 app=Antigravity window=MyRecall — config.yaml latency_ms=154 trigger_queue=0 spool=1 monitor=primary 1512x982
+11:08:42 | DEBUG   | openrecall.client.recorder | Heartbeat synced: recording=True, upload=True
+11:08:42 | INFO    | openrecall.client.v3_uploader | v3_uploader: 201 queued capture_id=019cf9c4-5f0d-7029-b71c-aad0d7975538 frame_id=5625
+11:08:42 | INFO    | openrecall.client.spool | spool: committed capture_id=019cf9c4-5f0d-7029-b71c-aad0d7975538 remaining=0
+11:08:50 | INFO    | openrecall.client.recorder | DEBUG: Computing phash for capture
+11:08:50 | INFO    | openrecall.client.recorder | DEBUG: phash computed = 13847335449954076265
+11:08:50 | INFO    | openrecall.client.recorder | MRV3 similar_frame_skipped device_name=monitor_1 hamming_distance_threshold=8 trigger_type=click
+11:08:50 | DEBUG   | openrecall.client.recorder | Heartbeat synced: recording=True, upload=True
+11:08:53 | INFO    | openrecall.client.recorder | DEBUG: Computing phash for capture
+11:08:53 | INFO    | openrecall.client.recorder | DEBUG: phash computed = 13851839049581446249
+11:08:53 | INFO    | openrecall.client.recorder | MRV3 similar_frame_skipped device_name=monitor_1 hamming_distance_threshold=8 trigger_type=click
+11:08:57 | INFO    | openrecall.client.recorder | DEBUG: Computing phash for capture
+11:08:57 | INFO    | openrecall.client.recorder | DEBUG: phash computed = 13851839049044575849
+11:08:57 | INFO    | openrecall.client.recorder | MRV3 similar_frame_skipped device_name=monitor_1 hamming_distance_threshold=8 trigger_type=click
+11:08:57 | DEBUG   | openrecall.client.recorder | Heartbeat synced: recording=True, upload=True
+11:09:53 | DEBUG   | openrecall.client.recorder | Force-capturing frame for device=monitor_1 after 71.5s of skips (max_skip_duration=30s)
+11:09:53 | INFO    | openrecall.client.spool | spool: enqueued capture_id=019cf9c5-767b-7316-b6e9-4b1b52263d1c size=688860 queue=1
+11:09:53 | DEBUG   | openrecall.client.recorder | 📸 trigger=click device=monitor_1 app=Code window=question.md — models latency_ms=178 trigger_queue=0 spool=1 monitor=primary 1512x982
+11:09:53 | DEBUG   | openrecall.client.recorder | Heartbeat synced: recording=True, upload=True
+11:09:53 | INFO    | openrecall.client.recorder | 📊 Capture (120s): idle=0 app_switch=2 click=9 manual=0 | debounced=0 | latency avg=136ms max=178ms | trigger_queue peak=0 spool peak=2
+11:09:53 | INFO    | openrecall.client.v3_uploader | v3_uploader: 201 queued capture_id=019cf9c5-767b-7316-b6e9-4b1b52263d1c frame_id=5626
+11:09:53 | INFO    | openrecall.client.spool | spool: committed capture_id=019cf9c5-767b-7316-b6e9-4b1b52263d1c remaining=0
+11:09:54 | INFO    | openrecall.client.spool | spool: enqueued capture_id=019cf9c5-783d-74ea-97a9-319fe105f2ba size=691767 queue=1
+11:09:54 | DEBUG   | openrecall.client.recorder | 📸 trigger=app_switch device=monitor_1 app=Code window=question.md — models latency_ms=149 trigger_queue=0 spool=1 monitor=primary 1512x982
+11:09:54 | INFO    | openrecall.client.v3_uploader | v3_uploader: 201 queued capture_id=019cf9c5-783d-74ea-97a9-319fe105f2ba frame_id=5627
+11:09:54 | INFO    | openrecall.client.spool | spool: committed capture_id=019cf9c5-783d-74ea-97a9-319fe105f2ba remaining=0
+11:10:09 | INFO    | openrecall.client.recorder | DEBUG: Computing phash for capture
+11:10:09 | INFO    | openrecall.client.recorder | DEBUG: phash computed = 14276332997285495865
+11:10:09 | INFO    | openrecall.client.spool | spool: enqueued capture_id=019cf9c5-b30d-7429-92c7-6290614e1fc3 size=692432 queue=1
+11:10:09 | DEBUG   | openrecall.client.recorder | 📸 trigger=click device=monitor_1 app=Code window=question.md — models latency_ms=145 trigger_queue=1 spool=1 monitor=primary 1512x982
+11:10:09 | DEBUG   | openrecall.client.recorder | Heartbeat synced: recording=True, upload=True
+11:10:09 | INFO    | openrecall.client.spool | spool: enqueued capture_id=019cf9c5-b36c-7e40-b05b-100d6ba19a13 size=692432 queue=2
+11:10:09 | DEBUG   | openrecall.client.recorder | 📸 trigger=app_switch device=monitor_1 app=Code window=question.md — models latency_ms=93 trigger_queue=0 spool=2 monitor=primary 1512x982
+11:10:09 | INFO    | openrecall.client.v3_uploader | v3_uploader: 201 queued capture_id=019cf9c5-b30d-7429-92c7-6290614e1fc3 frame_id=5628
+11:10:09 | INFO    | openrecall.client.spool | spool: committed capture_id=019cf9c5-b30d-7429-92c7-6290614e1fc3 remaining=1
+11:10:09 | INFO    | openrecall.client.v3_uploader | v3_uploader: 201 queued capture_id=019cf9c5-b36c-7e40-b05b-100d6ba19a13 frame_id=5629
+11:10:09 | INFO    | openrecall.client.spool | spool: committed capture_id=019cf9c5-b36c-7e40-b05b-100d6ba19a13 remaining=0
+11:10:15 | INFO    | openrecall.client.recorder | DEBUG: Computing phash for capture
+11:10:15 | INFO    | openrecall.client.recorder | DEBUG: phash computed = 14852784953462739003
+11:10:15 | INFO    | openrecall.client.recorder | MRV3 similar_frame_skipped device_name=monitor_1 hamming_distance_threshold=8 trigger_type=click
+11:10:15 | DEBUG   | openrecall.client.recorder | Heartbeat synced: recording=True, upload=True
+11:10:19 | INFO    | openrecall.client.recorder | DEBUG: Computing phash for capture
+11:10:19 | INFO    | openrecall.client.recorder | DEBUG: phash computed = 14852784953462739003
+11:10:19 | INFO    | openrecall.client.recorder | MRV3 similar_frame_skipped device_name=monitor_1 hamming_distance_threshold=8 trigger_type=click
+11:10:21 | INFO    | openrecall.client.spool | spool: enqueued capture_id=019cf9c5-e2be-76a2-b27d-c2a8d4dc2e11 size=580565 queue=1
+11:10:21 | DEBUG   | openrecall.client.recorder | 📸 trigger=app_switch device=monitor_1 app=iTerm2 window=OC | MyRecall-v3 P1-S4 文档审查与改进建议 latency_ms=137 trigger_queue=0 spool=1 monitor=primary 1512x982
+11:10:21 | DEBUG   | openrecall.client.recorder | Heartbeat synced: recording=True, upload=True
+11:10:21 | INFO    | openrecall.client.v3_uploader | v3_uploader: 201 queued capture_id=019cf9c5-e2be-76a2-b27d-c2a8d4dc2e11 frame_id=5630
+11:10:21 | INFO    | openrecall.client.spool | spool: committed capture_id=019cf9c5-e2be-76a2-b27d-c2a8d4dc2e11 remaining=0
+11:10:22 | INFO    | openrecall.client.recorder | DEBUG: Computing phash for capture
+11:10:22 | INFO    | openrecall.client.recorder | DEBUG: phash computed = 11829199467011884219
+11:10:22 | INFO    | openrecall.client.spool | spool: enqueued capture_id=019cf9c5-e802-778b-b973-c0de6bc67d3f size=574479 queue=1
+11:10:22 | DEBUG   | openrecall.client.recorder | 📸 trigger=click device=monitor_1 app=iTerm2 window=OC | MyRecall-v3 P1-S3 config review for O... latency_ms=103 trigger_queue=0 spool=1 monitor=primary 1512x982
+11:10:22 | INFO    | openrecall.client.v3_uploader | v3_uploader: 201 queued capture_id=019cf9c5-e802-778b-b973-c0de6bc67d3f frame_id=5631
+11:10:22 | INFO    | openrecall.client.spool | spool: committed capture_id=019cf9c5-e802-778b-b973-c0de6bc67d3f remaining=0
+11:10:27 | INFO    | openrecall.client.recorder | routing_filtered trigger=app_switch target_device=monitor_2 reason=primary_monitor_only
+11:10:27 | DEBUG   | openrecall.client.recorder | Heartbeat synced: recording=True, upload=True
+11:10:49 | INFO    | openrecall.client.recorder | DEBUG: Computing phash for capture
+11:10:49 | INFO    | openrecall.client.recorder | DEBUG: phash computed = 11834833355730027769
+11:10:49 | INFO    | openrecall.client.spool | spool: enqueued capture_id=019cf9c6-4f40-71a0-a6b0-dbaebd12dba7 size=545863 queue=1
+11:10:49 | DEBUG   | openrecall.client.recorder | 📸 trigger=click device=monitor_1 app=iTerm2 window=OC | MyRecall-v3 P1-S4 文档审查与改进建议 latency_ms=146 trigger_queue=0 spool=1 monitor=primary 1512x982
+11:10:49 | DEBUG   | openrecall.client.recorder | Heartbeat synced: recording=True, upload=True
+11:10:49 | INFO    | openrecall.client.spool | spool: enqueued capture_id=019cf9c6-50ea-70ef-9007-781369150372 size=556973 queue=2
+11:10:49 | DEBUG   | openrecall.client.recorder | 📸 trigger=app_switch device=monitor_1 app=iTerm2 window=OC | MyRecall-v3 P1-S4 文档审查与改进建议 latency_ms=115 trigger_queue=0 spool=2 monitor=primary 1512x982
+11:10:50 | INFO    | openrecall.client.v3_uploader | v3_uploader: 201 queued capture_id=019cf9c6-4f40-71a0-a6b0-dbaebd12dba7 frame_id=5632
+11:10:50 | INFO    | openrecall.client.spool | spool: committed capture_id=019cf9c6-4f40-71a0-a6b0-dbaebd12dba7 remaining=1
+11:10:50 | INFO    | openrecall.client.v3_uploader | v3_uploader: 201 queued capture_id=019cf9c6-50ea-70ef-9007-781369150372 frame_id=5633
+11:10:50 | INFO    | openrecall.client.spool | spool: committed capture_id=019cf9c6-50ea-70ef-9007-781369150372 remaining=0
+11:10:51 | INFO    | openrecall.client.recorder | routing_filtered trigger=app_switch target_device=monitor_2 reason=primary_monitor_only

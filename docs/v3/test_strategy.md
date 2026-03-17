@@ -88,8 +88,10 @@ tests/
 ### P1-S3（处理）
 
 > **详细测试清单**：参见 `acceptance/phase1/p1-s3.md` §1.3，本文件为高层映射
+>
+> **命名规范**：P1-S3 测试统一使用 `test_p1_s3_*` 前缀（与 test_strategy.md §3 基础名称 `test_ocr_pipeline.py` 对应关系：`test_ocr_pipeline.py` → `test_p1_s3_ocr_pipeline.py`）
 
-- `test_p1_s3_ocr_pipeline.py` — OCR-only 处理端到端流程
+- `test_p1_s3_ocr_pipeline.py` — OCR-only 处理端到端流程（对应基础名 `test_ocr_pipeline.py`）
 - `test_p1_s3_ocr_text_write.py` — `ocr_text` 表写入逻辑
 - `test_p1_s3_text_source_mark.py` — `frames.text_source='ocr'` 标记逻辑
 - `test_p1_s3_failed_semantic.py` — OCR 失败帧 `failed` 状态语义

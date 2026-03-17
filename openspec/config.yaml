@@ -25,9 +25,6 @@ context: |
   - Python implementation (ADR-0013).
   - OCR-only mainline (OQ-043).
   - P1-S3 owns: V3ProcessingWorker, OCR execution (RapidOCR), ocr_text persistence, frames.text_source='ocr' marking, failed semantics, processing_mode=ocr switching, UI card display.
-  - Architectural boundary: S3 processes frames already ingested (status='pending'); does NOT capture or modify capture-phase fields.
-  - Zero AI enhancement: No caption/keywords/fusion_text/embedding generation (OQ-014/OQ-015 deferred).
-  - OCR empty text = failed (error_message='OCR_EMPTY_TEXT'), no retry in P1.
 
 rules:
   proposal:

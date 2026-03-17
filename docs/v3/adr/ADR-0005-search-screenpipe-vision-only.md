@@ -30,8 +30,14 @@
 - 长尾语义问题检索不足，导致 Chat 回答质量波动。
 
 ## Validation
-- 评测分组：
-  - 组 A：精确关键词查询（必须不低于 screenpipe 对齐基线）
-  - 组 B：语义描述查询（量化退化幅度并记录可接受阈值）
+> **注**：本 ADR 签发于 pre-OQ-043 时代；自 OQ-043（OCR-only 收口）后，Search 验证策略已更新。详见 [gate_baseline.md#35-search-p95p1-s4](../gate_baseline.md#35-search-p95p1-s4) 与 [acceptance/phase1/p1-s4.md](../acceptance/phase1/p1-s4.md)。
+
+- ~~评测分组：~~
+  - ~~组 A：精确关键词查询（必须不低于 screenpipe 对齐基线）~~
+  - ~~组 B：语义描述查询（量化退化幅度并记录可接受阈值）~~
 - 线上指标：
-  - Search P95、引用覆盖率、Chat 失败率（缺上下文）
+  - Search P95（详见 gate_baseline.md）
+  - OCR 搜索 SQL/返回结构一致性 = 100%
+  - FTS 清空一致性 = 100%
+  - OCR-only 可检索完整性 = 100%
+  - Search 引用字段完整率 = 100%（frame_id/timestamp）

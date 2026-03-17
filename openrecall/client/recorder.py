@@ -223,7 +223,9 @@ class ScreenRecorder:
 
         # MSS instance reuse for screenshot capture
         self._mss_instance: mss.mss | None = None
-        self._mss_monitors_signature: tuple | None = None  # For hot-plug detection (hashable)
+        self._mss_monitors_signature: tuple | None = (
+            None  # For hot-plug detection (hashable)
+        )
         self._mss_last_check_time: float = 0.0  # Throttle signature checks
 
         # Capture stats for periodic logging
@@ -1076,7 +1078,9 @@ class ScreenRecorder:
                         # Safety valve: skip simhash to guarantee frame capture
                         should_check_simhash = False
                         self._pipeline_stall_count += 1
-                        time_since_last = current_time - last_capture if last_capture else 0.0
+                        time_since_last = (
+                            current_time - last_capture if last_capture else 0.0
+                        )
                         logger.debug(
                             "Force-capturing frame for device=%s after %.1fs of skips (max_skip_duration=%ds)",
                             routed_task.target_device_name,
@@ -1091,9 +1095,11 @@ class ScreenRecorder:
                         should_check_simhash = False
 
                     if should_check_simhash:
+                        logger.info(f"DEBUG: Computing phash for capture")
                         try:
                             # Compute PHash
                             phash_value = compute_phash(image)
+                            logger.info(f"DEBUG: phash computed = {phash_value}")
 
                             # Check similarity against cache
                             is_similar_frame = self._simhash_cache.is_similar_to_cache(
@@ -1162,7 +1168,9 @@ class ScreenRecorder:
                 self._spool.enqueue(image, metadata)
 
                 # Update last successful capture time for max_skip_duration safety valve
-                self._last_successful_capture_time[routed_task.target_device_name] = time.time()
+                self._last_successful_capture_time[routed_task.target_device_name] = (
+                    time.time()
+                )
 
                 # Update SimhashCache after successful enqueue
                 if phash_value is not None:
@@ -1237,11 +1245,11 @@ class ScreenRecorder:
                 # Explicitly clean up image resources to prevent memory pressure
                 # Done after all processing, logging, and stats collection
                 try:
-                    if 'image' in locals():
+                    if "image" in locals():
                         image.close()
-                    if 'screenshot' in locals():
+                    if "screenshot" in locals():
                         del screenshot
-                    if 'image' in locals():
+                    if "image" in locals():
                         del image
                 except Exception as cleanup_error:
                     logger.debug("Error during resource cleanup: %s", cleanup_error)
