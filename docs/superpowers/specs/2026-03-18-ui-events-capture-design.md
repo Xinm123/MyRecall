@@ -298,24 +298,42 @@ class UiEventType(str, Enum):
 
 #### 4.6.1 Click Event (Split Pattern - B2 Decision)
 
+> **Aligns with screenpipe**: Two independent events, no merging at query time. Chat primarily uses `elements` table for UI element queries.
+
 ```python
 # Thread 1: CGEventTap callback
 def on_click(x, y, button, click_count, modifiers):
-    # 1. Send main click event immediately
+    # 1. Send main click event immediately (must succeed)
     event = UiEvent.click(timestamp, x, y, button, click_count, modifiers)
     channel.try_send(event)
 
-    # 2. Spawn background thread for element context
-    threading.Thread(target=get_element_context, args=(x, y, event.timestamp)).start()
+    # 2. Spawn background thread for element context (best-effort)
+    threading.Thread(target=get_element_context, args=(x, y)).start()
 
-def get_element_context(x, y, timestamp):
+def get_element_context(x, y):
     element = get_element_at_position(x, y)
     if element:
-        # Send context-only event (click_count=0 as marker)
-        ctx_event = UiEvent.click_context(timestamp, x, y, element)
+        # Context event uses NEW timestamp, button=0, click_count=0, modifiers=0
+        # These two events are independent - no merging expected
+        ctx_event = UiEvent(
+            timestamp=datetime.utcnow(),  # New timestamp
+            event_type="click",
+            x=x, y=y,
+            button=0,
+            click_count=0,  # Marker: context-only event
+            modifiers=0,
+            element=element
+        )
         channel.try_send(ctx_event)
-    # Silent drop on failure
+    # Silent drop on AX API failure
 ```
+
+**Key points** (per screenpipe design):
+- Main event and context event have **different timestamps**
+- Context event uses `click_count=0` as marker
+- `button` and `modifiers` are fixed to 0 for context event
+- Events are **not merged** at query time
+- For Chat queries about UI elements, use `elements` table (from paired_capture AX tree)
 
 #### 4.6.2 Text Aggregation
 
