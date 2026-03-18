@@ -7,7 +7,7 @@ build
 .pytest_cache
 .coverage
 htmlcov
-reports
+
 .vscode
 .aider*
 .worktrees

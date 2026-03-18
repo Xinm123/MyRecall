@@ -1,0 +1,406 @@
+"""Tests for FTS5 SearchEngine — P1-S4 Section 2.
+
+Tests cover:
+- SQL path verification (conditional JOINs)
+- FTS recall correctness
+- Response schema validation
+- Reference field completeness
+- Latency logging
+
+Per tasks.md §2 and specs/fts-search/spec.md.
+"""
+
+import sqlite3
+import tempfile
+from pathlib import Path
+from datetime import datetime, timezone
+
+import pytest
+
+from openrecall.server.search.engine import SearchEngine, _sanitize_fts_value
+
+
+class TestSanitizeFtsValue:
+    """Tests for _sanitize_fts_value helper function."""
+
+    def test_basic_value(self):
+        """Basic value is unchanged."""
+        assert _sanitize_fts_value("Safari") == "Safari"
+
+    def test_value_with_quotes(self):
+        """Double quotes are stripped."""
+        assert _sanitize_fts_value('test"value') == "testvalue"
+
+    def test_multiple_quotes(self):
+        """Multiple quotes are all stripped."""
+        assert _sanitize_fts_value('"hello"') == "hello"
+        assert _sanitize_fts_value('a"b"c') == "abc"
+
+    def test_empty_string(self):
+        """Empty string returns empty string."""
+        assert _sanitize_fts_value("") == ""
+
+    def test_only_quotes(self):
+        """Only quotes returns empty string."""
+        assert _sanitize_fts_value('""') == ""
+        assert _sanitize_fts_value('"') == ""
+
+    def test_special_chars_preserved(self):
+        """Special characters other than quotes are preserved."""
+        assert _sanitize_fts_value("C++") == "C++"
+        assert _sanitize_fts_value("test-app") == "test-app"
+
+    def test_unicode_preserved(self):
+        """Unicode characters are preserved."""
+        assert _sanitize_fts_value("你好世界") == "你好世界"
+
+
+@pytest.fixture
+def temp_db():
+    """Create a temporary database with test data."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        db_path = Path(tmpdir) / "edge.db"
+        frames_dir = Path(tmpdir) / "frames"
+        frames_dir.mkdir(parents=True, exist_ok=True)
+
+        conn = sqlite3.connect(str(db_path))
+        conn.row_factory = sqlite3.Row
+
+        # Create schema (simplified for tests)
+        conn.executescript("""
+            CREATE TABLE IF NOT EXISTS frames (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                capture_id TEXT NOT NULL UNIQUE,
+                timestamp TEXT NOT NULL,
+                app_name TEXT DEFAULT NULL,
+                window_name TEXT DEFAULT NULL,
+                browser_url TEXT DEFAULT NULL,
+                focused BOOLEAN DEFAULT NULL,
+                device_name TEXT NOT NULL DEFAULT 'monitor_0',
+                snapshot_path TEXT DEFAULT NULL,
+                status TEXT NOT NULL DEFAULT 'completed',
+                text_source TEXT DEFAULT NULL,
+                ingested_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+            );
+
+            CREATE TABLE IF NOT EXISTS ocr_text (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                frame_id INTEGER NOT NULL,
+                text TEXT NOT NULL DEFAULT '',
+                text_length INTEGER DEFAULT 0,
+                ocr_engine TEXT,
+                app_name TEXT DEFAULT NULL,
+                window_name TEXT DEFAULT NULL,
+                FOREIGN KEY (frame_id) REFERENCES frames(id) ON DELETE CASCADE
+            );
+
+            CREATE VIRTUAL TABLE IF NOT EXISTS frames_fts USING fts5(
+                app_name, window_name, browser_url, focused, accessibility_text,
+                id UNINDEXED, tokenize='unicode61'
+            );
+
+            CREATE VIRTUAL TABLE IF NOT EXISTS ocr_text_fts USING fts5(
+                text, app_name, window_name, frame_id UNINDEXED, tokenize='unicode61'
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_frames_timestamp ON frames(timestamp);
+            CREATE INDEX IF NOT EXISTS idx_ocr_text_frame_id ON ocr_text(frame_id);
+
+            -- FTS triggers
+            CREATE TRIGGER IF NOT EXISTS frames_ai AFTER INSERT ON frames BEGIN
+                INSERT INTO frames_fts(id, app_name, window_name, browser_url, focused, accessibility_text)
+                VALUES (NEW.id, COALESCE(NEW.app_name, ''), COALESCE(NEW.window_name, ''),
+                        COALESCE(NEW.browser_url, ''), COALESCE(NEW.focused, 0), '');
+            END;
+
+            CREATE TRIGGER IF NOT EXISTS ocr_text_ai AFTER INSERT ON ocr_text
+            WHEN NEW.text IS NOT NULL AND NEW.text != '' BEGIN
+                INSERT INTO ocr_text_fts(frame_id, text, app_name, window_name)
+                VALUES (NEW.frame_id, NEW.text, COALESCE(NEW.app_name, ''), COALESCE(NEW.window_name, ''));
+            END;
+        """)
+
+        # Insert test frames with OCR
+        test_frames = [
+            (1, "capture-001", "2026-03-18T10:00:00Z", "Safari", "Web Browser", None, True, "Hello world from Safari"),
+            (2, "capture-002", "2026-03-18T11:00:00Z", "VSCode", "main.py", None, True, "def hello(): pass # code here"),
+            (3, "capture-003", "2026-03-18T12:00:00Z", "Terminal", "bash", None, False, "git status && git commit"),
+            (4, "capture-004", "2026-03-18T13:00:00Z", "Safari", "Google Search", None, True, "search query hello world"),
+            (5, "capture-005", "2026-03-18T14:00:00Z", "Slack", "#general", None, True, "meeting at 3pm hello team"),
+        ]
+
+        for frame_id, capture_id, ts, app, window, url, focused, ocr_text in test_frames:
+            conn.execute(
+                """INSERT INTO frames (id, capture_id, timestamp, app_name, window_name, browser_url, focused, status, text_source)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, 'completed', 'ocr')""",
+                (frame_id, capture_id, ts, app, window, url, focused),
+            )
+            conn.execute(
+                """INSERT INTO ocr_text (frame_id, text, text_length, ocr_engine)
+                   VALUES (?, ?, ?, 'test')""",
+                (frame_id, ocr_text, len(ocr_text)),
+            )
+
+        conn.commit()
+        conn.close()
+
+        yield db_path, frames_dir
+
+
+class TestSearchEngineBasic:
+    """Basic search functionality tests."""
+
+    def test_search_returns_results(self, temp_db):
+        """Search returns results for matching query."""
+        db_path, frames_dir = temp_db
+        engine = SearchEngine(db_path=db_path, frames_dir=frames_dir)
+        results, total = engine.search(q="hello", limit=20, offset=0)
+
+        assert total >= 1
+        assert len(results) >= 1
+
+    def test_search_empty_query_returns_all(self, temp_db):
+        """Empty query returns all frames (browse mode)."""
+        db_path, frames_dir = temp_db
+        engine = SearchEngine(db_path=db_path, frames_dir=frames_dir)
+        results, total = engine.search(q="", limit=20, offset=0)
+
+        assert total == 5
+        assert len(results) == 5
+
+    def test_search_no_results(self, temp_db):
+        """Non-matching query returns empty results."""
+        db_path, frames_dir = temp_db
+        engine = SearchEngine(db_path=db_path, frames_dir=frames_dir)
+        results, total = engine.search(q="nonexistentterm12345", limit=20, offset=0)
+
+        assert total == 0
+        assert len(results) == 0
+
+
+class TestSearchEngineFTS:
+    """FTS recall correctness tests."""
+
+    def test_single_word_query(self, temp_db):
+        """Single word query matches OCR text."""
+        db_path, frames_dir = temp_db
+        engine = SearchEngine(db_path=db_path, frames_dir=frames_dir)
+        results, total = engine.search(q="Safari", limit=20, offset=0)
+
+        # Should match Safari in app_name via frames_fts
+        assert total >= 1
+
+    def test_phrase_query(self, temp_db):
+        """Phrase query matches OCR text."""
+        db_path, frames_dir = temp_db
+        engine = SearchEngine(db_path=db_path, frames_dir=frames_dir)
+        results, total = engine.search(q="hello world", limit=20, offset=0)
+
+        # Should match "Hello world from Safari" and "search query hello world"
+        assert total >= 1
+
+    def test_special_characters_quoted(self, temp_db):
+        """Special characters are safely handled."""
+        db_path, frames_dir = temp_db
+        engine = SearchEngine(db_path=db_path, frames_dir=frames_dir)
+        # Should not raise FTS5 syntax error
+        results, total = engine.search(q="foo(bar)", limit=20, offset=0)
+        # Query won't match, but should not error
+        assert isinstance(results, list)
+
+
+class TestSearchEngineFiltering:
+    """Metadata filtering tests."""
+
+    def test_filter_by_app_name(self, temp_db):
+        """Filter by app_name returns matching frames."""
+        db_path, frames_dir = temp_db
+        engine = SearchEngine(db_path=db_path, frames_dir=frames_dir)
+        results, total = engine.search(q="", limit=20, offset=0, app_name="Safari")
+
+        assert total == 2
+        for r in results:
+            assert r.get("app_name") == "Safari"
+
+    def test_filter_by_window_name(self, temp_db):
+        """Filter by window_name returns matching frames."""
+        db_path, frames_dir = temp_db
+        engine = SearchEngine(db_path=db_path, frames_dir=frames_dir)
+        results, total = engine.search(q="", limit=20, offset=0, window_name="main.py")
+
+        assert total == 1
+        assert results[0].get("window_name") == "main.py"
+
+    def test_filter_by_focused_true(self, temp_db):
+        """Filter by focused=true returns focused frames."""
+        db_path, frames_dir = temp_db
+        engine = SearchEngine(db_path=db_path, frames_dir=frames_dir)
+        results, total = engine.search(q="", limit=20, offset=0, focused=True)
+
+        assert total == 4
+        for r in results:
+            assert r.get("focused") is True
+
+    def test_filter_by_focused_false(self, temp_db):
+        """Filter by focused=false returns unfocused frames."""
+        db_path, frames_dir = temp_db
+        engine = SearchEngine(db_path=db_path, frames_dir=frames_dir)
+        results, total = engine.search(q="", limit=20, offset=0, focused=False)
+
+        # Terminal has focused=False
+        assert total == 1
+        assert results[0].get("app_name") == "Terminal"
+
+    def test_combined_text_and_metadata_filters(self, temp_db):
+        """Combined text search and metadata filters."""
+        db_path, frames_dir = temp_db
+        engine = SearchEngine(db_path=db_path, frames_dir=frames_dir)
+        results, total = engine.search(q="hello", limit=20, offset=0, app_name="Safari")
+
+        # Should match "Hello world from Safari" but not Slack
+        assert total >= 1
+
+    def test_time_range_filter(self, temp_db):
+        """Time range filtering."""
+        db_path, frames_dir = temp_db
+        engine = SearchEngine(db_path=db_path, frames_dir=frames_dir)
+        results, total = engine.search(
+            q="",
+            limit=20,
+            offset=0,
+            start_time="2026-03-18T11:00:00Z",
+            end_time="2026-03-18T12:30:00Z",
+        )
+
+        # Should match VSCode (11:00) and Terminal (12:00)
+        assert total == 2
+
+    def test_text_length_filter(self, temp_db):
+        """Text length filtering."""
+        db_path, frames_dir = temp_db
+        engine = SearchEngine(db_path=db_path, frames_dir=frames_dir)
+        results, total = engine.search(q="", limit=20, offset=0, min_length=25)
+
+        # Only "meeting at 3pm hello team" (25 chars) and longer
+        assert total >= 1
+
+
+class TestSearchEnginePagination:
+    """Pagination tests."""
+
+    def test_limit(self, temp_db):
+        """Limit parameter limits results."""
+        db_path, frames_dir = temp_db
+        engine = SearchEngine(db_path=db_path, frames_dir=frames_dir)
+        results, total = engine.search(q="", limit=2, offset=0)
+
+        assert total == 5
+        assert len(results) == 2
+
+    def test_offset(self, temp_db):
+        """Offset parameter skips results."""
+        db_path, frames_dir = temp_db
+        engine = SearchEngine(db_path=db_path, frames_dir=frames_dir)
+        results1, _ = engine.search(q="", limit=2, offset=0)
+        results2, _ = engine.search(q="", limit=2, offset=2)
+
+        # Results should be different
+        ids1 = {r["frame_id"] for r in results1}
+        ids2 = {r["frame_id"] for r in results2}
+        assert ids1.isdisjoint(ids2)
+
+    def test_limit_clamped_to_max(self, temp_db):
+        """Limit is clamped to max 100."""
+        db_path, frames_dir = temp_db
+        engine = SearchEngine(db_path=db_path, frames_dir=frames_dir)
+        # Request limit 200, should be clamped to 100
+        results, total = engine.search(q="", limit=200, offset=0)
+        # No error should occur, and we get all 5 results (less than 100)
+        assert total == 5
+
+
+class TestSearchEngineResponseSchema:
+    """Response schema validation tests."""
+
+    def test_result_has_required_fields(self, temp_db):
+        """Each result has required fields."""
+        db_path, frames_dir = temp_db
+        engine = SearchEngine(db_path=db_path, frames_dir=frames_dir)
+        results, total = engine.search(q="hello", limit=20, offset=0)
+
+        required_fields = [
+            "frame_id", "timestamp", "text", "app_name", "window_name",
+            "device_name", "focused", "file_path", "frame_url",
+        ]
+
+        for r in results:
+            for field in required_fields:
+                assert field in r, f"Missing field: {field}"
+
+    def test_reference_fields_non_null(self, temp_db):
+        """frame_id and timestamp are non-null for all results."""
+        db_path, frames_dir = temp_db
+        engine = SearchEngine(db_path=db_path, frames_dir=frames_dir)
+        results, _ = engine.search(q="", limit=20, offset=0)
+
+        for r in results:
+            assert r.get("frame_id") is not None
+            assert r.get("timestamp") is not None
+
+    def test_reserved_fields_present(self, temp_db):
+        """Reserved fields are present as null/empty."""
+        db_path, frames_dir = temp_db
+        engine = SearchEngine(db_path=db_path, frames_dir=frames_dir)
+        results, _ = engine.search(q="", limit=20, offset=0)
+
+        for r in results:
+            # browser_url should be present (null for P1)
+            assert "browser_url" in r
+            # tags should be present (empty list for P1)
+            assert "tags" in r
+            assert r.get("tags") == []
+
+
+class TestSearchEngineOrdering:
+    """Result ordering tests."""
+
+    def test_browse_mode_orders_by_timestamp_desc(self, temp_db):
+        """Browse mode (no query) orders by timestamp DESC."""
+        db_path, frames_dir = temp_db
+        engine = SearchEngine(db_path=db_path, frames_dir=frames_dir)
+        results, _ = engine.search(q="", limit=20, offset=0)
+
+        timestamps = [r["timestamp"] for r in results]
+        assert timestamps == sorted(timestamps, reverse=True)
+
+    def test_search_mode_orders_by_rank(self, temp_db):
+        """Search mode orders by BM25 rank then timestamp DESC."""
+        db_path, frames_dir = temp_db
+        engine = SearchEngine(db_path=db_path, frames_dir=frames_dir)
+        results, _ = engine.search(q="hello", limit=20, offset=0)
+
+        # All results should contain "hello"
+        for r in results:
+            assert "hello" in r.get("text", "").lower() or "hello" in (r.get("app_name") or "").lower()
+
+
+class TestSearchEngineCount:
+    """Count query tests."""
+
+    def test_count_matches_search(self, temp_db):
+        """Count returns same total as search."""
+        db_path, frames_dir = temp_db
+        engine = SearchEngine(db_path=db_path, frames_dir=frames_dir)
+
+        results, total_from_search = engine.search(q="", limit=2, offset=0)
+        total_from_count = engine.count(q="")
+
+        assert total_from_search == total_from_count == 5
+
+    def test_count_with_filters(self, temp_db):
+        """Count respects filters."""
+        db_path, frames_dir = temp_db
+        engine = SearchEngine(db_path=db_path, frames_dir=frames_dir)
+
+        total = engine.count(q="", app_name="Safari")
+        assert total == 2

@@ -5,71 +5,83 @@ Provides HTTP endpoints for client-server communication:
 - Fast screenshot ingestion endpoint (async processing)
 """
 
+import json
 import logging
 import time
-import json
+import uuid
 from pathlib import Path
 from typing import Optional
 
 import numpy as np
-from flask import Blueprint, jsonify, request, redirect
+from flask import Blueprint, jsonify, request
 from PIL import Image
 
+from openrecall.server.config_runtime import runtime_settings
 from openrecall.server.database import SQLStore
 from openrecall.server.database.frames_store import (
     FramesStore,
     normalize_timestamp_filter,
 )
-from openrecall.server.config_runtime import runtime_settings
-from openrecall.shared.config import settings
 from openrecall.server.search.engine import SearchEngine
+from openrecall.shared.config import settings
 
 logger = logging.getLogger(__name__)
 
 api_bp = Blueprint("api", __name__, url_prefix="/api")
 
 # ---------------------------------------------------------------------------
-# Legacy /api/* -> /v1/* redirects (Section 8)
+# Legacy /api/* endpoints - 410 Gone (P1-S4)
 # ---------------------------------------------------------------------------
 
 
 @api_bp.route("/upload", methods=["POST"])
-def redirect_upload():
-    logger.info("[DEPRECATED] /api/upload -> /v1/ingest")
-
-    return redirect("/v1/ingest", code=308)
+def gone_upload():
+    """Legacy upload endpoint - returns 410 Gone."""
+    return jsonify({
+        "error": "This API endpoint has been removed",
+        "code": "GONE",
+        "request_id": str(uuid.uuid4()),
+    }), 410
 
 
 @api_bp.route("/search", methods=["GET"])
-def redirect_search():
-    logger.info("[DEPRECATED] /api/search -> /v1/search")
-
-    return redirect("/v1/search", code=301)
+def gone_search():
+    """Legacy search endpoint - returns 410 Gone."""
+    return jsonify({
+        "error": "This API endpoint has been removed",
+        "code": "GONE",
+        "request_id": str(uuid.uuid4()),
+    }), 410
 
 
 @api_bp.route("/queue/status", methods=["GET"])
-def redirect_queue_status():
-    logger.info("[DEPRECATED] /api/queue/status -> /v1/ingest/queue/status")
-
-    return redirect("/v1/ingest/queue/status", code=301)
+def gone_queue_status():
+    """Legacy queue status endpoint - returns 410 Gone."""
+    return jsonify({
+        "error": "This API endpoint has been removed",
+        "code": "GONE",
+        "request_id": str(uuid.uuid4()),
+    }), 410
 
 
 @api_bp.route("/health", methods=["GET"])
-def redirect_health():
-    logger.info("[DEPRECATED] /api/health -> /v1/health")
-
-    return redirect("/v1/health", code=301)
+def gone_health():
+    """Legacy health endpoint - returns 410 Gone."""
+    return jsonify({
+        "error": "This API endpoint has been removed",
+        "code": "GONE",
+        "request_id": str(uuid.uuid4()),
+    }), 410
 
 
 """
 NOTE ABOUT LEGACY /api ROUTES
 
-The redirect handlers above and the legacy handlers below intentionally share
-the same route+method pairs. In Flask, matching follows registration order,
-so the redirect handlers defined earlier are currently matched first.
+The handlers above return 410 Gone for the four legacy /api/* endpoints
+that were previously redirecting to /v1/* equivalents. Per P1-S4, these
+endpoints are now permanently removed.
 
-The legacy handlers are retained for reference/rollback only and are not
-expected to serve traffic unless routing order is changed.
+No [DEPRECATED] log messages are emitted - the endpoints simply return 410.
 """
 
 

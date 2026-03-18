@@ -604,3 +604,180 @@ def health():
             "capture_runtime": capture_runtime_snapshot,
         }
     )
+
+
+# ---------------------------------------------------------------------------
+# GET /v1/search
+# ---------------------------------------------------------------------------
+
+# Module-level search engine instance
+_search_engine = None
+
+
+def _get_search_engine():
+    """Lazily initialize the SearchEngine singleton."""
+    global _search_engine
+    if _search_engine is None:
+        from openrecall.server.search.engine import SearchEngine
+
+        _search_engine = SearchEngine()
+    return _search_engine
+
+
+@v1_bp.route("/search", methods=["GET"])
+def search():
+    """FTS5 full-text search endpoint.
+
+    Query Parameters:
+        q: Text query (sanitized via sanitize_fts5_query)
+        limit: Max results (default 20, max 100)
+        offset: Pagination offset (default 0)
+        start_time: ISO8601 UTC start timestamp
+        end_time: ISO8601 UTC end timestamp
+        app_name: Filter by app name (exact match via FTS)
+        window_name: Filter by window name (exact match via FTS)
+        focused: Filter by focused state (true/false)
+        min_length: Minimum OCR text length
+        max_length: Maximum OCR text length
+        browser_url: Accepted but no-op in P1
+        include_frames: Accepted, always null in P1
+
+    Returns:
+        JSON response with search results matching spec.md §4.5.
+    """
+    # Parse query parameters
+    q = request.args.get("q", "").strip()
+
+    # Parse limit (default 20, max 100)
+    try:
+        limit = int(request.args.get("limit", 20))
+    except (ValueError, TypeError):
+        limit = 20
+    limit = max(1, min(limit, 100))
+
+    # Parse offset (default 0)
+    try:
+        offset = int(request.args.get("offset", 0))
+    except (ValueError, TypeError):
+        offset = 0
+    offset = max(0, offset)
+
+    # Parse time range
+    start_time = request.args.get("start_time")
+    if start_time:
+        start_time = start_time.strip() or None
+
+    end_time = request.args.get("end_time")
+    if end_time:
+        end_time = end_time.strip() or None
+
+    # Parse metadata filters
+    app_name = request.args.get("app_name")
+    if app_name:
+        app_name = app_name.strip() or None
+
+    window_name = request.args.get("window_name")
+    if window_name:
+        window_name = window_name.strip() or None
+
+    # Parse focused
+    focused_str = request.args.get("focused")
+    focused = None
+    if focused_str:
+        focused_lower = focused_str.strip().lower()
+        if focused_lower in ("true", "1", "yes"):
+            focused = True
+        elif focused_lower in ("false", "0", "no"):
+            focused = False
+
+    # Parse text length
+    min_length = None
+    max_length = None
+    try:
+        min_length = int(request.args.get("min_length", 0)) or None
+    except (ValueError, TypeError):
+        pass
+    try:
+        max_length = int(request.args.get("max_length", 0)) or None
+    except (ValueError, TypeError):
+        pass
+
+    # browser_url is accepted but no-op in P1
+    # include_frames is accepted but always null in P1
+
+    # Execute search
+    engine = _get_search_engine()
+    results, total = engine.search(
+        q=q,
+        limit=limit,
+        offset=offset,
+        start_time=start_time,
+        end_time=end_time,
+        app_name=app_name,
+        window_name=window_name,
+        focused=focused,
+        min_length=min_length,
+        max_length=max_length,
+    )
+
+    # Build response per spec.md §4.5
+    data_items = []
+    for r in results:
+        item = {
+            "type": "OCR",
+            "content": {
+                "frame_id": r["frame_id"],
+                "text": r.get("text", ""),
+                "timestamp": r.get("timestamp"),
+                "file_path": r.get("file_path", ""),
+                "frame_url": r.get("frame_url", ""),
+                "app_name": r.get("app_name"),
+                "window_name": r.get("window_name"),
+                "browser_url": None,  # Reserved, always null in P1
+                "focused": r.get("focused"),
+                "device_name": r.get("device_name", "monitor_0"),
+                "tags": [],  # Reserved, always empty in P1
+                "fts_rank": r.get("fts_rank"),  # BM25 rank (null when no text query)
+            },
+        }
+        data_items.append(item)
+
+    return jsonify(
+        {
+            "type": "OCR",
+            "data": data_items,
+            "pagination": {
+                "limit": limit,
+                "offset": offset,
+                "total": total,
+            },
+        }
+    )
+
+
+# ---------------------------------------------------------------------------
+# GET /v1/search/keyword - 404 Guard Route
+# ---------------------------------------------------------------------------
+
+# IMPORTANT: This route MUST be registered AFTER /v1/search to avoid shadowing
+# the main search route. Flask matches routes in registration order, and
+# /v1/search is a prefix that would otherwise match /v1/search/keyword.
+# This is a guard route to prevent accidental implementation of an independent
+# keyword endpoint (per specs/fts-search/spec.md).
+
+
+@v1_bp.route("/search/keyword", methods=["GET"])
+def search_keyword_404_guard():
+    """Guard route that returns 404 for /v1/search/keyword.
+
+    This endpoint is intentionally not implemented in P1. Future versions
+    may add specialized keyword search functionality.
+
+    Returns:
+        404 NOT_FOUND with error JSON.
+    """
+    return make_error_response(
+        "not found",
+        "NOT_FOUND",
+        404,
+    )
