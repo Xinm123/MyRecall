@@ -83,6 +83,8 @@ CREATE INDEX idx_ui_events_app ON ui_events(app_name);
 CREATE INDEX idx_ui_events_session ON ui_events(session_id);
 ```
 
+> **Note**: Columns `delta_x`, `delta_y`, `key_code`, `modifiers` are reserved for P2+ event types (`scroll`, `move`, `key`). They are included in P1 schema for forward compatibility with screenpipe but not populated.
+
 ### 2.2 Design Decisions
 
 | Decision | Choice | Rationale |
@@ -90,7 +92,7 @@ CREATE INDEX idx_ui_events_session ON ui_events(session_id);
 | Idempotency | None | Aligns with screenpipe; local-only writes, no network retry risk |
 | Primary key | Auto-increment INTEGER | Simple, matches screenpipe pattern |
 | Schema structure | Flat columns (not JSON) | Aligns with screenpipe; easier indexing and querying |
-| `session_id` | UUID per session | Groups events from same capture session |
+| `session_id` | UUID v4 per Host process | A session = one Host process lifetime; generated on startup, groups events from same run |
 | `relative_ms` | Milliseconds offset | Enables precise timing within session |
 | `frame_id` | Nullable FK | Links event to triggered capture when applicable |
 | `element_*` | Optional columns | Accessibility context for richer interaction data |
@@ -400,7 +402,64 @@ class SharedState:
             self._current_window = value
 ```
 
-### 4.8 File Changes
+### 4.8 Error Handling and Storm Protection
+
+> **Addresses ADR-0001 risk**: "Edge 不可达导致 Host backlog 膨胀"
+
+**Storm protection strategy** (aligns with chat-prerequisites.md B4):
+
+```python
+class UIEventsUploader:
+    def __init__(self):
+        self._buffer: queue.Queue = queue.Queue(maxsize=1000)
+        self._drop_count = 0
+
+    def try_send(self, event: UiEvent) -> bool:
+        """Non-blocking send with storm protection."""
+        try:
+            self._buffer.put_nowait(event)
+            return True
+        except queue.Full:
+            # Storm protection: drop oldest event
+            try:
+                self._buffer.get_nowait()
+                self._buffer.put_nowait(event)
+                self._drop_count += 1
+            except queue.Empty:
+                pass
+            return False
+
+    def _upload_batch(self) -> None:
+        """Upload batch with retry and backoff."""
+        retry_count = 0
+        max_retries = 3
+        base_delay = 1.0
+
+        while retry_count < max_retries:
+            try:
+                response = requests.post(url, json=payload, timeout=5.0)
+                if response.ok:
+                    return
+            except requests.RequestException:
+                pass
+
+            retry_count += 1
+            time.sleep(base_delay * (2 ** retry_count))  # Exponential backoff
+
+        # On final failure: drop batch (storm protection)
+        logger.warning(f"Edge unavailable, dropping {len(batch)} events")
+```
+
+**Error handling policy**:
+
+| Scenario | Behavior | Rationale |
+|----------|----------|-----------|
+| Edge unavailable | Drop oldest events, keep buffer bounded | Prevent memory exhaustion |
+| POST timeout | Retry with exponential backoff (max 3) | Transient network issues |
+| POST 4xx/5xx | Log and drop batch | No retry for server errors |
+| Buffer overflow | Drop oldest event | Storm protection (B4) |
+
+### 4.9 File Changes
 
 | File | Change |
 |------|--------|
@@ -466,9 +525,78 @@ Users can:
 
 UI events follow the same retention policy as frames (configurable via `OPENRECALL_RETENTION_DAYS`).
 
-## 6. Migration
+## 6. API Contract
 
-### 6.1 Migration File
+### 6.1 POST /v1/events
+
+**Request:**
+
+```json
+POST /v1/events
+Content-Type: application/json
+
+{
+  "session_id": "550e8400-e29b-41d4-a716-446655440000",
+  "events": [
+    {
+      "timestamp": "2026-03-18T12:00:00.000Z",
+      "event_type": "click",
+      "x": 100,
+      "y": 200,
+      "button": 0,
+      "click_count": 1,
+      "modifiers": 0,
+      "app_name": "Safari",
+      "window_title": "Google - Safari",
+      "element_role": "button",
+      "element_name": "Search"
+    },
+    {
+      "timestamp": "2026-03-18T12:00:01.500Z",
+      "event_type": "text",
+      "text_content": "hello world",
+      "text_length": 11,
+      "app_name": "Safari"
+    },
+    {
+      "timestamp": "2026-03-18T12:00:05.000Z",
+      "event_type": "clipboard",
+      "clipboard_op": "copy",
+      "text_content": "selected text",
+      "app_name": "Safari"
+    }
+  ]
+}
+```
+
+**Response:**
+
+```json
+{
+  "status": "ok",
+  "inserted": 3
+}
+```
+
+**Error Response:**
+
+```json
+{
+  "status": "error",
+  "message": "Invalid event_type: unknown"
+}
+```
+
+### 6.2 Batch Semantics
+
+- **Batch size**: Max 100 events per request
+- **Idempotency**: None (per Section 2.2)
+- **Ordering**: Events processed in order received
+- **Partial failure**: Entire batch rejected on validation error
+
+## 7. Migration
+
+### 7.1 Migration File
 
 **Path**: `openrecall/server/database/migrations/20260318120000_create_ui_events.sql`
 
@@ -557,14 +685,16 @@ CREATE TRIGGER IF NOT EXISTS ui_events_au AFTER UPDATE ON ui_events BEGIN
 END;
 ```
 
-### 6.2 Rollback
+> **Note**: The INSERT trigger uses a WHEN clause to prevent indexing rows with no searchable content. This optimization differs from screenpipe's unconditional triggers, reducing FTS index size for events like `click` without element context.
+
+### 7.2 Rollback
 
 ```sql
 DROP TABLE IF EXISTS ui_events;
 DROP TABLE IF EXISTS ui_events_fts;
 ```
 
-## 7. Python Performance Considerations
+## 8. Python Performance Considerations
 
 ### 7.1 GIL Impact Analysis
 
@@ -634,31 +764,36 @@ self._text_buffer_chars = ""  # Single-threaded access
 self._text_buffer_last_time = 0
 ```
 
-## 8. Testing Strategy
+## 9. Testing Strategy
 
-### 8.1 Unit Tests
+### 9.1 Unit Tests
 
 - `test_ui_event_store_insert.py`: Verify insert operations
 - `test_ui_event_data_serialization.py`: Verify JSON payload handling
 
-### 8.2 Integration Tests
+### 9.2 Integration Tests
 
 - `test_ui_events_capture_flow.py`: End-to-end event capture
 - `test_ui_events_config_disable.py`: Verify config disables capture
 
-### 8.3 Acceptance Criteria
+### 9.3 Error Handling Tests
+
+- `test_ui_events_storm_protection.py`: Verify buffer overflow drops oldest events
+- `test_ui_events_edge_unavailable.py`: Verify exponential backoff and drop behavior
+
+### 9.4 Acceptance Criteria
 
 - [ ] `ui_events` table created successfully
 - [ ] `click` events persisted with correct payload (x, y, button, click_count)
-- [ ] `text` events persisted with length (content optional, disabled by default)
+- [ ] `text` events persisted with `text_content` (content always captured when enabled per A2)
 - [ ] `app_switch` events capture app_name, app_pid
-- [ ] `clipboard` events capture operation (content optional, disabled by default)
+- [ ] `clipboard` events capture operation and `text_content` (content always captured when enabled per A1)
 - [ ] `OPENRECALL_CAPTURE_UI_EVENTS=false` disables capture
 - [ ] No performance impact on capture pipeline
 
-## 9. Future Considerations
+## 10. Future Considerations
 
-### 9.1 API Exposure (P1-S5 or before Chat)
+### 10.1 API Exposure (P1-S5 or before Chat)
 
 **Required for**: Chat grounding (chat needs to search UI events)
 
@@ -671,7 +806,7 @@ GET /v1/search?content_type=input&q=...
 - `ContentType::Input` in search API
 - `SearchResult::Input(UiEventRecord)` in response
 
-### 9.2 Search Integration (P1-S5 or before Chat)
+### 10.2 Search Integration (P1-S5 or before Chat)
 
 **Required for**: Chat grounding
 
@@ -679,12 +814,12 @@ GET /v1/search?content_type=input&q=...
 - Support `content_type=input` in `/v1/search`
 - Align with screenpipe's `search_input()` function
 
-### 9.3 Cross-Platform (P2+)
+### 10.3 Cross-Platform (P2+)
 
 - Windows: Raw Input API
 - Linux: XInput / libinput
 
-## 10. Alignment with screenpipe
+## 11. Alignment with screenpipe
 
 | Aspect | screenpipe | MyRecall P1 | Aligned |
 |--------|-----------|-------------|---------|
@@ -715,7 +850,7 @@ GET /v1/search?content_type=input&q=...
 2. **Privacy model**: "透明捕获 + 用户自主" per `chat-prerequisites.md`
 3. **Search integration**: MyRecall needs this before Chat development (P1-S5)
 
-## 11. References
+## 12. References
 
 - screenpipe `macos.rs`: UI event capture implementation
 - screenpipe `events.rs`: Event types definition
