@@ -1,0 +1,13 @@
+[INFO] P1-S2b+ gate started
+[INFO] evidence_dir=docs/v3/acceptance/phase1/evidence
+[INFO] client_log=logs/client_final.log
+[INFO] edge_db=/Users/pyw/MRS/db/edge.db
+[INFO] spool_dir=/Users/pyw/MRC/spool
+[INFO] wait_seconds=45
+[INFO] auto_seed_count=0
+.....................................                                    [100%]
+37 passed in 0.40s
+pass
+[INFO] Result: Pass
+[INFO] Evidence: docs/v3/acceptance/phase1/evidence/p1-s2b-plus-summary.json
+[INFO] Evidence: docs/v3/acceptance/phase1/evidence/p1-s2b-plus-runtime.json

@@ -1,0 +1,23 @@
+{
+  "generated_at": "2026-03-15T08:55:26Z",
+  "method": "injected",
+  "notes": null,
+  "scenarios": {
+    "SC-T1": {
+      "name": "monitor_add",
+      "status": "pass"
+    },
+    "SC-T2": {
+      "name": "monitor_remove",
+      "status": "pass"
+    },
+    "SC-T3": {
+      "name": "primary_switch",
+      "status": "pass"
+    },
+    "SC-T4": {
+      "name": "monitor_recovery",
+      "status": "pass"
+    }
+  }
+}

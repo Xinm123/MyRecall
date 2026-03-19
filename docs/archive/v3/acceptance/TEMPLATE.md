@@ -1,0 +1,81 @@
+# 验收记录模板
+
+- 阶段：
+- 日期：
+- 负责人：
+- 版本/提交：
+- 状态：`Planned` | `In Progress` | `Pass` | `Fail`
+
+## 1. 范围与目标
+
+- 范围：
+- 目标：
+- 对应 Gate 条件：
+
+### 1.1 HTTP 契约 delta（本阶段，scope=对外 HTTP）
+
+- SSOT：[../http_contract_ledger.md](../http_contract_ledger.md)
+- 要求：必须列出本阶段相对上一阶段的 HTTP 契约变化（ADD/DEPRECATE/REMOVE/CHANGE/RETAIN）。未列出的 baseline 默认视为 `RETAIN`。
+
+| 类型 | 接口 | 变化/说明 | SSOT |
+|---|---|---|---|
+| ADD/DEPRECATE/REMOVE/CHANGE/RETAIN | METHOD `/v1/...` or legacy `/api/...` (see [http_contract_ledger.md](../http_contract_ledger.md)) | ... | [spec.md](../spec.md)/[roadmap.md](../roadmap.md)/[open_questions.md](../open_questions.md) |
+
+## 2. 环境与输入
+
+- 运行环境：
+- 配置与数据集：
+- 依赖版本：
+
+### 2.1 指标口径与样本说明（必填）
+
+- 口径基线版本（默认 [../gate_baseline.md](../gate_baseline.md)）：
+- 指标样本数：
+- 统计时间窗：
+- 百分位算法：
+
+## 3. 验收步骤
+
+1. 
+2. 
+3. 
+
+## 4. 结果与指标
+
+### 4.1 数值指标（可放宽，但需达标）
+
+- 指标 1：
+- 指标 2：
+- 指标 3：
+- 备注（是否满足最小样本数要求）：
+- 若存在 Soft KPI（如 Chat 引用覆盖率），需显式标注 `non-blocking`，并附整改动作/回归计划。
+
+### 4.2 功能完成度指标（强制）
+
+- 功能清单完成率（目标 100%）：
+- API/Schema 契约完成率（目标 100%）：
+- API 命名空间一致性（验收脚本主流程仅 `/v1/*`；旧 `/api/*` 仅对以下 legacy 端点做废弃回归检查：`POST /api/upload`、`GET /api/search`、`GET /api/queue/status`、`GET /api/health`；并按阶段策略验证 `308/301/410`，目标 100%）：
+- 关键功能用例通过率（目标 >= 95%）：
+
+### 4.3 完善度指标（强制）
+
+- 异常与降级场景通过率（目标 >= 95%）：
+- 可观测性检查项完成率（目标 100%，日志/指标/错误码）：
+- 文档与验收记录完整率（目标 100%）：
+
+### 4.4 UI 验收（按阶段启用）
+
+- 路由可达与基础状态可见性检查（健康态/错误态）：
+- UI 关键交互通过率（如 timeline/search/chat/citation）：
+- UI 证据附件（截图/录屏/日志路径）：
+
+## 5. 结论
+
+- Gate 结论：`Pass` | `Fail`
+- 依据：
+- 阻塞项（若 Fail 必填）：
+
+## 6. 风险与后续动作
+
+- 风险：
+- 后续动作：

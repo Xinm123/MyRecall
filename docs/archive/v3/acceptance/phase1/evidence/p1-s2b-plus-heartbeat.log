@@ -1,0 +1,13 @@
+[INFO] Heartbeat check started
+[INFO] client_log=/tmp/myrecall-client.log
+[INFO] edge_db=/Users/pyw/MRS/db/edge.db
+[INFO] heartbeat_sec=10
+[INFO] idle_interval_sec=30
+[INFO] padding_sec=5
+[INFO] requested_wait_seconds=15
+[INFO] min_wait_seconds=65
+[INFO] wait_seconds=65
+[INFO] Keep the screen static during this window.
+pass
+[INFO] Result: Pass
+[INFO] Evidence: docs/v3/acceptance/phase1/evidence/p1-s2b-plus-heartbeat-result.json

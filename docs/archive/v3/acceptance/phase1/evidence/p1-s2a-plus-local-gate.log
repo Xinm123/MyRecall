@@ -1,0 +1,18 @@
+[INFO] P1-S2a+ local gate started
+[INFO] run_ts=2026-03-13T15:14:11Z
+[INFO] window_id=p1-s2a-plus-20260313T151411Z
+[INFO] edge_pid=unknown
+[INFO] base_url=http://localhost:8083
+[INFO] evidence_dir=docs/v3/acceptance/phase1/evidence
+[INFO] sample_seconds=8
+[INFO] git_rev=157eef2
+[INFO] Skipping pytest checks by request (--skip-pytest)
+[INFO] health_status=ok http_code=200
+[INFO] permission_suite_status=skipped
+[INFO] Result: Pass
+[INFO] Evidence files:
+  - docs/v3/acceptance/phase1/evidence/p1-s2a-plus-local-gate.log
+  - docs/v3/acceptance/phase1/evidence/p1-s2a-plus-permission-transitions.jsonl
+  - docs/v3/acceptance/phase1/evidence/p1-s2a-plus-health-snapshots.json
+  - docs/v3/acceptance/phase1/evidence/p1-s2a-plus-ui-proof.md
+  - docs/v3/acceptance/phase1/evidence/p1-s2a-plus-context.json

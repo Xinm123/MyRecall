@@ -1,0 +1,36 @@
+{
+  "capacity": 200,
+  "capture_latency": {
+    "broken_window": false,
+    "capture_latency_anomaly_count": 0,
+    "capture_latency_p50": null,
+    "capture_latency_p90": null,
+    "capture_latency_p95": null,
+    "capture_latency_p99": null,
+    "capture_latency_sample_count": 0,
+    "edge_pid": 35056,
+    "window_id": "1773219098-1773219398"
+  },
+  "completed": 0,
+  "failed": 0,
+  "oldest_pending_ingested_at": null,
+  "pending": 0,
+  "processing": 0,
+  "processing_mode": "noop",
+  "status_sync": {
+    "broken_window": false,
+    "edge_pid": 35056,
+    "status_sync_p50": null,
+    "status_sync_p90": null,
+    "status_sync_p95": null,
+    "status_sync_p99": null,
+    "status_sync_sample_count": 0,
+    "window_id": "1773219098-1773219398"
+  },
+  "trigger_channel": {
+    "collapse_trigger_count": 0,
+    "overflow_drop_count": 0,
+    "queue_capacity": 64,
+    "queue_depth": 0
+  }
+}

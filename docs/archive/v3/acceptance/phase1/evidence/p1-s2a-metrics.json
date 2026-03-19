@@ -1,0 +1,45 @@
+{
+  "run_ts": "2026-03-11T08:56:21Z",
+  "window_id": "p1-s2a-20260311T085621Z",
+  "edge_pid": "35056",
+  "broken_window": false,
+  "git_rev": "d4674a9",
+  "checks": {
+    "trigger_coverage_pytest": "pass",
+    "debounce_pytest": "pass",
+    "device_binding_pytest": "pass",
+    "server_contracts_pytest": "pass",
+    "health_snapshot": "ok",
+    "queue_snapshot": "ok",
+    "db_metrics": "ok"
+  },
+  "metrics": {
+    "trigger_coverage": null,
+    "trigger_counts": {
+      "idle": 0,
+      "app_switch": 0,
+      "manual": 0,
+      "click": 0
+    },
+    "capture_latency_p50": null,
+    "capture_latency_p90": null,
+    "capture_latency_p95": null,
+    "capture_latency_p99": null,
+    "capture_latency_sample_count": 0,
+    "capture_latency_anomaly_count": 0,
+    "collapse_trigger_count": 0,
+    "queue_saturation_ratio": 0.0,
+    "overflow_drop_count": 0,
+    "loss_rate": 0.0006666666666666666
+  },
+  "context": {
+    "base_url": "http://localhost:8084",
+    "edge_db": "/tmp/myrecall_test/db/edge.db",
+    "raw_trigger_channel_file": "p1-s2a-trigger-channel-raw.jsonl",
+    "loss_rate_summary_file": "p1-s2a-loss-rate-summary.json",
+    "loss_rate_injected_event_count": 1500,
+    "loss_rate_produced_capture_count": 1500,
+    "loss_rate_committed_capture_count": 1499,
+    "loss_rate_calculation_basis": "loss_rate = (injected_event_count - committed_capture_count) / injected_event_count; committed_capture_count is SELECT COUNT(*) FROM frames WHERE app_name = window_id AND snapshot_path IS NOT NULL"
+  }
+}
