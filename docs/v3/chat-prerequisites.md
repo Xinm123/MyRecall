@@ -1,6 +1,6 @@
 # Chat 功能前置需求分析
 
-- 版本：v2.0
+- 版本：v3.3
 - 日期：2026-03-19
 - 状态：**Final**
 - 目标：明确在进入 Chat 功能开发前需要补齐的能力，与 screenpipe（accessibility 有，audio 无）**完全对齐**
@@ -1114,3 +1114,262 @@ class UIEventsUploader:
 | v1.0 | 2026-03-18 | 初始文档，确定 UI Events 选型（click/text/app_switch/clipboard/element context） |
 | v1.1 | 2026-03-18 | 关闭所有待决问题：Q1(独立端点)、Q2(300ms)、Q3(捕获内容)、Q4(双模式)、Q5(Chat前完成) |
 | v2.0 | 2026-03-19 | 重大更新：accessibility 和 elements 升级为 P0；完全对齐 screenpipe；新增 elements 表设计、tree_walker 唤醒机制、frames 表扩展；新增 /v1/activity-summary 和 /v1/raw_sql 端点决策；恢复所有被删除的详细设计内容 |
+| v3.0 | 2026-03-19 | Chat 架构决策：Agent 运行在 Host 端；Host 端新增 PiManager + UI；P1 完成 UI 完全迁移；新增与 screenpipe 对齐程度分析；新增 LLM 位置支持和 frame_id 优化 |
+| v3.1 | 2026-03-19 | 简化 P1：Agent 直接调用云端 LLM，移除 Edge 端 `/v1/chat/completions` API，与 screenpipe 完全对齐 |
+| v3.2 | 2026-03-19 | 统一术语：使用"Edge 端 LLM"替代"本地 LLM"，添加术语说明 |
+| v3.3 | 2026-03-19 | 架构图标注端口：Edge 端新增 "API: localhost:8083 (P1 同机部署)"；端口规划表添加 P1 说明 |
+
+---
+
+## 18. Chat 架构决策
+
+### 18.1 架构总览
+
+```
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                     MyRecall Chat 架构（P1 仅云端 LLM）                          │
+├─────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                 │
+│   ┌────────────────────────────────────────────┐   ┌──────────────────────────┐│
+│   │  Host (Client)                             │   │  Edge (Server)           ││
+│   │                                            │   │                          ││
+│   │  ┌────────────────────────────────────┐   │   │  ┌────────────────────┐  ││
+│   │  │  UI (Flask + Alpine.js)            │   │   │  │  数据层            │  ││
+│   │  │  - Timeline                        │   │   │  │  - ~/MRS/db/       │  ││
+│   │  │  - Search                          │   │   │  │  - ~/MRS/frames/   │  ││
+│   │  │  - Chat                            │   │   │  └────────────────────┘  ││
+│   │  │  - Settings                        │   │   │            │             ││
+│   │  └────────────────────────────────────┘   │   │            ▼             ││
+│   │                 │                          │   │  ┌────────────────────┐  ││
+│   │                 ▼                          │   │  │  数据 API          │  ││
+│   │  ┌────────────────────────────────────┐   │   │  │  - /v1/search      │  ││
+│   │  │  PiManager                         │   │   │  │  - /v1/frames      │  ││
+│   │  │  - 管理 Pi 进程生命周期            │   │   │  │  - /v1/events      │  ││
+│   │  │  - stdin/stdout 通信               │   │   │  │  - /v1/activity-   │  ││
+│   │  │  - 事件转发到 UI                   │   │   │  │    summary         │  ││
+│   │  └────────────────────────────────────┘   │   │  └────────────────────┘  ││
+│   │                 │                          │   │                          ││
+│   │                 ▼                          │   │  无 LLM 相关端点         ││
+│   │  ┌────────────────────────────────────┐   │   │  API: localhost:8083     ││
+│   │  │  Pi Process (Agent)                │   │   │  (P1 同机部署)           ││
+│   │  │  - bun pi --mode rpc               │   │   └──────────────────────────┘│
+│   │  │  - 调用 Edge 数据 API ─────────────┼──►│                               │
+│   │  │  - 直接调用云端 LLM API            │   │                               │
+│   │  └────────────────────────────────────┘   │                               │
+│   │                 │                          │                               │
+│   │                 │ HTTPS                    │                               │
+│   │                 ▼                          │                               │
+│   │  ┌────────────────────────────────────┐   │                               │
+│   │  │  云端 LLM                          │   │                               │
+│   │  │  - Claude API (api.anthropic.com)  │   │                               │
+│   │  │  - OpenAI API (api.openai.com)     │   │                               │
+│   │  └────────────────────────────────────┘   │                               │
+│   │                                            │                               │
+│   │  用户访问：http://localhost:8084           │                               │
+│   └────────────────────────────────────────────┘                               │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+```
+
+### 18.2 核心决策
+
+| ID | 问题 | 选项 | 决定 | 状态 |
+|----|------|------|------|------|
+| C1 | Agent 运行位置 | A Edge 端 / B Host 端 | **B Host 端** | ✅ 已关闭 |
+| C2 | Host 是否增加 PiManager | A 是 / B 否 | **A 是** | ✅ 已关闭 |
+| C3 | Host 是否增加 UI | A P1 仅 Chat / B P1 完全迁移 | **B P1 完全迁移** | ✅ 已关闭 |
+| C4 | LLM 调用方式 | A Agent 直接调云端 / B Edge 代理 / C 两者都支持 | **A Agent 直接调云端** | ✅ 已关闭 |
+
+### 18.3 C1 决策：Agent 运行在 Host 端
+
+**选择 B**：Agent (Pi) 运行在 Host 端，与 UI、PiManager 在同一进程。
+
+**理由**：
+
+1. **与 screenpipe 架构对齐**：screenpipe 的 UI、PiManager、Pi 都在"客户端"进程
+2. **通信简化**：UI ↔ PiManager ↔ Pi 在同一进程，无需跨进程通信
+3. **灵活扩展**：用户可选择不同的 Agent 实现（Pi、Claude Desktop、Cursor）
+
+### 18.4 C3 决策：P1 完成 UI 完全迁移
+
+**选择 B**：P1 阶段完成 Timeline、Search、Settings、Chat 的全部迁移，废弃 Edge UI。
+
+**迁移计划**：
+
+| 步骤 | 工作内容 | 工作量 |
+|------|---------|--------|
+| 1 | 创建 Host UI 框架（Flask 应用） | 极低 |
+| 2 | 复制现有 UI 模板到 Host | 极低 |
+| 3 | 修改 API 调用地址（配置 Edge URL） | 低 |
+| 4 | 更新导航（添加 Chat 链接） | 低 |
+| 5 | 实现 Chat UI + PiManager 集成 | 中 |
+| 6 | 实现 Settings 配置管理 | 低 |
+| 7 | 废弃 Edge UI 路由 | 极低 |
+
+**迁移后架构**：
+
+- **Host 端 (端口 8084)**：完整 UI（Timeline、Search、Chat、Settings）+ PiManager + Agent
+- **Edge 端 (端口 8083)**：仅 API 服务 + LLM 服务
+
+---
+
+## 19. 与 screenpipe 对齐程度分析
+
+### 19.1 组件级对齐
+
+| 组件 | screenpipe | MyRecall | 对齐程度 |
+|------|-----------|----------|---------|
+| UI | React + Tauri | Flask + Alpine.js | ✓ 结构对齐 |
+| PiManager | Rust (Tauri Core) | Python | ✓ 功能对齐 |
+| Pi Process | bun pi --mode rpc | bun pi --mode rpc | ✓ 完全对齐 |
+| stdin/stdout 通信 | JSON Lines | JSON Lines | ✓ 完全对齐 |
+| 事件协议 | 11 种事件类型 | 11 种事件类型 | ✓ 完全对齐 |
+| Skill 文件 | SKILL.md | SKILL.md | ✓ 完全对齐 |
+| 数据 API | localhost:3030 | Edge:8083 | ✓ 结构对齐 |
+| LLM 调用 | Agent 直接调云端 | Agent 直接调云端 | ✓ 完全对齐 |
+
+### 19.2 通信链路对齐
+
+```
+screenpipe:
+UI ──(Tauri Command)──► PiManager ──(stdin)──► Pi ──(curl)──► Server API
+UI ◄─(IPC Event)────── PiManager ◄─(stdout)─── Pi
+
+MyRecall:
+UI ──(HTTP/本地)──► PiManager ──(stdin)──► Pi ──(curl)──► Edge API
+UI ◄─(SSE/事件)──── PiManager ◄─(stdout)─── Pi
+
+对齐程度：完全对齐（仅传输层从 IPC 改为 HTTP/SSE）
+```
+
+### 19.3 对齐程度量化
+
+| 类别 | 比例 | 说明 |
+|------|------|------|
+| 完全对齐 | 90% | Agent 生命周期、通信协议、事件协议、Skill 机制、LLM 调用方式 |
+| 结构对齐 | 8% | API 设计、UI 功能、组件职责 |
+| 设计差异 | 2% | Host-Edge 分离（MyRecall 架构约束） |
+
+---
+
+## 20. LLM 调用方式
+
+### 20.1 P1 阶段：Agent 直接调用云端 LLM
+
+**与 screenpipe 完全对齐**：Pi Agent 直接调用云端 LLM API，不通过 Edge 代理。
+
+```
+Pi Agent 调用：
+├── 云端 LLM API (HTTPS)
+│   ├── Claude API: api.anthropic.com
+│   └── OpenAI API: api.openai.com
+│
+└── Edge 数据 API (HTTP)
+    └── localhost:8083/v1/search, /v1/frames, etc.
+```
+
+### 20.2 图片数据流
+
+```
+Agent 需要图片时：
+1. GET /v1/frames/{id} → 下载图片到 Host
+2. 转换为 base64
+3. 直接传给云端 LLM API
+
+与 screenpipe 完全一致
+```
+
+### 20.3 Edge 端无 LLM 相关端点
+
+**P1 阶段 Edge 只提供数据 API**，无 `/v1/chat/completions` 等端点。
+
+**P2 扩展**：如需支持 Edge 端 LLM，再添加相关端点和 frame_id 优化。
+
+---
+
+## 21. Host 端文件结构
+
+### 21.1 新增文件
+
+```
+openrecall/client/
+├── __init__.py
+├── recorder.py           (原有)
+├── spool.py              (原有)
+├── uploader.py           (原有)
+├── ui/                   (新增)
+│   ├── __init__.py
+│   ├── app.py            # Flask 应用
+│   ├── config_api.py     # 配置 API
+│   └── templates/
+│       ├── layout.html   # 主布局
+│       ├── index.html    # 网格视图
+│       ├── timeline.html # 时间轴
+│       ├── search.html   # 搜索页
+│       ├── chat.html     # Chat UI
+│       └── icons.html    # SVG 图标
+└── agent/                (新增)
+    ├── __init__.py
+    ├── manager.py        # PiManager
+    ├── process.py        # Pi 进程管理
+    └── protocol.py       # 事件协议
+```
+
+### 21.2 端口规划
+
+| 端口 | 用途 | 说明 |
+|------|------|------|
+| 8084 | Host UI | 用户访问入口 |
+| 8083 | Edge API | 数据 API（P1: localhost:8083） |
+
+**P2 扩展**：如需 Edge 端 LLM，添加 Ollama 端口 11434。
+
+---
+
+## 22. P1 工作清单更新
+
+### 22.1 Chat 架构相关（新增）
+
+| 序号 | 能力 | 工作量估算 |
+|------|------|-----------|
+| C-1 | Host UI 框架（Flask 应用） | 0.5 周 |
+| C-2 | 复制迁移 Timeline、Search、Settings | 0.5 周 |
+| C-3 | PiManager 实现 | 1 周 |
+| C-4 | Chat UI 实现 | 1 周 |
+| C-5 | Skill 文件创建（myrecall-search/SKILL.md） | 0.5 周 |
+| C-6 | 废弃 Edge UI | 0.5 周 |
+
+**Chat 架构相关小计：~4 周**
+
+### 22.2 原有 P0 清单（数据能力）
+
+见第 12 节，约 10-12 周。
+
+### 22.3 P1 总工作量
+
+| 类别 | 工作量 |
+|------|--------|
+| Chat 架构 | ~4 周 |
+| 数据能力 (P0) | ~10-12 周 |
+| **总计** | **~14-16 周** |
+
+---
+
+## 23. P2 扩展规划
+
+### 23.1 Edge 端 LLM 支持
+
+> **术语说明**：Edge 端 LLM 指运行在 Edge 进程中的 LLM（如 Ollama），而非用户机器上的 LLM。这与 screenpipe 的"本地 LLM"概念不同——screenpipe 是单机架构，而 MyRecall 是 Host-Edge 分离架构。
+
+**触发条件**：需要 Edge 端 LLM（隐私、成本、离线）时实现。
+
+**需要新增**：
+- Edge 端 `/v1/chat/completions` API
+- frame_id 优化：Agent 只传 frame_id，Edge 本地读取图片
+- model 路由：支持 `ollama:*`、`local:*` 前缀
+
+**工作量估算**：~1 周
+
+---
+
+## 24. 版本记录
