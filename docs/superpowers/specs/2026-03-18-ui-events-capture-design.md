@@ -1,4 +1,4 @@
-# UI Events Capture System Design
+# UI Events Capture and Ingest Design
 
 **Date**: 2026-03-18
 **Status**: Draft
@@ -10,7 +10,13 @@
 
 Capture user interaction events (clicks, text input, app switches, clipboard) to enable:
 - Smart capture triggers (click-triggered screenshots)
-- Future search enhancement ("find what I typed")
+- Chat grounding and `content_type=input` search
+
+This spec is now scoped as an implementation design for UI events capture/ingest. It is not the SSOT for Chat Gate classification, runtime architecture, or final privacy policy; those now live in:
+
+- `docs/v3/chat/prerequisites.md`
+- `docs/v3/chat/capability-alignment.md`
+- `docs/v3/chat/architecture.md`
 
 ### 1.2 Scope
 
@@ -18,11 +24,12 @@ Capture user interaction events (clicks, text input, app switches, clipboard) to
 - Implement `UIEventWriter` to persist events
 - Integrate with existing event tap infrastructure
 - Maintain alignment with screenpipe's approach (no idempotency for events)
+- Support the data path needed for `content_type=input` and Chat consumption
 
 ### 1.3 Out of Scope
 
-- Exposing UI events via API (future phase)
-- Search over UI events (future phase)
+- Final Chat runtime architecture (Host-side sidecar, session/controller, provider routing)
+- Final privacy policy beyond the currently confirmed decisions in `docs/v3/chat/*`
 - Windows/Linux support (macOS only for P1)
 
 ## 2. Database Schema
@@ -127,10 +134,11 @@ class UiEventType(str, Enum):
 | `app_switch` | `{"app_name": str, "app_pid": int, "window_title": str}` | ✅ Enabled |
 | `clipboard` | `{"clipboard_op": str, "text_content": str}` | ✅ Enabled |
 
-**Privacy approach** (per `chat-prerequisites.md`):
-- **No content filtering**: text_content and clipboard content captured as-is
-- **No password field skipping**: All input fields captured
-- **User control via event type toggle**: Disable entire event type if privacy needed
+**Current privacy approach** (per `docs/v3/chat/prerequisites.md` and `docs/v3/chat/capability-alignment.md`):
+- `clipboard` content is currently stored as-is
+- `secure/password field` content must not be persisted
+- `ui_events.element_value` may be persisted for relevant events, but still obeys the `secure/password field` exception
+- User control remains primarily at event-type granularity
 
 ### 3.3 Alignment with screenpipe
 
@@ -299,6 +307,8 @@ class UiEventType(str, Enum):
 #### 4.6.1 Click Event (Split Pattern - B2 Decision)
 
 > **Aligns with screenpipe**: Two independent events, no merging at query time. Chat primarily uses `elements` table for UI element queries.
+>
+> **Important**: The high-level contract is the split pattern itself (main click event is reliable; context event is best-effort). The exact marker encoding shown below is a candidate implementation, not a cross-document SSOT contract.
 
 ```python
 # Thread 1: CGEventTap callback
@@ -328,7 +338,7 @@ def get_element_context(x, y):
     # Silent drop on AX API failure
 ```
 
-**Key points** (per screenpipe design):
+**Key points** (current implementation candidate):
 - Main event and context event have **different timestamps**
 - Context event uses `click_count=0` as marker
 - `button` and `modifiers` are fixed to 0 for context event
@@ -336,6 +346,8 @@ def get_element_context(x, y):
 - For Chat queries about UI elements, use `elements` table (from paired_capture AX tree)
 
 #### 4.6.2 Text Aggregation
+
+> **Important**: The high-level contract is “aggregate text into input segments after a short quiet window.” The concrete timeout shown below is a candidate implementation value, not a cross-document SSOT parameter.
 
 ```python
 class TextBuffer:
@@ -424,7 +436,7 @@ class SharedState:
 
 > **Addresses ADR-0001 risk**: "Edge 不可达导致 Host backlog 膨胀"
 
-**Storm protection strategy** (aligns with chat-prerequisites.md B4):
+**Storm protection strategy** (implementation direction; high-level alignment now lives in `docs/v3/chat/prerequisites.md` and `docs/v3/chat/capability-alignment.md`):
 
 ```python
 class UIEventsUploader:
@@ -489,26 +501,33 @@ class UIEventsUploader:
 | `openrecall/client/events/uploader.py` | 🆕 New UIEventsUploader class |
 | `openrecall/shared/config.py` | ✏️ Add UI events config options |
 
-## 5. Privacy Safeguards
+## 5. Current Capture / Privacy Policy Alignment
 
-> **Alignment**: Follows `docs/v3/chat-prerequisites.md` § 隐私与安全决策: "透明捕获 + 用户自主" model.
+> **SSOT**: Privacy and gate decisions live in `docs/v3/chat/prerequisites.md` and `docs/v3/chat/capability-alignment.md`. This section only states how this spec should align with them.
 
 ### 5.1 Design Principles
 
-1. **Transparent Capture**: All content is captured as-is, no filtering or redaction
-2. **User Control**: Users can disable event types entirely via configuration
-3. **Local-First**: All data stays local, no cloud sync required
+1. **Capability-first for Chat grounding**: UI events are captured to support `content_type=input` and agent grounding
+2. **Explicit exception for secure input**: `secure/password field` content must not be persisted
+3. **Local-First**: All data stays local to the MyRecall deployment boundary
 
-### 5.2 Data Captured (P1)
+### 5.2 Data Captured (current direction)
 
 | Event Type | Data Captured | Notes |
 |------------|---------------|-------|
-| `click` | x, y, button, click_count, element_* | Full element context |
-| `text` | text_content, text_length | **No password field skipping** (A2) |
+| `click` | x, y, button, click_count, element_* | Element context is a best-effort enhancement |
+| `text` | text_content, text_length | Aggregated input segments, not per-key logging |
 | `app_switch` | app_name, app_pid | Application metadata |
-| `clipboard` | clipboard_op, text_content | **No PII redaction** (A1) |
+| `clipboard` | clipboard_op, text_content | Clipboard content currently stored as-is |
 
-### 5.3 Configuration Options
+### 5.3 Required privacy boundaries
+
+- `clipboard` content currently remains unredacted
+- `secure/password field` content must not be written to `text_content` or `element_value`
+- `element_value` may be stored for relevant events, but only outside secure/password contexts
+- This spec no longer assumes “capture everything” as a general principle
+
+### 5.4 Configuration posture
 
 ```bash
 # Master toggle
@@ -521,25 +540,18 @@ export OPENRECALL_CAPTURE_APP_SWITCH=true       # App switch events
 export OPENRECALL_CAPTURE_CLIPBOARD=true        # Clipboard events
 ```
 
-**No fine-grained content toggles**: Per `chat-prerequisites.md` decisions A1/A2/A4, we don't provide options like `capture_text_content` or `capture_clipboard_content`. If a user wants privacy, they disable the entire event type.
+Fine-grained policy beyond these toggles should follow the newer `docs/v3/chat/*` decisions rather than this spec.
 
-### 5.4 Privacy Decision Alignment
+### 5.5 Decision alignment
 
-| Decision ID | chat-prerequisites.md | This Spec | Status |
-|-------------|----------------------|-----------|--------|
-| A1 | PII 脱敏 → D 不处理 | clipboard 原样存储 | ✅ Aligned |
-| A2 | 密码字段 → B 不跳过 | text 捕获所有输入 | ✅ Aligned |
-| A3 | 应用黑名单 → C 不实现 | 不提供应用级过滤 | ✅ Aligned |
-| A4 | element_value → C 捕获所有 | click 捕获完整 element | ✅ Aligned |
+| Decision ID | Current status in `docs/v3/chat/*` | This spec should assume |
+|-------------|------------------------------------|-------------------------|
+| `A1` | Partially reopened | Clipboard content currently stored as-is |
+| `A2` | Reopened | `secure/password field` content not persisted |
+| `A3` | Partially reopened | Exclusion mechanism may exist later; not assumed complete here |
+| `A4` | Reopened | `ui_events.element_value` allowed, but secure/password values not persisted |
 
-### 5.5 User Control
-
-Users can:
-1. Disable all UI event capture via `OPENRECALL_CAPTURE_UI_EVENTS=false`
-2. Disable specific event types individually
-3. Close the application for complete privacy
-
-### 5.6 Data Retention
+### 5.6 Data retention
 
 UI events follow the same retention policy as frames (configurable via `OPENRECALL_RETENTION_DAYS`).
 
@@ -809,11 +821,11 @@ self._text_buffer_last_time = 0
 - [ ] `OPENRECALL_CAPTURE_UI_EVENTS=false` disables capture
 - [ ] No performance impact on capture pipeline
 
-## 10. Future Considerations
+## 10. Follow-on Implementation Work
 
-### 10.1 API Exposure (P1-S5 or before Chat)
+### 10.1 API Exposure and Search Integration
 
-**Required for**: Chat grounding (chat needs to search UI events)
+**Current status**: No longer a “future phase after UI events capture.” These capabilities are part of the Chat Entry Gate tracked in `docs/v3/chat/prerequisites.md`.
 
 ```
 GET /v1/events?type=click&start_time=...&end_time=...
@@ -824,9 +836,9 @@ GET /v1/search?content_type=input&q=...
 - `ContentType::Input` in search API
 - `SearchResult::Input(UiEventRecord)` in response
 
-### 10.2 Search Integration (P1-S5 or before Chat)
+### 10.2 Search contract details
 
-**Required for**: Chat grounding
+**Current status**: Must align with `docs/v3/chat/capability-alignment.md` rather than remain unspecified.
 
 - FTS index on `text_content`, `app_name`, `window_title`
 - Support `content_type=input` in `/v1/search`
@@ -845,16 +857,16 @@ GET /v1/search?content_type=input&q=...
 | Idempotency | None | None | ✅ |
 | Event types (P1) | click, text, app_switch, clipboard | click, text, app_switch, clipboard | ✅ |
 | Event types (P2+) | move, scroll, key, window_focus | Not implemented | Deferred |
-| Search integration | `content_type=input` | P1-S5 (before Chat) | ✅ Planned |
-| API exposure | `SearchResult::Input` | P1-S5 (before Chat) | ✅ Planned |
+| Search integration | `content_type=input` | Required before Chat | Entry Gate |
+| API exposure | `SearchResult::Input` | Required before Chat | Entry Gate |
 
-**Privacy differences** (intentional):
+**Privacy / policy differences**:
 
 | Aspect | screenpipe | MyRecall | Reason |
 |--------|-----------|----------|--------|
-| PII redaction | Regex-based | None | Local-first, no cloud sync |
-| Password fields | Skip by default | No skipping | User autonomy principle |
-| App blacklist | Built-in + configurable | Not implemented | Simplified design |
+| PII redaction | Regex-based | Clipboard currently unredacted | Current capability-first phase |
+| Password fields | Skip by default | Do not persist secure/password content | Reopened decision now aligned toward screenpipe |
+| App blacklist | Built-in + configurable | Not yet a blocker; may arrive later | Moved out of closed prerequisites decisions |
 
 **Schema differences** (intentional):
 
@@ -863,10 +875,10 @@ GET /v1/search?content_type=input&q=...
 | `clipboard_op` column | ❌ (reuses `modifiers`) | ✅ Independent column | Clearer semantics |
 | `sync_id`/`machine_id`/`synced_at` | ✅ | ❌ | MyRecall is local-only, no cloud sync |
 
-**Key differences**:
+**Key differences / current phase notes**:
 1. **P1 scope**: Only 4 event types implemented; others deferred to P2+
-2. **Privacy model**: "透明捕获 + 用户自主" per `chat-prerequisites.md`
-3. **Search integration**: MyRecall needs this before Chat development (P1-S5)
+2. **Privacy model**: Follow `docs/v3/chat/*`, not the old absolute “capture everything” posture
+3. **Search integration**: Required before Chat development, not a later optional phase
 
 ## 12. References
 
@@ -875,4 +887,6 @@ GET /v1/search?content_type=input&q=...
 - screenpipe `types.rs`: Database types and `UiEventRecord`
 - MyRecall ADR-0005: Vision-Only Search
 - MyRecall `openrecall/client/events/macos.py`: Existing event tap
-- MyRecall `docs/v3/chat-prerequisites.md`: Privacy decisions
+- MyRecall `docs/v3/chat/prerequisites.md`: Gate and reopened decision status
+- MyRecall `docs/v3/chat/capability-alignment.md`: Current contracts and policy alignment
+- MyRecall `docs/v3/chat/architecture.md`: Host/Edge runtime implications
