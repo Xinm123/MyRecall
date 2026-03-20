@@ -1,9 +1,11 @@
+import json
 import logging
 import os
 import queue
 import threading
 import time
 from collections.abc import Callable
+from dataclasses import asdict
 
 import mss
 import numpy as np
@@ -165,6 +167,62 @@ def compute_similarity(img1: ImageArray, img2: ImageArray) -> float:
     compress_img1: ImageArray = resize_image(img1)
     compress_img2: ImageArray = resize_image(img2)
     return mean_structured_similarity_index(compress_img1, compress_img2)
+
+
+def _merge_accessibility_metadata(
+    base_metadata: dict[str, str | int | None],
+    decision: "openrecall.client.accessibility.types.AccessibilityDecision",
+) -> dict[str, str | int | None]:
+    """Merge accessibility decision into capture metadata for upload.
+
+    For adopted decisions:
+    - Add text, text_source='accessibility'
+    - Add browser_url, content_hash, simhash from snapshot
+    - Add nested accessibility payload
+
+    For empty_text decisions:
+    - Add browser_url only (snapshot exists but no text)
+
+    For other non-adopted decisions:
+    - Return base_metadata unchanged
+
+    Args:
+        base_metadata: The base capture metadata dictionary
+        decision: The accessibility decision from collect_for_capture
+
+    Returns:
+        Updated metadata dictionary with accessibility fields if applicable
+    """
+    from openrecall.client.accessibility.types import (
+        AccessibilityDecision,
+        REASON_EMPTY_TEXT,
+    )
+
+    result = dict(base_metadata)
+
+    if decision.adopted and decision.snapshot:
+        # Canonical accessibility fields
+        result["text"] = decision.snapshot.text_content
+        result["text_source"] = "accessibility"
+        result["browser_url"] = decision.snapshot.browser_url
+        result["content_hash"] = decision.snapshot.content_hash
+        result["simhash"] = decision.snapshot.simhash
+
+        # Nested accessibility payload
+        result["accessibility"] = {
+            "text_content": decision.snapshot.text_content,
+            "tree_json": json.dumps([asdict(n) for n in decision.snapshot.nodes]),
+            "node_count": decision.snapshot.node_count,
+            "truncated": decision.snapshot.truncated,
+            "truncation_reason": decision.snapshot.truncation_reason,
+            "max_depth_reached": decision.snapshot.max_depth_reached,
+            "duration_ms": decision.snapshot.duration_ms,
+        }
+    elif decision.snapshot and decision.reason == REASON_EMPTY_TEXT:
+        # Add browser_url for empty_text case (snapshot exists)
+        result["browser_url"] = decision.snapshot.browser_url
+
+    return result
 
 
 class ScreenRecorder:
@@ -1176,7 +1234,8 @@ class ScreenRecorder:
                 )
                 self._last_ax_duration_ms = int(time.time() * 1000 - ax_start_ms)
 
-                metadata = self._build_capture_metadata(
+                # Build base metadata
+                base_metadata = self._build_capture_metadata(
                     routed_task,
                     context_active_app=context_active_app,
                     context_active_window=context_active_window,
@@ -1186,8 +1245,14 @@ class ScreenRecorder:
                     ),
                 )
 
-                # Add PHash to metadata if computed
-                if phash_value is not None:
+                # Merge accessibility metadata if snapshot exists
+                if ax_decision.snapshot is not None:
+                    metadata = _merge_accessibility_metadata(base_metadata, ax_decision)
+                else:
+                    metadata = base_metadata
+
+                # Add PHash to metadata if computed (may be overridden by accessibility simhash)
+                if phash_value is not None and "simhash" not in metadata:
                     metadata["simhash"] = phash_value
 
                 self._spool.enqueue(image, metadata)

@@ -314,6 +314,213 @@ class TestRecorderIntegration:
         assert decision.eligible is True
 
 
+class TestMergeAccessibilityMetadata:
+    """Tests for _merge_accessibility_metadata function."""
+
+    def test_merge_adds_canonical_fields_for_adopted(self):
+        """When adopted=True, metadata should contain text, text_source, accessibility payload."""
+        from openrecall.client.accessibility.types import (
+            AccessibilityDecision,
+            TreeSnapshot,
+            AccessibilityTreeNode,
+            NodeBounds,
+        )
+        from openrecall.client.recorder import _merge_accessibility_metadata
+        from datetime import datetime, timezone
+
+        snapshot = TreeSnapshot(
+            app_name="Safari",
+            window_name="Doc",
+            browser_url="https://example.com",
+            text_content="Hello World",
+            nodes=[
+                AccessibilityTreeNode(
+                    role="AXStaticText",
+                    text="Hello World",
+                    depth=0,
+                    bounds=NodeBounds(left=0.0, top=0.0, width=1.0, height=1.0),
+                )
+            ],
+            node_count=1,
+            truncated=False,
+            truncation_reason=None,
+            max_depth_reached=1,
+            content_hash=12345,
+            simhash=67890,
+            captured_at=datetime.now(timezone.utc),
+            duration_ms=50,
+        )
+        decision = AccessibilityDecision(
+            eligible=True,
+            adopted=True,
+            reason="adopted_accessibility",
+            snapshot=snapshot,
+        )
+
+        base_metadata = {"app_name": "Safari", "window_name": "Doc"}
+        result = _merge_accessibility_metadata(base_metadata, decision)
+
+        assert result["text"] == "Hello World"
+        assert result["text_source"] == "accessibility"
+        assert result["browser_url"] == "https://example.com"
+        assert result["content_hash"] == 12345
+        assert result["simhash"] == 67890
+        assert "accessibility" in result
+        assert result["accessibility"]["text_content"] == "Hello World"
+        assert result["accessibility"]["node_count"] == 1
+
+    def test_merge_adds_browser_url_for_empty_text(self):
+        """When reason=empty_text, metadata should still contain browser_url from snapshot."""
+        from openrecall.client.accessibility.types import (
+            AccessibilityDecision,
+            TreeSnapshot,
+        )
+        from openrecall.client.recorder import _merge_accessibility_metadata
+        from datetime import datetime, timezone
+
+        # Snapshot has browser_url but empty text_content
+        snapshot = TreeSnapshot(
+            app_name="Safari",
+            window_name="Doc",
+            browser_url="https://example.com",
+            text_content="",  # Empty!
+            nodes=[],
+            node_count=0,
+            truncated=False,
+            truncation_reason=None,
+            max_depth_reached=0,
+            content_hash=0,
+            simhash=0,
+            captured_at=datetime.now(timezone.utc),
+            duration_ms=50,
+        )
+        decision = AccessibilityDecision(
+            eligible=True,
+            adopted=False,  # Not adopted because empty text
+            reason="empty_text",
+            snapshot=snapshot,
+        )
+
+        base_metadata = {"app_name": "Safari", "window_name": "Doc"}
+        result = _merge_accessibility_metadata(base_metadata, decision)
+
+        # browser_url should be added even for non-adopted
+        assert result["browser_url"] == "https://example.com"
+        # But no text or accessibility payload
+        assert "text" not in result
+        assert "accessibility" not in result
+
+    def test_merge_omits_canonical_fields_for_non_adopted(self):
+        """When adopted=False with no snapshot, metadata should NOT contain text or accessibility."""
+        from openrecall.client.accessibility.types import AccessibilityDecision
+        from openrecall.client.recorder import _merge_accessibility_metadata
+
+        decision = AccessibilityDecision(
+            eligible=False,
+            adopted=False,
+            reason="non_focused_monitor",
+            snapshot=None,
+        )
+
+        base_metadata = {"app_name": "Safari", "window_name": "Doc"}
+        result = _merge_accessibility_metadata(base_metadata, decision)
+
+        assert "text" not in result
+        assert "text_source" not in result
+        assert "accessibility" not in result
+
+    def test_merge_preserves_base_metadata(self):
+        """Merge should preserve all existing base metadata fields."""
+        from openrecall.client.accessibility.types import (
+            AccessibilityDecision,
+            TreeSnapshot,
+            AccessibilityTreeNode,
+        )
+        from openrecall.client.recorder import _merge_accessibility_metadata
+        from datetime import datetime, timezone
+
+        snapshot = TreeSnapshot(
+            app_name="Safari",
+            window_name="Doc",
+            browser_url="https://example.com",
+            text_content="Hello World",
+            nodes=[AccessibilityTreeNode(role="AXStaticText", text="Hello World", depth=0)],
+            node_count=1,
+            truncated=False,
+            truncation_reason=None,
+            max_depth_reached=1,
+            content_hash=12345,
+            simhash=67890,
+            captured_at=datetime.now(timezone.utc),
+            duration_ms=50,
+        )
+        decision = AccessibilityDecision(
+            eligible=True,
+            adopted=True,
+            reason="adopted_accessibility",
+            snapshot=snapshot,
+        )
+
+        base_metadata = {
+            "app_name": "Safari",
+            "window_name": "Doc",
+            "timestamp": "2026-03-20T10:00:00Z",
+            "capture_trigger": "click",
+            "device_name": "monitor_1",
+            "event_ts": "2026-03-20T09:59:59Z",
+            "simhash": 11111,  # Should be overwritten by snapshot
+        }
+        result = _merge_accessibility_metadata(base_metadata, decision)
+
+        # Base metadata should be preserved
+        assert result["timestamp"] == "2026-03-20T10:00:00Z"
+        assert result["capture_trigger"] == "click"
+        assert result["device_name"] == "monitor_1"
+        assert result["event_ts"] == "2026-03-20T09:59:59Z"
+        # simhash from snapshot should override base
+        assert result["simhash"] == 67890
+
+    def test_merge_includes_truncation_info(self):
+        """Merge should include truncation info in accessibility payload."""
+        from openrecall.client.accessibility.types import (
+            AccessibilityDecision,
+            TreeSnapshot,
+            AccessibilityTreeNode,
+        )
+        from openrecall.client.recorder import _merge_accessibility_metadata
+        from datetime import datetime, timezone
+
+        snapshot = TreeSnapshot(
+            app_name="Safari",
+            window_name="Doc",
+            browser_url="https://example.com",
+            text_content="Hello World",
+            nodes=[AccessibilityTreeNode(role="AXStaticText", text="Hello World", depth=0)],
+            node_count=1000,
+            truncated=True,
+            truncation_reason="max_nodes_exceeded",
+            max_depth_reached=30,
+            content_hash=12345,
+            simhash=67890,
+            captured_at=datetime.now(timezone.utc),
+            duration_ms=200,
+        )
+        decision = AccessibilityDecision(
+            eligible=True,
+            adopted=True,
+            reason="adopted_accessibility",
+            snapshot=snapshot,
+        )
+
+        base_metadata = {"app_name": "Safari", "window_name": "Doc"}
+        result = _merge_accessibility_metadata(base_metadata, decision)
+
+        assert result["accessibility"]["truncated"] is True
+        assert result["accessibility"]["truncation_reason"] == "max_nodes_exceeded"
+        assert result["accessibility"]["max_depth_reached"] == 30
+        assert result["accessibility"]["duration_ms"] == 200
+
+
 class TestRecorderSkipsAx:
     """Tests for recorder skipping AX collection in specific cases."""
 

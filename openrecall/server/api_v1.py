@@ -295,6 +295,35 @@ def ingest():
     snapshot_filename = f"{capture_id_raw}.jpg"
     snapshot_path = frames_dir / snapshot_filename
 
+    # ------------------------------------------------------------------
+    # Step 4a: Check for accessibility-canonical payload
+    # ------------------------------------------------------------------
+    if (
+        metadata.get("text_source") == "accessibility"
+        and "accessibility" in metadata
+        and isinstance(metadata.get("accessibility"), dict)
+    ):
+        try:
+            return _handle_accessibility_canonical_ingest(
+                store=store,
+                frame_id=frame_id,
+                capture_id=capture_id_raw,
+                metadata=metadata,
+                snapshot_path=snapshot_path,
+                file_bytes=file_bytes,
+                request_id=request_id,
+            )
+        except Exception as exc:
+            # Log and degrade to OCR-pending
+            logger.warning(
+                "ingest: accessibility payload invalid, degrading to OCR-pending: %s",
+                exc,
+            )
+            # Fall through to normal pending path
+
+    # ------------------------------------------------------------------
+    # Step 5: Persist JPEG and finalize as pending (OCR path)
+    # ------------------------------------------------------------------
     try:
         tmp_path = snapshot_path.with_suffix(f".jpg.{request_id}.tmp")
         tmp_path.write_bytes(file_bytes)
@@ -341,6 +370,113 @@ def ingest():
                 "capture_id": capture_id_raw,
                 "frame_id": frame_id,
                 "status": "queued",
+                "request_id": request_id,
+            }
+        ),
+        201,
+    )
+
+
+def _handle_accessibility_canonical_ingest(
+    store: FramesStore,
+    frame_id: int,
+    capture_id: str,
+    metadata: dict,
+    snapshot_path: Path,
+    file_bytes: bytes,
+    request_id: str,
+):
+    """Handle ingest for accessibility-canonical frames.
+
+    This function processes frames that have accessibility data and
+    completes them synchronously without OCR processing.
+
+    Args:
+        store: FramesStore instance
+        frame_id: The claimed frame ID
+        capture_id: The capture UUID
+        metadata: The frame metadata dict
+        snapshot_path: Path to save the JPEG
+        file_bytes: The JPEG file bytes
+        request_id: Request ID for logging
+
+    Returns:
+        Flask response tuple
+
+    Raises:
+        ValueError: If accessibility payload is malformed
+    """
+    acc = metadata.get("accessibility")
+    if not isinstance(acc, dict):
+        raise ValueError("accessibility payload must be a dict")
+
+    # Validate required fields
+    if "tree_json" not in acc:
+        raise ValueError("Missing tree_json in accessibility payload")
+
+    # Parse tree_json to validate it's valid JSON
+    try:
+        tree_nodes = json.loads(acc["tree_json"])
+    except json.JSONDecodeError as e:
+        raise ValueError(f"Invalid tree_json: {e}") from e
+
+    if not isinstance(tree_nodes, list):
+        raise ValueError("tree_json must be a JSON array")
+
+    # Persist JPEG
+    try:
+        tmp_path = snapshot_path.with_suffix(f".jpg.{request_id}.tmp")
+        tmp_path.write_bytes(file_bytes)
+        tmp_path.replace(snapshot_path)
+    except Exception as exc:
+        logger.exception(
+            "ingest: failed to persist JPEG capture_id=%s frame_id=%d: %s",
+            capture_id,
+            frame_id,
+            exc,
+        )
+        raise RuntimeError(f"Failed to persist JPEG: {exc}") from exc
+
+    # Finalize snapshot path
+    finalized = store.finalize_claimed_frame(
+        frame_id=frame_id,
+        capture_id=capture_id,
+        snapshot_path=str(snapshot_path),
+    )
+    if not finalized:
+        raise RuntimeError("Failed to finalize claimed frame")
+
+    # Complete with accessibility
+    text = metadata.get("text", acc.get("text_content", ""))
+    success = store.complete_accessibility_frame(
+        frame_id=frame_id,
+        text=str(text),
+        browser_url=metadata.get("browser_url") if isinstance(metadata.get("browser_url"), str) else None,
+        content_hash=metadata.get("content_hash") if isinstance(metadata.get("content_hash"), int) else None,
+        simhash=metadata.get("simhash") if isinstance(metadata.get("simhash"), int) else None,
+        accessibility_tree_json=acc["tree_json"],
+        accessibility_text_content=acc.get("text_content", ""),
+        accessibility_node_count=acc.get("node_count", 0) if isinstance(acc.get("node_count"), int) else 0,
+        accessibility_truncated=acc.get("truncated", False) if isinstance(acc.get("truncated"), bool) else False,
+        elements=tree_nodes,
+    )
+
+    if not success:
+        raise RuntimeError("Failed to complete accessibility frame")
+
+    logger.info(
+        "ingest: 201 Created (accessibility-canonical) capture_id=%s frame_id=%d request_id=%s",
+        capture_id,
+        frame_id,
+        request_id,
+    )
+
+    return (
+        jsonify(
+            {
+                "capture_id": capture_id,
+                "frame_id": frame_id,
+                "status": "completed",
                 "request_id": request_id,
             }
         ),
@@ -728,6 +864,7 @@ def search():
             "content": {
                 "frame_id": r["frame_id"],
                 "text": r.get("text", ""),
+                "text_source": r.get("text_source"),
                 "timestamp": r.get("timestamp"),
                 "file_path": r.get("file_path", ""),
                 "frame_url": r.get("frame_url", ""),

@@ -868,3 +868,264 @@ class FramesStore:
                 e,
             )
             return False
+
+    # ------------------------------------------------------------------
+    # Accessibility Canonical Methods (Phase 5)
+    # ------------------------------------------------------------------
+
+    def complete_accessibility_frame(
+        self,
+        frame_id: int,
+        text: str,
+        browser_url: Optional[str],
+        content_hash: Optional[int],
+        simhash: Optional[int],
+        accessibility_tree_json: str,
+        accessibility_text_content: str,
+        accessibility_node_count: int,
+        accessibility_truncated: bool,
+        elements: list[dict],
+    ) -> bool:
+        """Complete a frame with accessibility-canonical data in one transaction.
+
+        Writes to:
+        - frames (text, text_source, accessibility_tree_json, browser_url,
+                  content_hash, simhash, status, processed_at)
+        - accessibility table
+        - elements table with derived parent_id and sort_order
+
+        Args:
+            frame_id: The frame ID to complete
+            text: The extracted text content
+            browser_url: Optional browser URL
+            content_hash: Optional content hash for deduplication
+            simhash: Optional similarity hash
+            accessibility_tree_json: JSON string of the accessibility tree
+            accessibility_text_content: Text content from accessibility
+            accessibility_node_count: Number of nodes in the tree
+            accessibility_truncated: Whether the tree was truncated
+            elements: List of element dicts with role, text, depth, bounds
+
+        Returns:
+            True if completed successfully, False otherwise
+        """
+        # Convert unsigned 64-bit integers to signed for SQLite compatibility.
+        # SQLite INTEGER is signed 64-bit. content_hash/simhash may be unsigned 64-bit.
+        if content_hash is not None and isinstance(content_hash, int):
+            if content_hash > 9223372036854775807:  # 2^63 - 1
+                content_hash = content_hash - 18446744073709551616  # 2^64
+        if simhash is not None and isinstance(simhash, int):
+            if simhash > 9223372036854775807:  # 2^63 - 1
+                simhash = simhash - 18446744073709551616  # 2^64
+
+        try:
+            with self._connect() as conn:
+                now = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+
+                # Update frames table
+                conn.execute(
+                    """
+                    UPDATE frames SET
+                        text = ?,
+                        text_source = 'accessibility',
+                        accessibility_tree_json = ?,
+                        browser_url = COALESCE(?, browser_url),
+                        content_hash = ?,
+                        simhash = ?,
+                        status = 'completed',
+                        processed_at = ?
+                    WHERE id = ?
+                    """,
+                    (
+                        text,
+                        accessibility_tree_json,
+                        browser_url,
+                        content_hash,
+                        simhash,
+                        now,
+                        frame_id,
+                    ),
+                )
+
+                # Get frame metadata for accessibility row
+                frame_row = conn.execute(
+                    "SELECT timestamp, app_name, window_name FROM frames WHERE id = ?",
+                    (frame_id,),
+                ).fetchone()
+
+                if frame_row is None:
+                    logger.error(
+                        "complete_accessibility_frame: frame not found id=%d",
+                        frame_id,
+                    )
+                    return False
+
+                # Delete existing accessibility row if any (idempotency)
+                conn.execute(
+                    "DELETE FROM accessibility WHERE frame_id = ?",
+                    (frame_id,),
+                )
+
+                # Insert accessibility row
+                conn.execute(
+                    """
+                    INSERT INTO accessibility (
+                        frame_id, timestamp, app_name, window_name, browser_url,
+                        text_content, text_length
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        frame_id,
+                        frame_row["timestamp"],
+                        frame_row["app_name"] or "",
+                        frame_row["window_name"] or "",
+                        browser_url,
+                        accessibility_text_content,
+                        len(accessibility_text_content),
+                    ),
+                )
+
+                # Delete existing elements if any (idempotency)
+                conn.execute(
+                    "DELETE FROM elements WHERE frame_id = ?",
+                    (frame_id,),
+                )
+
+                # Insert elements with parent_id and sort_order derivation
+                self._insert_elements_with_parent_derivation(conn, frame_id, elements)
+
+                conn.commit()
+                return True
+
+        except sqlite3.Error as e:
+            logger.error(
+                "complete_accessibility_frame failed frame_id=%d: %s",
+                frame_id,
+                e,
+            )
+            return False
+
+    def _insert_elements_with_parent_derivation(
+        self, conn: sqlite3.Connection, frame_id: int, elements: list[dict]
+    ) -> None:
+        """Insert elements with parent_id and sort_order derived from depth-first ordering.
+
+        The depth stack tracks the path from root to current position, enabling
+        correct parent_id assignment as we traverse the tree in depth-first order.
+
+        Args:
+            conn: Active database connection
+            frame_id: The frame ID
+            elements: List of element dicts in depth-first order
+        """
+        depth_stack: list[tuple[int, int]] = []  # Stack of (depth, element_id)
+
+        for sort_order, elem in enumerate(elements):
+            depth = elem.get("depth", 0)
+
+            # Pop stack until we find a shallower depth (potential parent)
+            while depth_stack and depth_stack[-1][0] >= depth:
+                depth_stack.pop()
+
+            # Parent is the last element with depth < current depth
+            parent_id = depth_stack[-1][1] if depth_stack else None
+
+            # Extract bounds if present
+            bounds = elem.get("bounds") or {}
+            left_bound = bounds.get("left") if isinstance(bounds, dict) else None
+            top_bound = bounds.get("top") if isinstance(bounds, dict) else None
+            width_bound = bounds.get("width") if isinstance(bounds, dict) else None
+            height_bound = bounds.get("height") if isinstance(bounds, dict) else None
+
+            # Insert element
+            cursor = conn.execute(
+                """
+                INSERT INTO elements (
+                    frame_id, source, role, text, parent_id, depth,
+                    left_bound, top_bound, width_bound, height_bound, sort_order
+                ) VALUES (?, 'accessibility', ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    frame_id,
+                    elem.get("role"),
+                    elem.get("text"),
+                    parent_id,
+                    depth,
+                    left_bound,
+                    top_bound,
+                    width_bound,
+                    height_bound,
+                    sort_order,
+                ),
+            )
+
+            # Push current element to stack
+            depth_stack.append((depth, cursor.lastrowid))
+
+    def list_accessibility_for_frame(self, frame_id: int) -> list[dict]:
+        """Get accessibility rows for a frame.
+
+        Args:
+            frame_id: The frame ID
+
+        Returns:
+            List of accessibility row dicts
+        """
+        try:
+            with self._connect() as conn:
+                rows = conn.execute(
+                    "SELECT * FROM accessibility WHERE frame_id = ?",
+                    (frame_id,),
+                ).fetchall()
+                return [dict(r) for r in rows]
+        except sqlite3.Error as e:
+            logger.error(
+                "list_accessibility_for_frame failed frame_id=%d: %s",
+                frame_id,
+                e,
+            )
+            return []
+
+    def list_elements_for_frame(self, frame_id: int) -> list[dict]:
+        """Get elements rows for a frame.
+
+        Args:
+            frame_id: The frame ID
+
+        Returns:
+            List of element row dicts in sort_order
+        """
+        try:
+            with self._connect() as conn:
+                rows = conn.execute(
+                    "SELECT * FROM elements WHERE frame_id = ? ORDER BY sort_order",
+                    (frame_id,),
+                ).fetchall()
+                return [dict(r) for r in rows]
+        except sqlite3.Error as e:
+            logger.error(
+                "list_elements_for_frame failed frame_id=%d: %s",
+                frame_id,
+                e,
+            )
+            return []
+
+    def get_frame_by_id(self, frame_id: int) -> Optional[dict]:
+        """Get a frame by ID as a dict with all fields.
+
+        Args:
+            frame_id: The frame ID
+
+        Returns:
+            Frame dict or None if not found
+        """
+        try:
+            with self._connect() as conn:
+                row = conn.execute(
+                    "SELECT * FROM frames WHERE id = ?",
+                    (frame_id,),
+                ).fetchone()
+                return dict(row) if row else None
+        except sqlite3.Error as e:
+            logger.error("get_frame_by_id failed frame_id=%d: %s", frame_id, e)
+            return None

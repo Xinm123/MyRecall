@@ -146,7 +146,8 @@ class SearchEngine:
                        frames.window_name,
                        frames.browser_url,
                        frames.focused,
-                       frames.device_name"""
+                       frames.device_name,
+                       frames.text_source"""
             # Include FTS rank when text query present
             if has_text_query:
                 select_clause += (
@@ -306,6 +307,7 @@ class SearchEngine:
                         "frame_id": frame_id,
                         "timestamp": ts,
                         "text": row["text"] or "",
+                        "text_source": row["text_source"],
                         "app_name": row["app_name"],
                         "window_name": row["window_name"],
                         "browser_url": None,  # Reserved, always null in P1
