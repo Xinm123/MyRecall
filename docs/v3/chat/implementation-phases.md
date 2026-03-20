@@ -1,0 +1,464 @@
+# MyRecall v3 Chat Implementation Phases
+
+## Purpose
+
+This document defines the recommended implementation order for the reduced MyRecall v3 chat MVP.
+
+It is intentionally phase-oriented rather than task-oriented.
+
+It exists to answer:
+
+- what should be built first
+- what must be validated before the next phase starts
+- which parts of the system are prerequisites for later chat capabilities
+
+This document does not replace `docs/v3/chat/mvp.md`.
+
+- `mvp.md` defines the target MVP behavior and contracts
+- this document defines the recommended rollout sequence
+
+## Document Boundaries
+
+This document answers:
+
+- what should be implemented first
+- what depends on what
+- what should be validated before the next phase begins
+
+This document does not try to be the detailed implementation checklist.
+
+The intended split is:
+
+- `docs/v3/chat/mvp.md`
+  - target behavior, contracts, and scope
+- `docs/v3/chat/implementation-phases.md`
+  - rollout order, dependencies, and phase-level milestones
+- `docs/superpowers/plans/*.md`
+  - task-level execution detail
+
+## Out Of Scope For This Document
+
+This document does not define:
+
+- exact task checklists
+- file-by-file implementation steps
+- test-by-test instructions
+- low-level API payload details beyond what is needed to explain phase ordering
+
+Those details should live in the implementation plan and the MVP spec.
+
+## Guiding Principle
+
+The implementation order should follow the data plane, not the UI surface.
+
+In particular:
+
+- accessibility acquisition must be stabilized before downstream search and summary APIs
+- persistence semantics must be stable before chat-facing tools are exposed
+- observability must exist before optimization work is attempted
+
+## Critical Path
+
+The critical path for this MVP is the accessibility-first data plane:
+
+```text
+Phase 2 -> Phase 3 -> Phase 4 -> Phase 5 -> Phase 6
+```
+
+This path establishes:
+
+- client-side accessibility contracts
+- capture-time AX eligibility and adoption
+- bounded focused-window AX collection
+- accessibility-complete ingest behavior
+- durable accessibility-backed search and summary inputs
+
+Phases after this path should be treated as consumers of that stabilized foundation.
+
+## Phase 0: Freeze Contracts
+
+### Objective
+
+Lock the MVP contracts before implementation starts.
+
+### Depends on
+
+- none
+
+### Includes
+
+- accessibility acquisition scope
+- accessibility-canonical metadata contract
+- ingest split semantics
+- `frames`, `accessibility`, and `elements` roles
+- search, summary, and frame-context contracts
+- reason vocabulary for AX decisions
+
+### Exit Criteria
+
+- `docs/v3/chat/mvp.md` is accepted as the active MVP spec
+- no unresolved contract ambiguity remains around accessibility acquisition or persistence
+
+### Observable Milestone
+
+- the MVP scope, accessibility semantics, and ingest split can be explained without referring back to older chat documents
+
+## Phase 1: Reset Schema To MVP Shape
+
+### Objective
+
+Prepare the database for the new chat-oriented data model.
+
+### Depends on
+
+- Phase 0
+
+### Includes
+
+- `frames.text`
+- `frames.accessibility_tree_json`
+- metadata-only `frames_fts`
+- frame-backed `accessibility + accessibility_fts`
+- internal `elements`
+
+### Why This Comes Early
+
+All later client and server work depends on stable persistence targets.
+
+### Exit Criteria
+
+- the schema matches the MVP document
+- no legacy `accessibility_text` dependency remains in the base schema
+
+### Observable Milestone
+
+- a fresh database contains the new `frames`, `accessibility`, `elements`, and FTS layout with no compatibility fields required for old chat assumptions
+
+## Phase 2: Introduce Client-side Accessibility Contracts And Policy
+
+### Objective
+
+Add the accessibility subsystem boundaries before adding real platform collection.
+
+### Depends on
+
+- Phase 0
+- Phase 1
+
+### Includes
+
+- `TreeWalkerConfig`
+- `TreeSnapshot`
+- `AccessibilityTreeNode`
+- `AccessibilityDecision`
+- focused-monitor AX eligibility rules
+- terminal-class `app_prefers_ocr` rules
+- debug log and dump contract
+
+### Why This Comes Early
+
+The system should know how to reason about accessibility before it knows how to collect it.
+
+### Exit Criteria
+
+- the client-side accessibility types are stable
+- policy decisions are deterministic and testable
+- debug output shape is defined
+
+### Observable Milestone
+
+- policy evaluation and debug payloads can be exercised without a real AX walker implementation
+
+## Phase 3: Insert Accessibility Decision Stage Into Capture Flow
+
+### Objective
+
+Add the accessibility decision stage into the client capture pipeline without yet relying on real AX adoption for server-side completion.
+
+### Depends on
+
+- Phase 2
+
+### Includes
+
+- capture order is explicitly:
+  - screenshot
+  - active context
+  - accessibility decision
+  - metadata build
+  - metadata merge
+  - enqueue
+- recorder integration points are established
+- eligibility and rejection reasons become visible in logs/debug dumps
+
+### Why This Comes Before Walker Adoption
+
+It validates routing, monitor ownership, and hot-path placement before real AX payloads start changing persistence behavior.
+
+### Recommended Transitional State
+
+Phase 3 should introduce the accessibility decision stage with a stable service interface before a real walker is required.
+
+Recommended transitional behavior:
+
+- the recorder calls a stable `collect_for_capture(...)` entrypoint
+- policy-based rejections already work:
+  - `non_focused_monitor`
+  - `app_prefers_ocr`
+- the non-rejected path may still return a non-adopted placeholder result while the real walker is not yet implemented
+- decision logs and debug dumps are already emitted
+- no accessibility-canonical payload is uploaded yet
+- server ingest behavior remains unchanged in this phase
+
+### Exit Criteria
+
+- non-focused monitor captures are rejected from AX cleanly
+- terminal-class apps are rejected from AX cleanly
+- capture still completes normally when AX collection is skipped or unavailable
+
+### Observable Milestone
+
+- capture logs clearly show AX eligibility and rejection reasons while the existing screenshot/enqueue pipeline remains stable
+
+## Phase 4: Implement Bounded Focused-window Accessibility Collection
+
+### Objective
+
+Implement the first real macOS accessibility walker for focused-window snapshots.
+
+### Depends on
+
+- Phase 2
+- Phase 3
+
+### Includes
+
+- focused-window lookup
+- bounded tree walk
+- text-bearing role extraction
+- `value -> title -> description` priority
+- best-effort `bounds`
+- best-effort browser URL extraction
+
+For the first MVP, browser URL extraction means:
+
+- treat app names containing `safari` or `chrome` as browser candidates
+- attempt `AXDocument` only
+- do not add browser-specific fallback strategies yet
+- flat depth-first text-node list output
+- `text_content`, `content_hash`, and `simhash`
+
+### Boundaries
+
+- focused window only
+- no desktop-wide accessibility state
+- no independent tree walker
+- no complete raw-tree serialization
+
+### Recommended Transitional State
+
+Phase 4 should replace the Phase 3 placeholder path with a real focused-window walker, but should still prioritize local validation before server-side canonical completion.
+
+Recommended transitional behavior:
+
+- eligible captures run the real focused-window walker
+- `TreeSnapshot` output is observable locally through logs and debug dumps
+- accessibility adoption decisions become real (`adopted_accessibility`, `empty_text`, `walk_failed`)
+- recorder-side metadata merge can still remain disabled until Phase 5 if needed
+- server ingest does not need to change during the earliest part of this phase
+
+### Exit Criteria
+
+- at least one known-good app yields usable `TreeSnapshot` output
+- empty or failed snapshots degrade cleanly
+- hot-path timing exists for AX collection
+
+### Observable Milestone
+
+- debug dumps contain real focused-window `TreeSnapshot` data with measurable `ax_walk_ms`, node counts, and truncation state
+
+## Phase 5: Promote Accessibility Snapshots Into Canonical Ingest Completion
+
+### Objective
+
+Allow accessibility-complete frames to finish during ingest instead of waiting for OCR.
+
+### Depends on
+
+- Phase 1
+- Phase 4
+
+### Includes
+
+- canonical accessibility metadata payload upload
+- ingest validation for accessibility-canonical payloads
+- one-transaction `complete_accessibility_frame(...)`
+- degradation to OCR-pending when accessibility payload is invalid
+
+### Why This Is A Separate Phase
+
+Accessibility collection and accessibility adoption should not be introduced at the same time. Collection quality should be understood first.
+
+### Exit Criteria
+
+- valid accessibility-canonical frames complete during ingest
+- invalid AX payloads degrade safely to OCR-pending
+- no duplicate or partial accessibility persistence appears
+
+### Observable Milestone
+
+- a captured frame with adopted AX data is immediately persisted as `completed` without waiting for OCR worker completion
+
+## Phase 6: Expand Accessibility Persistence Into Search And Summary Inputs
+
+### Objective
+
+Turn accessibility snapshots into durable queryable data.
+
+### Depends on
+
+- Phase 1
+- Phase 5
+
+### Includes
+
+- `frames.accessibility_tree_json`
+- `accessibility.text_content`
+- `elements` reconstruction from depth-first nodes
+- `elements.parent_id` and `sort_order` derivation from depth transitions
+
+### Why This Comes Before Chat APIs
+
+Chat APIs should consume a stable data plane rather than being used to validate it indirectly.
+
+### Exit Criteria
+
+- accessibility-complete frames produce stable `accessibility` and `elements` rows
+- summary and frame context can rely on those rows later
+
+### Observable Milestone
+
+- persisted frames can be inspected and shown to have matching `frames.accessibility_tree_json`, `accessibility.text_content`, and reconstructed `elements`
+
+## Phase 7: Upgrade OCR Worker Semantics
+
+### Objective
+
+Align OCR completion behavior with the new accessibility path.
+
+### Depends on
+
+- Phase 1
+- Phase 5
+
+### Includes
+
+- canonical OCR completion only for frames with no canonical `text_source`
+- auxiliary OCR persistence for accessibility-canonical frames
+- no canonical overwrite of accessibility-complete frames
+
+### Why This Is Later
+
+The OCR worker should be updated only after the accessibility-complete path exists, otherwise the final source-of-truth rules stay ambiguous.
+
+### Exit Criteria
+
+- OCR-only frames become canonical OCR frames
+- accessibility-canonical frames can keep auxiliary OCR without changing search visibility
+
+### Observable Milestone
+
+- logs and persisted rows show a clean distinction between canonical OCR completion and auxiliary OCR persistence
+
+## Phase 8: Expose Chat Tool APIs
+
+### Objective
+
+Expose the reduced tool surface only after the data plane is stable.
+
+### Depends on
+
+- Phase 6
+- Phase 7
+
+### Includes
+
+- `/v1/search` with `ocr | accessibility | all`
+- `/v1/activity-summary`
+- `/v1/frames/{id}/context`
+- `/v1/frames/{id}`
+
+### Why This Comes Late
+
+These APIs are consumers of the new model. They should not be used as the primary way to discover data-plane defects.
+
+### Exit Criteria
+
+- search, summary, and frame-context outputs reflect the new canonical frame model
+- `all` search ordering and non-duplication semantics are stable
+
+### Observable Milestone
+
+- `/v1/search`, `/v1/activity-summary`, and `/v1/frames/{id}/context` can be exercised against the new data plane without requiring additional schema or worker changes
+
+## Phase 9: Validate Accessibility Coverage And Performance
+
+### Objective
+
+Decide whether the Python accessibility implementation is sufficient for MVP.
+
+### Depends on
+
+- Phase 4
+- Phase 5
+- Phase 6
+- Phase 7
+- Phase 8
+
+### Includes
+
+- capture hot-path timing review
+- AX decision reason review
+- timeout and truncation review
+- multi-monitor focused/non-focused verification
+- terminal OCR-preference verification
+
+### Success Signals
+
+- acceptable AX walk latency
+- acceptable total capture latency
+- low timeout rate
+- low unexpected empty-text rate on supported apps
+
+### Decision Gate
+
+Only after this phase should the project decide whether to:
+
+- keep the Python walker as-is
+- optimize the Python implementation
+- or replace the walker with a lower-level helper
+
+### Observable Milestone
+
+- the team has real evidence about supported apps, latency, truncation, and timeout behavior rather than assumptions
+
+## Recommended Sequence Summary
+
+```text
+Phase 0  Freeze contracts
+Phase 1  Reset schema
+Phase 2  Add accessibility types/policy/debug contracts
+Phase 3  Insert accessibility decision stage into capture flow
+Phase 4  Implement bounded focused-window walker
+Phase 5  Promote accessibility-complete ingest path
+Phase 6  Persist accessibility into queryable planes
+Phase 7  Upgrade OCR worker semantics
+Phase 8  Expose chat tool APIs
+Phase 9  Validate coverage and performance
+```
+
+## Notes
+
+- Accessibility acquisition is the critical path for the MVP.
+- Downstream APIs should be treated as consumers of a stabilized accessibility-aware data plane.
+- Optimization should follow observability, not precede it.
