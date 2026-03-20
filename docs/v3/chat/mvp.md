@@ -167,7 +167,7 @@ When a frame is accessibility-canonical, the client must upload:
 - top-level canonical frame fields:
   - `text`
   - `text_source='accessibility'`
-  - `browser_url` when available
+  - `browser_url` when available (frame-level metadata, not accessibility-specific)
   - `content_hash`
   - `simhash`
 - a nested `accessibility` payload containing:
@@ -178,6 +178,10 @@ When a frame is accessibility-canonical, the client must upload:
   - `truncation_reason`
   - `max_depth_reached`
   - `duration_ms`
+
+> **Note on `browser_url`:** This is frame-level best-effort metadata, not accessibility-specific.
+> It should be extracted during capture and saved to `frames.browser_url` regardless of the frame's
+> final `text_source`. See the "Browser URL" section below for details.
 
 For accessibility-canonical frames:
 
@@ -305,7 +309,9 @@ The first MVP walker should follow this order:
 7. finalize `text_content`, hashes, timing, and truncation state
 8. return `TreeSnapshot` or `None`
 
-The walker should return `None` when no usable focused-window snapshot exists.
+The walker should return `None` when no focused window can be found or the walk itself fails.
+An empty-text snapshot is still a valid `TreeSnapshot` and will be mapped to `empty_text` by the service.
+This design preserves debug visibility when a window exists but contains no text-bearing nodes.
 
 #### `collect_for_capture(...)` Decision Mapping
 
@@ -328,11 +334,8 @@ Recommended mapping:
   - `adopted=false`
   - `reason='no_focused_window'`
   - `snapshot=None`
-- walker raises
-  - `eligible=true`
-  - `adopted=false`
-  - `reason='walk_failed'`
-  - `snapshot=None`
+  > Note: The walker returns `None` for both "no focused window found" and "walk failed" cases.
+  > The specific reason is logged internally by the walker for debugging.
 - walker returns a snapshot with empty `text_content`
   - `eligible=true`
   - `adopted=false`
@@ -688,7 +691,6 @@ Recommended reason vocabulary:
 - `non_focused_monitor`
 - `app_prefers_ocr`
 - `no_focused_window`
-- `walk_failed`
 - `empty_text`
 - `adopted_accessibility`
 
@@ -1018,9 +1020,18 @@ specific question
 
 ## Browser URL
 
-`browser_url` is best-effort metadata.
+`browser_url` is **frame-level best-effort metadata**.
 
-MVP browser URL rules:
+### Key Semantic
+
+- `browser_url` belongs to the frame, not to the accessibility subsystem
+- It should be persisted to `frames.browser_url` whenever available, regardless of the frame's final `text_source`
+- It does not influence or determine the canonical text source
+- Search APIs can filter by `browser_url` for any frame (accessibility or OCR)
+
+### Extraction Rules
+
+MVP browser URL extraction rules:
 
 - attempt retrieval only for focused browser windows
 - first implementation treats app names containing `safari` or `chrome` as browser candidates
@@ -1028,6 +1039,26 @@ MVP browser URL rules:
 - no fallback is required in MVP
 - retrieval failure should produce `None`
 - absence of `browser_url` is expected and non-fatal
+
+### Browser URL Availability
+
+`browser_url` availability depends on whether the walker produced a snapshot:
+
+| Decision Reason | browser_url | Explanation |
+|-----------------|-------------|-------------|
+| `adopted_accessibility` | ✅ Available | Snapshot produced with text |
+| `empty_text` | ✅ Available | Snapshot produced (browser_url extracted before text aggregation) |
+| `no_focused_window` | ❌ Unavailable | No snapshot produced, no window to extract from |
+
+> Note: The walker extracts `browser_url` via `AXDocument` before aggregating text content.
+> This means `empty_text` frames can still have `browser_url` populated.
+
+### Search Implications
+
+- `browser_url` filter works for both accessibility-canonical and OCR frames
+- Accessibility-canonical frames have higher `browser_url` coverage
+- OCR frames from `empty_text` may have `browser_url` (useful for browser history queries)
+- OCR frames from `no_focused_window` cannot have `browser_url`
 
 ## Screenpipe Alignment
 

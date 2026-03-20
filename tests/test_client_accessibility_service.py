@@ -57,14 +57,15 @@ class TestCollectForCapture:
         assert decision.app_name == "iTerm2"
 
     def test_collect_for_capture_returns_placeholder_when_eligible(self):
-        """Eligible capture should attempt walk (may return no_focused_window without real AX)."""
+        """Eligible capture should attempt walk (may return various reasons without real AX)."""
         from openrecall.client.accessibility.service import collect_for_capture
         from openrecall.client.accessibility.types import (
             REASON_NO_FOCUSED_WINDOW,
             REASON_ADOPTED_ACCESSIBILITY,
+            REASON_EMPTY_TEXT,
         )
 
-        # Phase 4: Walker is now called, but may return None in test environment
+        # Phase 4: Walker is now called, but may return various results in test environment
         decision = collect_for_capture(
             app_name="Safari",
             window_name="Test Window",
@@ -75,9 +76,11 @@ class TestCollectForCapture:
 
         # Eligible but may not be adopted (no real AX in test env)
         assert decision.eligible is True
-        # Without a real focused window, this returns no_focused_window
-        # With a real window, it could return adopted_accessibility
-        assert decision.reason in (REASON_NO_FOCUSED_WINDOW, REASON_ADOPTED_ACCESSIBILITY)
+        # Without a real focused window with text, this returns one of:
+        # - no_focused_window: walker couldn't find a window
+        # - empty_text: walker found a window but it has no text content
+        # - adopted_accessibility: walker found a window with text (rare in test env)
+        assert decision.reason in (REASON_NO_FOCUSED_WINDOW, REASON_ADOPTED_ACCESSIBILITY, REASON_EMPTY_TEXT)
 
     def test_collect_for_capture_includes_timing(self):
         """Decision should include duration_ms."""

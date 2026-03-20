@@ -162,7 +162,6 @@ class TestAccessibilityDecisionMapping:
             focused_device_name="monitor_1",
             app_name="Safari",
             snapshot=None,
-            walk_error=None,
         )
 
         assert decision.eligible is False
@@ -180,7 +179,6 @@ class TestAccessibilityDecisionMapping:
             focused_device_name="monitor_1",
             app_name="iTerm2",
             snapshot=None,
-            walk_error=None,
         )
 
         assert decision.eligible is False
@@ -198,30 +196,11 @@ class TestAccessibilityDecisionMapping:
             focused_device_name="monitor_1",
             app_name="Safari",
             snapshot=None,
-            walk_error=None,
         )
 
         assert decision.eligible is True
         assert decision.adopted is False
         assert decision.reason == REASON_NO_FOCUSED_WINDOW
-        assert decision.snapshot is None
-
-    def test_decision_walk_failed(self):
-        """Walk error should produce walk_failed decision."""
-        from openrecall.client.accessibility.policy import make_accessibility_decision
-        from openrecall.client.accessibility.types import REASON_WALK_FAILED
-
-        decision = make_accessibility_decision(
-            target_device_name="monitor_1",
-            focused_device_name="monitor_1",
-            app_name="Safari",
-            snapshot=None,
-            walk_error=Exception("AX API timeout"),
-        )
-
-        assert decision.eligible is True
-        assert decision.adopted is False
-        assert decision.reason == REASON_WALK_FAILED
         assert decision.snapshot is None
 
     def test_decision_empty_text(self):
@@ -253,7 +232,6 @@ class TestAccessibilityDecisionMapping:
             focused_device_name="monitor_1",
             app_name="Safari",
             snapshot=snapshot,
-            walk_error=None,
         )
 
         assert decision.eligible is True
@@ -290,7 +268,6 @@ class TestAccessibilityDecisionMapping:
             focused_device_name="monitor_1",
             app_name="Safari",
             snapshot=snapshot,
-            walk_error=None,
         )
 
         assert decision.eligible is True

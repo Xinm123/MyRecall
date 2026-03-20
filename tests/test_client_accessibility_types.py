@@ -194,12 +194,11 @@ class TestAccessibilityDecision:
 
         # MVP spec reason vocabulary:
         # non_focused_monitor, app_prefers_ocr, no_focused_window,
-        # walk_failed, empty_text, adopted_accessibility
+        # empty_text, adopted_accessibility
         valid_reasons = [
             "non_focused_monitor",
             "app_prefers_ocr",
             "no_focused_window",
-            "walk_failed",
             "empty_text",
             "adopted_accessibility",
         ]
@@ -219,7 +218,6 @@ class TestReasonVocabulary:
             REASON_NON_FOCUSED_MONITOR,
             REASON_APP_PREFERS_OCR,
             REASON_NO_FOCUSED_WINDOW,
-            REASON_WALK_FAILED,
             REASON_EMPTY_TEXT,
             REASON_ADOPTED_ACCESSIBILITY,
         )
@@ -227,7 +225,6 @@ class TestReasonVocabulary:
         assert REASON_NON_FOCUSED_MONITOR == "non_focused_monitor"
         assert REASON_APP_PREFERS_OCR == "app_prefers_ocr"
         assert REASON_NO_FOCUSED_WINDOW == "no_focused_window"
-        assert REASON_WALK_FAILED == "walk_failed"
         assert REASON_EMPTY_TEXT == "empty_text"
         assert REASON_ADOPTED_ACCESSIBILITY == "adopted_accessibility"
 

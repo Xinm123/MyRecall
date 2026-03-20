@@ -16,7 +16,6 @@ from .types import (
     REASON_NON_FOCUSED_MONITOR,
     REASON_APP_PREFERS_OCR,
     REASON_NO_FOCUSED_WINDOW,
-    REASON_WALK_FAILED,
     REASON_EMPTY_TEXT,
     REASON_ADOPTED_ACCESSIBILITY,
 )
@@ -145,7 +144,6 @@ def make_accessibility_decision(
     focused_device_name: str,
     app_name: str,
     snapshot: Optional[TreeSnapshot],
-    walk_error: Optional[Exception] = None,
 ) -> AccessibilityDecision:
     """Make an accessibility eligibility and adoption decision.
 
@@ -154,8 +152,7 @@ def make_accessibility_decision(
 
     - non_focused_monitor: target_device != focused_device
     - app_prefers_ocr: terminal-class app
-    - no_focused_window: walker returns None, no error
-    - walk_failed: walker raises exception
+    - no_focused_window: walker returns None (no window found or walk failed)
     - empty_text: snapshot has empty text_content
     - adopted_accessibility: snapshot has non-empty text_content
 
@@ -164,7 +161,6 @@ def make_accessibility_decision(
         focused_device_name: The device name of the currently focused monitor
         app_name: The application name
         snapshot: The accessibility snapshot from the walker (may be None)
-        walk_error: Exception if the walk failed (may be None)
 
     Returns:
         An AccessibilityDecision with eligibility, adoption, and reason
@@ -193,19 +189,9 @@ def make_accessibility_decision(
             duration_ms=0,
         )
 
-    # Walk failed: eligible but not adopted
-    if walk_error is not None:
-        return AccessibilityDecision(
-            eligible=True,
-            adopted=False,
-            reason=REASON_WALK_FAILED,
-            snapshot=None,
-            app_name=app_name,
-            window_name="",
-            duration_ms=0,
-        )
-
     # No snapshot: eligible but not adopted
+    # This covers both "no focused window found" and "walk failed" cases
+    # The walker returns None for both, logging the specific reason internally
     if snapshot is None:
         return AccessibilityDecision(
             eligible=True,

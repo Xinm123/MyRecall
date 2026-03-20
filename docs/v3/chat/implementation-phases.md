@@ -186,7 +186,7 @@ Add the accessibility decision stage into the client capture pipeline without ye
   - active context
   - accessibility decision
   - metadata build
-  - metadata merge
+  - metadata merge (placeholder in Phase 3, enabled in Phase 5)
   - enqueue
 - recorder integration points are established
 - eligibility and rejection reasons become visible in logs/debug dumps
@@ -263,7 +263,7 @@ Recommended transitional behavior:
 
 - eligible captures run the real focused-window walker
 - `TreeSnapshot` output is observable locally through logs and debug dumps
-- accessibility adoption decisions become real (`adopted_accessibility`, `empty_text`, `walk_failed`)
+- accessibility adoption decisions become real (`adopted_accessibility`, `empty_text`, `no_focused_window`)
 - recorder-side metadata merge can still remain disabled until Phase 5 if needed
 - server ingest does not need to change during the earliest part of this phase
 
@@ -292,7 +292,11 @@ Allow accessibility-complete frames to finish during ingest instead of waiting f
 
 - canonical accessibility metadata payload upload
 - ingest validation for accessibility-canonical payloads
-- one-transaction `complete_accessibility_frame(...)`
+- one-transaction `complete_accessibility_frame(...)` that writes:
+  - `frames.text`, `frames.text_source='accessibility'`
+  - `frames.accessibility_tree_json`
+  - `accessibility` row
+  - `elements` rows with `parent_id` and `sort_order` derivation
 - degradation to OCR-pending when accessibility payload is invalid
 
 ### Why This Is A Separate Phase
@@ -301,44 +305,43 @@ Accessibility collection and accessibility adoption should not be introduced at 
 
 ### Exit Criteria
 
-- valid accessibility-canonical frames complete during ingest
+- valid accessibility-canonical frames complete during ingest with all tables populated
 - invalid AX payloads degrade safely to OCR-pending
 - no duplicate or partial accessibility persistence appears
 
 ### Observable Milestone
 
-- a captured frame with adopted AX data is immediately persisted as `completed` without waiting for OCR worker completion
+- a captured frame with adopted AX data is immediately persisted as `completed` with matching `frames`, `accessibility`, and `elements` rows
 
-## Phase 6: Expand Accessibility Persistence Into Search And Summary Inputs
+## Phase 6: Expose Query Helpers For Chat APIs
 
 ### Objective
 
-Turn accessibility snapshots into durable queryable data.
+Provide read-side query methods for accessibility-persisted data, enabling summary and frame context APIs.
 
 ### Depends on
 
-- Phase 1
 - Phase 5
 
 ### Includes
 
-- `frames.accessibility_tree_json`
-- `accessibility.text_content`
-- `elements` reconstruction from depth-first nodes
-- `elements.parent_id` and `sort_order` derivation from depth transitions
+- query helpers for activity summary (`get_activity_summary_apps`, `get_activity_summary_recent_texts`)
+- query helper for frame context (`get_frame_context`)
+- validation that persisted `elements` rows are correctly queryable
 
 ### Why This Comes Before Chat APIs
 
-Chat APIs should consume a stable data plane rather than being used to validate it indirectly.
+Chat APIs should consume a stable query interface rather than directly querying tables.
 
 ### Exit Criteria
 
-- accessibility-complete frames produce stable `accessibility` and `elements` rows
-- summary and frame context can rely on those rows later
+- query helpers return correct data for accessibility-complete frames
+- summary and frame context APIs can use these helpers
 
 ### Observable Milestone
 
-- persisted frames can be inspected and shown to have matching `frames.accessibility_tree_json`, `accessibility.text_content`, and reconstructed `elements`
+- `get_activity_summary_recent_texts` returns text from `elements` table
+- `get_frame_context` returns parsed nodes from `accessibility_tree_json`
 
 ## Phase 7: Upgrade OCR Worker Semantics
 

@@ -20,7 +20,6 @@ from typing import Optional
 REASON_NON_FOCUSED_MONITOR = "non_focused_monitor"
 REASON_APP_PREFERS_OCR = "app_prefers_ocr"
 REASON_NO_FOCUSED_WINDOW = "no_focused_window"
-REASON_WALK_FAILED = "walk_failed"
 REASON_EMPTY_TEXT = "empty_text"
 REASON_ADOPTED_ACCESSIBILITY = "adopted_accessibility"
 

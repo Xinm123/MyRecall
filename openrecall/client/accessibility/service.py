@@ -84,7 +84,6 @@ def collect_for_capture(
         return decision
 
     # Phase 4: Walk the accessibility tree
-    walk_error = None
     snapshot = None
 
     try:
@@ -98,7 +97,7 @@ def collect_for_capture(
         )
     except Exception as e:
         logger.debug("AX walk failed: %s", e)
-        walk_error = e
+        # Walker returns None on failure, which maps to no_focused_window
 
     # Use make_accessibility_decision to map result
     decision = make_accessibility_decision(
@@ -106,7 +105,6 @@ def collect_for_capture(
         focused_device_name=focused_device_name,
         app_name=app_name_str,
         snapshot=snapshot,
-        walk_error=walk_error,
     )
 
     _log_decision(decision, target_device_name, captured_at, debug_dir)
