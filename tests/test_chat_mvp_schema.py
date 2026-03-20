@@ -157,6 +157,11 @@ class TestAccessibilityTable:
         cols = get_table_columns(sqlite_conn, "accessibility")
         assert "text_length" in cols, "accessibility.text_length is required for MVP"
 
+    def test_accessibility_fts_indexes_browser_url(self, sqlite_conn):
+        """accessibility_fts must index browser_url for URL-based search."""
+        indexed = get_fts_indexed_columns(sqlite_conn, "accessibility_fts")
+        assert "browser_url" in indexed, "accessibility_fts should index browser_url"
+
     def test_accessibility_no_focused(self, sqlite_conn):
         """accessibility.focused should be removed (focused is per-frame, not per-accessibility)."""
         cols = get_table_columns(sqlite_conn, "accessibility")
