@@ -1156,8 +1156,14 @@ class ScreenRecorder:
                     self._snapshot_active_context()
                 )
 
-                # Accessibility decision stage (Phase 3)
+                # Accessibility decision stage (Phase 3/4)
                 ax_start_ms = time.time() * 1000
+
+                # Check if accessibility debug mode is enabled
+                ax_debug_dir = None
+                if os.environ.get("OPENRECALL_ACCESSIBILITY_DEBUG"):
+                    ax_debug_dir = str(settings.client_data_dir / "ax_debug")
+
                 ax_decision = collect_for_capture(
                     app_name=context_active_app,
                     window_name=context_active_window,
@@ -1166,6 +1172,7 @@ class ScreenRecorder:
                         routed_task.routing_hints.get("focused_device_name") or ""
                     ),
                     captured_at=utc_now_iso(),
+                    debug_dir=ax_debug_dir,
                 )
                 self._last_ax_duration_ms = int(time.time() * 1000 - ax_start_ms)
 

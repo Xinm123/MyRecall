@@ -239,3 +239,51 @@ def make_accessibility_decision(
         window_name=snapshot.window_name,
         duration_ms=snapshot.duration_ms,
     )
+
+
+# =============================================================================
+# Text Hashing
+# =============================================================================
+
+
+def compute_simhash(text: str) -> int:
+    """Compute a simhash for near-duplicate detection.
+
+    This is a simple simhash implementation using character n-grams.
+    It produces a hash that can be used to detect near-duplicate text.
+
+    Args:
+        text: The text to hash
+
+    Returns:
+        A 64-bit simhash value
+    """
+    if not text:
+        return 0
+
+    # Use 3-character shingles
+    shingles = []
+    text = text.lower()
+    for i in range(len(text) - 2):
+        shingles.append(text[i : i + 3])
+
+    if not shingles:
+        return 0
+
+    # Compute hash for each shingle
+    import hashlib
+
+    v = [0] * 64
+    for shingle in shingles:
+        h = int(hashlib.md5(shingle.encode()).hexdigest(), 16)
+        for i in range(64):
+            bit = (h >> i) & 1
+            v[i] += 1 if bit else -1
+
+    # Compute final hash
+    result = 0
+    for i in range(64):
+        if v[i] > 0:
+            result |= 1 << i
+
+    return result

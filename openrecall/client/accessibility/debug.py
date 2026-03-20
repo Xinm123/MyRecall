@@ -199,10 +199,11 @@ def dump_accessibility_decision(
     capture_id: str,
     dump_dir: str,
 ) -> Optional[str]:
-    """Dump an accessibility decision to a JSON file.
+    """Dump an accessibility decision to JSON and Markdown files.
 
     When accessibility debug mode is enabled, this creates detailed JSON
-    dumps of accessibility decisions and snapshots for debugging.
+    dumps of accessibility decisions and snapshots for debugging, plus
+    a human-readable Markdown summary.
 
     Args:
         decision: The accessibility decision to dump
@@ -210,7 +211,7 @@ def dump_accessibility_decision(
         dump_dir: Directory to write dump files
 
     Returns:
-        Path to the dump file, or None if dump failed
+        Path to the JSON dump file, or None if dump failed
     """
     if not is_debug_mode():
         return None
@@ -263,6 +264,98 @@ def dump_accessibility_decision(
     try:
         with open(dump_path, "w") as f:
             json.dump(content, f, indent=2, default=str)
+
+        # Also write Markdown summary
+        md_path = dump_path.with_suffix(".md")
+        _write_markdown_summary(decision, capture_id, md_path)
+
         return str(dump_path)
     except Exception:
         return None
+
+
+def _write_markdown_summary(
+    decision: AccessibilityDecision,
+    capture_id: str,
+    md_path: Path,
+) -> None:
+    """Write a human-readable Markdown summary of the accessibility decision.
+
+    Args:
+        decision: The accessibility decision
+        capture_id: Unique identifier for this capture
+        md_path: Path to write the Markdown file
+    """
+    lines = [
+        f"# Accessibility Debug: {capture_id}",
+        "",
+        "## Decision",
+        "",
+        f"| Field | Value |",
+        f"|-------|-------|",
+        f"| **Eligible** | {decision.eligible} |",
+        f"| **Adopted** | {decision.adopted} |",
+        f"| **Reason** | `{decision.reason}` |",
+        f"| **App** | {decision.app_name or 'N/A'} |",
+        f"| **Window** | {decision.window_name or 'N/A'} |",
+        f"| **Duration** | {decision.duration_ms}ms |",
+        "",
+    ]
+
+    if decision.snapshot is not None:
+        snapshot = decision.snapshot
+        lines.extend([
+            "## Snapshot",
+            "",
+            f"| Field | Value |",
+            f"|-------|-------|",
+            f"| **App Name** | {snapshot.app_name} |",
+            f"| **Window Name** | {snapshot.window_name} |",
+            f"| **Browser URL** | {snapshot.browser_url or 'N/A'} |",
+            f"| **Node Count** | {snapshot.node_count} |",
+            f"| **Max Depth** | {snapshot.max_depth_reached} |",
+            f"| **Truncated** | {snapshot.truncated} |",
+            f"| **Truncation Reason** | {snapshot.truncation_reason or 'N/A'} |",
+            f"| **Duration** | {snapshot.duration_ms}ms |",
+            "",
+        ])
+
+        # Text content section
+        if snapshot.text_content:
+            lines.extend([
+                "## Text Content",
+                "",
+                "```",
+                snapshot.text_content,
+                "```",
+                "",
+            ])
+
+        # Nodes table (first 50)
+        if snapshot.nodes:
+            lines.extend([
+                "## Nodes",
+                "",
+                f"| # | Role | Text | Depth |",
+                f"|---|------|------|-------|",
+            ])
+            for i, node in enumerate(snapshot.nodes[:50]):
+                # Truncate text for table readability
+                text = node.text[:60] + "..." if len(node.text) > 60 else node.text
+                # Escape pipe characters
+                text = text.replace("|", "\\|")
+                lines.append(f"| {i + 1} | `{node.role}` | {text} | {node.depth} |")
+
+            if len(snapshot.nodes) > 50:
+                lines.append(f"| ... | *{len(snapshot.nodes) - 50} more nodes* | | |")
+            lines.append("")
+    else:
+        lines.extend([
+            "## Snapshot",
+            "",
+            "*No snapshot available*",
+            "",
+        ])
+
+    with open(md_path, "w", encoding="utf-8") as f:
+        f.write("\n".join(lines))
