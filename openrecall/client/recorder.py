@@ -36,6 +36,7 @@ from openrecall.client.events.permissions import (
     PermissionStateMachine,
     detect_permissions,
 )
+from openrecall.client.accessibility import collect_for_capture
 from openrecall.client.consumer import UploaderConsumer
 from openrecall.client.hash_utils import (
     SimhashCache,
@@ -256,6 +257,9 @@ class ScreenRecorder:
         # Max skip duration safety valve - track last successful capture per device
         self._last_successful_capture_time: dict[str, float] = {}
         self._pipeline_stall_count: int = 0  # Forced captures due to max_skip_duration
+
+        # Accessibility timing for performance logging (Phase 3)
+        self._last_ax_duration_ms: int = 0
 
     @property
     def _stop_requested(self) -> bool:
@@ -1151,6 +1155,20 @@ class ScreenRecorder:
                 context_active_app, context_active_window, context_active_monitor = (
                     self._snapshot_active_context()
                 )
+
+                # Accessibility decision stage (Phase 3)
+                ax_start_ms = time.time() * 1000
+                ax_decision = collect_for_capture(
+                    app_name=context_active_app,
+                    window_name=context_active_window,
+                    target_device_name=routed_task.target_device_name,
+                    focused_device_name=str(
+                        routed_task.routing_hints.get("focused_device_name") or ""
+                    ),
+                    captured_at=utc_now_iso(),
+                )
+                self._last_ax_duration_ms = int(time.time() * 1000 - ax_start_ms)
+
                 metadata = self._build_capture_metadata(
                     routed_task,
                     context_active_app=context_active_app,

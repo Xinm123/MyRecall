@@ -176,6 +176,9 @@ def make_accessibility_decision(
             adopted=False,
             reason=REASON_NON_FOCUSED_MONITOR,
             snapshot=None,
+            app_name=app_name,
+            window_name="",
+            duration_ms=0,
         )
 
     # Terminal app prefers OCR: not eligible, not adopted
@@ -185,6 +188,9 @@ def make_accessibility_decision(
             adopted=False,
             reason=REASON_APP_PREFERS_OCR,
             snapshot=None,
+            app_name=app_name,
+            window_name="",
+            duration_ms=0,
         )
 
     # Walk failed: eligible but not adopted
@@ -194,6 +200,9 @@ def make_accessibility_decision(
             adopted=False,
             reason=REASON_WALK_FAILED,
             snapshot=None,
+            app_name=app_name,
+            window_name="",
+            duration_ms=0,
         )
 
     # No snapshot: eligible but not adopted
@@ -203,6 +212,9 @@ def make_accessibility_decision(
             adopted=False,
             reason=REASON_NO_FOCUSED_WINDOW,
             snapshot=None,
+            app_name=app_name,
+            window_name="",
+            duration_ms=0,
         )
 
     # Empty text: eligible but not adopted, keep snapshot
@@ -212,6 +224,9 @@ def make_accessibility_decision(
             adopted=False,
             reason=REASON_EMPTY_TEXT,
             snapshot=snapshot,
+            app_name=app_name,
+            window_name=snapshot.window_name,
+            duration_ms=snapshot.duration_ms,
         )
 
     # Valid snapshot with text: adopted
@@ -220,4 +235,7 @@ def make_accessibility_decision(
         adopted=True,
         reason=REASON_ADOPTED_ACCESSIBILITY,
         snapshot=snapshot,
+        app_name=app_name,
+        window_name=snapshot.window_name,
+        duration_ms=snapshot.duration_ms,
     )

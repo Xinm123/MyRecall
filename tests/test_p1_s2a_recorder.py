@@ -314,7 +314,7 @@ def test_send_heartbeat_reports_permission_and_trigger_channel(monkeypatch):
     assert payload["capture_permission_status"] == "granted"
     assert payload["capture_permission_reason"] == "granted"
     assert payload["queue_depth"] == 1
-    assert payload["queue_capacity"] == 64
+    assert payload["queue_capacity"] == 1000
     assert payload["collapse_trigger_count"] == 0
     assert payload["overflow_drop_count"] == 0
 

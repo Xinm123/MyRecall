@@ -151,12 +151,18 @@ class AccessibilityDecision:
         adopted: Whether accessibility was adopted as canonical text
         reason: Vocabulary reason for the decision
         snapshot: The accessibility snapshot if one was produced
+        app_name: Application name at capture time
+        window_name: Window title at capture time
+        duration_ms: Duration of the accessibility decision in milliseconds
     """
 
     eligible: bool
     adopted: bool
     reason: str
     snapshot: Optional[TreeSnapshot] = None
+    app_name: str = ""
+    window_name: str = ""
+    duration_ms: int = 0
 
 
 @dataclass

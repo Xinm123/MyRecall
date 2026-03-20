@@ -24,6 +24,7 @@ from .types import (
     TEXT_SOURCE_ACCESSIBILITY,
     TEXT_SOURCE_OCR,
 )
+from .service import collect_for_capture
 
 __all__ = [
     # Types
@@ -43,4 +44,6 @@ __all__ = [
     # Text sources
     "TEXT_SOURCE_ACCESSIBILITY",
     "TEXT_SOURCE_OCR",
+    # Service
+    "collect_for_capture",
 ]
