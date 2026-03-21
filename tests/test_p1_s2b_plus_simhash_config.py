@@ -4,7 +4,7 @@ Unit tests for P1-S2b+ Simhash trigger-type configuration.
 This test module validates:
 - simhash_enabled_for_click configuration
 - simhash_enabled_for_app_switch configuration
-- min_capture_interval_ms default value (2000ms)
+- Three-layer debounce configuration (click, trigger, capture)
 - Simhash dedup logic respects trigger type configuration
 """
 
@@ -48,22 +48,40 @@ class TestSimhashTriggerConfig:
 
 
 class TestDebounceConfig:
-    """Tests for debounce interval configuration."""
+    """Tests for three-layer debounce configuration."""
 
-    def test_min_capture_interval_default_2000ms(self):
-        """min_capture_interval_ms should default to 2000ms."""
+    def test_debounce_defaults_3000ms(self):
+        """All debounce layers should default to 3000ms."""
         from openrecall.shared.config import Settings
 
         settings = Settings()
-        assert settings.min_capture_interval_ms == 2000
+        assert settings.click_debounce_ms == 3000
+        assert settings.trigger_debounce_ms == 3000
+        assert settings.capture_debounce_ms == 3000
 
-    def test_min_capture_interval_configurable(self, monkeypatch):
-        """min_capture_interval_ms should be configurable via env."""
-        monkeypatch.setenv("OPENRECALL_MIN_CAPTURE_INTERVAL_MS", "3000")
+    def test_click_debounce_configurable(self, monkeypatch):
+        """click_debounce_ms should be configurable via env."""
+        monkeypatch.setenv("OPENRECALL_CLICK_DEBOUNCE_MS", "1000")
         from openrecall.shared.config import Settings
 
         settings = Settings()
-        assert settings.min_capture_interval_ms == 3000
+        assert settings.click_debounce_ms == 1000
+
+    def test_trigger_debounce_configurable(self, monkeypatch):
+        """trigger_debounce_ms should be configurable via env."""
+        monkeypatch.setenv("OPENRECALL_TRIGGER_DEBOUNCE_MS", "2000")
+        from openrecall.shared.config import Settings
+
+        settings = Settings()
+        assert settings.trigger_debounce_ms == 2000
+
+    def test_capture_debounce_configurable(self, monkeypatch):
+        """capture_debounce_ms should be configurable via env."""
+        monkeypatch.setenv("OPENRECALL_CAPTURE_DEBOUNCE_MS", "5000")
+        from openrecall.shared.config import Settings
+
+        settings = Settings()
+        assert settings.capture_debounce_ms == 5000
 
 
 class TestSimhashTriggerTypeLogic:

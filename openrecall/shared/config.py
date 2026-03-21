@@ -42,11 +42,24 @@ class Settings(BaseSettings):
 
     debug: bool = Field(default=True, alias="OPENRECALL_DEBUG")
     capture_interval: int = Field(default=10, alias="OPENRECALL_CAPTURE_INTERVAL")
-    min_capture_interval_ms: int = Field(
+
+    # Three-layer debounce configuration (separate control for each layer)
+    click_debounce_ms: int = Field(
         default=3000,
-        alias="OPENRECALL_MIN_CAPTURE_INTERVAL_MS",
-        description="Minimum debounce interval for all capture triggers (ms)",
+        alias="OPENRECALL_CLICK_DEBOUNCE_MS",
+        description="Debounce interval for CLICK events (Layer 1: LockFreeDebouncer in CGEventTap thread)",
     )
+    trigger_debounce_ms: int = Field(
+        default=3000,
+        alias="OPENRECALL_TRIGGER_DEBOUNCE_MS",
+        description="Debounce interval for APP_SWITCH/IDLE/MANUAL events (Layer 2: TriggerDebouncer)",
+    )
+    capture_debounce_ms: int = Field(
+        default=3000,
+        alias="OPENRECALL_CAPTURE_DEBOUNCE_MS",
+        description="Global debounce in capture loop (Layer 3: prevents duplicate captures from concurrent triggers)",
+    )
+
     idle_capture_interval_ms: int = Field(
         default=60000,
         alias="OPENRECALL_IDLE_CAPTURE_INTERVAL_MS",
@@ -366,11 +379,16 @@ class Settings(BaseSettings):
         description="Enable PHash-based similarity detection to drop redundant frames",
     )
     simhash_dedup_threshold: int = Field(
-        default=8,
+        default=10,
         ge=0,
         le=64,
         alias="OPENRECALL_SIMHASH_DEDUP_THRESHOLD",
-        description="Maximum Hamming distance for PHash similarity (0-64 bits)",
+        description="Maximum Hamming distance for PHash similarity (0-64 bits). Default 10 aligns with screenpipe.",
+    )
+    simhash_ttl_seconds: float = Field(
+        default=60.0,
+        alias="OPENRECALL_SIMHASH_TTL_SECONDS",
+        description="TTL in seconds for simhash cache entries. After TTL, similar content is captured.",
     )
     simhash_cache_size_per_device: int = Field(
         default=1,

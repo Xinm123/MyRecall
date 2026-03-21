@@ -44,6 +44,10 @@ def _run_two_frame_capture(
 
     monkeypatch.setattr(settings, "simhash_dedup_enabled", True, raising=False)
     monkeypatch.setattr(settings, "simhash_dedup_threshold", 8, raising=False)
+    # Set low debounce to test phash dedup without interference
+    monkeypatch.setattr(settings, "click_debounce_ms", 0, raising=False)
+    monkeypatch.setattr(settings, "trigger_debounce_ms", 0, raising=False)
+    monkeypatch.setattr(settings, "capture_debounce_ms", 0, raising=False)
     # Note: simhash_enabled_for_click and simhash_enabled_for_app_switch
     # should be set by the caller before invoking this function
     monkeypatch.setattr(settings, "client_save_local_screenshots", False, raising=False)
@@ -116,7 +120,7 @@ def test_acceptance_4_1_similar_frames_are_skipped_and_logged(
 
     # First frame enqueued, second skipped due to similarity
     assert len(enqueued) == 1
-    assert "MRV3 similar_frame_skipped device_name=monitor_display-a" in caplog.text
+    assert "MRV3 phash_dropped device=monitor_display-a" in caplog.text
 
 
 @pytest.mark.unit
@@ -143,7 +147,11 @@ def test_acceptance_4_3_simhash_disabled_for_trigger(
     monkeypatch: pytest.MonkeyPatch,
     caplog: pytest.LogCaptureFixture,
 ) -> None:
-    """Test that frames are enqueued when simhash is disabled for the trigger type."""
+    """Test that frames are enqueued when simhash is disabled for the trigger type.
+
+    Note: Content exact dedup (Layer 1) still applies, so identical content frames
+    will still be deduplicated even when simhash (Layer 2) is disabled.
+    """
     # Disable simhash for CLICK
     monkeypatch.setattr(settings, "simhash_enabled_for_click", False, raising=False)
     monkeypatch.setattr(settings, "simhash_enabled_for_app_switch", True, raising=False)
@@ -154,8 +162,9 @@ def test_acceptance_4_3_simhash_disabled_for_trigger(
         trigger_type=CaptureTrigger.CLICK,
     )
 
-    # Both frames should be enqueued because simhash is disabled for CLICK
-    assert len(enqueued) == 2
+    # Only 1 frame because content exact dedup still applies
+    # (simhash disabled only skips visual similarity check, not content identity)
+    assert len(enqueued) == 1
 
 
 @pytest.mark.unit

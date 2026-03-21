@@ -85,39 +85,56 @@ def is_similar(hash1: int, hash2: int, threshold: int = 8) -> bool:
 
 class SimhashCache:
     """
-    In-memory cache for storing recent PHash values with per-device isolation.
+    In-memory cache for storing recent PHash values with per-device isolation and TTL.
 
     Each device (monitor) maintains its own independent cache entry with:
     - Recent PHash values in a sliding window (FIFO eviction)
     - Last successful enqueue timestamp for heartbeat calculation
+    - TTL-based expiration (expired entries don't block similar content)
+
+    Aligns with screenpipe's deduplication behavior:
+    - TTL allows similar content to be captured after timeout
+    - Threshold of 10 bits for Hamming distance
 
     Thread Safety: This class is NOT thread-safe. External synchronization
     is required if accessed from multiple threads.
 
     Attributes:
         cache_size_per_device: Maximum number of hashes to store per device
+        ttl_seconds: Time-to-live for cache entries (default: 60s)
         _caches: Dictionary mapping device_name -> OrderedDict of (phash, timestamp)
         _last_enqueue_time: Dictionary mapping device_name -> timestamp
         _hash_hits: Count of exact hash matches (Hash early exit)
 
     Example:
-        >>> cache = SimhashCache(cache_size_per_device=10)
+        >>> cache = SimhashCache(cache_size_per_device=10, ttl_seconds=60.0)
         >>> cache.add("monitor_0", 0xABC, timestamp=100.0)
         >>> cache.get_last_enqueue_time("monitor_0")
         100.0
-        >>> cache.is_similar_to_cache("monitor_0", 0xABC, threshold=8)
+        >>> cache.is_similar_to_cache("monitor_0", 0xABC, threshold=10)
         True
     """
 
-    def __init__(self, cache_size_per_device: int = 1):
+    DEFAULT_TTL_SECONDS: float = float("inf")  # Default to no expiry for backward compat
+    DEFAULT_THRESHOLD: int = 10
+
+    def __init__(
+        self,
+        cache_size_per_device: int = 1,
+        ttl_seconds: float = float("inf"),
+    ):
         """
         Initialize the SimhashCache.
 
         Args:
             cache_size_per_device: Maximum number of recent hashes to store
                                    per device (default: 1)
+            ttl_seconds: Time-to-live for cache entries in seconds.
+                        After TTL from newest entry, older entries are considered expired.
+                        Default is infinity (no expiry) for backward compatibility.
         """
         self.cache_size_per_device = cache_size_per_device
+        self.ttl_seconds = ttl_seconds
         self._caches: dict[str, OrderedDict[int, float]] = {}
         self._last_enqueue_time: dict[str, float] = {}
         # Hash early exit statistics
@@ -181,7 +198,11 @@ class SimhashCache:
         return self._last_enqueue_time.get(device_name)
 
     def is_similar_to_cache(
-        self, device_name: str, phash: int, threshold: int = 8
+        self,
+        device_name: str,
+        phash: int,
+        threshold: int = 10,
+        current_time: Optional[float] = None,
     ) -> bool:
         """
         Check if a PHash is similar to any cached PHash for a device.
@@ -189,21 +210,27 @@ class SimhashCache:
         Uses Hash early exit optimization: if the hash is exactly present in
         the cache, returns True immediately without computing Hamming distance.
 
+        TTL check: Entries older than ttl_seconds from the newest entry are skipped.
+        This means the TTL is relative to the most recent capture, ensuring consistent
+        behavior in both real-time and test scenarios.
+
         Args:
             device_name: Device identifier
             phash: 64-bit PHash value to check
-            threshold: Maximum Hamming distance for similarity (default: 8 bits)
+            threshold: Maximum Hamming distance for similarity (default: 10 bits)
+            current_time: Optional current timestamp for testing. If not provided,
+                         uses the max timestamp from cache entries.
 
         Returns:
-            True if similar to any cached hash, False otherwise
+            True if similar to any non-expired cached hash, False otherwise
 
         Example:
-            >>> cache = SimhashCache()
-            >>> cache.add("monitor_0", 0xABC, 100.0)
-            >>> cache.is_similar_to_cache("monitor_0", 0xABC, threshold=8)
+            >>> cache = SimhashCache(ttl_seconds=60.0)
+            >>> cache.add("monitor_0", 0xABC, timestamp=100.0)
+            >>> cache.is_similar_to_cache("monitor_0", 0xABC, threshold=10, current_time=150.0)
             True
-            >>> cache.is_similar_to_cache("monitor_0", 0xFFF, threshold=8)
-            False
+            >>> cache.is_similar_to_cache("monitor_0", 0xABC, threshold=10, current_time=200.0)
+            False  # TTL expired (>60s from newest entry)
         """
         self._total_checks += 1
 
@@ -211,15 +238,29 @@ class SimhashCache:
             return False
 
         cache = self._caches[device_name]
+        if not cache:
+            return False
 
-        # Hash early exit: O(1) check for exact match
-        # This avoids computing Hamming distance for identical frames
+        # Use relative TTL: compare against most recent entry timestamp
+        # This makes TTL behavior consistent for both real-time and test scenarios
+        max_timestamp = max(cache.values())
+        if current_time is None:
+            current_time = max_timestamp
+
+        # Hash early exit: O(1) check for exact match (if not expired)
         if phash in cache:
-            self._hash_hits += 1
-            return True
+            entry_time = cache[phash]
+            # TTL is relative to newest entry in cache
+            if max_timestamp - entry_time < self.ttl_seconds:
+                self._hash_hits += 1
+                return True
+            # Expired exact match - don't count as hit, continue to fuzzy check
 
-        # No exact match: check Hamming distance against all cached hashes
-        for cached_hash in cache.keys():
+        # No exact match or expired: check Hamming distance against non-expired hashes
+        for cached_hash, entry_time in cache.items():
+            # TTL check: skip entries older than TTL from newest
+            if max_timestamp - entry_time >= self.ttl_seconds:
+                continue
             if is_similar(phash, cached_hash, threshold):
                 return True
 

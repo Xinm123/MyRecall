@@ -233,10 +233,10 @@ def make_accessibility_decision(
 
 
 def compute_simhash(text: str) -> int:
-    """Compute a simhash for near-duplicate detection.
+    """Compute simhash using word-level 3-shingles.
 
-    This is a simple simhash implementation using character n-grams.
-    It produces a hash that can be used to detect near-duplicate text.
+    Aligns with screenpipe's TreeSnapshot::compute_simhash() which uses
+    word-level shingles for near-duplicate text detection.
 
     Args:
         text: The text to hash
@@ -247,29 +247,45 @@ def compute_simhash(text: str) -> int:
     if not text:
         return 0
 
-    # Use 3-character shingles
-    shingles = []
-    text = text.lower()
-    for i in range(len(text) - 2):
-        shingles.append(text[i : i + 3])
-
-    if not shingles:
+    # Split into words and use word-level 3-shingles
+    words = text.lower().split()
+    if not words:
         return 0
 
-    # Compute hash for each shingle
     import hashlib
 
     v = [0] * 64
-    for shingle in shingles:
+    shingle_size = min(3, len(words))
+
+    for i in range(len(words) - shingle_size + 1):
+        shingle = " ".join(words[i : i + shingle_size])
         h = int(hashlib.md5(shingle.encode()).hexdigest(), 16)
-        for i in range(64):
-            bit = (h >> i) & 1
-            v[i] += 1 if bit else -1
+        for j in range(64):
+            v[j] += 1 if (h >> j) & 1 else -1
 
-    # Compute final hash
     result = 0
-    for i in range(64):
-        if v[i] > 0:
-            result |= 1 << i
-
+    for j in range(64):
+        if v[j] > 0:
+            result |= 1 << j
     return result
+
+
+def compute_content_hash(text: str) -> int:
+    """Compute exact content hash for deduplication.
+
+    Used for Layer 1 (exact match) deduplication before simhash fuzzy matching.
+    Aligns with screenpipe's content_hash approach.
+
+    Args:
+        text: The text to hash
+
+    Returns:
+        A 64-bit hash value (truncated SHA-256)
+    """
+    if not text:
+        return 0
+
+    import hashlib
+
+    normalized = text.strip().lower()
+    return int(hashlib.sha256(normalized.encode()).hexdigest()[:16], 16)

@@ -16,7 +16,9 @@ def test_settings_expose_s2a_defaults_and_legacy_idle_mapping(monkeypatch):
 
     settings = Settings()
 
-    assert settings.min_capture_interval_ms == 3000  # Updated from 1000ms to 3000ms
+    assert settings.click_debounce_ms == 3000
+    assert settings.trigger_debounce_ms == 3000
+    assert settings.capture_debounce_ms == 3000
     assert settings.idle_capture_interval_ms == 17000
     assert settings.permission_poll_interval_sec == 10
     assert settings.trigger_queue_capacity == 1000  # Increased from 64 to align with screenpipe scale

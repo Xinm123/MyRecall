@@ -161,6 +161,7 @@ class FramesStore:
         last_known_app = metadata.get("last_known_app")
         last_known_window = metadata.get("last_known_window")
         simhash = metadata.get("simhash")
+        phash = metadata.get("phash")
         return (
             timestamp,
             app_name,
@@ -174,6 +175,7 @@ class FramesStore:
             last_known_app,
             last_known_window,
             simhash,
+            phash,
         )
 
     def claim_frame(
@@ -192,15 +194,19 @@ class FramesStore:
             last_known_app,
             last_known_window,
             simhash,
+            phash,
         ) = self._extract_metadata_fields(metadata)
-        # Convert unsigned 64-bit phash to signed for SQLite compatibility.
-        # SQLite INTEGER is signed 64-bit. PHash produces unsigned 64-bit values.
+        # Convert unsigned 64-bit hash values to signed for SQLite compatibility.
+        # SQLite INTEGER is signed 64-bit. Both simhash and phash produce unsigned 64-bit values.
         # We store as signed using two's complement representation (same bits).
         # This aligns with screenpipe's i64 storage approach.
         if simhash is not None and isinstance(simhash, int):
             # Convert values > 2^63-1 to their signed equivalents
             if simhash > 9223372036854775807:  # 2^63 - 1
                 simhash = simhash - 18446744073709551616  # 2^64
+        if phash is not None and isinstance(phash, int):
+            if phash > 9223372036854775807:  # 2^63 - 1
+                phash = phash - 18446744073709551616  # 2^64
 
         try:
             with self._connect() as conn:
@@ -209,8 +215,8 @@ class FramesStore:
                     INSERT OR IGNORE INTO frames
                         (capture_id, timestamp, app_name, window_name, browser_url,
                          focused, device_name, capture_trigger, event_ts, snapshot_path,
-                         image_size_bytes, status, last_known_app, last_known_window, simhash)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?)
+                         image_size_bytes, status, last_known_app, last_known_window, simhash, phash)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?)
                     """,
                     (
                         capture_id,
@@ -227,6 +233,7 @@ class FramesStore:
                         last_known_app,
                         last_known_window,
                         simhash,
+                        phash,
                     ),
                 )
                 conn.commit()

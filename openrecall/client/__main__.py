@@ -32,7 +32,7 @@ def main():
     )
     logger.info(f"Cache folder: {settings.cache_path}")
     logger.info(f"Server API: {settings.api_url}")
-    logger.info(f"Min capture interval: {settings.min_capture_interval_ms}ms")
+    logger.info(f"Debounce: click={settings.click_debounce_ms}ms, trigger={settings.trigger_debounce_ms}ms, capture={settings.capture_debounce_ms}ms")
     logger.info(f"Idle capture interval: {settings.idle_capture_interval_ms}ms")
     logger.info(f"Simhash dedup: click={settings.simhash_enabled_for_click}, app_switch={settings.simhash_enabled_for_app_switch}")
     logger.info(f"Trigger queue capacity: {settings.trigger_queue_capacity}")

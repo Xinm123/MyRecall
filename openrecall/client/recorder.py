@@ -257,11 +257,11 @@ class ScreenRecorder:
         )
         # Debouncer for IDLE and APP_SWITCH events (used in _emit_trigger)
         self._trigger_debouncer: TriggerDebouncer = TriggerDebouncer(
-            settings.min_capture_interval_ms
+            settings.trigger_debounce_ms
         )
         # Lock-free debouncer for CLICK events (used in CGEventTap callback)
         self._click_debouncer: LockFreeDebouncer = LockFreeDebouncer(
-            settings.min_capture_interval_ms
+            settings.click_debounce_ms
         )
         self._monitor_registry: MonitorRegistry = MonitorRegistry()
         self._permission_state_machine: PermissionStateMachine = (
@@ -275,10 +275,14 @@ class ScreenRecorder:
         self._event_tap: MacOSEventTap | None = None
         self._app_switch_monitor: MacOSAppSwitchMonitor | None = None
 
-        # PHash-based similarity detection (P1-S2b+)
-        self._simhash_cache: SimhashCache = SimhashCache(
-            cache_size_per_device=settings.simhash_cache_size_per_device
+        # PHash-based visual similarity detection (Layer 2)
+        # Note: Named _phash_cache (stores image perceptual hashes, not text simhash)
+        self._phash_cache: "SimhashCache" = SimhashCache(
+            cache_size_per_device=settings.simhash_cache_size_per_device,
+            ttl_seconds=settings.simhash_ttl_seconds,
         )
+        # Content exact dedup (Layer 1 before phash fuzzy dedup)
+        self._last_content_hash: dict[str, int] = {}  # device_name -> content_hash
 
         # MSS instance reuse for screenshot capture
         self._mss_instance: mss.mss | None = None
@@ -798,6 +802,13 @@ class ScreenRecorder:
         return routed
 
     def _route_trigger(self, event: TriggerEvent) -> list[RoutedCaptureTask]:
+        # Context reset on APP_SWITCH (aligns with screenpipe event_driven_capture.rs:381-386)
+        # This ensures first frame after app switch is always captured
+        if event.capture_trigger == CaptureTrigger.APP_SWITCH:
+            if event.device_name:
+                self._phash_cache.clear_device(event.device_name)
+            self._last_content_hash.pop(event.device_name or "", None)
+
         if not self._enabled_monitor_devices:
             return []
 
@@ -1089,6 +1100,27 @@ class ScreenRecorder:
                 continue
 
             routed_task = routed_tasks[0]
+
+            # Global debounce: skip if last capture completed too recently
+            # This prevents duplicate captures when multiple triggers fire
+            # in quick succession (e.g., CLICK + APP_SWITCH within same second)
+            # Aligns with screenpipe's event_driven_capture.rs debounce logic:
+            #   can_capture() checks last_capture.elapsed() >= min_capture_interval
+            #   mark_captured() updates last_capture AFTER capture completes
+            last_capture_end = self._last_successful_capture_time.get(
+                routed_task.target_device_name, 0.0
+            )
+            min_interval_sec = settings.capture_debounce_ms / 1000.0
+            if last_capture_end > 0 and time.time() - last_capture_end < min_interval_sec:
+                logger.debug(
+                    "Debounced trigger: device=%s trigger=%s (last_capture=%.2fs ago < %.2fs)",
+                    routed_task.target_device_name,
+                    routed_task.capture_trigger.value,
+                    time.time() - last_capture_end,
+                    min_interval_sec,
+                )
+                continue
+
             if not self._validate_routed_task(routed_task):
                 continue
 
@@ -1133,8 +1165,11 @@ class ScreenRecorder:
 
                 if settings.simhash_dedup_enabled:
                     # Determine if simhash should be checked based on trigger type
-                    # IDLE always skips simhash (ensures periodic frame capture)
-                    if routed_task.capture_trigger == CaptureTrigger.IDLE:
+                    # IDLE and MANUAL always skip simhash (ensures periodic/user-requested capture)
+                    if routed_task.capture_trigger in (
+                        CaptureTrigger.IDLE,
+                        CaptureTrigger.MANUAL,
+                    ):
                         should_check_simhash = False
                     elif force_capture:
                         # Safety valve: skip simhash to guarantee frame capture
@@ -1164,20 +1199,21 @@ class ScreenRecorder:
                             logger.info(f"DEBUG: phash computed = {phash_value}")
 
                             # Check similarity against cache
-                            is_similar_frame = self._simhash_cache.is_similar_to_cache(
+                            is_similar_frame = self._phash_cache.is_similar_to_cache(
                                 routed_task.target_device_name,
                                 phash_value,
                                 threshold=settings.simhash_dedup_threshold,
                             )
 
                             if is_similar_frame:
-                                # Drop the frame - similar to cached frame
+                                # Drop the frame - similar to cached frame (Layer 2: phash)
                                 should_drop_frame = True
                                 logger.info(
-                                    "MRV3 similar_frame_skipped device_name=%s hamming_distance_threshold=%d trigger_type=%s",
+                                    "MRV3 phash_dropped device=%s threshold=%d trigger=%s phash=%s",
                                     routed_task.target_device_name,
                                     settings.simhash_dedup_threshold,
                                     routed_task.capture_trigger.value,
+                                    phash_value,
                                 )
                         except Exception as e:
                             # On error, don't drop - continue with enqueue
@@ -1251,9 +1287,72 @@ class ScreenRecorder:
                 else:
                     metadata = base_metadata
 
-                # Add PHash to metadata if computed (may be overridden by accessibility simhash)
-                if phash_value is not None and "simhash" not in metadata:
-                    metadata["simhash"] = phash_value
+                # Layer 1: Content exact dedup (before simhash fuzzy dedup)
+                # Aligns with screenpipe's three-layer dedup architecture
+                content_hash_value = metadata.get("content_hash")
+                if isinstance(content_hash_value, int) and content_hash_value != 0:
+                    last_hash = self._last_content_hash.get(
+                        routed_task.target_device_name
+                    )
+                    last_capture_time = self._last_successful_capture_time.get(
+                        routed_task.target_device_name
+                    )
+
+                    # Check for exact content match (skip for IDLE/MANUAL triggers)
+                    if (
+                        last_hash is not None
+                        and content_hash_value == last_hash
+                        and routed_task.capture_trigger
+                        not in (CaptureTrigger.IDLE, CaptureTrigger.MANUAL)
+                        and last_capture_time is not None
+                        and (time.time() - last_capture_time) < 30.0
+                    ):
+                        # Exact content match - skip capture (Layer 1: content_hash)
+                        logger.info(
+                            "MRV3 content_dedup_dropped device=%s trigger=%s content_hash=%s",
+                            routed_task.target_device_name,
+                            routed_task.capture_trigger.value,
+                            content_hash_value,
+                        )
+                        # Clean up and continue to next task
+                        try:
+                            image.close()
+                            del screenshot
+                            del image
+                        except Exception:
+                            pass
+                        self._on_capture_completed(
+                            routed_task.target_device_name,
+                            now_epoch=time.time(),
+                        )
+                        self._last_capture_outcome = {
+                            "outcome": "content_dedup_dropped",
+                            "trigger": routed_task.capture_trigger.value,
+                            "target_device_name": routed_task.target_device_name,
+                            "reason": "exact_content_match",
+                            "routing_topology_epoch": routed_task.routing_topology_epoch,
+                            "event_ts": routed_task.event_ts,
+                            "timestamp": utc_now_iso(),
+                        }
+                        continue
+
+                    # Update last content hash for future dedup
+                    self._last_content_hash[routed_task.target_device_name] = (
+                        content_hash_value
+                    )
+                    logger.debug(
+                        "Content hash: device=%s current=%s last=%s match=%s trigger=%s",
+                        routed_task.target_device_name,
+                        content_hash_value,
+                        last_hash,
+                        content_hash_value == last_hash,
+                        routed_task.capture_trigger.value,
+                    )
+
+                # Add PHash to metadata if computed (separate from text simhash)
+                # simhash is set by accessibility path; phash is for visual similarity
+                if phash_value is not None:
+                    metadata["phash"] = phash_value
 
                 self._spool.enqueue(image, metadata)
 
@@ -1264,7 +1363,7 @@ class ScreenRecorder:
 
                 # Update SimhashCache after successful enqueue
                 if phash_value is not None:
-                    self._simhash_cache.add(
+                    self._phash_cache.add(
                         routed_task.target_device_name,
                         phash_value,
                         timestamp=time.time(),
