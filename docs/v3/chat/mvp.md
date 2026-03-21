@@ -966,6 +966,34 @@ The endpoint returns a typed union.
   - fallback to OCR-derived frame text and URLs
   - `text_source='ocr'`
 
+### Node Filtering (aligns with screenpipe)
+
+Nodes with empty `text` are filtered out. This matches screenpipe behavior:
+
+```rust
+// screenpipe: if !text.is_empty() { nodes.push(...) }
+```
+
+Only nodes with non-empty text content are included in the response.
+
+### URL Extraction (aligns with screenpipe)
+
+**Link-like node extraction:**
+
+- Matches roles containing "link" or "hyperlink" (case-insensitive)
+- Extracts URL only if node text starts with `http://` or `https://`
+
+**Full text extraction:**
+
+- Word-based scan for `http://` or `https://` prefixes
+- Length check: URL must be > 10 characters
+- Punctuation trimming: removes trailing `, ) ] > " '`
+
+**Deduplication:**
+
+- URLs are deduplicated while preserving order
+- Link node URLs are added first, then text URLs
+
 ### Node Shape
 
 MVP node entries should include:
@@ -974,6 +1002,31 @@ MVP node entries should include:
 - `text`
 - `depth`
 - `bounds` when available
+
+### Truncation Policy (aligns with screenpipe)
+
+The API returns complete data by default. Truncation is applied at the Chat/MCP layer, not the API layer.
+
+**Default limits for Chat/MCP consumption:**
+
+| Field | Default Limit | Behavior |
+|-------|---------------|----------|
+| `text` | 2000 chars | Truncate with `...` suffix |
+| `nodes` | 50 items | Include `nodes_truncated` count if exceeded |
+| `depth` indentation | 5 levels | Deeper nodes use max indent |
+
+**API query parameters (optional):**
+
+```
+GET /v1/frames/{id}/context?max_text=2000&max_nodes=50
+```
+
+**Rationale:**
+
+- API layer returns full data for flexibility (matches screenpipe behavior)
+- Chat/MCP layer applies truncation to protect LLM context window
+- Each frame context is ~1000-2000 tokens when sent to LLM
+- Agents should fetch no more than 2-3 frames per query
 
 ## Image Fetch
 
@@ -1002,6 +1055,8 @@ The MVP skill should align with screenpipe-search strategy while using the reduc
 - use image fetch only when necessary
 - treat activity summary as overview, not final evidence
 - use frame context as the main evidence layer
+- protect context window: use default truncation limits for frame context
+- fetch no more than 2-3 frames per query (each frame ~1000-2000 tokens)
 
 ### Default Tool Strategy
 

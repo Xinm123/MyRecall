@@ -1,5 +1,6 @@
 """v3 FramesStore: SQLite-backed store for the `frames` table."""
 
+import json
 import logging
 import os
 import sqlite3
@@ -1136,3 +1137,342 @@ class FramesStore:
         except sqlite3.Error as e:
             logger.error("get_frame_by_id failed frame_id=%d: %s", frame_id, e)
             return None
+
+    # ------------------------------------------------------------------
+    # Chat MVP Query Helpers (Phase 6)
+    # ------------------------------------------------------------------
+
+    # Text-like accessibility roles for recent_texts (MVP spec line 940)
+    TEXT_LIKE_ROLES = ("AXStaticText", "line", "paragraph")
+
+    def get_activity_summary_apps(
+        self,
+        start_time: str,
+        end_time: str,
+        app_name: Optional[str] = None,
+    ) -> list[dict]:
+        """Return apps with frame counts and approximate minutes.
+
+        Args:
+            start_time: ISO8601 start timestamp
+            end_time: ISO8601 end timestamp
+            app_name: Optional filter by app name
+
+        Returns:
+            List of dicts with name, frame_count, minutes (approximate)
+        """
+        apps = []
+        try:
+            with self._connect() as conn:
+                sql = """
+                    SELECT app_name AS name, COUNT(*) AS frame_count
+                    FROM frames
+                    WHERE status = 'completed'
+                      AND timestamp >= ?
+                      AND timestamp <= ?
+                """
+                params: list = [start_time, end_time]
+
+                if app_name:
+                    sql += " AND app_name = ?"
+                    params.append(app_name)
+
+                sql += " GROUP BY app_name ORDER BY frame_count DESC"
+
+                rows = conn.execute(sql, params).fetchall()
+
+                for row in rows:
+                    # minutes = frame_count * 2 / 60 (approximate)
+                    frame_count = row["frame_count"]
+                    minutes = frame_count * 2.0 / 60.0
+                    apps.append({
+                        "name": row["name"] or "Unknown",
+                        "frame_count": frame_count,
+                        "minutes": round(minutes, 2),
+                    })
+        except sqlite3.Error as e:
+            logger.error("get_activity_summary_apps failed: %s", e)
+        return apps
+
+    def get_activity_summary_recent_texts(
+        self,
+        start_time: str,
+        end_time: str,
+        app_name: Optional[str] = None,
+        limit: int = 10,
+    ) -> list[dict]:
+        """Return recent text-like elements from accessibility.
+
+        Only includes text-like accessibility roles (AXStaticText, line, paragraph)
+        per MVP spec line 940.
+
+        Args:
+            start_time: ISO8601 start timestamp
+            end_time: ISO8601 end timestamp
+            app_name: Optional filter by app name
+            limit: Maximum number of results (default 10)
+
+        Returns:
+            List of dicts with frame_id, text, app_name, timestamp, role
+        """
+        texts = []
+        try:
+            with self._connect() as conn:
+                sql = """
+                    SELECT e.frame_id, e.text, e.role, f.app_name, f.timestamp
+                    FROM elements e
+                    JOIN frames f ON e.frame_id = f.id
+                    WHERE e.source = 'accessibility'
+                      AND e.role IN (?, ?, ?)
+                      AND f.status = 'completed'
+                      AND f.timestamp >= ?
+                      AND f.timestamp <= ?
+                """
+                params: list = [
+                    self.TEXT_LIKE_ROLES[0],
+                    self.TEXT_LIKE_ROLES[1],
+                    self.TEXT_LIKE_ROLES[2],
+                    start_time,
+                    end_time,
+                ]
+
+                if app_name:
+                    sql += " AND f.app_name = ?"
+                    params.append(app_name)
+
+                sql += " ORDER BY f.timestamp DESC LIMIT ?"
+                params.append(limit)
+
+                rows = conn.execute(sql, params).fetchall()
+
+                for row in rows:
+                    texts.append({
+                        "frame_id": row["frame_id"],
+                        "text": row["text"] or "",
+                        "role": row["role"],
+                        "app_name": row["app_name"] or "",
+                        "timestamp": row["timestamp"],
+                    })
+        except sqlite3.Error as e:
+            logger.error("get_activity_summary_recent_texts failed: %s", e)
+        return texts
+
+    def get_activity_summary_total_frames(
+        self,
+        start_time: str,
+        end_time: str,
+        app_name: Optional[str] = None,
+    ) -> int:
+        """Return count of completed frames in time range.
+
+        Args:
+            start_time: ISO8601 start timestamp
+            end_time: ISO8601 end timestamp
+            app_name: Optional filter by app name
+
+        Returns:
+            Count of completed frames
+        """
+        try:
+            with self._connect() as conn:
+                sql = """
+                    SELECT COUNT(*) AS cnt
+                    FROM frames
+                    WHERE status = 'completed'
+                      AND timestamp >= ?
+                      AND timestamp <= ?
+                """
+                params: list = [start_time, end_time]
+
+                if app_name:
+                    sql += " AND app_name = ?"
+                    params.append(app_name)
+
+                row = conn.execute(sql, params).fetchone()
+                return row["cnt"] if row else 0
+        except sqlite3.Error as e:
+            logger.error("get_activity_summary_total_frames failed: %s", e)
+            return 0
+
+    def get_activity_summary_time_range(
+        self,
+        start_time: str,
+        end_time: str,
+        app_name: Optional[str] = None,
+    ) -> Optional[dict]:
+        """Return min/max timestamps of completed frames in time range.
+
+        Args:
+            start_time: ISO8601 start timestamp
+            end_time: ISO8601 end timestamp
+            app_name: Optional filter by app name
+
+        Returns:
+            Dict with start/end timestamps or None if no frames
+        """
+        try:
+            with self._connect() as conn:
+                sql = """
+                    SELECT MIN(timestamp) AS start, MAX(timestamp) AS end
+                    FROM frames
+                    WHERE status = 'completed'
+                      AND timestamp >= ?
+                      AND timestamp <= ?
+                """
+                params: list = [start_time, end_time]
+
+                if app_name:
+                    sql += " AND app_name = ?"
+                    params.append(app_name)
+
+                row = conn.execute(sql, params).fetchone()
+                if row and row["start"] and row["end"]:
+                    return {
+                        "start": row["start"],
+                        "end": row["end"],
+                    }
+                return None
+        except sqlite3.Error as e:
+            logger.error("get_activity_summary_time_range failed: %s", e)
+            return None
+
+    def get_frame_context(
+        self,
+        frame_id: int,
+        max_text_length: Optional[int] = None,
+        max_nodes: Optional[int] = None,
+    ) -> Optional[dict]:
+        """Return frame context for chat grounding.
+
+        Returns frame data including:
+        - frame_id, text, text_source
+        - nodes: parsed from accessibility_tree_json (text nodes only, aligns with screenpipe)
+        - urls: extracted from link-like nodes and text
+
+        Truncation (aligns with screenpipe MCP layer):
+        - By default, returns complete data (no truncation)
+        - When max_text_length is set, truncates text with "..." suffix
+        - When max_nodes is set, limits nodes and adds nodes_truncated count
+
+        Args:
+            frame_id: The frame ID
+            max_text_length: Optional max text length (default: None = no limit)
+            max_nodes: Optional max nodes count (default: None = no limit)
+
+        Returns:
+            Dict with frame context or None if not found
+        """
+        try:
+            with self._connect() as conn:
+                row = conn.execute(
+                    """
+                    SELECT id, text, text_source, accessibility_tree_json, browser_url, status
+                    FROM frames WHERE id = ?
+                    """,
+                    (frame_id,),
+                ).fetchone()
+
+                if row is None:
+                    return None
+
+                frame_id_val = row["id"]
+                text = row["text"] or ""
+                text_source = row["text_source"]
+                tree_json = row["accessibility_tree_json"]
+                browser_url = row["browser_url"]
+                status = row["status"]
+
+                raw_nodes: list[dict] = []
+                urls: list[str] = []
+                nodes_truncated: Optional[int] = None
+
+                # Parse accessibility tree if available
+                if tree_json:
+                    try:
+                        raw_nodes = json.loads(tree_json)
+                    except (json.JSONDecodeError, TypeError):
+                        raw_nodes = []
+
+                # Filter nodes: only include nodes with non-empty text (aligns with screenpipe)
+                # screenpipe: `if !text.is_empty() { nodes.push(...) }`
+                nodes = []
+                for node in raw_nodes:
+                    node_text = node.get("text", "")
+                    if node_text:  # Skip empty-text nodes
+                        nodes.append(node)
+
+                # Extract URLs from link-like nodes (aligns with screenpipe)
+                # screenpipe: `role_lower.contains("link") || role_lower.contains("hyperlink")`
+                for node in nodes:
+                    role = (node.get("role") or "").lower()
+                    if "link" in role or "hyperlink" in role:
+                        node_text = node.get("text", "")
+                        # screenpipe: extract URL if text starts with http/https
+                        for url in self._extract_urls_from_link_text(node_text):
+                            if url not in urls:
+                                urls.append(url)
+
+                # Extract URLs from full text using regex (aligns with screenpipe)
+                # screenpipe: word-based scan with length > 10 check and punctuation trimming
+                for url in self._extract_urls_from_text(text):
+                    if url not in urls:
+                        urls.append(url)
+
+                # Apply truncation (screenpipe-aligned defaults: text=2000, nodes=50)
+                result_text = text
+                if max_text_length is not None and len(result_text) > max_text_length:
+                    result_text = result_text[:max_text_length] + "..."
+
+                result_nodes = nodes
+                if max_nodes is not None and len(nodes) > max_nodes:
+                    nodes_truncated = len(nodes) - max_nodes
+                    result_nodes = nodes[:max_nodes]
+
+                result = {
+                    "frame_id": frame_id_val,
+                    "text": result_text,
+                    "text_source": text_source,
+                    "nodes": result_nodes,
+                    "urls": urls,
+                    "browser_url": browser_url,
+                    "status": status,
+                }
+
+                if nodes_truncated is not None:
+                    result["nodes_truncated"] = nodes_truncated
+
+                return result
+
+        except sqlite3.Error as e:
+            logger.error("get_frame_context failed frame_id=%d: %s", frame_id, e)
+            return None
+
+    def _extract_urls_from_link_text(self, text: str) -> list[str]:
+        """Extract URLs from link node text (screenpipe-aligned).
+
+        screenpipe behavior: extract URL only if the trimmed text starts with http/https.
+        Takes just the URL part (stops at whitespace).
+        """
+        trimmed = text.strip()
+        if trimmed.startswith("http://") or trimmed.startswith("https://"):
+            # Take just the URL part (stop at whitespace)
+            url = trimmed.split()[0] if trimmed.split() else trimmed
+            return [url]
+        return []
+
+    def _extract_urls_from_text(self, text: str) -> list[str]:
+        """Extract URLs from text using regex (screenpipe-aligned).
+
+        screenpipe behavior:
+        - Split by whitespace
+        - Trim punctuation: , ) ] > " '
+        - Must start with http:// or https://
+        - Length must be > 10
+        """
+        urls = []
+        for word in text.split():
+            # Trim punctuation (screenpipe: `, ) ] > " '`)
+            trimmed = word.strip(',)]>"\'')
+            if (trimmed.startswith("http://") or trimmed.startswith("https://")) and len(trimmed) > 10:
+                urls.append(trimmed)
+        return urls
