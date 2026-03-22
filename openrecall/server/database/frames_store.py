@@ -1142,8 +1142,15 @@ class FramesStore:
     # Chat MVP Query Helpers (Phase 6)
     # ------------------------------------------------------------------
 
-    # Text-like accessibility roles for recent_texts (MVP spec line 940)
-    TEXT_LIKE_ROLES = ("AXStaticText", "line", "paragraph")
+    # Text-like roles for recent_texts query.
+    # Note: In MVP, only AXStaticText exists in accessibility elements.
+    # 'line' and 'paragraph' are OCR hierarchy roles (source='ocr') that don't exist
+    # in MVP accessibility data. They are kept for screenpipe query compatibility
+    # and future OCR elements support.
+    # MVP: Only AXStaticText exists in accessibility elements.
+    # 'line' and 'paragraph' are OCR hierarchy roles that don't exist
+    # when source='accessibility'. Kept minimal for clarity.
+    TEXT_LIKE_ROLES = ("AXStaticText",)
 
     def get_activity_summary_apps(
         self,
@@ -1203,8 +1210,11 @@ class FramesStore:
     ) -> list[dict]:
         """Return recent text-like elements from accessibility.
 
-        Only includes text-like accessibility roles (AXStaticText, line, paragraph)
-        per MVP spec line 940.
+        Only AXStaticText is matched in MVP because 'line' and 'paragraph'
+        are OCR hierarchy roles that don't exist in accessibility elements.
+
+        Uses ROW_NUMBER() OVER (PARTITION BY text) to dedupe identical text
+        while preserving frame_id and role from the most recent occurrence.
 
         Args:
             start_time: ISO8601 start timestamp
@@ -1218,20 +1228,28 @@ class FramesStore:
         texts = []
         try:
             with self._connect() as conn:
+                # Use window function to dedupe by text while keeping
+                # frame_id and role from the most recent occurrence
                 sql = """
-                    SELECT e.frame_id, e.text, e.role, f.app_name, f.timestamp
-                    FROM elements e
-                    JOIN frames f ON e.frame_id = f.id
-                    WHERE e.source = 'accessibility'
-                      AND e.role IN (?, ?, ?)
-                      AND f.status = 'completed'
-                      AND f.timestamp >= ?
-                      AND f.timestamp <= ?
+                    SELECT frame_id, text, role, app_name, timestamp
+                    FROM (
+                        SELECT
+                            e.frame_id,
+                            e.text,
+                            e.role,
+                            f.app_name,
+                            f.timestamp,
+                            ROW_NUMBER() OVER (PARTITION BY e.text ORDER BY f.timestamp DESC) as rn
+                        FROM elements e
+                        JOIN frames f ON e.frame_id = f.id
+                        WHERE e.source = 'accessibility'
+                          AND e.role = ?
+                          AND f.status = 'completed'
+                          AND f.timestamp >= ?
+                          AND f.timestamp <= ?
                 """
                 params: list = [
                     self.TEXT_LIKE_ROLES[0],
-                    self.TEXT_LIKE_ROLES[1],
-                    self.TEXT_LIKE_ROLES[2],
                     start_time,
                     end_time,
                 ]
@@ -1240,7 +1258,11 @@ class FramesStore:
                     sql += " AND f.app_name = ?"
                     params.append(app_name)
 
-                sql += " ORDER BY f.timestamp DESC LIMIT ?"
+                sql += """
+                    )
+                    WHERE rn = 1
+                    ORDER BY timestamp DESC LIMIT ?
+                """
                 params.append(limit)
 
                 rows = conn.execute(sql, params).fetchall()

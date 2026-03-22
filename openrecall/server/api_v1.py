@@ -936,3 +936,75 @@ def search_keyword_404_guard():
         "NOT_FOUND",
         404,
     )
+
+
+# ---------------------------------------------------------------------------
+# GET /v1/activity-summary
+# ---------------------------------------------------------------------------
+
+
+@v1_bp.route("/activity-summary", methods=["GET"])
+def activity_summary():
+    """Return activity overview for chat agents.
+
+    Query Parameters:
+        start_time (str): Required. ISO8601 start timestamp.
+        end_time (str): Required. ISO8601 end timestamp.
+        app_name (str): Optional. Filter by app name.
+
+    Returns:
+        JSON with apps, recent_texts, audio_summary, total_frames, time_range.
+    """
+    request_id = str(uuid.uuid4())
+
+    # Parse required parameters
+    start_time = request.args.get("start_time", "").strip()
+    end_time = request.args.get("end_time", "").strip()
+
+    if not start_time or not end_time:
+        return make_error_response(
+            "start_time and end_time are required",
+            "INVALID_PARAMS",
+            400,
+            request_id=request_id,
+        )
+
+    # Parse optional parameters
+    app_name = request.args.get("app_name")
+    if app_name:
+        app_name = app_name.strip()
+        if not app_name:
+            app_name = None
+
+    # Get store instance
+    store = _get_frames_store()
+
+    # Call store methods
+    apps = store.get_activity_summary_apps(
+        start_time=start_time,
+        end_time=end_time,
+        app_name=app_name,
+    )
+    recent_texts = store.get_activity_summary_recent_texts(
+        start_time=start_time,
+        end_time=end_time,
+        app_name=app_name,
+    )
+    total_frames = store.get_activity_summary_total_frames(
+        start_time=start_time,
+        end_time=end_time,
+        app_name=app_name,
+    )
+    time_range = store.get_activity_summary_time_range(
+        start_time=start_time,
+        end_time=end_time,
+        app_name=app_name,
+    )
+
+    return jsonify({
+        "apps": apps,
+        "recent_texts": recent_texts,
+        "audio_summary": {"segment_count": 0, "speakers": []},
+        "total_frames": total_frames,
+        "time_range": time_range,
+    })

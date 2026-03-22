@@ -206,12 +206,15 @@ class TestActivitySummaryRecentTexts:
     def test_activity_summary_recent_texts_uses_text_like_roles(
         self, store: FramesStore
     ):
-        """recent_texts should only include AXStaticText, line, paragraph roles."""
+        """recent_texts should only include AXStaticText role.
+
+        Note: 'line' and 'paragraph' are OCR hierarchy roles that don't exist
+        in accessibility elements (source='accessibility'). MVP only writes
+        accessibility elements, so only AXStaticText is relevant.
+        """
         elements = [
             {"role": "AXStaticText", "text": "Static text content", "depth": 0},
             {"role": "AXButton", "text": "Button text", "depth": 0},  # Not text-like
-            {"role": "line", "text": "Line content", "depth": 0},
-            {"role": "paragraph", "text": "Paragraph content", "depth": 0},
             {"role": "AXLink", "text": "Link text", "depth": 0},  # Not text-like
         ]
         _create_completed_frame_with_accessibility(
@@ -223,10 +226,9 @@ class TestActivitySummaryRecentTexts:
             end_time="2026-03-20T11:00:00Z",
         )
 
-        # Should only have 3 entries (AXStaticText, line, paragraph)
-        assert len(texts) == 3
-        roles = {t["role"] for t in texts}
-        assert roles == {"AXStaticText", "line", "paragraph"}
+        # Should only have 1 entry (AXStaticText only)
+        assert len(texts) == 1
+        assert texts[0]["role"] == "AXStaticText"
 
     def test_activity_summary_recent_texts_joins_frames(
         self, store: FramesStore
@@ -254,16 +256,18 @@ class TestActivitySummaryRecentTexts:
         self, store: FramesStore
     ):
         """recent_texts should be ordered by frame timestamp descending."""
-        elements = [{"role": "AXStaticText", "text": "Text", "depth": 0}]
-
+        # Each frame has different text to test ordering with deduplication
         _create_completed_frame_with_accessibility(
-            store, "cap-1", "2026-03-20T10:00:00Z", "Safari", "First", elements
+            store, "cap-1", "2026-03-20T10:00:00Z", "Safari", "First",
+            [{"role": "AXStaticText", "text": "First text", "depth": 0}]
         )
         _create_completed_frame_with_accessibility(
-            store, "cap-2", "2026-03-20T10:30:00Z", "Safari", "Second", elements
+            store, "cap-2", "2026-03-20T10:30:00Z", "Safari", "Second",
+            [{"role": "AXStaticText", "text": "Second text", "depth": 0}]
         )
         _create_completed_frame_with_accessibility(
-            store, "cap-3", "2026-03-20T10:15:00Z", "Safari", "Middle", elements
+            store, "cap-3", "2026-03-20T10:15:00Z", "Safari", "Middle",
+            [{"role": "AXStaticText", "text": "Middle text", "depth": 0}]
         )
 
         texts = store.get_activity_summary_recent_texts(
@@ -281,11 +285,11 @@ class TestActivitySummaryRecentTexts:
         self, store: FramesStore
     ):
         """recent_texts should respect the limit parameter."""
-        elements = [{"role": "AXStaticText", "text": "Text", "depth": 0}]
-
+        # Each frame has different text to test limit with deduplication
         for i in range(20):
             _create_completed_frame_with_accessibility(
-                store, f"cap-{i}", f"2026-03-20T10:{i:02d}:00Z", "Safari", f"Text {i}", elements
+                store, f"cap-{i}", f"2026-03-20T10:{i:02d}:00Z", "Safari", f"Window {i}",
+                [{"role": "AXStaticText", "text": f"Unique text {i}", "depth": 0}]
             )
 
         texts = store.get_activity_summary_recent_texts(
@@ -295,6 +299,34 @@ class TestActivitySummaryRecentTexts:
         )
 
         assert len(texts) == 5
+
+    def test_activity_summary_recent_texts_dedupes_by_text(
+        self, store: FramesStore
+    ):
+        """recent_texts should dedupe identical text, keeping most recent frame."""
+        # Same text appears in multiple frames
+        elements = [{"role": "AXStaticText", "text": "Duplicate text", "depth": 0}]
+
+        _create_completed_frame_with_accessibility(
+            store, "cap-1", "2026-03-20T10:00:00Z", "Safari", "First", elements
+        )
+        _create_completed_frame_with_accessibility(
+            store, "cap-2", "2026-03-20T10:30:00Z", "Safari", "Second", elements
+        )
+        _create_completed_frame_with_accessibility(
+            store, "cap-3", "2026-03-20T10:15:00Z", "Mail", "Third", elements
+        )
+
+        texts = store.get_activity_summary_recent_texts(
+            start_time="2026-03-20T09:00:00Z",
+            end_time="2026-03-20T11:00:00Z",
+        )
+
+        # Only one entry for "Duplicate text" - the most recent one
+        assert len(texts) == 1
+        assert texts[0]["text"] == "Duplicate text"
+        assert texts[0]["timestamp"] == "2026-03-20T10:30:00Z"  # Most recent
+        assert texts[0]["app_name"] == "Safari"
 
     def test_activity_summary_recent_texts_filters_by_app_name(
         self, store: FramesStore

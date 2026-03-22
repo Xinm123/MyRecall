@@ -937,7 +937,8 @@ The endpoint returns a typed union.
 - `apps.minutes` is an approximate value derived from frame density and is not a precise active-time metric
 - `recent_texts` aligns with current screenpipe behavior
 - `recent_texts` comes from `elements(source='accessibility')`
-- `recent_texts` only includes text-like accessibility roles in MVP: `AXStaticText`, `line`, `paragraph`
+- `recent_texts` only includes `AXStaticText` role from accessibility elements
+  - Note: `line` and `paragraph` are OCR hierarchy roles that only exist when `source='ocr'`. Since MVP only writes `source='accessibility'` elements, these roles never appear in MVP queries. They are reserved for future OCR elements support.
 - `recent_texts` returns recent text-like accessibility nodes, sorted by frame timestamp descending
 - `audio_summary` is preserved as a shape-compatible empty shell in vision-only MVP
 
