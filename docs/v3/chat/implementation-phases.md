@@ -73,7 +73,7 @@ This path establishes:
 - accessibility-complete ingest behavior
 - durable accessibility-backed search and summary inputs
 
-Phases after this path should be treated as consumers of that stabilized foundation.
+Phases 7-10 are consumers of that stabilized foundation.
 
 ## Phase 0: Freeze Contracts
 
@@ -343,68 +343,103 @@ Chat APIs should consume a stable query interface rather than directly querying 
 - `get_activity_summary_recent_texts` returns text from `elements` table
 - `get_frame_context` returns parsed nodes from `accessibility_tree_json`
 
-## Phase 7: Upgrade OCR Worker Semantics
+## Phase 7: Upgrade /v1/search To Content-Type Aware
 
 ### Objective
 
-Align OCR completion behavior with the new accessibility path.
+Upgrade the search endpoint to support OCR, accessibility, and merged search modes.
 
 ### Depends on
 
-- Phase 1
-- Phase 5
+- Phase 5 (accessibility-canonical frames with text_source)
 
 ### Includes
 
-- canonical OCR completion only for frames with no canonical `text_source`
-- auxiliary OCR persistence for accessibility-canonical frames
-- no canonical overwrite of accessibility-complete frames
+- `GET /v1/search` with `content_type = ocr | accessibility | all`
+- Split SearchEngine into content-type-specific paths
+- Typed union response entries
+- `all` search ordering and non-duplication semantics
 
-### Why This Is Later
+### Why This Phase
 
-The OCR worker should be updated only after the accessibility-complete path exists, otherwise the final source-of-truth rules stay ambiguous.
+Search is the primary chat tool and should be delivered first. The current OCR-only search is insufficient for accessibility-canonical frames.
 
 ### Exit Criteria
 
-- OCR-only frames become canonical OCR frames
-- accessibility-canonical frames can keep auxiliary OCR without changing search visibility
+- `content_type=ocr` returns only OCR frames
+- `content_type=accessibility` returns only accessibility frames
+- `content_type=all` merges both without duplication
+- Ordering follows mvp.md specification
 
 ### Observable Milestone
 
-- logs and persisted rows show a clean distinction between canonical OCR completion and auxiliary OCR persistence
+- `/v1/search?content_type=all&q=hello` returns mixed results with correct pagination
 
-## Phase 8: Expose Chat Tool APIs
+## Phase 8: Add /v1/activity-summary
 
 ### Objective
 
-Expose the reduced tool surface only after the data plane is stable.
+Provide activity overview for chat agents.
 
 ### Depends on
 
-- Phase 6
-- Phase 7
+- Phase 6 (query helpers for activity summary)
+- Phase 7 (search endpoint pattern established)
 
 ### Includes
 
-- `/v1/search` with `ocr | accessibility | all`
-- `/v1/activity-summary`
-- `/v1/frames/{id}/context`
-- `/v1/frames/{id}`
+- `GET /v1/activity-summary`
+- Apps aggregation from completed frames
+- Recent texts from accessibility elements
+- Audio summary as empty shell
 
-### Why This Comes Late
+### Why This Phase
 
-These APIs are consumers of the new model. They should not be used as the primary way to discover data-plane defects.
+Activity summary gives chat agents a broad overview before targeted search. It depends on elements table population from Phase 6.
 
 ### Exit Criteria
 
-- search, summary, and frame-context outputs reflect the new canonical frame model
-- `all` search ordering and non-duplication semantics are stable
+- Returns apps with frame counts and approximate minutes
+- Returns recent_texts from accessibility elements
+- Returns audio_summary as shape-compatible empty shell
 
 ### Observable Milestone
 
-- `/v1/search`, `/v1/activity-summary`, and `/v1/frames/{id}/context` can be exercised against the new data plane without requiring additional schema or worker changes
+- `/v1/activity-summary?start_time=...&end_time=...` returns valid payload matching mvp.md contract
 
-## Phase 9: Validate Accessibility Coverage And Performance
+## Phase 9: Add /v1/frames/{id}/context
+
+### Objective
+
+Provide detailed frame context for chat grounding.
+
+### Depends on
+
+- Phase 5 (accessibility_tree_json persistence)
+- Phase 6 (get_frame_context query helper)
+
+### Includes
+
+- `GET /v1/frames/{id}/context`
+- Node parsing from accessibility_tree_json
+- URL extraction from link-like nodes and text
+- OCR fallback when accessibility unavailable
+
+### Why This Phase
+
+Frame context is the main evidence layer for chat answers. It should come after search and summary are available.
+
+### Exit Criteria
+
+- Returns text, nodes, urls, text_source for accessibility frames
+- Falls back to OCR data when accessibility unavailable
+- Node filtering and URL extraction match screenpipe behavior
+
+### Observable Milestone
+
+- `/v1/frames/123/context` returns parsed accessibility nodes with extracted URLs
+
+## Phase 10: Validate Accessibility Coverage And Performance
 
 ### Objective
 
@@ -417,6 +452,7 @@ Decide whether the Python accessibility implementation is sufficient for MVP.
 - Phase 6
 - Phase 7
 - Phase 8
+- Phase 9
 
 ### Includes
 
@@ -448,16 +484,17 @@ Only after this phase should the project decide whether to:
 ## Recommended Sequence Summary
 
 ```text
-Phase 0  Freeze contracts
-Phase 1  Reset schema
-Phase 2  Add accessibility types/policy/debug contracts
-Phase 3  Insert accessibility decision stage into capture flow
-Phase 4  Implement bounded focused-window walker
-Phase 5  Promote accessibility-complete ingest path
-Phase 6  Persist accessibility into queryable planes
-Phase 7  Upgrade OCR worker semantics
-Phase 8  Expose chat tool APIs
-Phase 9  Validate coverage and performance
+Phase 0   Freeze contracts
+Phase 1   Reset schema
+Phase 2   Add accessibility types/policy/debug contracts
+Phase 3   Insert accessibility decision stage into capture flow
+Phase 4   Implement bounded focused-window walker
+Phase 5   Promote accessibility-complete ingest path
+Phase 6   Persist accessibility into queryable planes
+Phase 7   Upgrade /v1/search to content-type aware
+Phase 8   Add /v1/activity-summary
+Phase 9   Add /v1/frames/{id}/context
+Phase 10  Validate coverage and performance
 ```
 
 ## Notes

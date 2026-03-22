@@ -67,7 +67,7 @@ class TestResponseSchemaSuccess:
     """Success response structure validation."""
 
     def test_response_type_is_ocr(self, app_with_search_route, mock_search_engine):
-        """Response type field is 'OCR'."""
+        """Each data item has type field 'OCR' for OCR results."""
         with patch(
             "openrecall.server.api_v1._get_search_engine",
             return_value=mock_search_engine,
@@ -76,7 +76,9 @@ class TestResponseSchemaSuccess:
             response = client.get("/v1/search?q=hello")
             data = json.loads(response.data)
 
-            assert data.get("type") == "OCR"
+            # Each item in data should have type "OCR" (OCR-canonical frames)
+            for item in data.get("data", []):
+                assert item.get("type") == "OCR"
 
     def test_response_has_data_array(self, app_with_search_route, mock_search_engine):
         """Response has data field as array."""
@@ -326,20 +328,6 @@ class TestEmptyResultStructure:
             assert data["data"] == []
             assert isinstance(data["data"], list)
 
-    def test_empty_results_has_type(
-        self, app_with_search_route, mock_empty_search_engine
-    ):
-        """Empty results response still has type field."""
-        with patch(
-            "openrecall.server.api_v1._get_search_engine",
-            return_value=mock_empty_search_engine,
-        ):
-            client = app_with_search_route.test_client()
-            response = client.get("/v1/search?q=nonexistent")
-            data = json.loads(response.data)
-
-            assert data.get("type") == "OCR"
-
     def test_empty_results_has_pagination(
         self, app_with_search_route, mock_empty_search_engine
     ):
@@ -382,13 +370,11 @@ class TestEmptyResultStructure:
             response = client.get("/v1/search?q=nonexistent")
             data = json.loads(response.data)
 
-            # Top-level structure
-            assert "type" in data
+            # Top-level structure (per mvp.md - no top-level type field)
             assert "data" in data
             assert "pagination" in data
 
             # Values
-            assert data["type"] == "OCR"
             assert data["data"] == []
             assert data["pagination"]["total"] == 0
 

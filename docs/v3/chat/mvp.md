@@ -1148,6 +1148,7 @@ The following items are explicitly deferred beyond MVP:
 - richer browser URL support across browsers
 - multi-skill architecture
 - broader parity work
+- auxiliary OCR persistence for accessibility-canonical frames
 
 ## Success Criteria
 

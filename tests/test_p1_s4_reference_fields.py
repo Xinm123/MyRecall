@@ -83,8 +83,27 @@ def temp_db_with_frames():
                 text, app_name, window_name, frame_id UNINDEXED, tokenize='unicode61'
             );
 
+            -- Accessibility table for content_type=accessibility search
+            CREATE TABLE IF NOT EXISTS accessibility (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                frame_id INTEGER NOT NULL,
+                timestamp TEXT NOT NULL,
+                app_name TEXT NOT NULL,
+                window_name TEXT NOT NULL,
+                browser_url TEXT,
+                text_content TEXT NOT NULL,
+                text_length INTEGER DEFAULT 0,
+                FOREIGN KEY (frame_id) REFERENCES frames(id) ON DELETE CASCADE
+            );
+
+            CREATE VIRTUAL TABLE IF NOT EXISTS accessibility_fts USING fts5(
+                text_content, app_name, window_name, browser_url,
+                content='accessibility', content_rowid='id', tokenize='unicode61'
+            );
+
             CREATE INDEX IF NOT EXISTS idx_frames_timestamp ON frames(timestamp);
             CREATE INDEX IF NOT EXISTS idx_ocr_text_frame_id ON ocr_text(frame_id);
+            CREATE INDEX IF NOT EXISTS idx_accessibility_frame_id ON accessibility(frame_id);
 
             -- FTS triggers
             CREATE TRIGGER IF NOT EXISTS frames_ai AFTER INSERT ON frames BEGIN

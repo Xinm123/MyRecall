@@ -120,14 +120,17 @@ class TestSearchAPIBasic:
 class TestSearchAPIResponseSchema:
     """Response schema tests."""
 
-    def test_response_has_type_field(self, app_with_search_route, mock_search_engine):
-        """Response has type field set to OCR."""
+    def test_data_items_have_type_field(self, app_with_search_route, mock_search_engine):
+        """Each data item has type field set to 'OCR' for OCR-canonical frames."""
         with patch("openrecall.server.api_v1._get_search_engine", return_value=mock_search_engine):
             client = app_with_search_route.test_client()
             response = client.get("/v1/search?q=hello")
             data = json.loads(response.data)
 
-            assert data.get("type") == "OCR"
+            # Each item in data should have a type field (per mvp.md format)
+            for item in data.get("data", []):
+                assert "type" in item
+                assert item.get("type") == "OCR"
 
     def test_data_is_array(self, app_with_search_route, mock_search_engine):
         """Data field is an array."""

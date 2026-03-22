@@ -766,23 +766,29 @@ def search():
 
     Query Parameters:
         q: Text query (sanitized via sanitize_fts5_query)
+        content_type: "ocr", "accessibility", or "all" (default: "all")
         limit: Max results (default 20, max 100)
         offset: Pagination offset (default 0)
         start_time: ISO8601 UTC start timestamp
         end_time: ISO8601 UTC end timestamp
         app_name: Filter by app name (exact match via FTS)
         window_name: Filter by window name (exact match via FTS)
+        browser_url: Filter by browser URL
         focused: Filter by focused state (true/false)
-        min_length: Minimum OCR text length
-        max_length: Maximum OCR text length
-        browser_url: Accepted but no-op in P1
-        include_frames: Accepted, always null in P1
+        min_length: Minimum text length
+        max_length: Maximum text length
 
     Returns:
-        JSON response with search results matching spec.md §4.5.
+        JSON response with search results matching mvp.md Search Contract.
+        Returns typed union entries: {"type": "OCR", ...} or {"type": "Accessibility", ...}
     """
     # Parse query parameters
     q = request.args.get("q", "").strip()
+
+    # Parse content_type (default: "all")
+    content_type = request.args.get("content_type", "all").strip().lower()
+    if content_type not in ("ocr", "accessibility", "all"):
+        content_type = "all"
 
     # Parse limit (default 20, max 100)
     try:
@@ -816,6 +822,11 @@ def search():
     if window_name:
         window_name = window_name.strip() or None
 
+    # Parse browser_url filter
+    browser_url = request.args.get("browser_url")
+    if browser_url:
+        browser_url = browser_url.strip() or None
+
     # Parse focused
     focused_str = request.args.get("focused")
     focused = None
@@ -838,9 +849,6 @@ def search():
     except (ValueError, TypeError):
         pass
 
-    # browser_url is accepted but no-op in P1
-    # include_frames is accepted but always null in P1
-
     # Execute search
     engine = _get_search_engine()
     results, total = engine.search(
@@ -851,29 +859,40 @@ def search():
         end_time=end_time,
         app_name=app_name,
         window_name=window_name,
+        browser_url=browser_url,
         focused=focused,
         min_length=min_length,
         max_length=max_length,
+        content_type=content_type,
     )
 
-    # Build response per spec.md §4.5
+    # Build response per mvp.md Search Contract
+    # Returns typed union entries based on text_source
     data_items = []
     for r in results:
+        # Determine type based on text_source
+        text_source = r.get("text_source")
+        if text_source == "accessibility":
+            entry_type = "Accessibility"
+        else:
+            # Default to OCR for both "ocr" and null text_source
+            entry_type = "OCR"
+
         item = {
-            "type": "OCR",
+            "type": entry_type,
             "content": {
                 "frame_id": r["frame_id"],
                 "text": r.get("text", ""),
-                "text_source": r.get("text_source"),
+                "text_source": text_source,
                 "timestamp": r.get("timestamp"),
                 "file_path": r.get("file_path", ""),
                 "frame_url": r.get("frame_url", ""),
                 "app_name": r.get("app_name"),
                 "window_name": r.get("window_name"),
-                "browser_url": None,  # Reserved, always null in P1
+                "browser_url": r.get("browser_url"),
                 "focused": r.get("focused"),
                 "device_name": r.get("device_name", "monitor_0"),
-                "tags": [],  # Reserved, always empty in P1
+                "tags": [],  # Reserved, always empty in MVP
                 "fts_rank": r.get("fts_rank"),  # BM25 rank (null when no text query)
             },
         }
@@ -881,7 +900,6 @@ def search():
 
     return jsonify(
         {
-            "type": "OCR",
             "data": data_items,
             "pagination": {
                 "limit": limit,
