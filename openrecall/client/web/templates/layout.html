@@ -529,7 +529,7 @@
         },
 
         refreshConfig() {
-          return fetch('/api/config')
+          return fetch(EDGE_BASE_URL + '/api/config')
             .then(response => response.json())
             .then(data => {
               this.config = data;
@@ -558,7 +558,7 @@
           this.updateBodyClass();
           
           // Send to server
-          fetch('/api/config', {
+          fetch(EDGE_BASE_URL + '/api/config', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ [key]: this.config[key] })
@@ -608,7 +608,7 @@
     
     // Health Polling Component
     (function() {
-      const HEALTH_ENDPOINT = '/v1/health';
+      const HEALTH_ENDPOINT = EDGE_BASE_URL + '/v1/health';
       const POLL_INTERVAL_MS = 5000;
       const REQUEST_TIMEOUT_MS = 2000;
       const UNREACHABLE_GRACE_MS = 5000;
