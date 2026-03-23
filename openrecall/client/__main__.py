@@ -12,6 +12,12 @@ import signal
 import sys
 import time
 
+# Parse --no-web flag before config loads
+if "--no-web" in sys.argv:
+    sys.argv.remove("--no-web")
+    import os
+    os.environ["OPENRECALL_CLIENT_WEB_ENABLED"] = "false"
+
 from openrecall.shared.config import settings
 from openrecall.shared.logging_config import configure_logging
 
@@ -39,6 +45,12 @@ def main():
     logger.info(f"Upload timeout: {settings.upload_timeout}s")
     logger.info(f"Primary monitor only: {settings.primary_monitor_only}")
     logger.info("=" * 50)
+
+    # Start client web UI server (if enabled)
+    web_server_thread = None
+    if settings.client_web_enabled:
+        from openrecall.client.web.app import start_web_server
+        web_server_thread = start_web_server()
 
     # Get recorder (manages Producer + Consumer)
     recorder = get_recorder()
