@@ -11,14 +11,15 @@ client_app = Flask(__name__, template_folder="templates")
 
 
 @client_app.context_processor
-def inject_edge_base_url():
-    """Make EDGE_BASE_URL available to all templates."""
-    return {"EDGE_BASE_URL": settings.edge_base_url}
+def inject_template_vars():
+    """Make EDGE_BASE_URL and settings available to all templates."""
+    return {"EDGE_BASE_URL": settings.edge_base_url, "settings": settings}
 
 
 @client_app.route("/")
 def index():
-    return render_template("index.html")
+    # Client doesn't have the database; templates fetch data via API from Edge
+    return render_template("index.html", entries=[], stats={"completed": 0, "pending": 0, "processing": 0})
 
 
 @client_app.route("/search")
@@ -28,7 +29,8 @@ def search():
 
 @client_app.route("/timeline")
 def timeline():
-    return render_template("timeline.html")
+    # Client doesn't have the database; templates fetch data via API from Edge
+    return render_template("timeline.html", timeline_frames=[])
 
 
 @client_app.route("/vendor/<path:filename>")
