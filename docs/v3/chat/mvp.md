@@ -262,7 +262,7 @@ The preferred implementation order is:
 ```text
 paired_capture
   -> frames
-     - text
+     - accessibility_text
      - text_source
      - accessibility_tree_json
   -> accessibility
@@ -893,6 +893,11 @@ The endpoint returns a typed union.
   - merged results are sorted globally by `timestamp DESC`
   - pagination is applied after merge
 
+> **Note on `content_type=all` ordering:** The merged results are sorted by timestamp only.
+> FTS relevance ranking from individual sub-searches is not preserved in the final ordering.
+> This is intentional MVP simplification. If you need relevance-based results, use
+> `content_type=ocr` or `content_type=accessibility` separately.
+
 ## Activity Summary Contract
 
 ### Endpoint
@@ -946,6 +951,7 @@ The endpoint returns a typed union.
   - Note: `line` and `paragraph` are OCR hierarchy roles that only exist when `source='ocr'`. Since MVP only writes `source='accessibility'` elements, these roles never appear in MVP queries. They are reserved for future OCR elements support.
 - `recent_texts` returns recent text-like accessibility nodes, sorted by frame timestamp descending
 - `audio_summary` is preserved as a shape-compatible empty shell in vision-only MVP
+- `time_range` always returns an object — when no frames exist in the queried range, the query bounds (`start_time`, `end_time`) are echoed back
 
 ## Frame Context Contract
 
@@ -1151,6 +1157,27 @@ MVP browser URL extraction rules:
 - `frames.ocr_text` is the canonical OCR text field
 - `frames_fts` is metadata-only
 
+## API Implementation Notes
+
+The following notes document additive implementation details that do not break the contracts above but extend them.
+
+### /v1/search additional content fields
+
+The implementation returns these extra fields in each `content` object beyond the spec minimum:
+
+- `file_path` — snapshot path
+- `frame_url` — URL for frame image fetch
+- `device_name` — capture device
+- `focused` — whether the frame was focused
+- `tags` — empty list placeholder
+- `fts_rank` — FTS rank score for debugging
+
+These are additive and do not affect spec-minimum consumers.
+
+### /v1/frames/{id}/context additional fields
+
+The store returns `browser_url` and `status` in addition to the spec-minimum fields. These are additive.
+
 ## Deferred
 
 The following items are explicitly deferred beyond MVP:
@@ -1165,7 +1192,26 @@ The following items are explicitly deferred beyond MVP:
 - broader parity work
 - auxiliary OCR persistence for accessibility-canonical frames
 
-## Success Criteria
+### Phase 10 Handoff Notes
+
+Phase 10 validation completed 2026-03-23. All 280+ automated tests pass.
+
+**Real-world validation still needed (requires running the actual client):**
+
+- `ax_walk_ms` and `total_ms` timing against real apps
+- Safari and Chrome `browser_url` extraction via `AXDocument`
+- At least one non-browser GUI app (e.g. VS Code, Cursor)
+- Multi-monitor focused/non-focused behavior in practice
+- Terminal-class OCR-preference gate in practice
+
+**Decision gate:** The Python walker's per-element timeout protection is currently limited to the whole-walk `walk_timeout_ms` budget. If real-world data shows frequent partial-stall issues, evaluate subprocess walker boundary before optimizing concurrency.
+
+**Known gaps from Phase 10 review:**
+
+- `element_timeout_ms` is defined in `TreeWalkerConfig` but not enforced per-element (macOS AXUIElement is synchronous). Current whole-walk timeout is the only protection.
+- The plan document (`docs/superpowers/plans/2026-03-19-chat-mvp.md`) contains stale references to `frames.text` in Task 5/6 notes. The actual implementation correctly uses `frames.accessibility_text`. The plan doc is an execution artifact and does not need correction.
+
+
 
 The MVP is successful when:
 

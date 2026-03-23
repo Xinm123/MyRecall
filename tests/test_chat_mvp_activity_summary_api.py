@@ -90,6 +90,25 @@ class TestActivitySummaryAPI:
             response = client.get("/v1/activity-summary?start_time=2026-03-19T00:00:00Z")
             assert response.status_code == 400
 
+    def test_time_range_falls_back_to_query_bounds_when_no_frames(self, app_with_activity_summary_route):
+        """time_range is never null — falls back to query params when store returns None."""
+        mock = MagicMock(spec=FramesStore)
+        mock.get_activity_summary_apps.return_value = []
+        mock.get_activity_summary_recent_texts.return_value = []
+        mock.get_activity_summary_total_frames.return_value = 0
+        mock.get_activity_summary_time_range.return_value = None  # no frames
+
+        with patch("openrecall.server.api_v1._get_frames_store", return_value=mock):
+            client = app_with_activity_summary_route.test_client()
+            response = client.get(
+                "/v1/activity-summary?start_time=2026-03-19T09:00:00Z&end_time=2026-03-19T10:00:00Z"
+            )
+            data = json.loads(response.data)
+
+            assert data["time_range"] is not None
+            assert data["time_range"]["start"] == "2026-03-19T09:00:00Z"
+            assert data["time_range"]["end"] == "2026-03-19T10:00:00Z"
+
     def test_filters_by_app_name(self, app_with_activity_summary_route, mock_store):
         """Passes app_name filter to store methods."""
         with patch("openrecall.server.api_v1._get_frames_store", return_value=mock_store):

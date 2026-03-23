@@ -1066,5 +1066,5 @@ def activity_summary():
         "recent_texts": recent_texts,
         "audio_summary": {"segment_count": 0, "speakers": []},
         "total_frames": total_frames,
-        "time_range": time_range,
+        "time_range": time_range or {"start": start_time, "end": end_time},
     })

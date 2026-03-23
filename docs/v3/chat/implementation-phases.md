@@ -115,7 +115,7 @@ Prepare the database for the new chat-oriented data model.
 
 ### Includes
 
-- `frames.text`
+- `frames.accessibility_text` + `frames.ocr_text`
 - `frames.accessibility_tree_json`
 - metadata-only `frames_fts`
 - frame-backed `accessibility + accessibility_fts`
@@ -128,11 +128,12 @@ All later client and server work depends on stable persistence targets.
 ### Exit Criteria
 
 - the schema matches the MVP document
-- no legacy `accessibility_text` dependency remains in the base schema
+- no legacy unified `frames.text` column remains in the base schema
+- `frames.accessibility_text` and `frames.ocr_text` exist as separate canonical text columns
 
 ### Observable Milestone
 
-- a fresh database contains the new `frames`, `accessibility`, `elements`, and FTS layout with no compatibility fields required for old chat assumptions
+- a fresh database contains `frames.accessibility_text`, `frames.ocr_text`, `frames.accessibility_tree_json`, `accessibility`, `elements`, and FTS layout matching the MVP data model
 
 ## Phase 2: Introduce Client-side Accessibility Contracts And Policy
 
