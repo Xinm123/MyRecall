@@ -4,6 +4,7 @@ This module defines the v1_bp Blueprint and implements:
   - POST /v1/ingest          — idempotent single-frame upload
   - GET  /v1/ingest/queue/status — live queue counters
   - GET  /v1/frames/<frame_id>   — serve frame JPEG
+  - GET  /v1/frames/<frame_id>/context — frame context for chat grounding
   - GET  /v1/health              — health check
 
 SSOT: docs/v3/spec.md §4.7, §4.8.1, §4.9; docs/v3/http_contract_ledger.md
@@ -588,6 +589,57 @@ def get_frame(frame_id: int):
         )
 
     return send_file(str(path), mimetype="image/jpeg")
+
+
+# ---------------------------------------------------------------------------
+# GET /v1/frames/<frame_id>/context
+# ---------------------------------------------------------------------------
+
+
+@v1_bp.route("/frames/<int:frame_id>/context", methods=["GET"])
+def get_frame_context(frame_id: int):
+    """Return frame context for chat grounding.
+
+    Query Parameters:
+        max_text_length: Optional. Maximum length of text field (truncates with "...").
+        max_nodes: Optional. Maximum number of nodes to return.
+
+    Returns:
+        200 JSON — frame context with text, nodes, urls, text_source
+        404 NOT_FOUND — frame_id not in DB
+    """
+    request_id = str(uuid.uuid4())
+
+    # Parse optional query parameters
+    max_text_length = None
+    max_nodes = None
+
+    max_text_length_raw = request.args.get("max_text_length")
+    if max_text_length_raw:
+        try:
+            max_text_length = int(max_text_length_raw)
+        except ValueError:
+            pass
+
+    max_nodes_raw = request.args.get("max_nodes")
+    if max_nodes_raw:
+        try:
+            max_nodes = int(max_nodes_raw)
+        except ValueError:
+            pass
+
+    store = _get_frames_store()
+    context = store.get_frame_context(frame_id, max_text_length, max_nodes)
+
+    if context is None:
+        return make_error_response(
+            "frame not found",
+            "NOT_FOUND",
+            404,
+            request_id=request_id,
+        )
+
+    return jsonify(context)
 
 
 # ---------------------------------------------------------------------------

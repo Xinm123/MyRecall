@@ -1019,7 +1019,7 @@ The API returns complete data by default. Truncation is applied at the Chat/MCP 
 **API query parameters (optional):**
 
 ```
-GET /v1/frames/{id}/context?max_text=2000&max_nodes=50
+GET /v1/frames/{id}/context?max_text_length=2000&max_nodes=50
 ```
 
 **Rationale:**
@@ -1105,9 +1105,10 @@ MVP browser URL extraction rules:
 | `adopted_accessibility` | ✅ Available | Snapshot produced with text |
 | `empty_text` | ✅ Available | Snapshot produced (browser_url extracted before text aggregation) |
 | `no_focused_window` | ❌ Unavailable | No snapshot produced, no window to extract from |
+| `non_focused_monitor` | ❌ Unavailable | AX collection skipped, no snapshot produced |
+| `app_prefers_ocr` | ❌ Unavailable | AX collection skipped, no snapshot produced |
 
-> Note: The walker extracts `browser_url` via `AXDocument` before aggregating text content.
-> This means `empty_text` frames can still have `browser_url` populated.
+> Note: The first three reasons (`adopted_accessibility`, `empty_text`, `no_focused_window`) occur during walker execution. The last two (`non_focused_monitor`, `app_prefers_ocr`) are policy-level rejections that prevent walker execution entirely.
 
 ### Search Implications
 

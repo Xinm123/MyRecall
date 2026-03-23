@@ -337,10 +337,11 @@ Chat APIs should consume a stable query interface rather than directly querying 
 
 - query helpers return correct data for accessibility-complete frames
 - summary and frame context APIs can use these helpers
+- `get_activity_summary_recent_texts` returns only `AXStaticText` role elements (matching screenpipe behavior)
 
 ### Observable Milestone
 
-- `get_activity_summary_recent_texts` returns text from `elements` table
+- `get_activity_summary_recent_texts` returns text from `elements` table with `role='AXStaticText'`
 - `get_frame_context` returns parsed nodes from `accessibility_tree_json`
 
 ## Phase 7: Upgrade /v1/search To Content-Type Aware
@@ -400,7 +401,7 @@ Activity summary gives chat agents a broad overview before targeted search. It d
 ### Exit Criteria
 
 - Returns apps with frame counts and approximate minutes
-- Returns recent_texts from accessibility elements
+- Returns recent_texts from accessibility elements (`AXStaticText` role only)
 - Returns audio_summary as shape-compatible empty shell
 
 ### Observable Milestone
@@ -434,6 +435,7 @@ Frame context is the main evidence layer for chat answers. It should come after 
 - Returns text, nodes, urls, text_source for accessibility frames
 - Falls back to OCR data when accessibility unavailable
 - Node filtering and URL extraction match screenpipe behavior
+- Supports optional `max_text` and `max_nodes` query parameters for Chat/MCP layer truncation
 
 ### Observable Milestone
 

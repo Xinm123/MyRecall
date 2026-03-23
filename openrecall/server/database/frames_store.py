@@ -1386,10 +1386,15 @@ class FramesStore:
         """
         try:
             with self._connect() as conn:
+                # Join with ocr_text table for OCR frames
+                # frames.text is used for accessibility frames, ocr_text.text for OCR frames
                 row = conn.execute(
                     """
-                    SELECT id, text, text_source, accessibility_tree_json, browser_url, status
-                    FROM frames WHERE id = ?
+                    SELECT f.id, f.text, f.text_source, f.accessibility_tree_json,
+                           f.browser_url, f.status, o.text AS ocr_text
+                    FROM frames f
+                    LEFT JOIN ocr_text o ON f.id = o.frame_id
+                    WHERE f.id = ?
                     """,
                     (frame_id,),
                 ).fetchone()
@@ -1398,7 +1403,11 @@ class FramesStore:
                     return None
 
                 frame_id_val = row["id"]
-                text = row["text"] or ""
+                # Use ocr_text for OCR frames, frames.text for accessibility frames
+                if row["text_source"] == "ocr" and row["ocr_text"]:
+                    text = row["ocr_text"]
+                else:
+                    text = row["text"] or ""
                 text_source = row["text_source"]
                 tree_json = row["accessibility_tree_json"]
                 browser_url = row["browser_url"]
