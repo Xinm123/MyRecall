@@ -21,6 +21,16 @@ Add a new `description` field to each frame that stores an AI-generated semantic
 - Batch processing of multiple frames (planned for v2)
 - Caching layer (planned for v2)
 
+## Web UI Migration Note
+
+The web UI is planned to migrate from `server/templates/` to the client side in a future phase. This has **no impact** on the description design:
+
+- Description data lives in the **database layer** (`frame_descriptions` table) — unchanged
+- Description is exposed via **HTTP API** (`/v1/*` endpoints) — contract unchanged
+- Only the frontend rendering layer moves; API consumers (AI agents, future client-side code) still call the same endpoints
+
+The `/v1/*` API contract is the stable boundary. Description generation, storage, and consumption all happen server-side regardless of where the UI is hosted.
+
 ---
 
 ## Data Model
@@ -312,36 +322,49 @@ openrecall/
 ├── shared/
 │   └── models.py                    # Add FrameDescription model
 ├── server/
+│   ├── ai/                          # Retain: base protocols (AIProvider, OCRProvider, EmbeddingProvider)
+│   └── description/                 # New: self-contained description feature module
+│       ├── __init__.py
+│       ├── models.py                 # FrameDescription Pydantic model
+│       ├── providers/
+│       │   ├── __init__.py
+│       │   ├── base.py              # DescriptionProvider protocol
+│       │   ├── local.py             # LocalDescriptionProvider (Qwen3 VL)
+│       │   ├── openai.py            # OpenAIDescriptionProvider (OpenAI-compatible)
+│       │   └── dashscope.py         # DashScopeDescriptionProvider (通义千问)
+│       ├── service.py               # DescriptionService (enqueue, generate, backfill)
+│       └── worker.py                # DescriptionWorker process
 │   ├── database/
 │   │   ├── migrations/
 │   │   │   └── YYYYMMDDHHMMSS_add_frame_description.sql
-│   │   └── frames_store.py          # Add description CRUD methods
-│   ├── ai/
-│   │   ├── base.py                  # Add DescriptionProvider protocol
-│   │   ├── providers.py              # LocalDescriptionProvider, OpenAIDescriptionProvider, DashScopeDescriptionProvider
-│   │   └── engine.py                 # Provider factory / initialization
-│   ├── worker/
-│   │   └── description_worker.py     # New: Independent DescriptionWorker
-│   ├── api_v1.py                    # Extend context, activity-summary; add new endpoints
-│   └── description/
-│       ├── service.py                # Description service (generate, enqueue, backfill)
-│       └── router.py                 # FastAPI router for description endpoints
+│   │   └── frames_store.py         # Add description CRUD methods
+│   └── api_v1.py                   # Extend context, activity-summary; add new endpoints
 └── tests/
     ├── test_description_provider.py  # Unit tests for providers
-    ├── test_description_worker.py    # Worker integration tests
-    └── test_description_api.py       # API endpoint tests
+    ├── test_description_worker.py   # Worker integration tests
+    └── test_description_api.py      # API endpoint tests
 ```
+
+### Directory Design Rationale
+
+The `description/` module is self-contained and decoupled from `server/ai/`:
+- `server/ai/` holds cross-cutting AI protocols used by multiple features (OCR, embedding, vision analysis)
+- `server/description/` holds description-specific logic (providers, service, worker)
+- Future features (e.g., summarization, keyword extraction) follow the same pattern: `server/<feature>/`
+
+This separation keeps `server/ai/` lean and makes each feature independently deployable.
 
 ---
 
 ## Implementation Order
 
 1. **Database migration** — Add tables and columns
-2. **Provider layer** — `DescriptionProvider` protocol + 3 implementations
-3. **Service layer** — Description service (enqueue, generate, backfill)
-4. **Worker** — `DescriptionWorker` process
-5. **API endpoints** — Extend existing + add new
-6. **Tests** — Unit + integration
+2. **Provider layer** — `server/description/providers/` (protocol + 3 implementations)
+3. **Models** — `FrameDescription` in `server/description/models.py`
+4. **Service layer** — `DescriptionService` (enqueue, generate, backfill)
+5. **Worker** — `DescriptionWorker` in `server/description/worker.py`
+6. **API endpoints** — Extend existing + add new in `api_v1.py`
+7. **Tests** — Unit + integration
 
 ---
 
