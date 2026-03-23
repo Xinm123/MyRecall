@@ -14,11 +14,13 @@ for arg in "$@"; do
     --debug)
       enable_debug="true"
       ;;
+    --no-web)
+      ;;
     --env=*)
       env_file="${arg#--env=}"
       ;;
     *)
-      echo "Usage: $0 [--debug] [--env=/abs/path/to/myrecall_client.env]" >&2
+      echo "Usage: $0 [--debug] [--no-web] [--env=/abs/path/to/myrecall_client.env]" >&2
       exit 2
       ;;
   esac
@@ -55,4 +57,4 @@ if [[ -z "${python_bin:-}" ]]; then
   exit 1
 fi
 
-exec "$python_bin" -m openrecall.client
+exec "$python_bin" -m openrecall.client "$@"
