@@ -38,6 +38,10 @@ class Settings(BaseSettings):
     - OPENRECALL_EMBEDDING_API_BASE: Optional override for embedding API base URL
     - OPENRECALL_UPLOAD_TIMEOUT: Client upload timeout in seconds
     - OPENRECALL_EMBEDDING_MODEL: Embedding model name for semantic search
+    - OPENRECALL_CLIENT_WEB_PORT: Port for client web UI server
+    - OPENRECALL_CLIENT_WEB_ENABLED: Enable client web UI server
+    - OPENRECALL_EDGE_BASE_URL: Base URL for Edge API server (used by client web UI)
+    - OPENRECALL_CLIENT_CORS_ORIGIN: Allowed CORS origin for Edge server
     """
 
     debug: bool = Field(default=True, alias="OPENRECALL_DEBUG")
@@ -419,6 +423,27 @@ class Settings(BaseSettings):
         default=False,
         alias="OPENRECALL_FUSION_LOG_ENABLED",
         description="Whether to log fusion text to a file for debugging",
+    )
+    # Client Web UI Configuration
+    client_web_port: int = Field(
+        default=5000,
+        alias="OPENRECALL_CLIENT_WEB_PORT",
+        description="Port for client web UI server",
+    )
+    client_web_enabled: bool = Field(
+        default=True,
+        alias="OPENRECALL_CLIENT_WEB_ENABLED",
+        description="Enable client web UI server",
+    )
+    edge_base_url: str = Field(
+        default="http://localhost:8083",
+        alias="OPENRECALL_EDGE_BASE_URL",
+        description="Base URL for Edge API server (used by client web UI)",
+    )
+    client_cors_origin: str = Field(
+        default="http://localhost:5000",
+        alias="OPENRECALL_CLIENT_CORS_ORIGIN",
+        description="Allowed CORS origin for Edge server (client web UI origin)",
     )
 
     @field_validator(
