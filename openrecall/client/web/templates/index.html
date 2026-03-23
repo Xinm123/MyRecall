@@ -1133,7 +1133,7 @@
                 <div class="modal-meta-line" x-text="selectedEntry ? `${selectedEntry.text_length || 0} 字符` : ''"></div>
               </div>
               <div class="modal-image-wrapper">
-                <img alt="OCR Visualization" :src="selectedEntry ? `/v1/frames/${selectedEntry.id}/ocr-vis` : ''">
+                <img alt="OCR Visualization" :src="selectedEntry ? `${EDGE_BASE_URL}/v1/frames/${selectedEntry.id}/ocr-vis` : ''">
               </div>
             </div>
 
@@ -1480,7 +1480,7 @@
           const sinceIso = this.lastCheckMs > 0
             ? new Date(this.lastCheckMs).toISOString()
             : '1970-01-01T00:00:00Z';
-          const res = await fetch(`/api/memories/latest?since=${encodeURIComponent(sinceIso)}`);
+          const res = await fetch(`${EDGE_BASE_URL}/api/memories/latest?since=${encodeURIComponent(sinceIso)}`);
           if (!res.ok) return;
           const newItems = await res.json();
           if (!Array.isArray(newItems) || newItems.length === 0) return;
@@ -1506,7 +1506,7 @@
 
       async refreshRecent() {
         try {
-          const res = await fetch(`/api/memories/recent?limit=200`);
+          const res = await fetch(`${EDGE_BASE_URL}/api/memories/recent?limit=200`);
           if (!res.ok) return;
           const recent = await res.json();
           if (!Array.isArray(recent) || recent.length === 0) return;
@@ -1570,10 +1570,10 @@
       imageSrc(entry) {
         const frameId = entry?.frame_id;
         if (frameId !== undefined && frameId !== null) {
-          return `/v1/frames/${frameId}`;
+          return `${EDGE_BASE_URL}/v1/frames/${frameId}`;
         }
         const filename = entry?.filename || `${entry?.timestamp}.png`;
-        return `/screenshots/${filename}`;
+        return `${EDGE_BASE_URL}/screenshots/${filename}`;
       },
 
       isOpen() {
