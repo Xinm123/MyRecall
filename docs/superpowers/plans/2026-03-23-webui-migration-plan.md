@@ -18,7 +18,7 @@
 | `openrecall/server/app.py` | Modify | Add CORS middleware |
 | `openrecall/client/__main__.py` | Modify | Parse `--no-web`, start web server |
 | `openrecall/client/web/__init__.py` | Create | Package marker |
-| `openrecall/client/web/app.py` | Create | Flask web server (~60 lines) |
+| `openrecall/client/web/app.py` | Create | Flask web server (~80 lines, includes /screenshots proxy) |
 | `openrecall/client/web/templates/*.html` | Create | Copy from server/templates/ |
 | `openrecall/client/web/vendor/alpine.min.js` | Create | Copy from server/vendor/ |
 | Template files (4 files) | Modify | ~12 EDGE_BASE_URL injections |
@@ -31,11 +31,11 @@
 ### Task 1: Add config fields
 
 **Files:**
-- Modify: `openrecall/shared/config.py:368` (after the `disable_similarity_filter` field)
+- Modify: `openrecall/shared/config.py` (after the `fusion_log_enabled` field, ~line 422)
 
 - [ ] **Step 1: Add the four new config fields**
 
-Insert after line 422 (after the `fusion_log_enabled` field):
+Insert after the `fusion_log_enabled` field (~line 422):
 
 ```python
     # Client Web UI Configuration
@@ -97,10 +97,12 @@ def add_cors_headers(response):
     return response
 ```
 
-- [ ] **Step 2: Verify it works**
+- [ ] **Step 2: Verify CORS middleware works**
 
-Run: `python -c "from openrecall.server.app import app; print('CORS middleware added')"`
-Expected: Output without import errors
+Run: `python -c "from openrecall.server.app import app; tc = app.test_client(); r = tc.get('/v1/health'); print(r.headers.get('Access-Control-Allow-Origin'))"`
+Expected: `http://localhost:5000`
+
+This verifies the CORS header is actually present on responses, not just that the import succeeds.
 
 - [ ] **Step 3: Commit**
 
@@ -170,6 +172,21 @@ def timeline():
 @client_app.route("/vendor/<path:filename>")
 def vendor(filename):
     return send_from_directory("vendor", filename)
+
+
+@client_app.route("/screenshots/<path:filename>")
+def screenshots(filename):
+    """Proxy screenshots requests to Edge server (served at /v1/frames/)."""
+    import requests
+    edge_url = f"{settings.edge_base_url}/v1/frames/{filename}"
+    try:
+        resp = requests.get(edge_url, timeout=5)
+        from flask import Response
+        return Response(resp.content, resp.status_code, {"Content-Type": resp.headers.get("Content-Type", "image/jpeg")})
+    except requests.RequestException as e:
+        from flask import abort
+        logger.error(f"Failed to proxy screenshot {filename}: {e}")
+        abort(502)
 
 
 def start_web_server():
@@ -264,8 +281,10 @@ For each `fetch('/...')` or `fetch("/...")`, change to `fetch(EDGE_BASE_URL + '/
 
 - [ ] **Step 3: Verify all changed**
 
-Run: `grep -n "fetch\|/api\|/v1" openrecall/client/web/templates/layout.html | grep -v "EDGE_BASE_URL"`
-Expected: No results (all API calls should use EDGE_BASE_URL)
+Run: `grep -n "fetch\|src=.*'/api\|src=.*'/v1\|/api/\|/v1/" openrecall/client/web/templates/layout.html | grep -v "EDGE_BASE_URL"`
+Expected: No results (all API calls and image URLs should use EDGE_BASE_URL)
+
+Note: The grep catches `fetch()`, inline `src='...'` attributes, and bare `/api/` or `/v1/` strings. Alpine.js bindings like `:src="..."` are also caught because they reference JS variables containing `/api/` or `/v1/` strings.
 
 - [ ] **Step 4: Commit**
 
@@ -297,8 +316,8 @@ For each API endpoint, change:
 
 - [ ] **Step 3: Verify all changed**
 
-Run: `grep -n "fetch\|/api\|/v1" openrecall/client/web/templates/index.html | grep -v "EDGE_BASE_URL"`
-Expected: No results (all API calls should use EDGE_BASE_URL)
+Run: `grep -n "fetch\|src=.*'/api\|src=.*'/v1\|/api/\|/v1/" openrecall/client/web/templates/index.html | grep -v "EDGE_BASE_URL"`
+Expected: No results (all API calls and image URLs should use EDGE_BASE_URL)
 
 - [ ] **Step 4: Commit**
 
@@ -326,7 +345,7 @@ Expected locations:
 
 - [ ] **Step 3: Verify all changed**
 
-Run: `grep -n "fetch\|/api\|/v1" openrecall/client/web/templates/search.html | grep -v "EDGE_BASE_URL"`
+Run: `grep -n "fetch\|src=.*'/api\|src=.*'/v1\|/api/\|/v1/" openrecall/client/web/templates/search.html | grep -v "EDGE_BASE_URL"`
 Expected: No results
 
 - [ ] **Step 4: Commit**
@@ -354,7 +373,7 @@ Expected locations:
 
 - [ ] **Step 3: Verify all changed**
 
-Run: `grep -n "fetch\|/api\|/v1" openrecall/client/web/templates/timeline.html | grep -v "EDGE_BASE_URL"`
+Run: `grep -n "fetch\|src=.*'/api\|src=.*'/v1\|/api/\|/v1/" openrecall/client/web/templates/timeline.html | grep -v "EDGE_BASE_URL"`
 Expected: No results
 
 - [ ] **Step 4: Commit**
@@ -418,23 +437,27 @@ git commit -m "feat(client): start web UI server on client startup"
 ### Task 10: Update run_client.sh
 
 **Files:**
-- Modify: `run_client.sh` (or `scripts/run_client.sh` — check location first)
+- Modify: `run_client.sh` (root directory of the repo)
 
-- [ ] **Step 1: Find run_client.sh**
+> **Note:** Run scripts are at the repo root (`./run_client.sh`, `./run_server.sh`), not in `scripts/`.
 
-Run: `find . -name "run_client.sh" -o -name "run*.sh" 2>/dev/null | head -10`
-Expected: Script path
+- [ ] **Step 1: Read run_client.sh to find the python invocation**
 
-- [ ] **Step 2: Update to support --no-web**
+Run: `grep -n "openrecall.client" run_client.sh`
+Expected: Finds the line that runs `python -m openrecall.client`
 
-If `--no-web` flag is detected, pass it through:
+- [ ] **Step 2: Update to pass through --no-web**
+
+In the shell script, find the line that runs `python -m openrecall.client` and ensure it passes all arguments through:
 
 ```bash
-# Pass --no-web flag to python
+# Ensure the line reads something like:
 python -m openrecall.client "$@"
+# or
+exec "$python_bin" -m openrecall.client "$@"
 ```
 
-The `--no-web` parsing in `__main__.py` handles the rest.
+The `"$@"` passes through any arguments including `--no-web`, which `__main__.py` handles.
 
 - [ ] **Step 3: Test with --no-web**
 
@@ -485,7 +508,20 @@ curl -s -o /dev/null -w "%{http_code}" http://localhost:5000/timeline
 # Expected: 200
 ```
 
-- [ ] **Step 4: Verify CORS headers on Edge**
+- [ ] **Step 4: Verify image URLs work (frames via EDGE_BASE_URL)**
+
+Get a frame ID from the API, then verify the image URL redirects/proxies correctly:
+
+```bash
+# Get a frame ID from search
+FRAME_ID=$(curl -s "http://localhost:8083/v1/search?q=*" 2>/dev/null | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['frames'][0]['frame_id'] if d.get('frames') else '')" 2>/dev/null)
+
+# Verify /v1/frames/ returns an image from Edge
+curl -s -o /dev/null -w "%{http_code}" -H "Origin: http://localhost:5000" "http://localhost:8083/v1/frames/$FRAME_ID"
+# Expected: 200 (image/jpeg)
+```
+
+- [ ] **Step 5: Verify CORS headers on Edge**
 
 ```bash
 curl -s -I -X OPTIONS http://localhost:8083/v1/health \
@@ -494,11 +530,21 @@ curl -s -I -X OPTIONS http://localhost:8083/v1/health \
 # Expected: Access-Control-Allow-Origin: http://localhost:5000
 ```
 
-- [ ] **Step 5: Cleanup**
+- [ ] **Step 6: Cleanup**
 
 ```bash
 kill $(pgrep -f "openrecall.client") $(pgrep -f "openrecall.server") 2>/dev/null
 ```
+
+---
+
+## Deferred Future Work
+
+The following items are **out of scope** for this plan (per design spec):
+
+1. **Remove server templates** — Delete `openrecall/server/templates/` after migration is verified
+2. **Remove server web routes** — Delete web routes (`/`, `/search`, `/timeline`) from `openrecall/server/app.py` after migration verified
+3. **Remove `/screenshots/` proxy** — The proxy added in Task 3 can be removed once all templates use `EDGE_BASE_URL + '/v1/frames/...'`
 
 ---
 
