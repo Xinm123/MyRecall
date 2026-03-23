@@ -1,0 +1,732 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>{% block title %}MyRecall{% endblock %}</title>
+  
+  <!-- Alpine.js -->
+  <script src="/vendor/alpine.min.js" defer onerror="this.onerror=null;this.src='https://unpkg.com/alpinejs';"></script>
+  
+  <!-- Icons Module Import -->
+  {% import 'icons.html' as icons %}
+  
+  <style>
+    /* Global Reset */
+    *, *::before, *::after {
+      box-sizing: border-box;
+    }
+    
+    body {
+      margin: 0;
+      padding: 0;
+    }
+    
+    /* CSS Variables - macOS Light Theme */
+    :root {
+      --bg-body: #F5F5F7;
+      --bg-card: #FFFFFF;
+      --text-primary: #1D1D1F;
+      --text-secondary: #86868B;
+      --accent-color: #007AFF;
+      --border-color: rgba(0, 0, 0, 0.08);
+      --glass-bg: rgba(255, 255, 255, 0.72);
+      --font-stack: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      --toolbar-bg: rgba(245, 245, 247, 0.85);
+      --toolbar-border: rgba(0, 0, 0, 0.08);
+      --icon-color: #5c5c5e;
+      --icon-hover: rgba(0, 0, 0, 0.05);
+    }
+    
+    /* Global Styles */
+    body {
+      font-family: var(--font-stack);
+      background-color: var(--bg-body);
+      color: var(--text-primary);
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+    
+    /* Sticky Frosted Glass Header */
+    header {
+      position: sticky;
+      top: 0;
+      z-index: 1000;
+      height: 52px;
+      width: 100%;
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      background-color: var(--toolbar-bg);
+      border-bottom: 1px solid var(--toolbar-border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 16px;
+      user-select: none;
+    }
+    
+    /* Left Group: Navigation + Title */
+    .toolbar-left-group {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      min-width: 180px;
+    }
+    
+    /* Health Indicator */
+    .health-indicator {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      border-radius: 12px;
+      font-size: 12px;
+      font-weight: 500;
+      transition: all 0.3s ease;
+      margin-left: 12px;
+    }
+    
+    .health-indicator[data-state="healthy"] {
+      background-color: rgba(26, 127, 55, 0.1);
+      color: #1a7f37;
+    }
+    
+    .health-indicator[data-state="degraded"] {
+      background-color: rgba(191, 133, 10, 0.1);
+      color: #bf8706;
+    }
+    
+    .health-indicator[data-state="unreachable"] {
+      background-color: rgba(191, 38, 0, 0.1);
+      color: #bf2600;
+    }
+    
+    .health-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      animation: pulse 2s infinite;
+    }
+    
+    .health-indicator[data-state="healthy"] .health-dot {
+      background-color: #2ecc71;
+    }
+    
+    .health-indicator[data-state="degraded"] .health-dot {
+      background-color: #f5a623;
+    }
+    
+    .health-indicator[data-state="unreachable"] .health-dot {
+      background-color: #ff4d4f;
+    }
+    
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+    
+    .toolbar-nav-btn {
+      background: transparent;
+      border: none;
+      padding: 6px 10px;
+      border-radius: 6px;
+      color: var(--icon-color);
+      cursor: pointer;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    
+    .toolbar-nav-btn:hover {
+      background-color: var(--icon-hover);
+      color: #000;
+    }
+    
+    .toolbar-nav-btn:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+    
+    .toolbar-title {
+      font-weight: 600;
+      font-size: 15px;
+      color: var(--text-primary);
+      letter-spacing: -0.3px;
+    }
+    
+    /* Toolbar Spacer */
+    .toolbar-spacer {
+      flex: 1;
+    }
+    
+    /* Icons Container */
+    .toolbar-icons-container {
+      display: flex;
+      gap: 0;
+      align-items: center;
+    }
+    
+    .toolbar-icon-link {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 32px;
+      height: 32px;
+      border-radius: 6px;
+      color: var(--icon-color);
+      text-decoration: none;
+      transition: all 0.2s;
+      background: transparent;
+    }
+    
+    .toolbar-icon-link:hover {
+      background-color: var(--icon-hover);
+      color: #000;
+    }
+    
+    /* Highlight current view icon */
+    html[data-current-view="grid"] a[href="/"] {
+      background-color: rgba(0, 0, 0, 0.12);
+      color: #1D1D1F;
+    }
+    
+    html[data-current-view="timeline"] a[href="/timeline"] {
+      background-color: rgba(0, 0, 0, 0.12);
+      color: #1D1D1F;
+    }
+
+    html[data-current-view="search"] a[href="/search"] {
+      background-color: rgba(0, 0, 0, 0.12);
+      color: #1D1D1F;
+    }
+    
+    /* Right Group: Icons */
+    .toolbar-right-group {
+      display: flex;
+      gap: 0;
+      align-items: center;
+      justify-content: flex-end;
+    }
+    
+    /* Main Content Container */
+    main {
+      max-width: 1600px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+
+    /* Tooltip Styles */
+    .toolbar-icon-link[title],
+    .toolbar-nav-btn[title] {
+      position: relative;
+    }
+
+    .toolbar-icon-link[title]:hover::after,
+    .toolbar-nav-btn[title]:hover::after {
+      content: attr(title);
+      position: absolute;
+      bottom: -28px;
+      left: 50%;
+      transform: translateX(-50%);
+      background-color: rgba(0, 0, 0, 0.8);
+      color: white;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 12px;
+      white-space: nowrap;
+      pointer-events: none;
+      animation: tooltipShow 0.15s ease-out forwards;
+      z-index: 1001;
+    }
+
+    @keyframes tooltipShow {
+      from {
+        opacity: 0;
+        transform: translateX(-50%) translateY(-2px);
+      }
+      to {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0);
+      }
+    }
+
+    /* Control Center Popover Styles */
+    .control-center-btn {
+      position: relative;
+    }
+
+    .control-center-popover {
+      position: absolute;
+      top: 44px;
+      right: 0;
+      width: 280px;
+      background: rgba(255, 255, 255, 0.95);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(0, 0, 0, 0.1);
+      border-radius: 12px;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
+      padding: 12px;
+      z-index: 1002;
+      animation: popoverIn 0.2s ease-out forwards;
+    }
+
+    @keyframes popoverIn {
+      from {
+        opacity: 0;
+        transform: translateY(-8px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .control-section {
+      padding: 8px 0;
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    .control-section:last-child {
+      border-bottom: none;
+    }
+
+    .control-section-title {
+      font-size: 11px;
+      font-weight: 600;
+      color: #666;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      padding: 4px 8px;
+      margin-bottom: 6px;
+    }
+
+    .control-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 8px;
+      border-radius: 6px;
+      transition: background-color 0.15s;
+    }
+
+    .control-item:hover {
+      background-color: rgba(0, 0, 0, 0.04);
+    }
+
+    .control-item-label {
+      font-size: 13px;
+      color: #333;
+      font-weight: 500;
+    }
+
+    .control-item-label-with-status {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .client-status {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      font-weight: 500;
+      line-height: 1;
+    }
+
+    .client-status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 999px;
+      background: #ff4d4f;
+    }
+
+    .client-status.online {
+      color: #1a7f37;
+    }
+
+    .client-status.online .client-status-dot {
+      background: #2ecc71;
+    }
+
+    .client-status.offline {
+      color: #b42318;
+    }
+
+    /* Toggle Switch Styles */
+    .toggle-switch {
+      position: relative;
+      width: 44px;
+      height: 24px;
+      background-color: #E0E0E0;
+      border-radius: 12px;
+      cursor: pointer;
+      transition: background-color 0.2s;
+    }
+
+    .toggle-switch.active {
+      background-color: var(--accent-color);
+    }
+
+    .toggle-switch-thumb {
+      position: absolute;
+      top: 2px;
+      left: 2px;
+      width: 20px;
+      height: 20px;
+      background-color: white;
+      border-radius: 10px;
+      transition: left 0.2s;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+
+    .toggle-switch.active .toggle-switch-thumb {
+      left: 22px;
+    }
+
+    /* Hide AI text when disabled */
+    body.hide-ai .ai-insight-text {
+      display: none;
+    }
+  </style>
+  
+  {% block extra_head %}{% endblock %}
+</head>
+<body>
+  <header>
+    <!-- Left Group: Title + Health Indicator -->
+    <div class="toolbar-left-group">
+      <span class="toolbar-title">MyRecall</span>
+      <div id="mr-health" class="health-indicator" data-state="degraded">
+        <span class="health-dot"></span>
+        <span class="health-text">等待首帧</span>
+      </div>
+    </div>
+    
+    <!-- Spacer -->
+    <div class="toolbar-spacer"></div>
+    
+    <!-- Right Group: Icons + Control Center -->
+    <div class="toolbar-right-group" id="toolbarRightGroup">
+      <div class="toolbar-icons-container">
+        <a href="/" class="toolbar-icon-link" title="Grid View">
+          {{ icons.icon_grid() }}
+        </a>
+        <a href="/timeline" class="toolbar-icon-link" title="Timeline View">
+          {{ icons.icon_timeline() }}
+        </a>
+      </div>
+      <a href="/search" class="toolbar-icon-link" title="Search">
+        {{ icons.icon_search() }}
+      </a>
+      
+      <!-- Control Center Button & Popover -->
+      <div x-data="controlCenter()" class="control-center-btn">
+        <button 
+          @click="toggle()" 
+          type="button"
+          class="toolbar-icon-link" 
+          title="Control"
+          style="position: relative; margin-left: 8px;">
+          {{ icons.icon_sliders() }}
+        </button>
+        
+        <!-- Popover Menu -->
+        <div x-show="open" @click.away="open = false" class="control-center-popover">
+          <!-- Privacy Section -->
+          <div class="control-section">
+            <div class="control-section-title">Privacy</div>
+            <div class="control-item">
+              <span class="control-item-label control-item-label-with-status">
+                <span>Recording</span>
+                <span
+                  class="client-status"
+                  :class="config.client_online ? 'online' : 'offline'">
+                  <span class="client-status-dot"></span>
+                  <span x-text="config.client_online ? 'Connected' : 'Offline'"></span>
+                </span>
+              </span>
+              <div 
+                @click="toggleSetting('recording_enabled')"
+                :class="{ 'toggle-switch': true, 'active': config.recording_enabled }"
+                class="toggle-switch">
+                <div class="toggle-switch-thumb"></div>
+              </div>
+            </div>
+            <div class="control-item">
+              <span class="control-item-label">Upload</span>
+              <div 
+                @click="toggleSetting('upload_enabled')"
+                :class="{ 'toggle-switch': true, 'active': config.upload_enabled }"
+                class="toggle-switch">
+                <div class="toggle-switch-thumb"></div>
+              </div>
+            </div>
+          </div>
+          
+          <!-- Intelligence Section -->
+          <div class="control-section">
+            <div class="control-section-title">Intelligence</div>
+            <div class="control-item">
+              <span class="control-item-label">AI Processing</span>
+              <div 
+                @click="toggleSetting('ai_processing_enabled')"
+                :class="{ 'toggle-switch': true, 'active': config.ai_processing_enabled }"
+                class="toggle-switch">
+                <div class="toggle-switch-thumb"></div>
+              </div>
+            </div>
+          </div>
+          
+          <!-- View Section -->
+          <div class="control-section">
+            <div class="control-section-title">View</div>
+            <div class="control-item">
+              <span class="control-item-label">Show AI</span>
+              <div 
+                @click="toggleSetting('ui_show_ai')"
+                :class="{ 'toggle-switch': true, 'active': config.ui_show_ai }"
+                class="toggle-switch">
+                <div class="toggle-switch-thumb"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </header>
+  
+  <main>
+    {% block content %}{% endblock %}
+  </main>
+  
+  <script>
+    function controlCenter() {
+      return {
+        open: false,
+        config: {
+          recording_enabled: true,
+          upload_enabled: true,
+          ai_processing_enabled: true,
+          ui_show_ai: true,
+          client_online: false
+        },
+        _pollerId: null,
+        
+        init() {
+          console.log('Control Center initializing...');
+          this.refreshConfig();
+          this._pollerId = setInterval(() => this.refreshConfig(), 5000);
+        },
+
+        destroy() {
+          if (this._pollerId) {
+            clearInterval(this._pollerId);
+            this._pollerId = null;
+          }
+        },
+
+        refreshConfig() {
+          return fetch('/api/config')
+            .then(response => response.json())
+            .then(data => {
+              this.config = data;
+              this.updateBodyClass();
+              if (this.open) {
+                console.log('Config refreshed:', this.config);
+              }
+            })
+            .catch(error => {
+              console.error('Failed to fetch config:', error);
+              this.config.client_online = false;
+            });
+        },
+        
+        toggle() {
+          this.open = !this.open;
+          console.log('Popover toggled:', this.open);
+        },
+        
+        toggleSetting(key) {
+          const previousValue = this.config[key];
+          this.config[key] = !this.config[key];
+          console.log(`Toggle ${key}: ${previousValue} -> ${this.config[key]}`);
+          
+          // Update body class immediately for ui_show_ai
+          this.updateBodyClass();
+          
+          // Send to server
+          fetch('/api/config', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ [key]: this.config[key] })
+          })
+          .then(response => {
+            if (!response.ok) {
+              throw new Error('Failed to update setting');
+            }
+            return response.json();
+          })
+          .then(data => {
+            console.log('Config updated on server:', data);
+            window.dispatchEvent(new CustomEvent('openrecall-config-changed', { detail: data }));
+          })
+          .catch(error => {
+            console.error('Failed to update setting:', error);
+            // Revert on error
+            this.config[key] = previousValue;
+            this.updateBodyClass();
+          });
+        },
+        
+        updateBodyClass() {
+          if (!this.config.ui_show_ai) {
+            document.body.classList.add('hide-ai');
+            console.log('Added hide-ai class');
+          } else {
+            document.body.classList.remove('hide-ai');
+            console.log('Removed hide-ai class');
+          }
+          // Debug: Check if AI elements exist
+          const aiElements = document.querySelectorAll('.ai-insight-text');
+          console.log(`Found ${aiElements.length} .ai-insight-text elements:`, aiElements);
+        }
+      };
+    }
+    
+    // Detect current page
+    const currentPath = window.location.pathname;
+    let currentView = 'grid'; // default
+    if (currentPath === '/timeline') {
+      currentView = 'timeline';
+    } else if (currentPath === '/search') {
+      currentView = 'search';
+    }
+    document.documentElement.setAttribute('data-current-view', currentView);
+    
+    // Health Polling Component
+    (function() {
+      const HEALTH_ENDPOINT = '/v1/health';
+      const POLL_INTERVAL_MS = 5000;
+      const REQUEST_TIMEOUT_MS = 2000;
+      const UNREACHABLE_GRACE_MS = 5000;
+      
+      let healthComponent = document.getElementById('mr-health');
+      let consecutiveFailures = 0;
+      let failureStartTime = null;
+      let pollerId = null;
+      
+      function updateHealthState(state, message) {
+        healthComponent.setAttribute('data-state', state);
+        healthComponent.querySelector('.health-text').textContent = message;
+      }
+      
+      function determineState(data) {
+        if (!data) {
+          return null;
+        }
+        
+        const status = data.status;
+        const frameStatus = data.frame_status;
+        const failed = data.queue ? data.queue.failed : 0;
+        const lastFrameTimestamp = data.last_frame_timestamp;
+        const permissionStatus = data.capture_permission_status;
+        const permissionReason = data.capture_permission_reason;
+
+        if (permissionReason === 'stale_permission_state') {
+          return { state: 'degraded', message: '权限状态陈旧' };
+        }
+
+        if (permissionStatus === 'transient_failure') {
+          return { state: 'degraded', message: '权限待确认' };
+        }
+
+        if (permissionStatus === 'recovering') {
+          return { state: 'degraded', message: '权限恢复中' };
+        }
+
+        if (permissionStatus === 'denied_or_revoked') {
+          return { state: 'degraded', message: '权限异常' };
+        }
+        
+        // Healthy: status == "ok" and frame_status == "ok" and queue.failed == 0
+        if (status === 'ok' && frameStatus === 'ok' && failed === 0) {
+          return { state: 'healthy', message: '服务健康/队列正常' };
+        }
+        
+        // Waiting for first frame: last_frame_timestamp == null and frame_status == "stale" and status == "degraded" and failed == 0
+        if (lastFrameTimestamp === null && frameStatus === 'stale' && status === 'degraded' && failed === 0) {
+          return { state: 'degraded', message: '等待首帧' };
+        }
+        
+        // Degraded: request succeeded but status != "ok" or queue.failed > 0 or frame_status != "ok"
+        if (status !== 'ok' || failed > 0 || frameStatus !== 'ok') {
+          if (failed > 0) {
+            return { state: 'degraded', message: '队列异常' };
+          }
+          if (frameStatus === 'stale') {
+            return { state: 'degraded', message: '数据延迟' };
+          }
+          return { state: 'degraded', message: '服务异常' };
+        }
+        
+        return { state: 'degraded', message: '服务降级' };
+      }
+      
+      function checkHealth() {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+        
+        fetch(HEALTH_ENDPOINT, {
+          signal: controller.signal,
+          cache: 'no-cache'
+        })
+        .then(response => {
+          clearTimeout(timeoutId);
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+          }
+          return response.json();
+        })
+        .then(data => {
+          clearTimeout(timeoutId);
+          consecutiveFailures = 0;
+          failureStartTime = null;
+          
+          const result = determineState(data);
+          if (result) {
+            updateHealthState(result.state, result.message);
+          }
+        })
+        .catch(error => {
+          clearTimeout(timeoutId);
+          consecutiveFailures++;
+          
+          if (consecutiveFailures === 1) {
+            failureStartTime = Date.now();
+          }
+          
+          const timeSinceFirstFailure = failureStartTime ? Date.now() - failureStartTime : 0;
+          
+          if (timeSinceFirstFailure >= UNREACHABLE_GRACE_MS) {
+            updateHealthState('unreachable', 'Edge 不可达');
+          }
+        });
+      }
+      
+      function startPolling() {
+        checkHealth();
+        pollerId = setInterval(checkHealth, POLL_INTERVAL_MS);
+      }
+      
+      if (healthComponent) {
+        startPolling();
+      }
+    })();
+  </script>
+  
+  {% block extra_body %}{% endblock %}
+</body>
+</html>
