@@ -67,7 +67,7 @@
     <div class="slider-value" id="sliderValue">{{timeline_frames[0].timestamp | timestamp_to_human_readable }}</div>
   </div>
   <div class="image-container">
-    <img id="timestampImage" src="/v1/frames/{{timeline_frames[0].frame_id}}" alt="Screenshot at selected time">
+    <img id="timestampImage" src="${EDGE_BASE_URL}/v1/frames/{{timeline_frames[0].frame_id}}" alt="Screenshot at selected time">
   </div>
 {% else %}
   <div class="alert" role="alert">
@@ -101,14 +101,14 @@
     const frame = timelineFrames[reversedIndex];
     const date = new Date(frame.timestamp);
     sliderValue.textContent = Number.isNaN(date.getTime()) ? 'Invalid timestamp' : formatDate24Hour(date);
-    timestampImage.src = `/v1/frames/${frame.frame_id}`;
+    timestampImage.src = `${EDGE_BASE_URL}/v1/frames/${frame.frame_id}`;
   });
 
   // Initialize the slider with a default value
   slider.value = timelineFrames.length - 1;
   const initialDate = new Date(timelineFrames[0].timestamp);
   sliderValue.textContent = Number.isNaN(initialDate.getTime()) ? 'Invalid timestamp' : formatDate24Hour(initialDate);
-  timestampImage.src = `/v1/frames/${timelineFrames[0].frame_id}`;
+  timestampImage.src = `${EDGE_BASE_URL}/v1/frames/${timelineFrames[0].frame_id}`;
 </script>
 {% endif %}
 {% endblock %}
