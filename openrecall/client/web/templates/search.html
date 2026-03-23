@@ -506,7 +506,7 @@
     if (!currentResults.length) return;
     currentIndex = normalizeIndex(currentIndex);
     const item = currentResults[currentIndex];
-    modalImage.src = `/v1/frames/${item.content.frame_id}`;
+    modalImage.src = `${EDGE_BASE_URL}/v1/frames/${item.content.frame_id}`;
     modalCount.textContent = `${currentIndex + 1} / ${currentResults.length}`;
     modalApp.textContent = item.content.app_name || 'Unknown';
     modalTime.textContent = formatTimestamp(item.content.timestamp);
@@ -648,7 +648,7 @@
           </div>
           <div class="card-image-wrapper">
             <img 
-              src="/v1/frames/${frameId}" 
+              src="${EDGE_BASE_URL}/v1/frames/${frameId}" 
               alt="Screenshot" 
               class="card-image js-open-modal"
               loading="lazy"
@@ -690,7 +690,7 @@
   // Perform search
   async function performSearch(offset = 0) {
     const queryString = buildQueryString(offset);
-    const url = `/v1/search?${queryString}`;
+    const url = `${EDGE_BASE_URL}/v1/search?${queryString}`;
 
     // Update URL without reloading
     const newUrl = `${window.location.pathname}?${queryString}`;
