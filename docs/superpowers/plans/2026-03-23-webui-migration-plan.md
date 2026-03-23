@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Move Web UI templates from Edge Server to Client. Client runs a Flask web server on port 5000 serving Jinja2 templates. API calls from templates go directly to Edge (port 8083) via CORS.
+**Goal:** Move Web UI templates from Edge Server to Client. Client runs a Flask web server on port 8883 serving Jinja2 templates. API calls from templates go directly to Edge (port 8083) via CORS.
 
 **Architecture:** Direct Connect mode — Client Flask serves HTML only, browser fetches API from Edge directly (per screenpipe alignment). No proxy layer needed.
 
@@ -55,7 +55,7 @@ Insert after the `fusion_log_enabled` field (~line 422):
         description="Base URL for Edge API server (used by client web UI)",
     )
     client_cors_origin: str = Field(
-        default="http://localhost:5000",
+        default="http://localhost:8883",
         alias="OPENRECALL_CLIENT_CORS_ORIGIN",
         description="Allowed CORS origin for Edge server (client web UI origin)",
     )
@@ -64,7 +64,7 @@ Insert after the `fusion_log_enabled` field (~line 422):
 - [ ] **Step 2: Verify config loads correctly**
 
 Run: `python -c "from openrecall.shared.config import settings; print(settings.client_web_port, settings.edge_base_url, settings.client_cors_origin, settings.client_web_enabled)"`
-Expected: `5000 http://localhost:8083 http://localhost:5000 True`
+Expected: `5000 http://localhost:8083 http://localhost:8883 True`
 
 - [ ] **Step 3: Commit**
 
@@ -100,7 +100,7 @@ def add_cors_headers(response):
 - [ ] **Step 2: Verify CORS middleware works**
 
 Run: `python -c "from openrecall.server.app import app; tc = app.test_client(); r = tc.get('/v1/health'); print(r.headers.get('Access-Control-Allow-Origin'))"`
-Expected: `http://localhost:5000`
+Expected: `http://localhost:8883`
 
 This verifies the CORS header is actually present on responses, not just that the import succeeds.
 
@@ -215,7 +215,7 @@ Expected: `OK` (may warn about missing templates — that's expected before Task
 
 ```bash
 git add openrecall/client/web/__init__.py openrecall/client/web/app.py
-git commit -m "feat(client): add web UI Flask app on port 5000"
+git commit -m "feat(client): add web UI Flask app on port 8883"
 ```
 
 ---
@@ -498,13 +498,13 @@ sleep 3
 - [ ] **Step 3: Test all three pages load**
 
 ```bash
-curl -s -o /dev/null -w "%{http_code}" http://localhost:5000/
+curl -s -o /dev/null -w "%{http_code}" http://localhost:8883/
 # Expected: 200
 
-curl -s -o /dev/null -w "%{http_code}" http://localhost:5000/search
+curl -s -o /dev/null -w "%{http_code}" http://localhost:8883/search
 # Expected: 200
 
-curl -s -o /dev/null -w "%{http_code}" http://localhost:5000/timeline
+curl -s -o /dev/null -w "%{http_code}" http://localhost:8883/timeline
 # Expected: 200
 ```
 
@@ -517,7 +517,7 @@ Get a frame ID from the API, then verify the image URL redirects/proxies correct
 FRAME_ID=$(curl -s "http://localhost:8083/v1/search?q=*" 2>/dev/null | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['frames'][0]['frame_id'] if d.get('frames') else '')" 2>/dev/null)
 
 # Verify /v1/frames/ returns an image from Edge
-curl -s -o /dev/null -w "%{http_code}" -H "Origin: http://localhost:5000" "http://localhost:8083/v1/frames/$FRAME_ID"
+curl -s -o /dev/null -w "%{http_code}" -H "Origin: http://localhost:8883" "http://localhost:8083/v1/frames/$FRAME_ID"
 # Expected: 200 (image/jpeg)
 ```
 
@@ -525,9 +525,9 @@ curl -s -o /dev/null -w "%{http_code}" -H "Origin: http://localhost:5000" "http:
 
 ```bash
 curl -s -I -X OPTIONS http://localhost:8083/v1/health \
-  -H "Origin: http://localhost:5000" \
+  -H "Origin: http://localhost:8883" \
   -H "Access-Control-Request-Method: GET"
-# Expected: Access-Control-Allow-Origin: http://localhost:5000
+# Expected: Access-Control-Allow-Origin: http://localhost:8883
 ```
 
 - [ ] **Step 6: Cleanup**

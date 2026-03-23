@@ -18,7 +18,7 @@ Move Web UI templates from Edge Server to Client. The Client provides an indepen
 
 ```
 ┌──────────────────────────────────────────────────────┐
-│  Client (Host)           :5000                      │
+│  Client (Host)           :8883                      │
 │  ┌────────────────────────────────────────────────┐  │
 │  │  Flask Web Server                              │  │
 │  │  ├── GET /           → render index.html       │  │
@@ -52,14 +52,14 @@ Move Web UI templates from Edge Server to Client. The Client provides an indepen
 | Server | Pure API | Pure API |
 | UI Provider | Tauri (static files) | Client Flask (Jinja2) |
 | Frontend → API | Browser → :3030 direct | Browser → :8083 direct |
-| CORS | Permissive | Configured for :5000 |
+| CORS | Permissive | Configured for :8883 |
 | Process Model | Single-process monolith | Dual-process (Host + Edge) |
 
 MyRecall retains Host/Edge separation, so CORS is needed for cross-origin requests.
 
 ## Data Flow
 
-1. User opens `http://localhost:5000`
+1. User opens `http://localhost:8883`
 2. Client Flask renders template, injecting `EDGE_BASE_URL = "http://localhost:8083"`
 3. Browser receives HTML, JS calls `EDGE_BASE_URL + '/v1/search'` (CORS cross-origin)
 4. Edge returns JSON, JS renders the page
@@ -101,7 +101,7 @@ Added to `openrecall/shared/config.py`:
 | `OPENRECALL_CLIENT_WEB_PORT` | `5000` | Client web server port |
 | `OPENRECALL_CLIENT_WEB_ENABLED` | `true` | Enable client web server |
 | `OPENRECALL_EDGE_BASE_URL` | `http://localhost:8083` | Edge API base URL |
-| `OPENRECALL_CLIENT_CORS_ORIGIN` | `http://localhost:5000` | CORS allowed origin for Edge |
+| `OPENRECALL_CLIENT_CORS_ORIGIN` | `http://localhost:8883` | CORS allowed origin for Edge |
 
 ## Template Changes
 
