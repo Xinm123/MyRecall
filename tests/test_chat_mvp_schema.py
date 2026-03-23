@@ -4,8 +4,8 @@ Chat MVP Schema Tests
 Validates that the database schema matches the MVP shape defined in docs/v3/chat/mvp.md.
 
 Phase 1 Exit Criteria:
-- frames table has 'text' and 'accessibility_tree_json', no 'accessibility_text'
-- frames_fts is metadata-only (no accessibility_text)
+- frames table has 'accessibility_text', 'ocr_text', and 'accessibility_tree_json', no old 'text' column
+- frames_fts is metadata-only (no text columns)
 - accessibility table has required frame_id and text_length, no 'focused'
 - elements table exists with all required columns
 """
@@ -91,20 +91,25 @@ def sqlite_conn():
 class TestFramesTable:
     """Tests for frames table MVP shape."""
 
-    def test_frames_has_text_column(self, sqlite_conn):
-        """frames.text must exist for unified text storage."""
+    def test_frames_has_accessibility_text_column(self, sqlite_conn):
+        """frames.accessibility_text must exist for canonical accessibility text."""
         cols = get_table_columns(sqlite_conn, "frames")
-        assert "text" in cols, "frames.text column is required for MVP"
+        assert "accessibility_text" in cols, "frames.accessibility_text column is required for MVP"
+
+    def test_frames_no_old_text_column(self, sqlite_conn):
+        """frames.text must be removed (replaced by accessibility_text + ocr_text)."""
+        cols = get_table_columns(sqlite_conn, "frames")
+        assert "text" not in cols, "frames.text should be removed in MVP"
+
+    def test_frames_has_ocr_text_column(self, sqlite_conn):
+        """frames.ocr_text must exist for canonical OCR text."""
+        cols = get_table_columns(sqlite_conn, "frames")
+        assert "ocr_text" in cols, "frames.ocr_text column is required for MVP"
 
     def test_frames_has_accessibility_tree_json(self, sqlite_conn):
         """frames.accessibility_tree_json must exist for storing raw accessibility data."""
         cols = get_table_columns(sqlite_conn, "frames")
         assert "accessibility_tree_json" in cols, "frames.accessibility_tree_json is required for MVP"
-
-    def test_frames_no_accessibility_text(self, sqlite_conn):
-        """frames.accessibility_text must be removed (moved to accessibility table)."""
-        cols = get_table_columns(sqlite_conn, "frames")
-        assert "accessibility_text" not in cols, "frames.accessibility_text should be removed in MVP"
 
     def test_frames_retains_text_source(self, sqlite_conn):
         """frames.text_source must exist to indicate text origin."""
@@ -133,10 +138,11 @@ class TestFramesFts:
         assert indexed == expected or indexed == {"app_name", "window_name", "browser_url", "focused"}, \
             f"frames_fts should only index metadata, got: {indexed}"
 
-    def test_frames_fts_no_accessibility_text(self, sqlite_conn):
-        """frames_fts should not index accessibility_text."""
+    def test_frames_fts_no_text_columns(self, sqlite_conn):
+        """frames_fts should not index text columns (text is in dedicated FTS tables)."""
         cols = get_table_columns(sqlite_conn, "frames_fts")
         assert "accessibility_text" not in cols, "frames_fts should not have accessibility_text column"
+        assert "ocr_text" not in cols, "frames_fts should not have ocr_text column"
 
 
 class TestAccessibilityTable:

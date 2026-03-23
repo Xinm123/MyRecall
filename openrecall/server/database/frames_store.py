@@ -853,6 +853,30 @@ class FramesStore:
             )
             return False
 
+    def update_frames_ocr_text(self, frame_id: int, text: str) -> bool:
+        """Update frames.ocr_text after OCR completion.
+
+        Args:
+            frame_id: The frame ID
+            text: The OCR-extracted text
+
+        Returns:
+            True if updated, False otherwise
+        """
+        try:
+            with self._connect() as conn:
+                cursor = conn.execute(
+                    "UPDATE frames SET ocr_text = ? WHERE id = ?",
+                    (text, frame_id),
+                )
+                conn.commit()
+                return cursor.rowcount > 0
+        except sqlite3.Error as e:
+            logger.error(
+                "update_frames_ocr_text failed frame_id=%d: %s", frame_id, e
+            )
+            return False
+
     def check_ocr_text_exists(self, frame_id: int) -> bool:
         """Check if an ocr_text row exists for a frame.
 
@@ -897,7 +921,7 @@ class FramesStore:
         """Complete a frame with accessibility-canonical data in one transaction.
 
         Writes to:
-        - frames (text, text_source, accessibility_tree_json, browser_url,
+        - frames (accessibility_text, text_source, accessibility_tree_json, browser_url,
                   content_hash, simhash, status, processed_at)
         - accessibility table
         - elements table with derived parent_id and sort_order
@@ -934,7 +958,7 @@ class FramesStore:
                 conn.execute(
                     """
                     UPDATE frames SET
-                        text = ?,
+                        accessibility_text = ?,
                         text_source = 'accessibility',
                         accessibility_tree_json = ?,
                         browser_url = COALESCE(?, browser_url),
@@ -1361,6 +1385,7 @@ class FramesStore:
     def get_frame_context(
         self,
         frame_id: int,
+        include_nodes: bool = False,
         max_text_length: Optional[int] = None,
         max_nodes: Optional[int] = None,
     ) -> Optional[dict]:
@@ -1369,31 +1394,33 @@ class FramesStore:
         Returns frame data including:
         - frame_id, text, text_source
         - nodes: parsed from accessibility_tree_json (text nodes only, aligns with screenpipe)
+          — only included when include_nodes=True
         - urls: extracted from link-like nodes and text
 
         Truncation (aligns with screenpipe MCP layer):
         - By default, returns complete data (no truncation)
         - When max_text_length is set, truncates text with "..." suffix
         - When max_nodes is set, limits nodes and adds nodes_truncated count
+          — only has effect when include_nodes=True
 
         Args:
             frame_id: The frame ID
+            include_nodes: Whether to include parsed nodes (default: False).
+                When False, skips accessibility_tree_json parsing for efficiency.
             max_text_length: Optional max text length (default: None = no limit)
-            max_nodes: Optional max nodes count (default: None = no limit)
-
-        Returns:
-            Dict with frame context or None if not found
+            max_nodes: Optional max nodes count (default: None = no limit).
+                Only applies when include_nodes=True.
         """
         try:
             with self._connect() as conn:
                 # Join with ocr_text table for OCR frames
-                # frames.text is used for accessibility frames, ocr_text.text for OCR frames
+                # accessibility frames: read frames.accessibility_text
+                # ocr frames: read frames.ocr_text
                 row = conn.execute(
                     """
-                    SELECT f.id, f.text, f.text_source, f.accessibility_tree_json,
-                           f.browser_url, f.status, o.text AS ocr_text
+                    SELECT f.id, f.accessibility_text, f.ocr_text, f.text_source,
+                           f.accessibility_tree_json, f.browser_url, f.status
                     FROM frames f
-                    LEFT JOIN ocr_text o ON f.id = o.frame_id
                     WHERE f.id = ?
                     """,
                     (frame_id,),
@@ -1403,11 +1430,11 @@ class FramesStore:
                     return None
 
                 frame_id_val = row["id"]
-                # Use ocr_text for OCR frames, frames.text for accessibility frames
-                if row["text_source"] == "ocr" and row["ocr_text"]:
-                    text = row["ocr_text"]
+                # Use frames.ocr_text for OCR frames, frames.accessibility_text for accessibility frames
+                if row["text_source"] == "ocr":
+                    text = row["ocr_text"] or ""
                 else:
-                    text = row["text"] or ""
+                    text = row["accessibility_text"] or ""
                 text_source = row["text_source"]
                 tree_json = row["accessibility_tree_json"]
                 browser_url = row["browser_url"]
@@ -1416,32 +1443,40 @@ class FramesStore:
                 raw_nodes: list[dict] = []
                 urls: list[str] = []
                 nodes_truncated: Optional[int] = None
+                result_nodes: list[dict] = []
 
-                # Parse accessibility tree if available
-                if tree_json:
+                # Parse accessibility tree only when include_nodes=True
+                if include_nodes and tree_json:
                     try:
                         raw_nodes = json.loads(tree_json)
                     except (json.JSONDecodeError, TypeError):
                         raw_nodes = []
 
-                # Filter nodes: only include nodes with non-empty text (aligns with screenpipe)
-                # screenpipe: `if !text.is_empty() { nodes.push(...) }`
-                nodes = []
-                for node in raw_nodes:
-                    node_text = node.get("text", "")
-                    if node_text:  # Skip empty-text nodes
-                        nodes.append(node)
-
-                # Extract URLs from link-like nodes (aligns with screenpipe)
-                # screenpipe: `role_lower.contains("link") || role_lower.contains("hyperlink")`
-                for node in nodes:
-                    role = (node.get("role") or "").lower()
-                    if "link" in role or "hyperlink" in role:
+                    # Filter nodes: only include nodes with non-empty text (aligns with screenpipe)
+                    # screenpipe: `if !text.is_empty() { nodes.push(...) }`
+                    filtered = []
+                    for node in raw_nodes:
                         node_text = node.get("text", "")
-                        # screenpipe: extract URL if text starts with http/https
-                        for url in self._extract_urls_from_link_text(node_text):
-                            if url not in urls:
-                                urls.append(url)
+                        if node_text:  # Skip empty-text nodes
+                            filtered.append(node)
+
+                    # Extract URLs from link-like nodes (aligns with screenpipe)
+                    # screenpipe: `role_lower.contains("link") || role_lower.contains("hyperlink")`
+                    for node in filtered:
+                        role = (node.get("role") or "").lower()
+                        if "link" in role or "hyperlink" in role:
+                            node_text = node.get("text", "")
+                            # screenpipe: extract URL if text starts with http/https
+                            for url in self._extract_urls_from_link_text(node_text):
+                                if url not in urls:
+                                    urls.append(url)
+
+                    # Apply nodes truncation (only when include_nodes=True)
+                    if max_nodes is not None and len(filtered) > max_nodes:
+                        nodes_truncated = len(filtered) - max_nodes
+                        result_nodes = filtered[:max_nodes]
+                    else:
+                        result_nodes = filtered
 
                 # Extract URLs from full text using regex (aligns with screenpipe)
                 # screenpipe: word-based scan with length > 10 check and punctuation trimming
@@ -1449,28 +1484,25 @@ class FramesStore:
                     if url not in urls:
                         urls.append(url)
 
-                # Apply truncation (screenpipe-aligned defaults: text=2000, nodes=50)
+                # Apply text truncation
                 result_text = text
                 if max_text_length is not None and len(result_text) > max_text_length:
                     result_text = result_text[:max_text_length] + "..."
-
-                result_nodes = nodes
-                if max_nodes is not None and len(nodes) > max_nodes:
-                    nodes_truncated = len(nodes) - max_nodes
-                    result_nodes = nodes[:max_nodes]
 
                 result = {
                     "frame_id": frame_id_val,
                     "text": result_text,
                     "text_source": text_source,
-                    "nodes": result_nodes,
                     "urls": urls,
                     "browser_url": browser_url,
                     "status": status,
                 }
 
-                if nodes_truncated is not None:
-                    result["nodes_truncated"] = nodes_truncated
+                # Only include nodes when include_nodes=True
+                if include_nodes:
+                    result["nodes"] = result_nodes
+                    if nodes_truncated is not None:
+                        result["nodes_truncated"] = nodes_truncated
 
                 return result
 

@@ -52,7 +52,7 @@ class TestFrameContextAPI:
 
         with patch("openrecall.server.api_v1._get_frames_store", return_value=mock_store):
             client = app_with_context_route.test_client()
-            response = client.get("/v1/frames/1/context")
+            response = client.get("/v1/frames/1/context?include_nodes=true")
 
             assert response.status_code == 200
             body = json.loads(response.data)
@@ -126,8 +126,8 @@ class TestFrameContextAPI:
             response = client.get("/v1/frames/1/context?max_text_length=500&max_nodes=20")
 
             assert response.status_code == 200
-            # Verify store was called with correct params
-            mock_store.get_frame_context.assert_called_once_with(1, 500, 20)
+            # Verify store was called with correct params (include_nodes=False by default)
+            mock_store.get_frame_context.assert_called_once_with(1, False, 500, 20)
 
     def test_frame_context_handles_invalid_max_text_length(self, app_with_context_route, mock_store):
         """Invalid max_text_length is ignored (treated as None)."""
@@ -138,8 +138,8 @@ class TestFrameContextAPI:
             response = client.get("/v1/frames/1/context?max_text_length=invalid")
 
             assert response.status_code == 200
-            # Should be called with None for max_text_length
-            mock_store.get_frame_context.assert_called_once_with(1, None, None)
+            # Should be called with include_nodes=False (default) and None for max_text_length
+            mock_store.get_frame_context.assert_called_once_with(1, False, None, None)
 
     def test_frame_context_handles_invalid_max_nodes(self, app_with_context_route, mock_store):
         """Invalid max_nodes is ignored (treated as None)."""
@@ -150,8 +150,8 @@ class TestFrameContextAPI:
             response = client.get("/v1/frames/1/context?max_nodes=invalid")
 
             assert response.status_code == 200
-            # Should be called with None for max_nodes
-            mock_store.get_frame_context.assert_called_once_with(1, None, None)
+            # Should be called with include_nodes=False (default) and None for max_nodes
+            mock_store.get_frame_context.assert_called_once_with(1, False, None, None)
 
     def test_frame_context_returns_ocr_fallback(self, app_with_context_route, mock_store):
         """Endpoint returns OCR data when accessibility unavailable."""
@@ -166,7 +166,7 @@ class TestFrameContextAPI:
 
         with patch("openrecall.server.api_v1._get_frames_store", return_value=mock_store):
             client = app_with_context_route.test_client()
-            response = client.get("/v1/frames/3/context")
+            response = client.get("/v1/frames/3/context?include_nodes=true")
 
             assert response.status_code == 200
             body = json.loads(response.data)
@@ -192,3 +192,62 @@ class TestFrameContextAPI:
             assert response.status_code == 200
             body = json.loads(response.data)
             assert body["browser_url"] == "https://example.com/page"
+
+    def test_frame_context_include_nodes_false_omits_nodes(self, app_with_context_route, mock_store):
+        """When include_nodes=false, response has no nodes key."""
+        mock_store.get_frame_context.return_value = {
+            "frame_id": 1,
+            "text": "Hello World",
+            "text_source": "accessibility",
+            "urls": [],
+            "browser_url": "https://example.com",
+        }
+
+        with patch("openrecall.server.api_v1._get_frames_store", return_value=mock_store):
+            client = app_with_context_route.test_client()
+            response = client.get("/v1/frames/1/context?include_nodes=false")
+
+            assert response.status_code == 200
+            body = json.loads(response.data)
+            # nodes should be absent (not present as empty array)
+            assert "nodes" not in body
+            assert "nodes_truncated" not in body
+            assert "frame_id" in body
+            assert "text" in body
+            assert "text_source" in body
+            assert "urls" in body
+
+    def test_frame_context_include_nodes_false_passes_to_store(self, app_with_context_route, mock_store):
+        """include_nodes=false query param is passed to store."""
+        mock_store.get_frame_context.return_value = {
+            "frame_id": 1,
+            "text": "Hello",
+            "text_source": "accessibility",
+            "urls": [],
+            "browser_url": None,
+        }
+
+        with patch("openrecall.server.api_v1._get_frames_store", return_value=mock_store):
+            client = app_with_context_route.test_client()
+            response = client.get("/v1/frames/1/context?include_nodes=false")
+
+            assert response.status_code == 200
+            mock_store.get_frame_context.assert_called_once_with(1, False, None, None)
+
+    def test_frame_context_include_nodes_true_passes_to_store(self, app_with_context_route, mock_store):
+        """include_nodes=true query param is passed to store."""
+        mock_store.get_frame_context.return_value = {
+            "frame_id": 1,
+            "text": "Hello",
+            "text_source": "accessibility",
+            "nodes": [],
+            "urls": [],
+            "browser_url": None,
+        }
+
+        with patch("openrecall.server.api_v1._get_frames_store", return_value=mock_store):
+            client = app_with_context_route.test_client()
+            response = client.get("/v1/frames/1/context?include_nodes=true&max_text_length=100&max_nodes=5")
+
+            assert response.status_code == 200
+            mock_store.get_frame_context.assert_called_once_with(1, True, 100, 5)

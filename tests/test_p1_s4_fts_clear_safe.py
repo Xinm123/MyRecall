@@ -63,7 +63,7 @@ def temp_db():
             );
 
             CREATE VIRTUAL TABLE IF NOT EXISTS frames_fts USING fts5(
-                app_name, window_name, browser_url, focused, accessibility_text,
+                app_name, window_name, browser_url, focused,
                 id UNINDEXED, tokenize='unicode61'
             );
 
@@ -76,17 +76,17 @@ def temp_db():
 
             -- frames_fts INSERT trigger
             CREATE TRIGGER IF NOT EXISTS frames_ai AFTER INSERT ON frames BEGIN
-                INSERT INTO frames_fts(id, app_name, window_name, browser_url, focused, accessibility_text)
+                INSERT INTO frames_fts(id, app_name, window_name, browser_url, focused)
                 VALUES (NEW.id, COALESCE(NEW.app_name, ''), COALESCE(NEW.window_name, ''),
-                        COALESCE(NEW.browser_url, ''), COALESCE(NEW.focused, 0), '');
+                        COALESCE(NEW.browser_url, ''), COALESCE(NEW.focused, 0));
             END;
 
             -- frames_fts UPDATE trigger (clear-safe: delete old, insert new)
             CREATE TRIGGER IF NOT EXISTS frames_au AFTER UPDATE ON frames BEGIN
                 DELETE FROM frames_fts WHERE id = OLD.id;
-                INSERT INTO frames_fts(id, app_name, window_name, browser_url, focused, accessibility_text)
+                INSERT INTO frames_fts(id, app_name, window_name, browser_url, focused)
                 VALUES (NEW.id, COALESCE(NEW.app_name, ''), COALESCE(NEW.window_name, ''),
-                        COALESCE(NEW.browser_url, ''), COALESCE(NEW.focused, 0), '');
+                        COALESCE(NEW.browser_url, ''), COALESCE(NEW.focused, 0));
             END;
 
             -- ocr_text_fts INSERT trigger

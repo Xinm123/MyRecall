@@ -601,18 +601,26 @@ def get_frame_context(frame_id: int):
     """Return frame context for chat grounding.
 
     Query Parameters:
+        include_nodes: Optional. Whether to include parsed nodes from accessibility_tree_json.
+            Defaults to False (nodes omitted). Pass true to include nodes.
         max_text_length: Optional. Maximum length of text field (truncates with "...").
         max_nodes: Optional. Maximum number of nodes to return.
+            Only applies when include_nodes=true.
 
     Returns:
-        200 JSON — frame context with text, nodes, urls, text_source
+        200 JSON — frame context with text, nodes (if include_nodes=true), urls, text_source
         404 NOT_FOUND — frame_id not in DB
     """
     request_id = str(uuid.uuid4())
 
     # Parse optional query parameters
+    include_nodes = False
     max_text_length = None
     max_nodes = None
+
+    include_nodes_raw = request.args.get("include_nodes")
+    if include_nodes_raw is not None:
+        include_nodes = include_nodes_raw.lower() in ("true", "1", "yes")
 
     max_text_length_raw = request.args.get("max_text_length")
     if max_text_length_raw:
@@ -629,7 +637,7 @@ def get_frame_context(frame_id: int):
             pass
 
     store = _get_frames_store()
-    context = store.get_frame_context(frame_id, max_text_length, max_nodes)
+    context = store.get_frame_context(frame_id, include_nodes, max_text_length, max_nodes)
 
     if context is None:
         return make_error_response(

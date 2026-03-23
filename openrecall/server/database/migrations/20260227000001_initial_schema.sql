@@ -27,9 +27,10 @@ CREATE TABLE IF NOT EXISTS frames (
     snapshot_path         TEXT DEFAULT NULL,       -- JPEG 快照路径（主链路，推荐 .jpg）
     capture_trigger       TEXT DEFAULT NULL,       -- 'idle'|'app_switch'|'manual'|'click' (P1)
 
-    -- MVP: Unified text column (replaces separate ocr_text/accessibility_text)
-    text                  TEXT DEFAULT NULL,       -- Unified text for search (OCR or accessibility)
-    text_source           TEXT DEFAULT NULL,       -- 'ocr'|'accessibility'
+    -- MVP: Symmetric canonical text columns (replaces unified frames.text)
+    accessibility_text        TEXT DEFAULT NULL,       -- Canonical text from accessibility (AX-first path)
+    ocr_text                  TEXT DEFAULT NULL,       -- Canonical text from OCR (OCR-fallback path)
+    text_source               TEXT DEFAULT NULL,       -- 'accessibility'|'ocr'
 
     -- MVP: Raw accessibility tree for chat context
     accessibility_tree_json TEXT DEFAULT NULL,     -- Full accessibility tree as JSON

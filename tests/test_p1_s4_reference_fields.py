@@ -107,9 +107,9 @@ def temp_db_with_frames():
 
             -- FTS triggers
             CREATE TRIGGER IF NOT EXISTS frames_ai AFTER INSERT ON frames BEGIN
-                INSERT INTO frames_fts(id, app_name, window_name, browser_url, focused, accessibility_text)
+                INSERT INTO frames_fts(id, app_name, window_name, browser_url, focused)
                 VALUES (NEW.id, COALESCE(NEW.app_name, ''), COALESCE(NEW.window_name, ''),
-                        COALESCE(NEW.browser_url, ''), COALESCE(NEW.focused, 0), '');
+                        COALESCE(NEW.browser_url, ''), COALESCE(NEW.focused, 0));
             END;
 
             CREATE TRIGGER IF NOT EXISTS ocr_text_ai AFTER INSERT ON ocr_text

@@ -291,6 +291,10 @@ class V3ProcessingWorker:
 
         # --- Step 8: Update text_source and advance to completed ---
         self._store.update_text_source(frame_id, "ocr")
+
+        # --- Step 9: Write ocr_text to frames table ---
+        self._store.update_frames_ocr_text(frame_id, result.text)
+
         ok = self._store.advance_frame_status(frame_id, "processing", "completed")
         if not ok:
             logger.error(

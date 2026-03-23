@@ -138,12 +138,12 @@ class TestAccessibilityCanonicalIngest:
         with sqlite3.connect(str(store.db_path)) as conn:
             conn.row_factory = sqlite3.Row
             row = conn.execute(
-                "SELECT status, text_source, text FROM frames WHERE id = ?",
+                "SELECT status, text_source, accessibility_text FROM frames WHERE id = ?",
                 (frame_id,),
             ).fetchone()
             assert row["status"] == "completed"
             assert row["text_source"] == "accessibility"
-            assert row["text"] == "Hello World\nFoo Bar"
+            assert row["accessibility_text"] == "Hello World\nFoo Bar"
 
     def test_ingest_degrades_bad_accessibility_payload_to_pending(
         self, store: FramesStore, tmp_path: Path
@@ -367,9 +367,9 @@ class TestCompleteAccessibilityFrame:
         with sqlite3.connect(str(store.db_path)) as conn:
             conn.row_factory = sqlite3.Row
             frame = conn.execute(
-                "SELECT text, browser_url FROM frames WHERE id = ?", (frame_id,)
+                "SELECT accessibility_text, browser_url FROM frames WHERE id = ?", (frame_id,)
             ).fetchone()
-            assert frame["text"] == "Hello World Updated"
+            assert frame["accessibility_text"] == "Hello World Updated"
             assert frame["browser_url"] == "https://example.com/updated"
 
     def test_complete_accessibility_frame_with_empty_elements(
@@ -463,17 +463,32 @@ class TestHttpAccessibilityIngest:
         """Create a Flask test client with temporary data directory."""
         import importlib
 
-        monkeypatch.setenv("OPENRECALL_SERVER_DATA_DIR", str(tmp_path / "server"))
-        monkeypatch.setenv("OPENRECALL_DATA_DIR", str(tmp_path / "server"))
+        server_dir = tmp_path / "server"
+        server_dir.mkdir(parents=True, exist_ok=True)
+
+        monkeypatch.setenv("OPENRECALL_SERVER_DATA_DIR", str(server_dir))
+        monkeypatch.setenv("OPENRECALL_DATA_DIR", str(server_dir))
 
         import openrecall.shared.config
         importlib.reload(openrecall.shared.config)
 
-        from openrecall.server.api_v1 import v1_bp, _get_frames_store
+        # Apply migrations to the temp database before starting the app
+        from openrecall.server.database.migrations_runner import run_migrations
+        db_path = server_dir / "db"
+        db_path.mkdir(parents=True, exist_ok=True)
+        conn = sqlite3.connect(str(db_path / "edge.db"))
+        migrations_dir = Path(__file__).resolve().parent.parent / (
+            "openrecall/server/database/migrations"
+        )
+        run_migrations(conn, migrations_dir)
+        conn.close()
 
-        # Reset store singleton
+        # Pre-create the store with the temp DB and inject it into the module
         import openrecall.server.api_v1 as api_module
-        api_module._frames_store = None
+        from openrecall.server.database.frames_store import FramesStore
+        api_module._frames_store = FramesStore(db_path=db_path / "edge.db")
+
+        from openrecall.server.api_v1 import v1_bp
 
         from flask import Flask
         app = Flask(__name__)

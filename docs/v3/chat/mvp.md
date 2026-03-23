@@ -83,11 +83,12 @@ The MVP keeps the paired capture direction.
   - write `frames`
   - write `accessibility`
   - write `elements`
-  - set `frames.text`
+  - set `frames.accessibility_text`
   - set `frames.text_source='accessibility'`
 - if accessibility is unavailable at capture time:
   - write base `frames`
-  - leave `frames.text=NULL`
+  - leave `frames.accessibility_text=NULL`
+  - leave `frames.ocr_text=NULL`
   - leave `frames.text_source=NULL`
   - let the OCR worker complete the frame later
 
@@ -165,7 +166,7 @@ For AX-eligible non-terminal focused-window captures:
 When a frame is accessibility-canonical, the client must upload:
 
 - top-level canonical frame fields:
-  - `text`
+  - `accessibility_text` (client uploads as `text`, stored as `frames.accessibility_text`)
   - `text_source='accessibility'`
   - `browser_url` when available (frame-level metadata, not accessibility-specific)
   - `content_hash`
@@ -185,7 +186,7 @@ When a frame is accessibility-canonical, the client must upload:
 
 For accessibility-canonical frames:
 
-- `text` must equal `accessibility.text_content`
+- `frames.accessibility_text` must equal `accessibility.text_content`
 - `accessibility.tree_json` is required
 - `accessibility.tree_json` must parse successfully on the server before the frame can take the accessibility-complete path
 
@@ -248,10 +249,11 @@ The preferred implementation order is:
 - canonical OCR completion only applies to frames that are still pending and have no canonical `text_source`
 - on canonical OCR success, the worker writes:
   - `ocr_text`
-  - `frames.text`
+  - `frames.ocr_text`
   - `frames.text_source='ocr'`
 - OCR may still be persisted for accessibility-canonical frames as auxiliary OCR data
-- auxiliary OCR persistence must not overwrite `frames.text`
+- auxiliary OCR persistence must not overwrite `frames.accessibility_text`
+- auxiliary OCR persistence must not overwrite `frames.ocr_text`
 - auxiliary OCR persistence must not overwrite `frames.text_source`
 - search visibility is always controlled by canonical `frames.text_source`
 
@@ -268,7 +270,7 @@ paired_capture
 
 ocr_worker
   -> ocr_text
-  -> frames.text
+  -> frames.ocr_text
   -> frames.text_source='ocr'
 ```
 
@@ -376,7 +378,7 @@ If the uploaded metadata contains a valid accessibility-canonical payload, inges
 - finalize the claimed frame image
 - synchronously complete the frame in one DB transaction
 - write:
-  - `frames.text`
+  - `frames.accessibility_text`
   - `frames.text_source='accessibility'`
   - `frames.accessibility_tree_json`
   - `frames.browser_url`
@@ -424,7 +426,8 @@ It stores:
 - `device_name`
 - `snapshot_path`
 - `capture_trigger`
-- `text`
+- `accessibility_text`
+- `ocr_text`
 - `text_source`
 - `accessibility_tree_json`
 - `content_hash`
@@ -438,7 +441,8 @@ It stores:
 
 Notes:
 
-- `frames.text` is the canonical text for the frame
+- `frames.accessibility_text` is the canonical text from the accessibility path
+- `frames.ocr_text` is the canonical text from the OCR path
 - `frames.text_source` is one of `accessibility | ocr | NULL`
 - `frames.accessibility_tree_json` stores the serialized flat accessibility node list from the focused-window snapshot and is used by frame context
 - `frames_fts` should be metadata-only
@@ -716,7 +720,8 @@ Recommended properties:
 
 The server should make it easy to inspect the persisted result for a frame, including:
 
-- `frames.text`
+- `frames.accessibility_text`
+- `frames.ocr_text`
 - `frames.text_source`
 - `frames.browser_url`
 - `frames.accessibility_tree_json`
@@ -952,17 +957,18 @@ The endpoint returns a typed union.
 
 - `frame_id`
 - `text`
-- `nodes`
 - `urls`
 - `text_source`
+- `nodes` — only present when `include_nodes=true`
+- `nodes_truncated` — only present when `include_nodes=true` and `max_nodes` truncation was applied
 
 ### Semantics
 
-- `text` comes from `frames.text`
+- `text` comes from `frames.accessibility_text` (accessibility frames) or `frames.ocr_text` (OCR frames)
 - if accessibility data is available:
   - `text_source='accessibility'`
-  - `nodes` are derived from `accessibility_tree_json`
-  - `urls` are extracted from link-like nodes first, then from text
+  - `nodes` are derived from `accessibility_tree_json` (only when `include_nodes=true`)
+  - `urls` are extracted from link-like nodes first (only when `include_nodes=true`), then from text
 - otherwise:
   - fallback to OCR-derived frame text and URLs
   - `text_source='ocr'`
@@ -979,12 +985,12 @@ Only nodes with non-empty text content are included in the response.
 
 ### URL Extraction (aligns with screenpipe)
 
-**Link-like node extraction:**
+**Link-like node extraction** (only when `include_nodes=true`):
 
 - Matches roles containing "link" or "hyperlink" (case-insensitive)
 - Extracts URL only if node text starts with `http://` or `https://`
 
-**Full text extraction:**
+**Full text extraction** (always active):
 
 - Word-based scan for `http://` or `https://` prefixes
 - Length check: URL must be > 10 characters
@@ -1019,15 +1025,21 @@ The API returns complete data by default. Truncation is applied at the Chat/MCP 
 **API query parameters (optional):**
 
 ```
-GET /v1/frames/{id}/context?max_text_length=2000&max_nodes=50
+GET /v1/frames/{id}/context?include_nodes=false&max_text_length=2000&max_nodes=50
 ```
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `include_nodes` | boolean | `false` | When `false` (default), omits `nodes` and `nodes_truncated` from response and skips accessibility tree parsing. When `true`, includes parsed accessibility nodes. |
+| `max_text_length` | integer | — | Truncates text with `...` suffix |
+| `max_nodes` | integer | — | Limits node count. Only applies when `include_nodes=true`. |
 
 **Rationale:**
 
-- API layer returns full data for flexibility (matches screenpipe behavior)
+- `include_nodes` defaults to `false` to reduce token overhead for default consumers. Consumers needing structural node data must explicitly pass `include_nodes=true`.
+- When `include_nodes=false`, the accessibility tree JSON is not parsed, reducing compute and memory overhead.
+- URL extraction from text (via regex) remains active regardless of `include_nodes` value.
 - Chat/MCP layer applies truncation to protect LLM context window
-- Each frame context is ~1000-2000 tokens when sent to LLM
-- Agents should fetch no more than 2-3 frames per query
 
 ## Image Fetch
 
@@ -1135,7 +1147,8 @@ MVP browser URL extraction rules:
 - no public `/v1/elements`
 - no input or audio parity
 - weaker browser URL support in MVP
-- `frames.text` is the canonical frame text field
+- `frames.accessibility_text` is the canonical accessibility text field
+- `frames.ocr_text` is the canonical OCR text field
 - `frames_fts` is metadata-only
 
 ## Deferred

@@ -48,7 +48,9 @@ def temp_db_with_schema():
                 snapshot_path         TEXT DEFAULT NULL,
                 capture_trigger       TEXT DEFAULT NULL,
                 accessibility_text    TEXT DEFAULT NULL,
+                ocr_text             TEXT DEFAULT NULL,
                 text_source           TEXT DEFAULT NULL,
+                accessibility_tree_json TEXT DEFAULT NULL,
                 content_hash          TEXT DEFAULT NULL,
                 simhash               INTEGER DEFAULT NULL,
                 capture_id            TEXT NOT NULL UNIQUE,
@@ -81,14 +83,14 @@ def temp_db_with_schema():
                 window_name   TEXT NOT NULL,
                 text_content  TEXT NOT NULL,
                 browser_url   TEXT,
-                frame_id      INTEGER DEFAULT NULL,
-                focused       BOOLEAN DEFAULT NULL,
-                FOREIGN KEY (frame_id) REFERENCES frames(id) ON DELETE SET NULL
+                frame_id      INTEGER NOT NULL,
+                text_length   INTEGER DEFAULT 0,
+                FOREIGN KEY (frame_id) REFERENCES frames(id) ON DELETE CASCADE
             );
 
             -- frames_fts
             CREATE VIRTUAL TABLE IF NOT EXISTS frames_fts USING fts5(
-                app_name, window_name, browser_url, focused, accessibility_text,
+                app_name, window_name, browser_url, focused,
                 id UNINDEXED, tokenize='unicode61'
             );
 
@@ -105,18 +107,16 @@ def temp_db_with_schema():
 
             -- Triggers for frames_fts
             CREATE TRIGGER IF NOT EXISTS frames_ai AFTER INSERT ON frames BEGIN
-                INSERT INTO frames_fts(id, app_name, window_name, browser_url, focused, accessibility_text)
+                INSERT INTO frames_fts(id, app_name, window_name, browser_url, focused)
                 VALUES (NEW.id, COALESCE(NEW.app_name, ''), COALESCE(NEW.window_name, ''),
-                        COALESCE(NEW.browser_url, ''), COALESCE(NEW.focused, 0),
-                        COALESCE(NEW.accessibility_text, ''));
+                        COALESCE(NEW.browser_url, ''), COALESCE(NEW.focused, 0));
             END;
 
             CREATE TRIGGER IF NOT EXISTS frames_au AFTER UPDATE ON frames BEGIN
                 DELETE FROM frames_fts WHERE id = OLD.id;
-                INSERT INTO frames_fts(id, app_name, window_name, browser_url, focused, accessibility_text)
+                INSERT INTO frames_fts(id, app_name, window_name, browser_url, focused)
                 VALUES (NEW.id, COALESCE(NEW.app_name, ''), COALESCE(NEW.window_name, ''),
-                        COALESCE(NEW.browser_url, ''), COALESCE(NEW.focused, 0),
-                        COALESCE(NEW.accessibility_text, ''));
+                        COALESCE(NEW.browser_url, ''), COALESCE(NEW.focused, 0));
             END;
 
             CREATE TRIGGER IF NOT EXISTS frames_ad AFTER DELETE ON frames BEGIN
@@ -125,7 +125,8 @@ def temp_db_with_schema():
 
             -- Triggers for ocr_text_fts
             CREATE TRIGGER IF NOT EXISTS ocr_text_ai AFTER INSERT ON ocr_text
-            WHEN NEW.text IS NOT NULL AND NEW.text != '' BEGIN
+            WHEN NEW.text IS NOT NULL AND NEW.text != '' AND NEW.frame_id IS NOT NULL
+            BEGIN
                 INSERT INTO ocr_text_fts(frame_id, text, app_name, window_name)
                 VALUES (NEW.frame_id, NEW.text, COALESCE(NEW.app_name, ''), COALESCE(NEW.window_name, ''));
             END;
@@ -134,7 +135,9 @@ def temp_db_with_schema():
                 DELETE FROM ocr_text_fts WHERE frame_id = OLD.frame_id;
                 INSERT INTO ocr_text_fts(frame_id, text, app_name, window_name)
                 SELECT NEW.frame_id, NEW.text, COALESCE(NEW.app_name, ''), COALESCE(NEW.window_name, '')
-                WHERE NEW.text IS NOT NULL AND NEW.text != '';
+                WHERE NEW.frame_id IS NOT NULL
+                  AND NEW.text IS NOT NULL
+                  AND NEW.text != '';
             END;
 
             CREATE TRIGGER IF NOT EXISTS ocr_text_ad AFTER DELETE ON ocr_text BEGIN
@@ -309,7 +312,7 @@ class TestV4SeamSchemaIntegrity:
             "text_content",
             "browser_url",
             "frame_id",
-            "focused",
+            "text_length",
         }
 
         with sqlite3.connect(str(db_path)) as conn:

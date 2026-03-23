@@ -80,10 +80,10 @@ def temp_db_with_mixed_frames(tmp_path: Path) -> Path:
     ]
 
     for frame_data in ocr_frames:
-        # Insert frame
+        # Insert frame with ocr_text column
         conn.execute("""
             INSERT INTO frames (capture_id, timestamp, app_name, window_name, browser_url,
-                                focused, device_name, text, text_source, status)
+                                focused, device_name, ocr_text, text_source, status)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'completed')
         """, (
             frame_data["capture_id"],
@@ -151,10 +151,10 @@ def temp_db_with_mixed_frames(tmp_path: Path) -> Path:
     ]
 
     for frame_data in ax_frames:
-        # Insert frame
+        # Insert frame with accessibility_text column
         conn.execute("""
             INSERT INTO frames (capture_id, timestamp, app_name, window_name, browser_url,
-                                focused, device_name, text, text_source, status)
+                                focused, device_name, accessibility_text, text_source, status)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'completed')
         """, (
             frame_data["capture_id"],
