@@ -161,3 +161,12 @@ def init_background_worker(app_instance):
     # Step 3: Attach to App (Crucial: Prevents Garbage Collection)
     app_instance.worker = worker
     logger.info("🚀 Background Processing Worker started successfully.")
+
+
+@app.after_request
+def add_cors_headers(response):
+    """Allow cross-origin requests from the client web UI."""
+    response.headers["Access-Control-Allow-Origin"] = settings.client_cors_origin
+    response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
+    response.headers["Access-Control-Allow-Headers"] = "Content-Type"
+    return response
