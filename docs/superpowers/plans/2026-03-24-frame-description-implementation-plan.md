@@ -55,6 +55,7 @@ Spec:  docs/superpowers/specs/2026-03-24-frame-description-design.md
 ```sql
 -- Migration: 20260324120000_add_frame_description.sql
 -- Add description support: frame_descriptions table, description_tasks table, frames.description_status
+-- NOTE: Do NOT write to schema_migrations — the runner records migrations automatically.
 
 BEGIN;
 
@@ -90,9 +91,6 @@ CREATE TABLE IF NOT EXISTS description_tasks (
 );
 CREATE INDEX IF NOT EXISTS idx_dt_status ON description_tasks(status);
 CREATE INDEX IF NOT EXISTS idx_dt_next_retry ON description_tasks(next_retry_at);
-
--- 4. Record migration
-INSERT OR REPLACE INTO schema_migrations (version, description) VALUES ('20260324120000', 'add frame description tables');
 
 COMMIT;
 ```
@@ -270,7 +268,7 @@ class FrameDescription(BaseModel):
 class FrameContext(BaseModel):
     """Context metadata passed to description provider."""
     app_name: Optional[str] = None
-    window_title: Optional[str] = None
+    window_name: Optional[str] = None  # Matches frames.window_name column
     browser_url: Optional[str] = None
     timestamp: Optional[float] = None
 ```
@@ -422,8 +420,8 @@ def _build_messages(context: FrameContext) -> list[dict[str, Any]]:
     app_context = ""
     if context.app_name:
         app_context = f"App: {context.app_name}"
-    if context.window_title:
-        app_context += f" | Window: {context.window_title}"
+    if context.window_name:
+        app_context += f" | Window: {context.window_name}"
     if context.browser_url:
         app_context += f" | URL: {context.browser_url}"
 
@@ -655,8 +653,8 @@ class OpenAIDescriptionProvider(DescriptionProvider):
         ctx_parts = []
         if context.app_name:
             ctx_parts.append(f"App: {context.app_name}")
-        if context.window_title:
-            ctx_parts.append(f"Window: {context.window_title}")
+        if context.window_name:
+            ctx_parts.append(f"Window: {context.window_name}")
         if context.browser_url:
             ctx_parts.append(f"URL: {context.browser_url}")
         ctx_str = " | ".join(ctx_parts) if ctx_parts else "unknown"
@@ -768,8 +766,8 @@ class DashScopeDescriptionProvider(DescriptionProvider):
         ctx_parts = []
         if context.app_name:
             ctx_parts.append(f"App: {context.app_name}")
-        if context.window_title:
-            ctx_parts.append(f"Window: {context.window_title}")
+        if context.window_name:
+            ctx_parts.append(f"Window: {context.window_name}")
         if context.browser_url:
             ctx_parts.append(f"URL: {context.browser_url}")
         ctx_str = " | ".join(ctx_parts) if ctx_parts else "unknown"
@@ -1118,7 +1116,7 @@ class DescriptionWorker(threading.Thread):
         # Build context
         context = FrameContext(
             app_name=frame.get("app_name"),
-            window_title=frame.get("window_name"),
+            window_name=frame.get("window_name"),
             browser_url=frame.get("browser_url"),
         )
 
@@ -1766,12 +1764,16 @@ At line 157 where `worker = ProcessingWorker()`, add after that line:
 
 ```python
     if settings.description_enabled:
+        from openrecall.server.database.frames_store import FramesStore
         from openrecall.server.description.worker import DescriptionWorker
-        description_worker = DescriptionWorker(worker._store)
+        description_store = FramesStore()
+        description_worker = DescriptionWorker(description_store)
         description_worker.start()
         app_instance.description_worker = description_worker
         logger.info("DescriptionWorker started (legacy mode)")
 ```
+
+Note: `ProcessingWorker` and `V3ProcessingWorker` do not expose a `_store` attribute. Always create a new `FramesStore()` instance for `DescriptionWorker`.
 
 - [ ] **Step 5: Wire shutdown in `shutdown_handler()` in `__main__.py`**
 
