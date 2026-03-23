@@ -426,7 +426,7 @@ class Settings(BaseSettings):
     )
     # Client Web UI Configuration
     client_web_port: int = Field(
-        default=5000,
+        default=8883,
         alias="OPENRECALL_CLIENT_WEB_PORT",
         description="Port for client web UI server",
     )
@@ -441,7 +441,7 @@ class Settings(BaseSettings):
         description="Base URL for Edge API server (used by client web UI)",
     )
     client_cors_origin: str = Field(
-        default="http://localhost:5000",
+        default="http://localhost:8883",
         alias="OPENRECALL_CLIENT_CORS_ORIGIN",
         description="Allowed CORS origin for Edge server (client web UI origin)",
     )
