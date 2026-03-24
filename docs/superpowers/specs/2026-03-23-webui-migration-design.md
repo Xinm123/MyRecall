@@ -1,7 +1,7 @@
 # Web UI Migration: Server → Client
 
 **Date:** 2026-03-23
-**Status:** Approved
+**Status:** ✅ Implemented (2026-03-24)
 **Reference:** Aligns with screenpipe's "server as pure API" philosophy
 
 ## Context
@@ -12,7 +12,7 @@ This design migrates the Web UI to the Client, aligning with screenpipe's archit
 
 ## Decision
 
-Move Web UI templates from Edge Server to Client. The Client provides an independent Flask web server on port 5000. API calls from the browser go directly to Edge (port 8083) via CORS.
+Move Web UI templates from Edge Server to Client. The Client provides an independent Flask web server on port 8883. API calls from the browser go directly to Edge (port 8083) via CORS.
 
 ## Architecture
 
@@ -64,6 +64,50 @@ MyRecall retains Host/Edge separation, so CORS is needed for cross-origin reques
 3. Browser receives HTML, JS calls `EDGE_BASE_URL + '/v1/search'` (CORS cross-origin)
 4. Edge returns JSON, JS renders the page
 
+### Distributed Mode (Client and Edge on Different Machines)
+
+```
+┌──────────────────────────────────────────────────────┐
+│  Client Machine (192.168.1.101)                      │
+│  ┌────────────────────────────────────────────────┐  │
+│  │  Flask Web Server  :8883                         │  │
+│  │  └── EDGE_BASE_URL = http://192.168.1.100:8083  │  │
+│  │                                                │  │
+│  │  JS requests go to http://192.168.1.100:8083   │  │
+│  │  Browser Origin = http://192.168.1.101:8883     │  │
+│  └────────────────────────────────────────────────┘  │
+└────────────────────────┬─────────────────────────────┘
+                         │ LAN / VPN
+                         ▼
+┌──────────────────────────────────────────────────────┐
+│  Edge Machine (192.168.1.100)                        │
+│  ┌────────────────────────────────────────────────┐  │
+│  │  Flask API Server  :8083                         │  │
+│  │  CORS: echo-back any Origin header             │  │
+│  └────────────────────────────────────────────────┘  │
+└──────────────────────────────────────────────────────┘
+```
+
+**Configuration (Client machine):**
+```bash
+# myrecall_client.env
+OPENRECALL_API_URL=http://192.168.1.100:8083/api
+# EDGE_BASE_URL auto-derived to http://192.168.1.100:8083
+```
+
+**How it works:**
+1. User opens `http://192.168.1.101:8883` in browser
+2. Client Flask renders template, injects `EDGE_BASE_URL = "http://192.168.1.100:8083"` (from `OPENRECALL_API_URL` auto-derive)
+3. Browser JS calls `http://192.168.1.100:8083/v1/search` (CORS cross-origin)
+4. Edge CORS echoes back `Access-Control-Allow-Origin: http://192.168.1.101:8883`
+5. Browser allows response
+
+**Requirements:**
+- Both machines on same network (LAN or VPN)
+- Edge port 8083 accessible from Client machine
+- Client web UI port 8883 accessible from user's browser
+- No NAT/port-mapping support (machines must be directly reachable)
+
 ### Health Check & Degradation
 
 JS polls Edge health regularly. If Edge is offline, a warning banner appears — the page does not crash.
@@ -98,10 +142,11 @@ Added to `openrecall/shared/config.py`:
 
 | Config Key | Default | Description |
 |------------|---------|-------------|
-| `OPENRECALL_CLIENT_WEB_PORT` | `5000` | Client web server port |
+| `OPENRECALL_CLIENT_WEB_PORT` | `8883` | Client web server port |
 | `OPENRECALL_CLIENT_WEB_ENABLED` | `true` | Enable client web server |
 | `OPENRECALL_EDGE_BASE_URL` | `http://localhost:8083` | Edge API base URL |
-| `OPENRECALL_CLIENT_CORS_ORIGIN` | `http://localhost:8883` | CORS allowed origin for Edge |
+| `OPENRECALL_CLIENT_CORS_ORIGIN` | `http://localhost:8883` | Deprecated: CORS now accepts any origin (echo-back). Kept for backward compatibility. |
+| `OPENRECALL_API_URL` | `http://localhost:8083/api` | Used for uploader. `EDGE_BASE_URL` is auto-derived from this (removes `/api` suffix). |
 
 ## Template Changes
 
