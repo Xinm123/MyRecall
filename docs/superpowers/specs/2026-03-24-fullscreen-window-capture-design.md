@@ -35,6 +35,8 @@ Fix: screencapture path:
 
 ### Capture Strategy
 
+`_record_frame` is called per-monitor, so fullscreen detection and capture are **per-monitor**. On a multi-monitor setup, each monitor is evaluated independently.
+
 ```
 _record_frame(trigger, monitor):
   1. Try to detect fullscreen window on this monitor
@@ -43,23 +45,29 @@ _record_frame(trigger, monitor):
      → extract kCGWindowNumber
 
   2. If fullscreen window found:
-     → screencapture -l<window_id> -x -t jpg /tmp/cap.jpg
+     → screencapture -l<window_id> -x -t jpg /tmp/cap.jpg   (5s timeout)
      → PIL.Image.open → numpy array (BGR)
+     → if screencapture fails (any reason) or returns None → fallback to mss
      → save frame
-     → else fallback to mss display capture
 
   3. If no fullscreen window:
      → continue using existing mss display capture
 ```
 
+**Timeout:** `subprocess.run(..., timeout=5)` — 5 seconds. Prevents blocking the capture loop. `screencapture` is fast (~5-30ms) but permission-denied or hung scenarios must not stall captures.
+
+**Image format:** `-t jpg` is specified (matches project's JPEG contract). If format support varies by macOS version, PIL can re-encode from PNG as fallback (detect via `tmp_path` extension). `screencapture` without `-t` defaults to PNG.
+
 ### Fallback Chain
 
 ```
-Capture attempt:
-  1. screencapture -l <window_id>   (for fullscreen windows)
-     ↓ if fails
-  2. mss display capture             (existing behavior)
+Per monitor capture:
+  1. screencapture -l <window_id>   (for fullscreen windows, 5s timeout)
+     ↓ if subprocess fails (non-zero exit, timeout, permission denied)
+  2. mss display capture             (existing behavior, unchanged)
 ```
+
+`_capture_window_by_id` returns `None` on **any** subprocess error (exit code != 0, timeout, `OSError`, `subprocess.TimeoutExpired`). This makes the fallback automatic — no caller needs to distinguish error types.
 
 ### Permission
 
@@ -102,8 +110,9 @@ def _detect_fullscreen_window_on_monitor(
 Key logic:
 - Uses `kCGWindowListOptionAll` to include windows on all Spaces
 - Filters `kCGWindowLayer == 0` (normal windows, not overlay)
-- Filters system apps (Dock, Window Server, ControlCenter, etc.)
+- Filters system apps: `Dock`, `Window Server`, `ControlCenter`, `SystemUIServer`, `NotificationCenter`, `loginwindow`, `WindowManager`, `Contexts`, `Screenshot`
 - Checks if window bounds ≥ 95% of monitor dimensions
+- Returns `kCGWindowNumber` or `None`
 
 ### 3. `openrecall/client/recorder.py` — Modified: `_record_frame`
 
@@ -111,13 +120,15 @@ Modified to call `_detect_fullscreen_window_on_monitor` before capture. If a ful
 
 ### 4. `openrecall/client/events/macos.py` — Reuse existing `CGWindowListCopyWindowInfo`
 
-The existing code at lines 556-589 already uses `CGWindowListCopyWindowInfo`. Extract window info extraction logic into a reusable helper.
+The existing code at lines 556-589 already uses `CGWindowListCopyWindowInfo`. Extract window info extraction logic into a standalone helper function in `macos.py` (e.g., `get_all_windows_info()`) returning a list of window dicts with `kCGWindowNumber`, `kCGWindowOwnerName`, `kCGWindowLayer`, `kCGWindowBounds`. Both `get_active_app_monitor` and `_detect_fullscreen_window_on_monitor` call this helper.
 
 ## Risk: Cross-Space Window Enumeration
 
 `CGWindowListCopyWindowInfo` with `kCGWindowListOptionAll` may not enumerate windows on all Spaces depending on macOS version and TCC permissions. **This is the primary risk.**
 
-**Mitigation:** If `CGWindowListCopyWindowInfo` returns no windows in the fullscreen region, the method returns `None` and we fall back to `mss` display capture. No functionality is lost.
+**Mitigation:** If `CGWindowListCopyWindowInfo` returns no windows in the fullscreen region, `_detect_fullscreen_window_on_monitor` returns `None` and we fall back to `mss` display capture. No functionality is lost.
+
+**screencapture failure:** If the window is detected but `screencapture` fails (exit code != 0, timeout, permission denied), `_capture_window_by_id` returns `None` and the caller falls back to `mss`. Both failure modes are silent — the capture loop continues without error.
 
 **Verification test:** Write a test script that enters fullscreen in an app and checks whether `CGWindowListCopyWindowInfo` enumerates the fullscreen window.
 
@@ -127,9 +138,14 @@ All frame metadata (timestamp, app_name, window_title, etc.) remains unchanged. 
 
 ## Testing
 
-1. **Unit test**: Mock `CGWindowListCopyWindowInfo` response with fullscreen window data, verify correct `window_id` is returned
-2. **Integration test**: Manual test — fullscreen a browser tab, verify screenshot contains actual content not just desktop
-3. **Fallback test**: If `screencapture` fails, verify `mss` fallback still works
+1. **Unit test** (`tests/test_p1_s2a_trigger_coverage.py` or new file): Mock `CGWindowListCopyWindowInfo` response with fullscreen window data, verify correct `window_id` is returned and `None` is returned when no fullscreen window exists
+2. **Integration test**: Manual test procedure:
+   - Start MyRecall client and server
+   - Open a browser, navigate to any page
+   - Click the browser's fullscreen button (green button → "Enter Full Screen")
+   - Wait 10s for capture cycle
+   - Check the saved frame: if it shows browser content → fix works; if only desktop → fix not working
+3. **Fallback test**: Temporarily break `screencapture` (e.g., `chmod -x`), trigger capture, verify `mss` fallback still produces frames
 
 ## Relationship to screenpipe
 
