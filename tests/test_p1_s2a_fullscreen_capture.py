@@ -96,3 +96,85 @@ def test_capture_window_by_id_returns_none_on_failure(monkeypatch):
     recorder = ScreenRecorder()
     result = recorder._capture_window_by_id(999)
     assert result is None
+
+
+@pytest.mark.unit
+def test_detect_fullscreen_window_returns_id(monkeypatch):
+    """_detect_fullscreen_window_on_monitor returns kCGWindowNumber for fullscreen window."""
+    mock_windows = [
+        {
+            "kCGWindowNumber": 123,
+            "kCGWindowOwnerName": "Arc",
+            "kCGWindowLayer": 0,
+            "kCGWindowBounds": {"X": 0, "Y": 0, "Width": 2560, "Height": 1600},
+        },
+        {
+            "kCGWindowNumber": 789,
+            "kCGWindowOwnerName": "Dock",
+            "kCGWindowLayer": 0,
+            "kCGWindowBounds": {"X": 0, "Y": 1560, "Width": 2560, "Height": 40},
+        },
+    ]
+    with patch("openrecall.client.recorder.get_all_windows_info", return_value=mock_windows):
+        from openrecall.client.recorder import ScreenRecorder
+        recorder = ScreenRecorder()
+        monitor = MonitorDescriptor(stable_id="1", left=0, top=0, width=2560, height=1600, is_primary=True)
+        window_id = recorder._detect_fullscreen_window_on_monitor(monitor)
+        assert window_id == 123
+
+
+@pytest.mark.unit
+def test_detect_fullscreen_window_returns_none_when_no_fullscreen(monkeypatch):
+    """Returns None when no window fills the monitor."""
+    mock_windows = [
+        {
+            "kCGWindowNumber": 200,
+            "kCGWindowOwnerName": "Arc",
+            "kCGWindowLayer": 0,
+            "kCGWindowBounds": {"X": 100, "Y": 100, "Width": 800, "Height": 600},
+        },
+    ]
+    with patch("openrecall.client.recorder.get_all_windows_info", return_value=mock_windows):
+        from openrecall.client.recorder import ScreenRecorder
+        recorder = ScreenRecorder()
+        monitor = MonitorDescriptor(stable_id="1", left=0, top=0, width=2560, height=1600, is_primary=True)
+        window_id = recorder._detect_fullscreen_window_on_monitor(monitor)
+        assert window_id is None
+
+
+@pytest.mark.unit
+def test_detect_fullscreen_window_returns_none_for_system_apps(monkeypatch):
+    """Returns None for system apps even if they fill the screen."""
+    mock_windows = [
+        {
+            "kCGWindowNumber": 999,
+            "kCGWindowOwnerName": "Dock",
+            "kCGWindowLayer": 0,
+            "kCGWindowBounds": {"X": 0, "Y": 0, "Width": 2560, "Height": 1600},
+        },
+    ]
+    with patch("openrecall.client.recorder.get_all_windows_info", return_value=mock_windows):
+        from openrecall.client.recorder import ScreenRecorder
+        recorder = ScreenRecorder()
+        monitor = MonitorDescriptor(stable_id="1", left=0, top=0, width=2560, height=1600, is_primary=True)
+        window_id = recorder._detect_fullscreen_window_on_monitor(monitor)
+        assert window_id is None
+
+
+@pytest.mark.unit
+def test_detect_fullscreen_window_skips_overlay_layers(monkeypatch):
+    """Returns None for overlay windows (layer > 0)."""
+    mock_windows = [
+        {
+            "kCGWindowNumber": 500,
+            "kCGWindowOwnerName": "Arc",
+            "kCGWindowLayer": 25,  # overlay
+            "kCGWindowBounds": {"X": 0, "Y": 0, "Width": 2560, "Height": 1600},
+        },
+    ]
+    with patch("openrecall.client.recorder.get_all_windows_info", return_value=mock_windows):
+        from openrecall.client.recorder import ScreenRecorder
+        recorder = ScreenRecorder()
+        monitor = MonitorDescriptor(stable_id="1", left=0, top=0, width=2560, height=1600, is_primary=True)
+        window_id = recorder._detect_fullscreen_window_on_monitor(monitor)
+        assert window_id is None

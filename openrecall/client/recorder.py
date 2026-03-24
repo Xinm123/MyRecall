@@ -28,6 +28,7 @@ from openrecall.client.events.base import (
 )
 from openrecall.client.events.macos import (
     get_active_app_monitor,
+    get_all_windows_info,
     get_frontmost_app_name,
     list_monitors,
     MacOSAppSwitchMonitor,
@@ -1027,6 +1028,63 @@ class ScreenRecorder:
         except Exception:
             logger.debug("Window capture failed for window_id=%d", window_id)
             return None
+
+    SYSTEM_WINDOW_APPS: frozenset[str] = frozenset({
+        "Dock",
+        "Window Server",
+        "ControlCenter",
+        "SystemUIServer",
+        "NotificationCenter",
+        "loginwindow",
+        "WindowManager",
+        "Contexts",
+        "Screenshot",
+    })
+
+    def _detect_fullscreen_window_on_monitor(
+        self, monitor: MonitorDescriptor
+    ) -> int | None:
+        """Detect if there's a fullscreen window on the given monitor.
+
+        Uses get_all_windows_info() to enumerate all windows across Spaces,
+        then finds one whose bounds cover >=95% of the monitor.
+
+        Returns:
+            kCGWindowNumber (int) of the fullscreen window, or None.
+        """
+        try:
+            windows = get_all_windows_info()
+        except Exception:
+            return None
+
+        for window in windows:
+            layer = window.get("kCGWindowLayer", 0)
+            if layer != 0:
+                continue
+
+            owner_name = window.get("kCGWindowOwnerName", "")
+            if owner_name in self.SYSTEM_WINDOW_APPS:
+                continue
+
+            bounds = window.get("kCGWindowBounds")
+            if bounds is None:
+                continue
+
+            win_x = bounds.get("X", 0)
+            win_y = bounds.get("Y", 0)
+            win_w = bounds.get("Width", 0)
+            win_h = bounds.get("Height", 0)
+
+            # Fullscreen window: fills >=95% of monitor
+            if (
+                win_w >= monitor.width * 0.95
+                and win_h >= monitor.height * 0.95
+                and abs(win_x - monitor.left) <= 10
+                and abs(win_y - monitor.top) <= 10
+            ):
+                return window.get("kCGWindowNumber")
+
+        return None
 
     def _record_permission_issue(self, reason: str) -> None:
         self._last_permission_snapshot = self._permission_state_machine.record_check(
