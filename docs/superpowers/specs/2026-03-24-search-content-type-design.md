@@ -1,7 +1,7 @@
 # Search Content Type Filter — Design
 
 **Date:** 2026-03-24
-**Status:** Approved
+**Status:** Completed
 **Scope:** Client web search page only (`openrecall/client/web/templates/search.html`)
 
 ## Overview

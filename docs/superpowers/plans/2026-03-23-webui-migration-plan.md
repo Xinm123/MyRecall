@@ -1,6 +1,9 @@
 # Web UI Migration: Server → Client Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **Status:** ✅ Completed
+> **Completed:** 2026-03-24
+
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Move Web UI templates from Edge Server to Client. Client runs a Flask web server on port 8883 serving Jinja2 templates. API calls from templates go directly to Edge (port 8083) via CORS.
 
@@ -33,14 +36,14 @@
 **Files:**
 - Modify: `openrecall/shared/config.py` (after the `fusion_log_enabled` field, ~line 422)
 
-- [ ] **Step 1: Add the four new config fields**
+- [x] **Step 1: Add the four new config fields**
 
 Insert after the `fusion_log_enabled` field (~line 422):
 
 ```python
     # Client Web UI Configuration
     client_web_port: int = Field(
-        default=5000,
+        default=8883,
         alias="OPENRECALL_CLIENT_WEB_PORT",
         description="Port for client web UI server",
     )
@@ -61,12 +64,12 @@ Insert after the `fusion_log_enabled` field (~line 422):
     )
 ```
 
-- [ ] **Step 2: Verify config loads correctly**
+- [x] **Step 2: Verify config loads correctly**
 
 Run: `python -c "from openrecall.shared.config import settings; print(settings.client_web_port, settings.edge_base_url, settings.client_cors_origin, settings.client_web_enabled)"`
-Expected: `5000 http://localhost:8083 http://localhost:8883 True`
+Expected: `8883 http://localhost:8083 http://localhost:8883 True`
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add openrecall/shared/config.py
@@ -83,7 +86,7 @@ OPENRECALL_EDGE_BASE_URL, OPENRECALL_CLIENT_CORS_ORIGIN settings.
 **Files:**
 - Modify: `openrecall/server/app.py` (after line 163, after `init_background_worker` function)
 
-- [ ] **Step 1: Add CORS after_request handler**
+- [x] **Step 1: Add CORS after_request handler**
 
 Add at the end of `app.py`, after the `init_background_worker` function:
 
@@ -97,14 +100,14 @@ def add_cors_headers(response):
     return response
 ```
 
-- [ ] **Step 2: Verify CORS middleware works**
+- [x] **Step 2: Verify CORS middleware works**
 
 Run: `python -c "from openrecall.server.app import app; tc = app.test_client(); r = tc.get('/v1/health'); print(r.headers.get('Access-Control-Allow-Origin'))"`
 Expected: `http://localhost:8883`
 
 This verifies the CORS header is actually present on responses, not just that the import succeeds.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add openrecall/server/app.py
@@ -123,7 +126,7 @@ git commit -m "feat(server): add CORS headers for client web UI origin"
 - Create: `openrecall/client/web/templates/` (directory)
 - Create: `openrecall/client/web/vendor/` (directory)
 
-- [ ] **Step 1: Create `__init__.py`**
+- [x] **Step 1: Create `__init__.py`**
 
 ```python
 """Client web UI package."""
@@ -133,7 +136,7 @@ from openrecall.client.web.app import start_web_server
 __all__ = ["start_web_server"]
 ```
 
-- [ ] **Step 2: Create `app.py`**
+- [x] **Step 2: Create `app.py`**
 
 ```python
 """Flask web server for client-side Web UI."""
@@ -206,12 +209,12 @@ def start_web_server():
     return t
 ```
 
-- [ ] **Step 3: Verify imports work**
+- [x] **Step 3: Verify imports work**
 
 Run: `python -c "from openrecall.client.web.app import client_app, start_web_server; print('OK')"`
 Expected: `OK` (may warn about missing templates — that's expected before Task 4)
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add openrecall/client/web/__init__.py openrecall/client/web/app.py
@@ -230,7 +233,7 @@ git commit -m "feat(client): add web UI Flask app on port 8883"
 - Create: `openrecall/client/web/templates/icons.html` (copy from server)
 - Create: `openrecall/client/web/vendor/alpine.min.js` (copy from server)
 
-- [ ] **Step 1: Copy all template files**
+- [x] **Step 1: Copy all template files**
 
 ```bash
 cp openrecall/server/templates/index.html openrecall/client/web/templates/
@@ -241,12 +244,12 @@ cp openrecall/server/templates/icons.html openrecall/client/web/templates/
 cp openrecall/server/vendor/alpine.min.js openrecall/client/web/vendor/
 ```
 
-- [ ] **Step 2: Verify files exist**
+- [x] **Step 2: Verify files exist**
 
 Run: `ls openrecall/client/web/templates/ && ls openrecall/client/web/vendor/`
 Expected: 5 HTML files + alpine.min.js
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add openrecall/client/web/templates/ openrecall/client/web/vendor/
@@ -264,7 +267,7 @@ git commit -m "feat(client): copy web UI templates and vendor assets"
 
 First, read `layout.html` and identify all fetch() calls and hardcoded URLs that need `EDGE_BASE_URL` prefix.
 
-- [ ] **Step 1: Read layout.html to find all API calls**
+- [x] **Step 1: Read layout.html to find all API calls**
 
 Run: `grep -n "fetch\|/api\|/v1\|/screenshots" openrecall/client/web/templates/layout.html`
 
@@ -275,18 +278,18 @@ Expected locations (exact lines may vary):
 
 These should become `fetch(EDGE_BASE_URL + '/v1/health')` etc.
 
-- [ ] **Step 2: Apply EDGE_BASE_URL prefix to all API calls in layout.html**
+- [x] **Step 2: Apply EDGE_BASE_URL prefix to all API calls in layout.html**
 
 For each `fetch('/...')` or `fetch("/...")`, change to `fetch(EDGE_BASE_URL + '/...')`.
 
-- [ ] **Step 3: Verify all changed**
+- [x] **Step 3: Verify all changed**
 
 Run: `grep -n "fetch\|src=.*'/api\|src=.*'/v1\|/api/\|/v1/" openrecall/client/web/templates/layout.html | grep -v "EDGE_BASE_URL"`
 Expected: No results (all API calls and image URLs should use EDGE_BASE_URL)
 
 Note: The grep catches `fetch()`, inline `src='...'` attributes, and bare `/api/` or `/v1/` strings. Alpine.js bindings like `:src="..."` are also caught because they reference JS variables containing `/api/` or `/v1/` strings.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add openrecall/client/web/templates/layout.html
@@ -300,7 +303,7 @@ git commit -m "feat(templates): add EDGE_BASE_URL prefix to API calls in layout.
 **Files:**
 - Modify: `openrecall/client/web/templates/index.html`
 
-- [ ] **Step 1: Read index.html to find all API calls and frame URLs**
+- [x] **Step 1: Read index.html to find all API calls and frame URLs**
 
 Run: `grep -n "fetch\|/api\|/v1\|/screenshots" openrecall/client/web/templates/index.html`
 
@@ -308,18 +311,18 @@ Expected locations:
 - Memories API: `fetch('/api/memories/latest?...')` and `fetch('/api/memories/recent?...')`
 - Frame URLs: `/v1/frames/${frameId}` and `/v1/frames/${frameId}/ocr-vis`
 
-- [ ] **Step 2: Apply EDGE_BASE_URL prefix**
+- [x] **Step 2: Apply EDGE_BASE_URL prefix**
 
 For each API endpoint, change:
 - `'/api/...'` → `EDGE_BASE_URL + '/api/...'`
 - `'/v1/...'` → `EDGE_BASE_URL + '/v1/...'`
 
-- [ ] **Step 3: Verify all changed**
+- [x] **Step 3: Verify all changed**
 
 Run: `grep -n "fetch\|src=.*'/api\|src=.*'/v1\|/api/\|/v1/" openrecall/client/web/templates/index.html | grep -v "EDGE_BASE_URL"`
 Expected: No results (all API calls and image URLs should use EDGE_BASE_URL)
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add openrecall/client/web/templates/index.html
@@ -333,7 +336,7 @@ git commit -m "feat(templates): add EDGE_BASE_URL prefix to API calls in index.h
 **Files:**
 - Modify: `openrecall/client/web/templates/search.html`
 
-- [ ] **Step 1: Read search.html to find all API calls and frame URLs**
+- [x] **Step 1: Read search.html to find all API calls and frame URLs**
 
 Run: `grep -n "fetch\|/api\|/v1\|/screenshots" openrecall/client/web/templates/search.html`
 
@@ -341,14 +344,14 @@ Expected locations:
 - Search API: `fetch('/v1/search?...')`
 - Frame URL: `/v1/frames/${frameId}`
 
-- [ ] **Step 2: Apply EDGE_BASE_URL prefix**
+- [x] **Step 2: Apply EDGE_BASE_URL prefix**
 
-- [ ] **Step 3: Verify all changed**
+- [x] **Step 3: Verify all changed**
 
 Run: `grep -n "fetch\|src=.*'/api\|src=.*'/v1\|/api/\|/v1/" openrecall/client/web/templates/search.html | grep -v "EDGE_BASE_URL"`
 Expected: No results
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add openrecall/client/web/templates/search.html
@@ -362,21 +365,21 @@ git commit -m "feat(templates): add EDGE_BASE_URL prefix to API calls in search.
 **Files:**
 - Modify: `openrecall/client/web/templates/timeline.html`
 
-- [ ] **Step 1: Read timeline.html to find all API calls and frame URLs**
+- [x] **Step 1: Read timeline.html to find all API calls and frame URLs**
 
 Run: `grep -n "fetch\|/api\|/v1\|/screenshots" openrecall/client/web/templates/timeline.html`
 
 Expected locations:
 - Frame URLs: `/v1/frames/${frameId}`
 
-- [ ] **Step 2: Apply EDGE_BASE_URL prefix**
+- [x] **Step 2: Apply EDGE_BASE_URL prefix**
 
-- [ ] **Step 3: Verify all changed**
+- [x] **Step 3: Verify all changed**
 
 Run: `grep -n "fetch\|src=.*'/api\|src=.*'/v1\|/api/\|/v1/" openrecall/client/web/templates/timeline.html | grep -v "EDGE_BASE_URL"`
 Expected: No results
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add openrecall/client/web/templates/timeline.html
@@ -392,7 +395,7 @@ git commit -m "feat(templates): add EDGE_BASE_URL prefix to API calls in timelin
 **Files:**
 - Modify: `openrecall/client/__main__.py`
 
-- [ ] **Step 1: Modify `main()` to start web server when enabled**
+- [x] **Step 1: Modify `main()` to start web server when enabled**
 
 Add at the beginning of `main()`, after the logger config block:
 
@@ -404,7 +407,7 @@ Add at the beginning of `main()`, after the logger config block:
         web_server_thread = start_web_server()
 ```
 
-- [ ] **Step 2: Handle --no-web flag**
+- [x] **Step 2: Handle --no-web flag**
 
 At the top of `__main__.py` (before `from openrecall.shared.config import settings`), add:
 
@@ -418,12 +421,12 @@ if "--no-web" in sys.argv:
     os.environ["OPENRECALL_CLIENT_WEB_ENABLED"] = "false"
 ```
 
-- [ ] **Step 3: Verify it works**
+- [x] **Step 3: Verify it works**
 
 Run: `python -m openrecall.client --no-web 2>&1 | head -20`
 Expected: No "Web UI started" log line when `--no-web` is passed
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add openrecall/client/__main__.py
@@ -441,12 +444,12 @@ git commit -m "feat(client): start web UI server on client startup"
 
 > **Note:** Run scripts are at the repo root (`./run_client.sh`, `./run_server.sh`), not in `scripts/`.
 
-- [ ] **Step 1: Read run_client.sh to find the python invocation**
+- [x] **Step 1: Read run_client.sh to find the python invocation**
 
 Run: `grep -n "openrecall.client" run_client.sh`
 Expected: Finds the line that runs `python -m openrecall.client`
 
-- [ ] **Step 2: Update to pass through --no-web**
+- [x] **Step 2: Update to pass through --no-web**
 
 In the shell script, find the line that runs `python -m openrecall.client` and ensure it passes all arguments through:
 
@@ -459,7 +462,7 @@ exec "$python_bin" -m openrecall.client "$@"
 
 The `"$@"` passes through any arguments including `--no-web`, which `__main__.py` handles.
 
-- [ ] **Step 3: Test with --no-web**
+- [x] **Step 3: Test with --no-web**
 
 ```bash
 ./run_client.sh --no-web &
@@ -468,7 +471,7 @@ sleep 2
 kill %1
 ```
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add run_client.sh  # or the correct path
@@ -481,21 +484,21 @@ git commit -m "chore: run_client.sh passes --no-web to client"
 
 ### Task 11: End-to-end verification
 
-- [ ] **Step 1: Start Edge server**
+- [x] **Step 1: Start Edge server**
 
 ```bash
 ./run_server.sh --debug &
 sleep 5
 ```
 
-- [ ] **Step 2: Start Client**
+- [x] **Step 2: Start Client**
 
 ```bash
 ./run_client.sh --debug &
 sleep 3
 ```
 
-- [ ] **Step 3: Test all three pages load**
+- [x] **Step 3: Test all three pages load**
 
 ```bash
 curl -s -o /dev/null -w "%{http_code}" http://localhost:8883/
@@ -508,7 +511,7 @@ curl -s -o /dev/null -w "%{http_code}" http://localhost:8883/timeline
 # Expected: 200
 ```
 
-- [ ] **Step 4: Verify image URLs work (frames via EDGE_BASE_URL)**
+- [x] **Step 4: Verify image URLs work (frames via EDGE_BASE_URL)**
 
 Get a frame ID from the API, then verify the image URL redirects/proxies correctly:
 
@@ -521,7 +524,7 @@ curl -s -o /dev/null -w "%{http_code}" -H "Origin: http://localhost:8883" "http:
 # Expected: 200 (image/jpeg)
 ```
 
-- [ ] **Step 5: Verify CORS headers on Edge**
+- [x] **Step 5: Verify CORS headers on Edge**
 
 ```bash
 curl -s -I -X OPTIONS http://localhost:8083/v1/health \
@@ -530,7 +533,7 @@ curl -s -I -X OPTIONS http://localhost:8083/v1/health \
 # Expected: Access-Control-Allow-Origin: http://localhost:8883
 ```
 
-- [ ] **Step 6: Cleanup**
+- [x] **Step 6: Cleanup**
 
 ```bash
 kill $(pgrep -f "openrecall.client") $(pgrep -f "openrecall.server") 2>/dev/null
@@ -550,16 +553,16 @@ The following items are **out of scope** for this plan (per design spec):
 
 ## Task Summary
 
-| # | Task | Files Modified | Commit |
-|---|------|---------------|--------|
-| 1 | Config fields | `openrecall/shared/config.py` | feat(config): add client web UI config fields |
-| 2 | CORS middleware | `openrecall/server/app.py` | feat(server): add CORS headers |
-| 3 | Client web package | `openrecall/client/web/__init__.py`, `app.py` | feat(client): add web UI Flask app |
-| 4 | Copy templates | `openrecall/client/web/templates/`, `vendor/` | feat(client): copy web UI templates |
-| 5 | layout.html | `openrecall/client/web/templates/layout.html` | feat(templates): layout.html |
-| 6 | index.html | `openrecall/client/web/templates/index.html` | feat(templates): index.html |
-| 7 | search.html | `openrecall/client/web/templates/search.html` | feat(templates): search.html |
-| 8 | timeline.html | `openrecall/client/web/templates/timeline.html` | feat(templates): timeline.html |
-| 9 | Client integration | `openrecall/client/__main__.py` | feat(client): start web UI on startup |
-| 10 | Run script | `run_client.sh` | chore: run_client.sh --no-web |
-| 11 | E2E verification | — | — |
+| # | Task | Status | Files Modified | Commit |
+|---|------|--------|---------------|--------|
+| 1 | Config fields | ✅ | `openrecall/shared/config.py` | feat(config): add client web UI config fields |
+| 2 | CORS middleware | ✅ | `openrecall/server/app.py` | feat(server): add CORS headers |
+| 3 | Client web package | ✅ | `openrecall/client/web/__init__.py`, `app.py` | feat(client): add web UI Flask app |
+| 4 | Copy templates | ✅ | `openrecall/client/web/templates/`, `vendor/` | feat(client): copy web UI templates |
+| 5 | layout.html | ✅ | `openrecall/client/web/templates/layout.html` | feat(templates): layout.html |
+| 6 | index.html | ✅ | `openrecall/client/web/templates/index.html` | feat(templates): index.html |
+| 7 | search.html | ✅ | `openrecall/client/web/templates/search.html` | feat(templates): search.html |
+| 8 | timeline.html | ✅ | `openrecall/client/web/templates/timeline.html` | feat(templates): timeline.html |
+| 9 | Client integration | ✅ | `openrecall/client/__main__.py` | feat(client): start web UI on startup |
+| 10 | Run script | ✅ | `run_client.sh` | chore: run_client.sh --no-web |
+| 11 | E2E verification | ✅ | — | — |

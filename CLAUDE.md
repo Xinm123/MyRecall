@@ -8,7 +8,8 @@ MyRecall v3 is a privacy-first alternative to proprietary digital memory solutio
 
 **Core Principles:**
 - **Edge-Centric Architecture**: Host (capture) and Edge (processing) are separate processes
-- **Vision-Only, OCR-Only**: Uses OCR for text extraction
+- **Vision + OCR + Accessibility**: Uses macOS AX (accessibility) for text extraction with OCR as fallback
+- **AX-first**: Client collects accessibility data first; if AX succeeds → `text_source='accessibility'`, else OCR fallback → `text_source='ocr'`
 - **Privacy-First**: All data stays local, no cloud required
 - **FTS5 Search**: Full-text search with metadata filtering
 
@@ -70,40 +71,48 @@ pip install -e ".[test]"    # Include test dependencies
 
 ### Host (Client) - `openrecall.client`
 
-**Responsibility:** Capture + Spool + Upload
+**Responsibility:** Capture + Spool + Upload + Web UI Server (port 8883)
 
 **Components:**
 - **Recorder**: Event-driven screenshot capture
   - Triggers: `idle`, `app_switch`, `manual`, `click`
-  - Debounce: `min_capture_interval_ms=1000ms`
-  - Idle fallback: `idle_capture_interval_ms=30000ms`
+  - Debounce: Three-layer debouncing (click: 3000ms, trigger: 3000ms, capture: 3000ms)
+  - Idle fallback: `idle_capture_interval_ms=60000ms`
 - **Spool**: Disk queue for reliability (`~/MRC/spool/`)
   - Format: JPEG (`.jpg`/`.jpeg`) + JSON metadata
   - Atomic writes, idempotent retry
 - **Uploader**: Background consumer, posts to Edge `/v1/ingest`
+- **Web Server**: Flask app on port 8883 serving Jinja2 templates; browser JS fetches API from Edge (port 8083) via CORS
+
+**Web Routes (served by Client):**
+- `/` (Grid), `/search`, `/timeline` — Jinja2 templates
+- `/vendor/*` — Alpine.js static assets
+- `/screenshots/*` — Proxy to Edge `/v1/frames/` (for legacy fallback)
+
+**Web Server:** Flask app in `openrecall/client/web/app.py` serving templates from `openrecall/client/web/templates/`
 
 **Entry Point:** `python -m openrecall.client`
 
 ### Edge (Server) - `openrecall.server`
 
-**Responsibility:** Processing + API + Search
+**Responsibility:** Processing + API + Search (pure API, no Web UI)
 
 **Components:**
 - **Ingest API**: `POST /v1/ingest` (idempotent)
-- **Worker**: Async OCR processing with task queue
+- **Worker**: Processing worker (`V3ProcessingWorker` for OCR mode, `DescriptionWorker` for frame descriptions)
 - **Database**:
-  - `~/MRS/db/edge.db`: Frames metadata, task queue
-  - `~/MRS/fts.db`: FTS5 full-text index
+  - `~/MRS/db/edge.db`: Frames metadata + FTS5 tables (frames_fts, ocr_text_fts, accessibility_fts)
+  - `~/MRS/fts.db`: Legacy schema (used by old API layer)
   - `~/MRS/frames/`: JPEG snapshots
 - **Search Engine**: FTS5 + metadata filtering (P1)
   - Filters: time range, app_name, window_name, browser_url, focused
+  - `content_type` parameter: `ocr`, `accessibility`, or `all` (default)
   - No vector embeddings in production P1 (reserved for P2+ experimental)
+- **CORS Middleware**: Echo-back `Origin` header for cross-origin browser requests from Client web UI
+
+**API Routes:** `/v1/*`, `/api/*` — all responses include `Access-Control-Allow-Origin: <browser-origin>`
 
 **Entry Point:** `python -m openrecall.server`
-
-**Web Routes:**
-- Web UI (served by Client on port 8883): `/` (Grid), `/search`, `/timeline` — browser fetches API from Edge directly
-- Server (port 8083) serves API only: `/v1/*`, `/api/*` — web UI routes are disabled (`DISABLE_SERVER_WEB=True`)
 
 ### Key Data Structures
 
@@ -112,32 +121,30 @@ pip install -e ".[test]"    # Include test dependencies
 - frame_id (TEXT PRIMARY KEY)
 - capture_id (TEXT UNIQUE, idempotency key)
 - timestamp (TEXT ISO8601 UTC)
-- app_name, window_title, browser_url
+- app_name, window_name, browser_url
 - monitor_index, device_id
 - capture_trigger (idle/app_switch/manual/click)
-- ocr_text
+- accessibility_text (text from AX, if AX-first succeeded)
+- ocr_text (text from OCR fallback)
+- text_source ('accessibility'|'ocr')
+- accessibility_tree_json (full AX tree as JSON)
 - processing_status (pending/processing/completed/failed)
 - event_ts (capture event timestamp, separate from frame timestamp)
 ```
 
 **FTS5 Tables**:
 - `ocr_text_fts`: Full-text index on OCR text
-- `frames_fts`: Full-text index on metadata + OCR
+- `accessibility_fts`: Full-text index on accessibility text (includes browser_url)
+- `frames_fts`: Full-text index on metadata only (app_name, window_name, browser_url, focused)
 
-## Key Architecture Decisions (ADRs)
+## Key Architecture Decisions
 
-Located in `docs/v3/adr/`:
+Key decisions embedded in this document:
+- **Edge-Centric**: Host captures/uploads, Edge processes/indexes/searches
+- **Vision + AX + OCR**: AX-first text extraction with OCR fallback; both indexed separately
+- **FTS5 Search**: Full-text search on both OCR and accessibility text via `content_type` filter
 
-1. **ADR-0001**: Edge-Centric Responsibility Split
-   - Host: capture + spool + upload only
-   - Edge: processing + index + search + chat
-
-2. **ADR-0005**: Vision-Only Search (aligns with screenpipe)
-   - FTS + metadata filtering
-   - No vector search in production
-   - Embeddings reserved for P2+ experimental use
-
-3. **OCR-Only (OQ-043)**: Accessibility schema reserved for v4, not in v3 data flow
+Architecture baselines: `docs/baselines/` (chat, search)
 
 ## Database Migrations
 
@@ -155,8 +162,8 @@ Migrations are in `openrecall/server/database/migrations/`:
 
 ### Adding New Features
 
-1. **Check roadmap**: `docs/v3/roadmap.md` for current phase
-2. **Read ADRs**: `docs/v3/adr/` for architectural constraints
+1. **Check current plans**: `docs/superpowers/plans/` for active implementation plans
+2. **Read specs**: `docs/superpowers/specs/` for design specifications
 3. **Write tests first**: Follow TDD (minimum 80% coverage)
 4. **Update docs**: If changing API contracts or architecture
 
@@ -165,17 +172,32 @@ Migrations are in `openrecall/server/database/migrations/`:
 ```
 openrecall/
 ├── client/           # Host process
+│   ├── __main__.py  # Entry point
 │   ├── events/      # Event capture (macOS CGEventTap)
-│   ├── recorder.py  # Screenshot capture
+│   ├── recorder.py  # Screenshot capture + AX collection
 │   ├── spool.py     # Disk queue
-│   └── uploader.py  # Edge upload consumer
+│   ├── uploader.py  # Edge upload consumer
+│   ├── hash_utils.py  # Frame deduplication (hash)
+│   ├── accessibility/  # macOS AX (accessibility) text extraction
+│   │   ├── service.py  # AX collection entrypoint
+│   │   ├── macos.py    # macOS AX API bindings
+│   │   ├── policy.py   # AX vs OCR decision logic
+│   │   └── types.py    # AccessibilityDecision types
+│   └── web/         # Flask web UI (port 8883)
+│       ├── app.py
+│       └── templates/
 ├── server/          # Edge process
-│   ├── api.py       # Legacy API routes
+│   ├── __main__.py  # Entry point
+│   ├── app.py       # Flask app
+│   ├── api.py       # Legacy API (410 Gone)
 │   ├── api_v1.py    # v1 API endpoints (/v1/*)
-│   ├── worker.py    # Async OCR processing
+│   ├── worker.py    # Legacy ProcessingWorker
 │   ├── database/    # SQLite + migrations
+│   │   ├── frames_store.py  # v3 FramesStore (edge.db)
+│   │   └── sql.py          # Legacy SQLStore (fts.db)
 │   ├── search/      # FTS5 search engine
-│   └── ocr/         # OCR providers
+│   ├── processing/  # V3ProcessingWorker, OCR processor
+│   └── description/ # DescriptionWorker (frame descriptions)
 └── shared/          # Common utilities
     ├── config.py    # Settings management
     └── models.py    # Data models
@@ -191,8 +213,10 @@ Key settings (see `openrecall/shared/config.py`):
 - `OPENRECALL_DEBUG`: Enable debug logging
 - `OPENRECALL_AI_PROVIDER`: AI provider (local/dashscope/openai)
 - `OPENRECALL_DEVICE`: Inference device (cpu/cuda/mps)
-- `OPENRECALL_MIN_CAPTURE_INTERVAL_MS`: Debounce interval (default: 2000)
-- `OPENRECALL_IDLE_CAPTURE_INTERVAL_MS`: Idle fallback (default: 30000)
+- `OPENRECALL_TRIGGER_DEBOUNCE_MS`: Debounce for APP_SWITCH/IDLE/MANUAL events (default: 3000)
+- `OPENRECALL_CLICK_DEBOUNCE_MS`: Debounce for CLICK events (default: 3000)
+- `OPENRECALL_CAPTURE_DEBOUNCE_MS`: Global capture debounce (default: 3000)
+- `OPENRECALL_IDLE_CAPTURE_INTERVAL_MS`: Idle fallback interval (default: 60000)
 
 ## Testing Strategy
 
@@ -204,6 +228,7 @@ Key settings (see `openrecall/shared/config.py`):
 - `security`: Security tests
 - `model`: Tests requiring AI models/large downloads
 - `manual`: Manual test scripts
+- `search`: Search engine tests
 
 **Test Organization:**
 - `tests/` - Active tests
@@ -227,23 +252,25 @@ Key settings (see `openrecall/shared/config.py`):
 ## API Contracts
 
 **v1 API Endpoints** (`/v1/*`):
-- `POST /v1/ingest`: Upload frame (idempotent)
+- `POST /v1/ingest`: Upload frame (idempotent, supports AX-canonical payload)
 - `GET /v1/frames/<frame_id>`: Retrieve frame JPEG
 - `GET /v1/health`: Health check
 - `GET /v1/ingest/queue/status`: Queue status
+- `GET /v1/search`: Search with `content_type` filter (`ocr`/`accessibility`/`all`)
+- `GET /v1/search/counts`: Get result counts by content type
 
 **Legacy API** (`/api/*`):
-- Deprecated, redirects to `/v1/*` with 301/308
-- Logs `[DEPRECATED]` warning
+- Deprecated, returns 410 Gone for all endpoints
+- All functionality migrated to `/v1/*`
 
-See `docs/v3/http_contract_ledger.md` for complete API documentation.
+See `docs/archive/v3/http_contract_ledger.md` for complete API documentation (archived).
 
 ## Performance Characteristics
 
 **Capture Frequency:**
 - P1/P2: 1Hz maximum (intentional deviation from screenpipe's 5Hz)
-- Debounce: 1000ms minimum between captures
-- Idle fallback: 30000ms timeout
+- Debounce: Three-layer (click 3000ms, trigger 3000ms, capture 3000ms)
+- Idle fallback: 60000ms timeout
 
 **Search:**
 - FTS5-based full-text search
@@ -267,7 +294,7 @@ See `docs/v3/http_contract_ledger.md` for complete API documentation.
 
 ### Adding a New Capture Trigger
 
-1. Update `CaptureTrigger` enum in `openrecall/shared/models.py`
+1. Update `CaptureTrigger` enum in `openrecall/client/events/base.py`
 2. Add event detection in `openrecall/client/events/`
 3. Update recorder logic in `openrecall/client/recorder.py`
 4. Add tests in `tests/test_p1_s2a_trigger_coverage.py`
@@ -297,13 +324,6 @@ The `_ref/screenpipe/` directory contains the screenpipe Rust implementation for
 
 ## Current Development Phase
 
-See `docs/v3/roadmap.md` for current phase:
-
-**Phase 1**: Local simulated Edge (process isolation)
-- P1-S1: Basic ingest pipeline ✓
-- P1-S2a: Event-driven capture
-- P1-S2a+: Permission stability closure
-- P1-S2b: Capture completion
-- P1-S3+: OCR processing and beyond
-
-Each stage has explicit gates in `docs/v3/gate_baseline.md`.
+Active implementation plans: `docs/superpowers/plans/`
+Design specifications: `docs/superpowers/specs/`
+Architecture baselines: `docs/baselines/`

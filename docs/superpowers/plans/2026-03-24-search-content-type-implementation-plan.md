@@ -1,5 +1,9 @@
 # Search Content Type Filter Implementation Plan
 
+> **Status:** ✅ Completed (2026-03-24)
+>
+> **Summary:** All tasks implemented and tested. Backend `count_by_type()` + `/v1/search/counts` API + frontend pill filters with lazy-loaded counts.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use @superpowers:subagent-driven-development (recommended) or @superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Add content type filter (OCR/AX/All) with pill UI and lazy-loaded counts to the client web search page.
@@ -26,7 +30,7 @@
 - Modify: `openrecall/server/search/engine.py:850+`
 - Test: `tests/test_search_engine.py`
 
-- [ ] **Step 1.1: Write the failing test**
+- [x] **Step 1.1: Write the failing test**
 
 ```python
 def test_count_by_type_returns_ocr_and_accessibility_counts(test_db):
@@ -56,13 +60,13 @@ def test_count_by_type_returns_ocr_and_accessibility_counts(test_db):
     assert isinstance(counts["accessibility"], int)
 ```
 
-- [ ] **Step 1.2: Run test to verify it fails**
+- [x] **Step 1.2: Run test to verify it fails**
 
 Run: `pytest tests/test_search_engine.py::test_count_by_type_returns_ocr_and_accessibility_counts -v`
 
 Expected: FAIL with `AttributeError: 'SearchEngine' object has no attribute 'count_by_type'`
 
-- [ ] **Step 1.3: Implement `count_by_type()` method**
+- [x] **Step 1.3: Implement `count_by_type()` method**
 
 Add to `openrecall/server/search/engine.py` after the `count()` method (around line 891):
 
@@ -117,13 +121,13 @@ def count_by_type(
         return {"ocr": 0, "accessibility": 0}
 ```
 
-- [ ] **Step 1.4: Run test to verify it passes**
+- [x] **Step 1.4: Run test to verify it passes**
 
 Run: `pytest tests/test_search_engine.py::test_count_by_type_returns_ocr_and_accessibility_counts -v`
 
 Expected: PASS
 
-- [ ] **Step 1.5: Write edge case test**
+- [x] **Step 1.5: Write edge case test**
 
 ```python
 def test_count_by_type_returns_zeros_on_empty_database(test_db):
@@ -136,13 +140,13 @@ def test_count_by_type_returns_zeros_on_empty_database(test_db):
     assert counts["accessibility"] == 0
 ```
 
-- [ ] **Step 1.6: Run edge case test**
+- [x] **Step 1.6: Run edge case test**
 
 Run: `pytest tests/test_search_engine.py::test_count_by_type_returns_zeros_on_empty_database -v`
 
 Expected: PASS
 
-- [ ] **Step 1.7: Commit**
+- [x] **Step 1.7: Commit**
 
 ```bash
 git add openrecall/server/search/engine.py tests/test_search_engine.py
@@ -161,7 +165,7 @@ for any given search filters."
 - Modify: `openrecall/server/api_v1.py:850+`
 - Test: `tests/test_search_api.py`
 
-- [ ] **Step 2.1: Write the failing test**
+- [x] **Step 2.1: Write the failing test**
 
 ```python
 def test_search_counts_endpoint_returns_type_counts(client):
@@ -177,13 +181,13 @@ def test_search_counts_endpoint_returns_type_counts(client):
     assert isinstance(data["counts"]["accessibility"], int)
 ```
 
-- [ ] **Step 2.2: Run test to verify it fails**
+- [x] **Step 2.2: Run test to verify it fails**
 
 Run: `pytest tests/test_search_api.py::test_search_counts_endpoint_returns_type_counts -v`
 
 Expected: FAIL with 404 Not Found (route doesn't exist)
 
-- [ ] **Step 2.3: Implement the endpoint**
+- [x] **Step 2.3: Implement the endpoint**
 
 Add to `openrecall/server/api_v1.py` after the `search()` endpoint (around line 1015, after the search endpoint returns):
 
@@ -275,13 +279,13 @@ def search_counts():
     return jsonify({"counts": counts})
 ```
 
-- [ ] **Step 2.4: Run test to verify it passes**
+- [x] **Step 2.4: Run test to verify it passes**
 
 Run: `pytest tests/test_search_api.py::test_search_counts_endpoint_returns_type_counts -v`
 
 Expected: PASS
 
-- [ ] **Step 2.5: Write edge case test**
+- [x] **Step 2.5: Write edge case test**
 
 ```python
 def test_search_counts_endpoint_handles_invalid_params(client):
@@ -295,13 +299,13 @@ def test_search_counts_endpoint_handles_invalid_params(client):
     assert "accessibility" in data["counts"]
 ```
 
-- [ ] **Step 2.6: Run edge case test**
+- [x] **Step 2.6: Run edge case test**
 
 Run: `pytest tests/test_search_api.py::test_search_counts_endpoint_handles_invalid_params -v`
 
 Expected: PASS
 
-- [ ] **Step 2.7: Commit**
+- [x] **Step 2.7: Commit**
 
 ```bash
 git add openrecall/server/api_v1.py tests/test_search_api.py
@@ -321,7 +325,7 @@ Returns {counts: {ocr: N, accessibility: M}}. Same filters as
 
 ### 3.1: Add CSS Styles
 
-- [ ] **Step 3.1.1: Add pill filter styles**
+- [x] **Step 3.1.1: Add pill filter styles**
 
 Add to `<style>` section (around line 100, before spinner animation):
 
@@ -389,7 +393,7 @@ Add to `<style>` section (around line 100, before spinner animation):
   }
 ```
 
-- [ ] **Step 3.1.2: Commit**
+- [x] **Step 3.1.2: Commit**
 
 ```bash
 git add openrecall/client/web/templates/search.html
@@ -401,7 +405,7 @@ Add type-badge styles for OCR (blue) and AX (purple) badges."
 
 ### 3.2: Add Pill Filter HTML
 
-- [ ] **Step 3.2.1: Add pill filter HTML**
+- [x] **Step 3.2.1: Add pill filter HTML**
 
 Add after the search form (around line 441, after `</form>`), before results grid:
 
@@ -414,7 +418,7 @@ Add after the search form (around line 441, after `</form>`), before results gri
 </div>
 ```
 
-- [ ] **Step 3.2.2: Commit**
+- [x] **Step 3.2.2: Commit**
 
 ```bash
 git add openrecall/client/web/templates/search.html
@@ -425,7 +429,7 @@ Add three pill buttons: All (default active), OCR, AX with count spans."
 
 ### 3.3: Add JavaScript State and Event Handlers
 
-- [ ] **Step 3.3.1: Add selectedContentType state**
+- [x] **Step 3.3.1: Add selectedContentType state**
 
 Add to JavaScript state section (around line 474, after `let currentPagination`):
 
@@ -434,7 +438,7 @@ Add to JavaScript state section (around line 474, after `let currentPagination`)
   let selectedContentType = 'all';
 ```
 
-- [ ] **Step 3.3.2: Add pill elements and event handlers**
+- [x] **Step 3.3.2: Add pill elements and event handlers**
 
 Add after pill state declaration (around line 476):
 
@@ -479,7 +483,7 @@ Add after pill state declaration (around line 476):
   });
 ```
 
-- [ ] **Step 3.3.3: Update buildQueryString to include content_type**
+- [x] **Step 3.3.3: Update buildQueryString to include content_type**
 
 Modify `buildQueryString()` function (around line 553):
 
@@ -517,7 +521,7 @@ Modify `buildQueryString()` function (around line 553):
   }
 ```
 
-- [ ] **Step 3.3.4: Add fetchCounts function**
+- [x] **Step 3.3.4: Add fetchCounts function**
 
 Add after `buildQueryString()` function (around line 580):
 
@@ -568,7 +572,7 @@ Add after `buildQueryString()` function (around line 580):
   }
 ```
 
-- [ ] **Step 3.3.5: Update performSearch to call fetchCounts**
+- [x] **Step 3.3.5: Update performSearch to call fetchCounts**
 
 Modify `performSearch()` function (around line 691), add `fetchCounts()` call after successful search:
 
@@ -611,7 +615,7 @@ Modify `performSearch()` function (around line 691), add `fetchCounts()` call af
   }
 ```
 
-- [ ] **Step 3.3.6: Update renderResults to add type badges**
+- [x] **Step 3.3.6: Update renderResults to add type badges**
 
 Modify card footer in `renderResults()` (around line 658), add type badge:
 
@@ -626,7 +630,7 @@ Modify card footer in `renderResults()` (around line 658), add type badge:
           </div>
 ```
 
-- [ ] **Step 3.3.7: Add initContentTypeFromUrl call to page load**
+- [x] **Step 3.3.7: Add initContentTypeFromUrl call to page load**
 
 Add before the existing page load check (around line 746), before `if (window.location.search)`:
 
@@ -635,7 +639,7 @@ Add before the existing page load check (around line 746), before `if (window.lo
   initContentTypeFromUrl();
 ```
 
-- [ ] **Step 3.3.8: Commit**
+- [x] **Step 3.3.8: Commit**
 
 ```bash
 git add openrecall/client/web/templates/search.html
@@ -655,7 +659,7 @@ git commit -m "feat(search): add content type filter JavaScript
 **Files:**
 - All modified files
 
-- [ ] **Step 4.1: Start the server and verify endpoint**
+- [x] **Step 4.1: Start the server and verify endpoint**
 
 ```bash
 # Terminal 1: Start server
@@ -667,7 +671,7 @@ curl "http://localhost:8883/v1/search/counts?q=test"
 
 Expected: `{"counts":{"ocr":0,"accessibility":0}}` (or actual counts)
 
-- [ ] **Step 4.2: Verify search page loads with pills**
+- [x] **Step 4.2: Verify search page loads with pills**
 
 Open browser: http://localhost:8083/search
 
@@ -675,7 +679,7 @@ Expected:
 - Three pills visible: "All" (active), "OCR —", "AX —"
 - "All" pill has accent background
 
-- [ ] **Step 4.3: Test OCR filter**
+- [x] **Step 4.3: Test OCR filter**
 
 1. Click "OCR" pill
 2. Verify pill becomes active (accent background)
@@ -683,38 +687,38 @@ Expected:
 4. Search executes
 5. URL updates with `content_type=ocr`
 
-- [ ] **Step 4.4: Test AX filter**
+- [x] **Step 4.4: Test AX filter**
 
 1. Click "AX" pill
 2. Verify URL updates with `content_type=accessibility`
 3. Results update
 
-- [ ] **Step 4.5: Test type badges on cards**
+- [x] **Step 4.5: Test type badges on cards**
 
 Verify each result card shows:
 - "OCR" badge for OCR frames
 - "AX" badge for accessibility frames
 
-- [ ] **Step 4.6: Test counts appear after search**
+- [x] **Step 4.6: Test counts appear after search**
 
 1. Perform a search
 2. Wait briefly
 3. Verify OCR and AX pills show numbers (not "—")
 
-- [ ] **Step 4.7: Test URL sharing**
+- [x] **Step 4.7: Test URL sharing**
 
 1. Filter to "OCR" and search
 2. Copy URL with `content_type=ocr`
 3. Open in new tab
 4. Verify "OCR" pill is active on page load
 
-- [ ] **Step 4.8: Test pagination with filters**
+- [x] **Step 4.8: Test pagination with filters**
 
 1. Search with OCR filter
 2. Click Next page
 3. Verify filter persists (OCR pill still active, URL still has content_type)
 
-- [ ] **Step 4.9: Commit**
+- [x] **Step 4.9: Commit**
 
 ```bash
 git add -A
@@ -740,3 +744,20 @@ This plan implements:
 4. **UX:** URL sync for shareable filtered searches
 
 All changes follow existing patterns in the codebase and use the same query parameter parsing as the existing search endpoint.
+
+---
+
+## Completion Verification
+
+**Date:** 2026-03-24
+
+**Tests:** 19/19 passed
+- `test_search_engine.py::test_count_by_type_returns_ocr_and_accessibility_counts`
+- `test_search_engine.py::test_count_by_type_returns_zeros_on_empty_database`
+- `tests/test_search_api.py::TestSearchCountsAPI` (11 tests)
+- `tests/test_search_api.py::TestSearchCountsIntegration` (6 tests)
+
+**Implementation Notes:**
+- Refactored form parameter extraction into `getFormFilterParams()` helper (better than duplicated code in plan)
+- All CSS/HTML/JS matches design spec exactly
+- Type badges use "AX" label for Accessibility type as specified

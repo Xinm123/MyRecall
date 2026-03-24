@@ -7,7 +7,7 @@ Use it as the operational source of truth for commands and coding conventions.
 
 - MyRecall v3 is a privacy-first local memory system (screenshot capture + AI + search).
 - **Python 3.11+ required**.
-- Architecture is split into `openrecall/client`, `openrecall/server`, and `openrecall/client/events/` (event-driven capture).
+- Architecture is split into `openrecall/client`, `openrecall/server`, and `openrecall/client/events/` (event-driven capture with macOS AX accessibility support).
 - Main entry points are module runs (`python -m openrecall.*`) and wrapper scripts.
 - Reference repo: `_ref/screenpipe`.
 
@@ -135,7 +135,7 @@ This pattern is used in `openrecall/server/api.py` and `openrecall/client/buffer
 - Test classes often use `Test*`; test functions use `test_*`.
 - Prefer pytest fixtures (`conftest.py` + local fixtures).
 - Marker usage is active and strict:
-  - `unit`, `integration`, `e2e`, `perf`, `security`, `model`, `manual`
+  - `unit`, `integration`, `e2e`, `perf`, `security`, `model`, `manual`, `search`
 - Some modules apply markers via module-level `pytestmark`.
 
 **Test Categories**: See `tests/README.md` for detailed test classification (which tests require running server, which are standalone).
@@ -155,18 +155,22 @@ Common vars:
 - `OPENRECALL_DEVICE`
 
 Event-Driven Capture (P1-S2a+):
-- `OPENRECALL_MIN_CAPTURE_INTERVAL_MS` — Debounce interval (default: 2000)
-- `OPENRECALL_IDLE_CAPTURE_INTERVAL_MS` — Idle fallback interval (default: 30000)
+- `OPENRECALL_TRIGGER_DEBOUNCE_MS` — Debounce for APP_SWITCH/IDLE/MANUAL events (default: 3000)
+- `OPENRECALL_CLICK_DEBOUNCE_MS` — Debounce for CLICK events (default: 3000)
+- `OPENRECALL_CAPTURE_DEBOUNCE_MS` — Global capture debounce (default: 3000)
+- `OPENRECALL_IDLE_CAPTURE_INTERVAL_MS` — Idle fallback interval (default: 60000)
 - `OPENRECALL_PERMISSION_POLL_INTERVAL_SEC` — Permission check interval (default: 10)
-- `OPENRECALL_TRIGGER_QUEUE_CAPACITY` — Trigger queue size (default: 64)
+- `OPENRECALL_TRIGGER_QUEUE_CAPACITY` — Trigger queue size (default: 1000)
 - `OPENRECALL_STATS_INTERVAL_SEC` — Stats logging interval (default: 60)
 
 Simhash Dedup (P1-S2b+):
 - `OPENRECALL_SIMHASH_DEDUP_ENABLED` — Enable PHash-based dedup (default: true)
 - `OPENRECALL_SIMHASH_DEDUP_THRESHOLD` — Hamming distance threshold (default: 8)
-- `OPENRECALL_SIMHASH_CACHE_SIZE` — Hashes cached per device (default: 1)
+- `OPENRECALL_SIMHASH_TTL_SECONDS` — TTL for simhash cache entries (default: 300)
+- `OPENRECALL_SIMHASH_CACHE_SIZE_PER_DEVICE` — Hashes cached per device (default: 1)
 - `OPENRECALL_SIMHASH_ENABLED_FOR_CLICK` — Dedup for click triggers (default: true)
 - `OPENRECALL_SIMHASH_ENABLED_FOR_APP_SWITCH` — Dedup for app_switch triggers (default: true)
+- `OPENRECALL_FORCE_CAPTURE_AFTER_SECONDS` — Force capture after N seconds of skipped frames (default: 600)
 - Note: IDLE triggers always skip simhash (ensures periodic frame capture)
 
 ## Agent Rules from Cursor / Copilot
