@@ -24,7 +24,7 @@
 
 This is a **manual verification** step to confirm the core assumption before writing any production code.
 
-- [ ] **Step 1: Verify cross-Space window enumeration**
+- [x] **Step 1: Verify cross-Space window enumeration**
 
 ```python
 # Save as ~/tmp/test_window_enum.py and run
@@ -52,7 +52,7 @@ Expected: When a browser tab is fullscreened, this should list the fullscreen wi
 - Modify: `openrecall/client/events/macos.py:556-589`
 - Test: `tests/test_p1_s2a_fullscreen_capture.py`
 
-- [ ] **Step 1: Create test file with imports, then write failing test**
+- [x] **Step 1: Create test file with imports, then write failing test**
 
 Create `tests/test_p1_s2a_fullscreen_capture.py` with file-level imports:
 
@@ -113,7 +113,7 @@ def test_get_all_windows_info_returns_empty_on_error(monkeypatch):
 Run: `pytest tests/test_p1_s2a_fullscreen_capture.py::test_get_all_windows_info_returns_list -v`
 Expected: FAIL — `get_all_windows_info` not defined yet
 
-- [ ] **Step 2: Write minimal implementation**
+- [x] **Step 2: Write minimal implementation**
 
 In `openrecall/client/events/macos.py`, add new helper **before** `get_active_app_monitor` (around line 543):
 
@@ -143,12 +143,12 @@ def get_all_windows_info() -> list[dict]:
         return []
 ```
 
-- [ ] **Step 3: Run tests to verify they pass**
+- [x] **Step 3: Run tests to verify they pass**
 
 Run: `pytest tests/test_p1_s2a_fullscreen_capture.py -v`
 Expected: PASS (or FAIL if other tests not yet written)
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add openrecall/client/events/macos.py tests/test_p1_s2a_fullscreen_capture.py
@@ -163,7 +163,7 @@ git commit -m "feat(macos): extract get_all_windows_info() helper"
 - Modify: `openrecall/client/recorder.py`
 - Test: `tests/test_p1_s2a_fullscreen_capture.py`
 
-- [ ] **Step 1: Write failing test**
+- [x] **Step 1: Write failing test**
 
 Append to `tests/test_p1_s2a_fullscreen_capture.py`:
 
@@ -215,7 +215,7 @@ def test_capture_window_by_id_returns_none_on_failure(monkeypatch):
 Run: `pytest tests/test_p1_s2a_fullscreen_capture.py::test_capture_window_by_id_returns_numpy_array -v`
 Expected: FAIL — `_capture_window_by_id` not defined yet
 
-- [ ] **Step 2: Add imports**
+- [x] **Step 2: Add imports**
 
 In `recorder.py` imports (around line 1), add:
 
@@ -223,7 +223,7 @@ In `recorder.py` imports (around line 1), add:
 import subprocess
 ```
 
-- [ ] **Step 3: Add `_capture_window_by_id` method**
+- [x] **Step 3: Add `_capture_window_by_id` method**
 
 Add after `_capture_monitors` (after line 998):
 
@@ -264,7 +264,7 @@ Add after `_capture_monitors` (after line 998):
 Run: `pytest tests/test_p1_s2a_fullscreen_capture.py::test_capture_window_by_id_returns_numpy_array tests/test_p1_s2a_fullscreen_capture.py::test_capture_window_by_id_returns_none_on_failure -v`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add openrecall/client/recorder.py tests/test_p1_s2a_fullscreen_capture.py
@@ -279,7 +279,7 @@ git commit -m "feat(recorder): add _capture_window_by_id using screencapture"
 - Modify: `openrecall/client/recorder.py`
 - Test: `tests/test_p1_s2a_fullscreen_capture.py`
 
-- [ ] **Step 1: Write failing test**
+- [x] **Step 1: Write failing test**
 
 ```python
 SYSTEM_APPS_FULLSCREEN = {
@@ -373,7 +373,7 @@ def test_detect_fullscreen_window_skips_overlay_layers(monkeypatch):
 Run: `pytest tests/test_p1_s2a_fullscreen_capture.py::test_detect_fullscreen_window_returns_id -v`
 Expected: FAIL — `_detect_fullscreen_window_on_monitor` not defined yet
 
-- [ ] **Step 2: Add import of helper**
+- [x] **Step 2: Add import of helper**
 
 In `recorder.py` (around line 28), add to the `macos` imports:
 
@@ -388,7 +388,7 @@ from openrecall.client.events.macos import (
 )
 ```
 
-- [ ] **Step 3: Add `_detect_fullscreen_window_on_monitor` method**
+- [x] **Step 3: Add `_detect_fullscreen_window_on_monitor` method**
 
 Add after `_capture_window_by_id` (after line ~1025):
 
@@ -456,7 +456,7 @@ Add after `_capture_window_by_id` (after line ~1025):
 Run: `pytest tests/test_p1_s2a_fullscreen_capture.py -v`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add openrecall/client/recorder.py tests/test_p1_s2a_fullscreen_capture.py
@@ -470,7 +470,7 @@ git commit -m "feat(recorder): add _detect_fullscreen_window_on_monitor"
 **Files:**
 - Modify: `openrecall/client/recorder.py:882-889`
 
-- [ ] **Step 1: Write failing test (integration-level)**
+- [x] **Step 1: Write failing test (integration-level)**
 
 ```python
 @pytest.mark.unit
@@ -532,7 +532,7 @@ def test_capture_single_monitor_uses_window_capture_for_fullscreen(monkeypatch):
 Run: `pytest tests/test_p1_s2a_fullscreen_capture.py::test_capture_single_monitor_uses_window_capture_for_fullscreen -v`
 Expected: FAIL — `_capture_single_monitor` not modified yet
 
-- [ ] **Step 2: Modify `_capture_single_monitor`**
+- [x] **Step 2: Modify `_capture_single_monitor`**
 
 Replace the existing method (lines 882-889):
 
@@ -555,17 +555,17 @@ Replace the existing method (lines 882-889):
         return screenshot
 ```
 
-- [ ] **Step 3: Run tests to verify they pass**
+- [x] **Step 3: Run tests to verify they pass**
 
 Run: `pytest tests/test_p1_s2a_fullscreen_capture.py -v`
 Expected: PASS
 
-- [ ] **Step 4: Run existing recorder tests to check for regressions**
+- [x] **Step 4: Run existing recorder tests to check for regressions**
 
 Run: `pytest tests/test_p1_s2a_recorder.py -v`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add openrecall/client/recorder.py tests/test_p1_s2a_fullscreen_capture.py
@@ -578,7 +578,7 @@ git commit -m "feat(recorder): use screencapture for fullscreen windows with mss
 
 **No code changes. Verification only.**
 
-- [ ] **Step 1: Run the full test suite**
+- [x] **Step 1: Run the full test suite**
 
 ```bash
 pytest tests/test_p1_s2a_fullscreen_capture.py tests/test_p1_s2a_recorder.py -v
@@ -586,7 +586,7 @@ pytest tests/test_p1_s2a_fullscreen_capture.py tests/test_p1_s2a_recorder.py -v
 
 Expected: All PASS
 
-- [ ] **Step 2: Manual verification on macOS**
+- [x] **Step 2: Manual verification on macOS**
 
 1. Start Edge server: `./run_server.sh --debug`
 2. Start client: `./run_client.sh --debug`
@@ -596,7 +596,7 @@ Expected: All PASS
 6. Check saved frame in `~/MRC/spool/` or `~/MRS/frames/`
 7. **Pass criteria**: Frame shows browser content, not just desktop background
 
-- [ ] **Step 3: Fallback verification**
+- [x] **Step 3: Fallback verification**
 
 1. Temporarily break screencapture: `chmod -x /usr/sbin/screencapture`
 2. Trigger a capture (manual trigger or wait for idle)

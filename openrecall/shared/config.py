@@ -305,6 +305,34 @@ class Settings(BaseSettings):
         alias="OPENRECALL_EMBEDDING_MODEL",
         description="Embedding model for semantic search",
     )
+
+    # Description generation settings
+    description_enabled: bool = Field(
+        default=True,
+        alias="OPENRECALL_DESCRIPTION_ENABLED",
+        description="Enable AI description generation for frames",
+    )
+    description_provider: str = Field(
+        default="",
+        alias="OPENRECALL_DESCRIPTION_PROVIDER",
+        description="Optional override for description provider; falls back to ai_provider when empty",
+    )
+    description_model: str = Field(
+        default="",
+        alias="OPENRECALL_DESCRIPTION_MODEL",
+        description="Optional override for description model name/path; falls back to ai_model_name when empty",
+    )
+    description_api_key: str = Field(
+        default="",
+        alias="OPENRECALL_DESCRIPTION_API_KEY",
+        description="Optional override for description API key; falls back to ai_api_key when empty",
+    )
+    description_api_base: str = Field(
+        default="",
+        alias="OPENRECALL_DESCRIPTION_API_BASE",
+        description="Optional override for description API base URL; falls back to ai_api_base when empty",
+    )
+
     keyword_strategy: str = Field(
         default="local",
         alias="OPENRECALL_KEYWORD_STRATEGY",

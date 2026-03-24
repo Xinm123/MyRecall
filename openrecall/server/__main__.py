@@ -15,6 +15,8 @@ from openrecall.shared.logging_config import configure_logging
 
 logger = configure_logging("openrecall.server")
 
+_description_worker = None  # module-level reference for shutdown
+
 from openrecall.server.app import app
 from openrecall.server.database.migrations_runner import run_migrations
 
@@ -99,10 +101,21 @@ def preload_ai_models():
 
 
 def _start_noop_mode():
+    global _description_worker
     from openrecall.server.queue_driver import NoopQueueDriver
 
     driver = NoopQueueDriver()
     driver.start()
+
+    if settings.description_enabled:
+        from openrecall.server.database.frames_store import FramesStore
+        from openrecall.server.description.worker import DescriptionWorker
+
+        store = FramesStore()
+        _description_worker = DescriptionWorker(store)
+        _description_worker.start()
+        logger.info("DescriptionWorker started (noop mode)")
+
     return driver
 
 
@@ -132,10 +145,21 @@ def _preload_ocr_model():
 
 def _start_ocr_mode():
     """Start the V3ProcessingWorker for OCR processing."""
+    global _description_worker
     from openrecall.server.processing.v3_worker import V3ProcessingWorker
 
     worker = V3ProcessingWorker()
     worker.start()
+
+    if settings.description_enabled:
+        from openrecall.server.database.frames_store import FramesStore
+        from openrecall.server.description.worker import DescriptionWorker
+
+        store = FramesStore()
+        _description_worker = DescriptionWorker(store)
+        _description_worker.start()
+        logger.info("DescriptionWorker started (ocr mode)")
+
     return worker
 
 
@@ -200,6 +224,20 @@ def main():
         except Exception as e:
             logger.warning(f"Error stopping worker: {e}")
 
+        # Stop DescriptionWorker
+        if _description_worker is not None:
+            logger.info("Stopping DescriptionWorker...")
+            _description_worker.stop()
+            _description_worker.join(timeout=5)
+            logger.info("DescriptionWorker stopped")
+        else:
+            app_desc_worker = getattr(app, "description_worker", None)
+            if app_desc_worker is not None:
+                logger.info("Stopping DescriptionWorker (legacy mode)...")
+                app_desc_worker.stop()
+                app_desc_worker.join(timeout=5)
+                logger.info("DescriptionWorker stopped")
+
         logger.info("Server shutdown complete")
         sys.exit(0)
 
@@ -209,10 +247,16 @@ def main():
     def _cleanup_worker() -> None:
         if worker is not None:
             worker.stop()
-            return
-        app_worker = getattr(app, "worker", None)
-        if app_worker is not None:
-            app_worker.stop()
+        else:
+            app_worker = getattr(app, "worker", None)
+            if app_worker is not None:
+                app_worker.stop()
+        if _description_worker is not None:
+            _description_worker.stop()
+        else:
+            app_desc_worker = getattr(app, "description_worker", None)
+            if app_desc_worker is not None:
+                app_desc_worker.stop()
 
     atexit.register(_cleanup_worker)
 

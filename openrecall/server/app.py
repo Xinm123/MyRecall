@@ -162,6 +162,17 @@ def init_background_worker(app_instance):
     app_instance.worker = worker
     logger.info("🚀 Background Processing Worker started successfully.")
 
+    # Step 4: Start DescriptionWorker if enabled
+    if settings.description_enabled:
+        from openrecall.server.database.frames_store import FramesStore
+        from openrecall.server.description.worker import DescriptionWorker
+
+        description_store = FramesStore()
+        description_worker = DescriptionWorker(description_store)
+        description_worker.start()
+        app_instance.description_worker = description_worker
+        logger.info("DescriptionWorker started (legacy mode)")
+
 
 @app.after_request
 def add_cors_headers(response):

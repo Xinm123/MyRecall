@@ -25,7 +25,16 @@ def app_with_context_route():
 @pytest.fixture
 def mock_store():
     """Create a mock FramesStore with test data."""
-    mock = MagicMock(spec=FramesStore)
+    mock = MagicMock()
+    # Configure _connect to return a context manager with a mock connection
+    mock_conn = MagicMock()
+    # Return None from execute().fetchone() so description_status stays None
+    mock_conn.execute.return_value.fetchone.return_value = None
+    mock.__enter__ = MagicMock(return_value=mock_conn)
+    mock.__exit__ = MagicMock(return_value=None)
+    mock._connect.return_value = mock
+    # Configure description-related methods
+    mock.get_frame_description.return_value = None
     return mock
 
 

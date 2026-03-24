@@ -169,7 +169,7 @@ OPENRECALL_DESCRIPTION_ENABLED: bool = True      # Global toggle
 
 ## Worker Architecture
 
-### Independent `DescriptionWorker` Process
+### Independent `DescriptionWorker` Thread
 
 ```
 ingest (POST /v1/ingest)

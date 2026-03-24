@@ -837,6 +837,55 @@
     color: var(--text-tertiary, #8E8E93);
   }
 
+  /* Description Status Badge */
+  .description-status-badge {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 6px;
+    font-size: 0.75rem;
+  }
+
+  .status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-weight: 500;
+    font-size: 0.7rem;
+  }
+
+  .status-badge.pending {
+    background: rgba(255, 149, 0, 0.12);
+    color: #FF9500;
+  }
+
+  .status-badge.processing {
+    background: rgba(0, 122, 255, 0.12);
+    color: #007AFF;
+  }
+
+  .status-badge.completed {
+    background: rgba(52, 199, 89, 0.15);
+    color: #34C759;
+  }
+
+  .status-badge.failed {
+    background: rgba(255, 59, 48, 0.12);
+    color: #FF3B30;
+  }
+
+  .spinner-inline {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border: 1.5px solid rgba(0, 122, 255, 0.2);
+    border-top-color: #007AFF;
+    border-radius: 50%;
+    animation: spin 0.6s linear infinite;
+  }
+
   /* Text preview */
   .text-preview {
     font-size: 0.8rem;
@@ -1045,6 +1094,23 @@
                     </span>
                     <span class="char-count" x-text="entry.text_length + ' chars'"></span>
                   </div>
+                  <!-- Description Status Badge -->
+                  <div class="description-status-badge" x-show="entry.description_status">
+                    <span class="status-badge" :class="entry.description_status?.toLowerCase()">
+                      <template x-if="entry.description_status === 'pending'">
+                        <span>⏳ Desc pending</span>
+                      </template>
+                      <template x-if="entry.description_status === 'processing'">
+                        <span><span class="spinner-inline"></span> Desc processing...</span>
+                      </template>
+                      <template x-if="entry.description_status === 'completed'">
+                        <span>✓ Description ready</span>
+                      </template>
+                      <template x-if="entry.description_status === 'failed'">
+                        <span>⚠ Desc failed</span>
+                      </template>
+                    </span>
+                  </div>
                   <!-- Text Preview (based on text_source) -->
                   <div class="text-preview" x-show="entry.text_preview" x-text="entry.text_preview"></div>
                   <!-- Browser URL -->
@@ -1104,6 +1170,13 @@
               @click="modalTab = 'accessibility'"
               x-show="selectedEntry?.status === 'COMPLETED' && selectedEntry?.text_source === 'accessibility'"
             >Accessibility</button>
+            <button
+              type="button"
+              class="modal-tab"
+              :class="{ 'active': modalTab === 'description' }"
+              @click="modalTab = 'description'; fetchDescriptionData(selectedEntry?.frame_id)"
+              x-show="selectedEntry?.status === 'COMPLETED'"
+            >Description</button>
             <button
               type="button"
               class="modal-tab"
@@ -1169,6 +1242,86 @@
                 >复制</button>
               </div>
               <div class="text-panel-content" x-text="selectedEntry?.accessibility_text || '无 Accessibility 文本'"></div>
+            </div>
+
+            <!-- Description Tab -->
+            <div x-show="modalTab === 'description'" class="modal-metadata-panel">
+              <template x-if="selectedEntry?.description_status === 'completed'">
+                <div>
+                  <!-- Summary Section -->
+                  <div class="metadata-section" x-show="selectedEntry?.description?.summary">
+                    <h3>Summary</h3>
+                    <div class="metadata-value" style="font-size: 14px; line-height: 1.6;" x-text="selectedEntry.description.summary"></div>
+                  </div>
+
+                  <!-- Narrative Section -->
+                  <div class="metadata-section" x-show="selectedEntry?.description?.narrative">
+                    <h3>Narrative</h3>
+                    <div style="font-size: 13px; line-height: 1.7; color: var(--text-primary);" x-text="selectedEntry.description.narrative"></div>
+                  </div>
+
+                  <!-- Intent Section -->
+                  <div class="metadata-section" x-show="selectedEntry?.description?.intent">
+                    <h3>Intent</h3>
+                    <div class="metadata-value" style="font-style: italic;" x-text="selectedEntry.description.intent"></div>
+                  </div>
+
+                  <!-- Entities Section -->
+                  <div class="metadata-section" x-show="selectedEntry?.description?.entities?.length">
+                    <h3>Entities</h3>
+                    <div style="display: flex; flex-wrap: wrap; gap: 8px;">
+                      <template x-for="entity in selectedEntry.description.entities" :key="entity">
+                        <span style="
+                          display: inline-flex;
+                          align-items: center;
+                          padding: 4px 12px;
+                          background: rgba(0, 122, 255, 0.12);
+                          color: #007AFF;
+                          border-radius: 12px;
+                          font-size: 12px;
+                          font-weight: 500;
+                        " x-text="entity"></span>
+                      </template>
+                    </div>
+                  </div>
+
+                  <!-- Generation Info -->
+                  <div class="metadata-section" x-show="selectedEntry?.description_model">
+                    <h3>Generation Info</h3>
+                    <div class="metadata-grid">
+                      <div class="metadata-item">
+                        <span class="metadata-label">Model</span>
+                        <span class="metadata-value monospace" x-text="selectedEntry.description_model || '-'"></span>
+                      </div>
+                      <div class="metadata-item" x-show="selectedEntry?.description_generated_at">
+                        <span class="metadata-label">Generated At</span>
+                        <span class="metadata-value" x-text="formatTime(selectedEntry.description_generated_at)"></span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </template>
+
+              <template x-if="selectedEntry?.description_status === 'pending'">
+                <div class="status-pending" style="padding: 40px; justify-content: center;">
+                  <span class="ai-icon">⏳</span>
+                  <span>Description generation pending...</span>
+                </div>
+              </template>
+
+              <template x-if="selectedEntry?.description_status === 'processing'">
+                <div class="status-processing" style="padding: 40px; justify-content: center;">
+                  <div class="spinner"></div>
+                  <span>Generating description...</span>
+                </div>
+              </template>
+
+              <template x-if="selectedEntry?.description_status === 'failed'">
+                <div class="metadata-error" style="margin-top: 20px;">
+                  <span>⚠️</span>
+                  <span x-text="selectedEntry?.description_error || 'Description generation failed'"></span>
+                </div>
+              </template>
             </div>
 
             <!-- 元数据 Tab -->
@@ -1437,6 +1590,29 @@
       },
 
       /**
+       * 获取帧的 AI 描述数据
+       * @param {number} frameId - 帧 ID
+       */
+      async fetchDescriptionData(frameId) {
+        if (!frameId) return;
+        // 如果已经加载过描述数据，不再重复请求
+        if (this.selectedEntry?.description) return;
+        try {
+          const res = await fetch(`${EDGE_BASE_URL}/v1/frames/${frameId}/context`);
+          if (!res.ok) return;
+          const data = await res.json();
+          if (data.description && this.selectedEntry && this.selectedEntry.frame_id === frameId) {
+            this.selectedEntry.description_status = data.description_status;
+            this.selectedEntry.description = data.description;
+            this.selectedEntry.description_model = data.description.model;
+            this.selectedEntry.description_generated_at = data.description.generated_at;
+          }
+        } catch (e) {
+          console.error('获取描述数据失败:', e);
+        }
+      },
+
+      /**
        * 格式化文件大小
        * @param {number} bytes - 字节数
        * @returns {string} 格式化后的文件大小
@@ -1588,6 +1764,13 @@
         if (!Number.isFinite(idx)) return;
         if (idx < 0 || idx >= this.entries.length) return;
         this.selectedIndex = idx;
+        // If description tab is active, fetch description data for the new entry
+        if (this.modalTab === 'description') {
+          const entry = this.entries[idx];
+          if (entry?.frame_id) {
+            this.fetchDescriptionData(entry.frame_id);
+          }
+        }
       },
 
       closeModal() {
@@ -1599,6 +1782,13 @@
         const n = this.entries.length;
         if (!n) return;
         this.selectedIndex = (this.selectedIndex - 1 + n) % n;
+        // If description tab is active, fetch description data for the new entry
+        if (this.modalTab === 'description') {
+          const entry = this.entries[this.selectedIndex];
+          if (entry?.frame_id) {
+            this.fetchDescriptionData(entry.frame_id);
+          }
+        }
       },
 
       next() {
@@ -1606,6 +1796,13 @@
         const n = this.entries.length;
         if (!n) return;
         this.selectedIndex = (this.selectedIndex + 1) % n;
+        // If description tab is active, fetch description data for the new entry
+        if (this.modalTab === 'description') {
+          const entry = this.entries[this.selectedIndex];
+          if (entry?.frame_id) {
+            this.fetchDescriptionData(entry.frame_id);
+          }
+        }
       },
     };
   }

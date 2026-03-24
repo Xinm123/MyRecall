@@ -155,6 +155,16 @@ DESCRIPTION_MODEL: Optional[str] = Field(
 Add at end of `factory.py`:
 
 ```python
+from __future__ import annotations
+from typing import TYPE_CHECKING
+
+# ... existing imports ...
+
+_instances: Dict[str, object] = {}
+
+if TYPE_CHECKING:
+    from openrecall.server.description.providers.base import DescriptionProvider
+
 def get_description_provider() -> "DescriptionProvider":
     """Get or create a cached DescriptionProvider instance.
 
@@ -165,7 +175,7 @@ def get_description_provider() -> "DescriptionProvider":
     capability = "description"
     cached = _instances.get(capability)
     if cached is not None:
-        return cached
+        return cached  # type: ignore[return-value]
 
     # Lazy import — must stay inside function to avoid circular dependency
     from openrecall.server.description.providers import (
@@ -181,7 +191,7 @@ def get_description_provider() -> "DescriptionProvider":
     provider = (provider or "local").strip().lower()
 
     if provider == "local":
-        instance: DescriptionProvider = LocalDescriptionProvider(model_name=model_name)
+        instance: "DescriptionProvider" = LocalDescriptionProvider(model_name=model_name)
     elif provider == "dashscope":
         instance = DashScopeDescriptionProvider(api_key=api_key, model_name=model_name)
     elif provider == "openai":
@@ -192,6 +202,8 @@ def get_description_provider() -> "DescriptionProvider":
     _instances[capability] = instance
     return instance
 ```
+
+> **Note on `TYPE_CHECKING`**: The `DescriptionProvider` type annotation uses a string literal (`"DescriptionProvider"`) because the actual class is defined in `providers/base.py` (Task 4), which imports from `models.py` (Task 3), which is safe — but the factory itself (Task 2) runs before the description module exists. Using `TYPE_CHECKING` + string annotation avoids import-time errors.
 
 - [ ] **Step 3: Add api_key and api_base fields to config**
 
@@ -242,7 +254,7 @@ class FrameDescription(BaseModel):
     entities: List[str] = Field(
         default_factory=list,
         max_length=10,
-        description="Key entities extracted from the frame (max 10)",
+        description="Key entities extracted from the frame (max 10 items)",
     )
     intent: str = Field(
         ...,
@@ -251,7 +263,7 @@ class FrameDescription(BaseModel):
     summary: str = Field(
         ...,
         max_length=200,
-        description="One-sentence summary (max 50 words)",
+        description="One-sentence summary (max 200 chars / ~50 words)",
     )
 
     def to_db_dict(self) -> dict:
@@ -1535,9 +1547,11 @@ In the `activity_summary()` function, after building the `result` dict, add:
     result["descriptions"] = descriptions
 ```
 
-Note: `get_recent_descriptions()` is added to FramesStore in Task 9 Step 11.
+Note: `store.get_recent_descriptions()` is added in Step 3 below.
 
-- [ ] **Step 3: Add `POST /v1/frames/<frame_id>/description` endpoint** (new function, add near other frame endpoints)
+- [ ] **Step 3: Add `get_recent_descriptions()` to FramesStore**
+
+> This method is needed by Step 2 above. Add it as a new method in `frames_store.py`:
 
 ```python
 def get_recent_descriptions(
@@ -1547,6 +1561,7 @@ def get_recent_descriptions(
     time_end: str,
     limit: int = 20,
 ) -> list[dict]:
+    """Get recent frame descriptions within a time range."""
     cursor = conn.execute(
         """
         SELECT fd.frame_id, fd.summary, fd.intent
@@ -1566,16 +1581,14 @@ def get_recent_descriptions(
     ]
 ```
 
-Add this as **Step 11** under Task 9 (after Step 10's commit), then update Task 10 Step 2 to reference it.
+> **Placement**: Add this method to `frames_store.py` alongside the other description CRUD methods from Task 9. It is part of FramesStore, not the API layer.
 
-- [ ] **Step 3: Add POST /v1/frames/<frame_id>/description endpoint**
+- [ ] **Step 4: Add POST /v1/frames/<frame_id>/description endpoint**
 
 ```python
 @v1_bp.route("/frames/<int:frame_id>/description", methods=["POST"])
 def trigger_description(frame_id: int):
     """Manually trigger description generation for a frame."""
-    from openrecall.server.description.service import DescriptionService
-
     request_id = str(uuid.uuid4())
     conn = store.get_db_connection()
     try:
@@ -1602,14 +1615,17 @@ def trigger_description(frame_id: int):
                 "request_id": request_id,
             }), 409
 
-        # Re-enqueue (resets failed status)
-        from openrecall.server.description.service import DescriptionService
-        svc = DescriptionService(store)
-        svc.enqueue_description_task(conn, frame_id)
+        # Enqueue (insert OR IGNORE handles the re-enqueue of failed tasks)
+        store.insert_description_task(conn, frame_id)
         conn.commit()
 
-        task = store.claim_description_task(conn)
-        task_id = task["id"] if task else 0
+        # Query the newly inserted/updated task to get its id
+        cursor = conn.execute(
+            "SELECT id, status FROM description_tasks WHERE frame_id = ? ORDER BY id DESC LIMIT 1",
+            (frame_id,),
+        )
+        row = cursor.fetchone()
+        task_id = row[0] if row else 0
 
         return jsonify({
             "task_id": task_id,
@@ -1622,7 +1638,9 @@ def trigger_description(frame_id: int):
         conn.close()
 ```
 
-- [ ] **Step 4: Add GET /v1/description/tasks/status endpoint**
+> **Bug fix vs. draft**: The original draft called `claim_description_task(conn)` which atomically claims (status→processing) a pending task, returning nothing useful for the POST endpoint. The corrected version queries the task after enqueue to get the `task_id`.
+
+- [ ] **Step 5: Add GET /v1/description/tasks/status endpoint**
 
 ```python
 @v1_bp.route("/description/tasks/status", methods=["GET"])
@@ -1636,7 +1654,7 @@ def description_queue_status():
         conn.close()
 ```
 
-- [ ] **Step 5: Add POST /v1/admin/description/backfill endpoint**
+- [ ] **Step 6: Add POST /v1/admin/description/backfill endpoint**
 
 ```python
 @v1_bp.route("/admin/description/backfill", methods=["POST"])
@@ -1658,7 +1676,7 @@ def description_backfill():
         conn.close()
 ```
 
-- [ ] **Step 6: Write API test**
+- [ ] **Step 7: Write API test**
 
 ```python
 """tests/test_description_api.py"""
@@ -1676,7 +1694,7 @@ class TestDescriptionAPI:
         pass  # TODO: full integration test with running server
 ```
 
-- [ ] **Step 7: Commit**
+- [ ] **Step 8: Commit**
 
 ```bash
 git add openrecall/server/api_v1.py tests/test_description_api.py

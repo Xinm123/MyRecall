@@ -486,6 +486,25 @@ def _handle_accessibility_canonical_ingest(
     if not success:
         raise RuntimeError("Failed to complete accessibility frame")
 
+    # Enqueue description task if enabled
+    if settings.description_enabled:
+        try:
+            with store._connect() as conn:
+                store.insert_description_task(conn, frame_id)
+                conn.commit()
+                logger.debug(
+                    "ingest: description task enqueued capture_id=%s frame_id=%d",
+                    capture_id,
+                    frame_id,
+                )
+        except Exception as e:
+            logger.warning(
+                "ingest: failed to enqueue description task capture_id=%s frame_id=%d: %s",
+                capture_id,
+                frame_id,
+                e,
+            )
+
     logger.info(
         "ingest: 201 Created (accessibility-canonical) capture_id=%s frame_id=%d request_id=%s",
         capture_id,

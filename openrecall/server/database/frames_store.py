@@ -112,9 +112,10 @@ class FramesStore:
         self.db_path = db_path or settings.db_path
 
     def _connect(self) -> sqlite3.Connection:
-        conn = sqlite3.connect(str(self.db_path))
+        conn = sqlite3.connect(str(self.db_path), timeout=30.0)
         conn.row_factory = sqlite3.Row
         conn.execute("PRAGMA journal_mode=WAL")
+        conn.execute("PRAGMA busy_timeout=30000")  # 30 seconds
         return conn
 
     def _row_to_frame(self, row: sqlite3.Row) -> Frame:
@@ -329,7 +330,7 @@ class FramesStore:
                     """
                     SELECT id, capture_id, timestamp, app_name, window_name,
                            snapshot_path, status, ingested_at, image_size_bytes, error_message,
-                           last_known_app, last_known_window
+                           last_known_app, last_known_window, description_status
                     FROM frames WHERE id = ?
                     """,
                     (frame_id,),
@@ -530,6 +531,7 @@ class FramesStore:
                            f.last_known_window, f.text_source, f.processed_at,
                            f.capture_trigger, f.device_name, f.error_message,
                            f.accessibility_text, f.ocr_text, f.browser_url, f.focused,
+                           f.description_status,
                            o.text_length, o.ocr_engine,
                            CASE
                              WHEN f.text_source = 'accessibility' THEN SUBSTR(f.accessibility_text, 1, 100)
@@ -579,6 +581,8 @@ class FramesStore:
                             "capture_trigger": row["capture_trigger"] or "",
                             "device_name": row["device_name"] or "",
                             "error_message": row["error_message"] or "",
+                            # Description status (P1-S3+)
+                            "description_status": row["description_status"] or "",
                         }
                     )
         except sqlite3.Error as e:
@@ -1156,22 +1160,33 @@ class FramesStore:
             )
             return []
 
-    def get_frame_by_id(self, frame_id: int) -> Optional[dict]:
+    def get_frame_by_id(
+        self,
+        frame_id: int,
+        conn: Optional[sqlite3.Connection] = None,
+    ) -> Optional[dict]:
         """Get a frame by ID as a dict with all fields.
 
         Args:
             frame_id: The frame ID
+            conn: Optional existing connection. If None, creates a new one.
 
         Returns:
             Frame dict or None if not found
         """
+        def _query(c: sqlite3.Connection) -> Optional[dict]:
+            row = c.execute(
+                "SELECT * FROM frames WHERE id = ?",
+                (frame_id,),
+            ).fetchone()
+            return dict(row) if row else None
+
+        if conn is not None:
+            return _query(conn)
+
         try:
             with self._connect() as conn:
-                row = conn.execute(
-                    "SELECT * FROM frames WHERE id = ?",
-                    (frame_id,),
-                ).fetchone()
-                return dict(row) if row else None
+                return _query(conn)
         except sqlite3.Error as e:
             logger.error("get_frame_by_id failed frame_id=%d: %s", frame_id, e)
             return None
@@ -1553,3 +1568,219 @@ class FramesStore:
             if (trimmed.startswith("http://") or trimmed.startswith("https://")) and len(trimmed) > 10:
                 urls.append(trimmed)
         return urls
+
+    # ======================================================================
+    # Description task methods
+    # ======================================================================
+
+    def insert_description_task(self, conn: sqlite3.Connection, frame_id: int) -> None:
+        """Insert a pending description task. Idempotent via UNIQUE constraint."""
+        conn.execute(
+            """
+            INSERT OR IGNORE INTO description_tasks (frame_id, status)
+            VALUES (?, 'pending')
+            """,
+            (frame_id,),
+        )
+        conn.execute(
+            """
+            UPDATE frames
+            SET description_status = 'pending'
+            WHERE id = ? AND description_status IS NULL
+            """,
+            (frame_id,),
+        )
+
+    def claim_description_task(
+        self,
+        conn: sqlite3.Connection,
+    ) -> Optional[dict]:
+        """Atomically claim the next pending description task. Returns dict or None."""
+        cursor = conn.execute(
+            """
+            WITH next_task AS (
+                SELECT id FROM description_tasks
+                WHERE status = 'pending'
+                  AND (next_retry_at IS NULL OR next_retry_at <= strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+                ORDER BY id
+                LIMIT 1
+            )
+            UPDATE description_tasks
+            SET status = 'processing',
+                started_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+            WHERE id IN (SELECT id FROM next_task)
+            RETURNING id, frame_id, retry_count
+            """,
+        )
+        row = cursor.fetchone()
+        if row is None:
+            return None
+        conn.commit()
+        return {"id": row[0], "frame_id": row[1], "retry_count": row[2]}
+
+    def insert_frame_description(
+        self,
+        conn: sqlite3.Connection,
+        frame_id: int,
+        narrative: str,
+        entities_json: str,
+        intent: str,
+        summary: str,
+        description_model: Optional[str] = None,
+    ) -> None:
+        """Insert completed description. Idempotent via UNIQUE(frame_id)."""
+        conn.execute(
+            """
+            INSERT OR REPLACE INTO frame_descriptions
+              (frame_id, narrative, entities_json, intent, summary, description_model, generated_at)
+            VALUES (?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+            """,
+            (frame_id, narrative, entities_json, intent, summary, description_model),
+        )
+
+    def complete_description_task(
+        self,
+        conn: sqlite3.Connection,
+        task_id: int,
+        frame_id: int,
+    ) -> None:
+        """Mark a description task as completed and update frames table."""
+        conn.execute(
+            """
+            UPDATE description_tasks
+            SET status = 'completed',
+                completed_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+            WHERE id = ?
+            """,
+            (task_id,),
+        )
+        conn.execute(
+            "UPDATE frames SET description_status = 'completed' WHERE id = ?",
+            (frame_id,),
+        )
+
+    def reschedule_description_task(
+        self,
+        conn: sqlite3.Connection,
+        task_id: int,
+        retry_count: int,
+        next_retry_at: str,
+    ) -> None:
+        conn.execute(
+            """
+            UPDATE description_tasks
+            SET status = 'pending',
+                retry_count = ?,
+                next_retry_at = ?
+            WHERE id = ?
+            """,
+            (retry_count, next_retry_at, task_id),
+        )
+
+    def fail_description_task(
+        self,
+        conn: sqlite3.Connection,
+        task_id: int,
+        frame_id: int,
+        error_message: str,
+    ) -> None:
+        conn.execute(
+            """
+            UPDATE description_tasks
+            SET status = 'failed', error_message = ?
+            WHERE id = ?
+            """,
+            (error_message, task_id),
+        )
+        conn.execute(
+            "UPDATE frames SET description_status = 'failed' WHERE id = ?",
+            (frame_id,),
+        )
+
+    def enqueue_pending_descriptions(self, conn: sqlite3.Connection) -> int:
+        """Enqueue all frames without description_status. Returns count."""
+        cursor = conn.execute(
+            """
+            INSERT OR IGNORE INTO description_tasks (frame_id, status)
+            SELECT id, 'pending'
+            FROM frames
+            WHERE description_status IS NULL
+              AND snapshot_path IS NOT NULL
+            """
+        )
+        conn.execute(
+            """
+            UPDATE frames
+            SET description_status = 'pending'
+            WHERE description_status IS NULL
+              AND id IN (SELECT frame_id FROM description_tasks WHERE status = 'pending')
+            """
+        )
+        conn.commit()
+        return cursor.rowcount
+
+    def get_description_queue_status(self, conn: sqlite3.Connection) -> dict[str, int]:
+        """Return count of tasks by status."""
+        cursor = conn.execute(
+            """
+            SELECT status, COUNT(*) FROM description_tasks GROUP BY status
+            """
+        )
+        result: dict[str, int] = {"pending": 0, "processing": 0, "completed": 0, "failed": 0}
+        for row in cursor.fetchall():
+            status = row[0]
+            if status in result:
+                result[status] = row[1]
+        return result
+
+    def get_frame_description(
+        self,
+        conn: sqlite3.Connection,
+        frame_id: int,
+    ) -> Optional[dict]:
+        """Get description for a frame, or None if not completed."""
+        import json
+        cursor = conn.execute(
+            """
+            SELECT narrative, entities_json, intent, summary, description_model, generated_at
+            FROM frame_descriptions WHERE frame_id = ?
+            """,
+            (frame_id,),
+        )
+        row = cursor.fetchone()
+        if row is None:
+            return None
+        return {
+            "narrative": row[0],
+            "entities": json.loads(row[1]),
+            "intent": row[2],
+            "summary": row[3],
+            "model": row[4],
+            "generated_at": row[5],
+        }
+
+    def get_recent_descriptions(
+        self,
+        conn: sqlite3.Connection,
+        time_start: str,
+        time_end: str,
+        limit: int = 20,
+    ) -> list[dict]:
+        """Get recent frame descriptions within a time range."""
+        cursor = conn.execute(
+            """
+            SELECT fd.frame_id, fd.summary, fd.intent
+            FROM frame_descriptions fd
+            JOIN frames f ON f.id = fd.frame_id
+            WHERE f.timestamp BETWEEN ? AND ?
+              AND fd.narrative IS NOT NULL
+            ORDER BY f.timestamp DESC
+            LIMIT ?
+            """,
+            (time_start, time_end, limit),
+        )
+        rows = cursor.fetchall()
+        return [
+            {"frame_id": r[0], "summary": r[1], "intent": r[2]}
+            for r in rows
+        ]

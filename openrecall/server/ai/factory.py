@@ -1,6 +1,9 @@
 from __future__ import annotations
 
-from typing import Any, Dict, Union
+from typing import TYPE_CHECKING, Dict, Union
+
+if TYPE_CHECKING:
+    from openrecall.server.description.providers.base import DescriptionProvider
 
 from openrecall.server.ai.base import AIProvider, AIProviderConfigError, EmbeddingProvider, OCRProvider
 from openrecall.server.ai.providers import (
@@ -116,6 +119,39 @@ def get_embedding_provider() -> EmbeddingProvider:
         instance = OpenAIEmbeddingProvider(api_key=api_key, model_name=model_name, api_base=api_base)
     else:
         raise AIProviderConfigError(f"Unknown embedding provider: {provider}")
+
+    _instances[capability] = instance
+    return instance
+
+
+def get_description_provider() -> "DescriptionProvider":
+    """Get or create a cached DescriptionProvider instance."""
+    capability = "description"
+    cached = _instances.get(capability)
+    if cached is not None:
+        return cached  # type: ignore[return-value]
+
+    # Lazy import to avoid circular dependency
+    from openrecall.server.description.providers import (
+        LocalDescriptionProvider,
+        OpenAIDescriptionProvider,
+        DashScopeDescriptionProvider,
+    )
+
+    provider = settings.description_provider or settings.ai_provider
+    model_name = settings.description_model or settings.ai_model_name
+    api_key = settings.description_api_key or settings.ai_api_key
+    api_base = settings.description_api_base or settings.ai_api_base
+    provider = (provider or "local").strip().lower()
+
+    if provider == "local":
+        instance: DescriptionProvider = LocalDescriptionProvider(model_name=model_name)
+    elif provider == "dashscope":
+        instance = DashScopeDescriptionProvider(api_key=api_key, model_name=model_name)
+    elif provider == "openai":
+        instance = OpenAIDescriptionProvider(api_key=api_key, model_name=model_name, api_base=api_base)
+    else:
+        raise AIProviderConfigError(f"Unknown description provider: {provider}")
 
     _instances[capability] = instance
     return instance

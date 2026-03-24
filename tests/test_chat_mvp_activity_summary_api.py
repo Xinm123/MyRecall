@@ -39,6 +39,7 @@ def mock_store():
         "start": "2026-03-19T09:00:00Z",
         "end": "2026-03-19T10:00:00Z",
     }
+    mock.get_recent_descriptions.return_value = []
     return mock
 
 
@@ -64,6 +65,7 @@ class TestActivitySummaryAPI:
             assert "audio_summary" in data
             assert "total_frames" in data
             assert "time_range" in data
+            assert "descriptions" in data
 
     def test_audio_summary_is_empty_shell(self, app_with_activity_summary_route, mock_store):
         """audio_summary is shape-compatible empty shell."""
@@ -97,6 +99,7 @@ class TestActivitySummaryAPI:
         mock.get_activity_summary_recent_texts.return_value = []
         mock.get_activity_summary_total_frames.return_value = 0
         mock.get_activity_summary_time_range.return_value = None  # no frames
+        mock.get_recent_descriptions.return_value = []
 
         with patch("openrecall.server.api_v1._get_frames_store", return_value=mock):
             client = app_with_activity_summary_route.test_client()
