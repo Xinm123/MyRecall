@@ -2,6 +2,7 @@ import json
 import logging
 import os
 import queue
+import subprocess
 import threading
 import time
 from collections.abc import Callable
@@ -996,6 +997,36 @@ class ScreenRecorder:
             )[:, :, [2, 1, 0]]
             captures[monitor.device_name] = screenshot
         return captures
+
+    def _capture_window_by_id(self, window_id: int) -> ImageArray | None:
+        """Capture a specific window by its kCGWindowNumber using screencapture CLI.
+
+        Falls back to None on any error (non-zero exit, timeout, permission denied).
+        This enables automatic fallback to mss display capture in the caller.
+
+        Args:
+            window_id: The kCGWindowNumber of the target window.
+
+        Returns:
+            numpy array (BGR order) or None if capture failed.
+        """
+        tmp_path = "/tmp/myrecall_window_cap.jpg"
+        try:
+            subprocess.run(
+                ["screencapture", "-l", str(window_id), "-x", "-t", "jpg", tmp_path],
+                capture_output=True,
+                timeout=5,
+            )
+            if not os.path.exists(tmp_path):
+                logger.debug("screencapture produced no output for window_id=%d", window_id)
+                return None
+            img = Image.open(tmp_path)
+            screenshot = np.array(img)[:, :, [2, 1, 0]]
+            os.remove(tmp_path)
+            return screenshot
+        except Exception:
+            logger.debug("Window capture failed for window_id=%d", window_id)
+            return None
 
     def _record_permission_issue(self, reason: str) -> None:
         self._last_permission_snapshot = self._permission_state_machine.record_check(
