@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from typing import List, Optional
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class FrameDescription(BaseModel):
@@ -15,7 +15,6 @@ class FrameDescription(BaseModel):
     )
     entities: List[str] = Field(
         default_factory=list,
-        max_length=10,
         description="Key entities extracted from the frame (max 10 items)",
     )
     intent: str = Field(
@@ -27,6 +26,13 @@ class FrameDescription(BaseModel):
         max_length=200,
         description="One-sentence summary (max 200 chars / ~50 words)",
     )
+
+    @field_validator("entities")
+    @classmethod
+    def entities_max_length(cls, v: List[str]) -> List[str]:
+        if len(v) > 10:
+            return v[:10]
+        return v
 
     def to_db_dict(self) -> dict:
         """Convert to dict for database insertion."""
@@ -44,4 +50,3 @@ class FrameContext(BaseModel):
     app_name: Optional[str] = None
     window_name: Optional[str] = None
     browser_url: Optional[str] = None
-    timestamp: Optional[float] = None

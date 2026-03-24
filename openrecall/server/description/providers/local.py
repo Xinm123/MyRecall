@@ -137,10 +137,9 @@ class LocalDescriptionProvider(DescriptionProvider):
             if isinstance(data, dict):
                 original_narrative = data.get("narrative", "")
                 original_summary = data.get("summary", "")
-                narrative = original_narrative[:512]  # Truncate to max length
-                summary = original_summary[:200]  # Truncate to max length
+                narrative = original_narrative[:512]
+                summary = original_summary[:200]
 
-                # Log truncation warnings
                 if len(original_narrative) > 512:
                     logger.warning(f"Narrative truncated from {len(original_narrative)} to 512 chars")
                 if len(original_summary) > 200:
@@ -157,7 +156,6 @@ class LocalDescriptionProvider(DescriptionProvider):
             pass
 
         logger.warning(f"Failed to parse JSON from LocalDescriptionProvider. Raw: {raw[:100]}...")
-        # Truncate raw text for fallback
         fallback_narrative = raw[:512]
         fallback_summary = raw[:200]
         if len(raw) > 512:

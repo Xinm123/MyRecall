@@ -1,12 +1,14 @@
 # Frame Description Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Add an AI-generated structured description to each frame, enabling chat agents to understand screen semantics beyond fragmented OCR text.
 
 **Architecture:** Independent `description/` module under `server/`, with its own provider layer, service, and worker. Description tasks are enqueued on ingest and processed asynchronously by a dedicated worker.
 
 **Tech Stack:** Python, SQLite (existing), Pydantic, threading.Thread worker, Flask Blueprint.
+
+**Status:** ✅ Completed — All 47 steps verified. Implementation matches design spec. Post-review fixes applied (entities validator, FrameContext cleanup, local provider log consistency, config Optional types).
 
 ---
 
@@ -50,7 +52,7 @@ Spec:  docs/superpowers/specs/2026-03-24-frame-description-design.md
 - Create: `openrecall/server/database/migrations/20260324120000_add_frame_description.sql`
 - Test: `tests/test_description_migration.py` (or extend existing migration test)
 
-- [ ] **Step 1: Write the migration SQL**
+- [x] **Step 1: Write the migration SQL**
 
 ```sql
 -- Migration: 20260324120000_add_frame_description.sql
@@ -95,7 +97,7 @@ CREATE INDEX IF NOT EXISTS idx_dt_next_retry ON description_tasks(next_retry_at)
 COMMIT;
 ```
 
-- [ ] **Step 2: Verify migration with bootstrap test**
+- [x] **Step 2: Verify migration with bootstrap test**
 
 Run: `pytest tests/test_v3_migrations_bootstrap.py -v`
 Expected: All existing migrations pass (the new migration file is automatically picked up since migrations are applied in filename order). If the test passes, the migration is valid.
@@ -113,7 +115,7 @@ def test_description_tables_exist(temp_db):
     conn.close()
 ```
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add openrecall/server/database/migrations/20260324120000_add_frame_description.sql
@@ -127,7 +129,7 @@ git commit -m "feat: add frame description migration (frame_descriptions, descri
 **Files:**
 - Modify: `openrecall/shared/config.py`
 
-- [ ] **Step 1: Add description config fields to Settings class**
+- [x] **Step 1: Add description config fields to Settings class**
 
 Add after existing AI provider fields (around line 38):
 
@@ -150,7 +152,7 @@ DESCRIPTION_MODEL: Optional[str] = Field(
 )
 ```
 
-- [ ] **Step 2: Add config resolver in ai/factory.py — get_description_provider()**
+- [x] **Step 2: Add config resolver in ai/factory.py — get_description_provider()**
 
 Add at end of `factory.py`:
 
@@ -205,7 +207,7 @@ def get_description_provider() -> "DescriptionProvider":
 
 > **Note on `TYPE_CHECKING`**: The `DescriptionProvider` type annotation uses a string literal (`"DescriptionProvider"`) because the actual class is defined in `providers/base.py` (Task 4), which imports from `models.py` (Task 3), which is safe — but the factory itself (Task 2) runs before the description module exists. Using `TYPE_CHECKING` + string annotation avoids import-time errors.
 
-- [ ] **Step 3: Add api_key and api_base fields to config**
+- [x] **Step 3: Add api_key and api_base fields to config**
 
 ```python
 DESCRIPTION_API_KEY: Optional[str] = Field(
@@ -218,7 +220,7 @@ DESCRIPTION_API_BASE: Optional[str] = Field(
 )
 ```
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add openrecall/shared/config.py openrecall/server/ai/factory.py
@@ -233,7 +235,7 @@ git commit -m "feat(config): add description provider settings and factory"
 - Create: `openrecall/server/description/__init__.py`
 - Create: `openrecall/server/description/models.py`
 
-- [ ] **Step 1: Create models.py**
+- [x] **Step 1: Create models.py**
 
 ```python
 """Description models for frame description generation."""
@@ -285,7 +287,7 @@ class FrameContext(BaseModel):
     timestamp: Optional[float] = None
 ```
 
-- [ ] **Step 2: Create __init__.py**
+- [x] **Step 2: Create __init__.py**
 
 ```python
 """Frame description feature module."""
@@ -294,7 +296,7 @@ from openrecall.server.description.models import FrameDescription, FrameContext
 __all__ = ["FrameDescription", "FrameContext"]
 ```
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add openrecall/server/description/__init__.py openrecall/server/description/models.py
@@ -309,7 +311,7 @@ git commit -m "feat(description): add FrameDescription and FrameContext models"
 - Create: `openrecall/server/description/providers/__init__.py`
 - Create: `openrecall/server/description/providers/base.py`
 
-- [ ] **Step 1: Create providers/__init__.py**
+- [x] **Step 1: Create providers/__init__.py**
 
 ```python
 """Description providers."""
@@ -327,7 +329,7 @@ __all__ = [
 ]
 ```
 
-- [ ] **Step 2: Create providers/base.py**
+- [x] **Step 2: Create providers/base.py**
 
 ```python
 """Description provider protocol and errors."""
@@ -386,7 +388,7 @@ class DescriptionProvider(ABC):
         raise NotImplementedError
 ```
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add openrecall/server/description/providers/__init__.py openrecall/server/description/providers/base.py
@@ -400,7 +402,7 @@ git commit -m "feat(description): add DescriptionProvider protocol and errors"
 **Files:**
 - Create: `openrecall/server/description/providers/local.py`
 
-- [ ] **Step 1: Write the provider**
+- [x] **Step 1: Write the provider**
 
 ```python
 """Local description provider using Qwen3 VL."""
@@ -554,7 +556,7 @@ class LocalDescriptionProvider(DescriptionProvider):
         )
 ```
 
-- [ ] **Step 2: Write failing unit test**
+- [x] **Step 2: Write failing unit test**
 
 ```python
 """tests/test_description_provider.py"""
@@ -593,7 +595,7 @@ Expected: PASS (FrameDescription is working)
 Run: `pytest tests/test_description_provider.py::TestDescriptionProviderProtocol -v`
 Expected: PASS (protocol exists)
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add openrecall/server/description/providers/local.py tests/test_description_provider.py
@@ -608,7 +610,7 @@ git commit -m "feat(description): add LocalDescriptionProvider with Qwen3 VL"
 - Create: `openrecall/server/description/providers/openai.py`
 - Create: `openrecall/server/description/providers/dashscope.py`
 
-- [ ] **Step 1: Write OpenAIDescriptionProvider**
+- [x] **Step 1: Write OpenAIDescriptionProvider**
 
 ```python
 """OpenAI-compatible description provider."""
@@ -733,7 +735,7 @@ class OpenAIDescriptionProvider(DescriptionProvider):
         return FrameDescription(narrative=raw, entities=[], intent="", summary="")
 ```
 
-- [ ] **Step 2: Write DashScopeDescriptionProvider**
+- [x] **Step 2: Write DashScopeDescriptionProvider**
 
 ```python
 """DashScope description provider."""
@@ -852,7 +854,7 @@ class DashScopeDescriptionProvider(DescriptionProvider):
         return FrameDescription(narrative=raw_text, entities=[], intent="", summary="")
 ```
 
-- [ ] **Step 3: Add tests for cloud providers** (mocked, no real API calls)
+- [x] **Step 3: Add tests for cloud providers** (mocked, no real API calls)
 
 ```python
 """tests/test_description_provider.py — add after existing tests"""
@@ -871,7 +873,7 @@ class TestDashScopeDescriptionProvider:
             DashScopeDescriptionProvider(api_key="", model_name="qwen-vl-max")
 ```
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add openrecall/server/description/providers/openai.py openrecall/server/description/providers/dashscope.py tests/test_description_provider.py
@@ -885,7 +887,7 @@ git commit -m "feat(description): add OpenAIDescriptionProvider and DashScopeDes
 **Files:**
 - Create: `openrecall/server/description/service.py`
 
-- [ ] **Step 1: Write the service**
+- [x] **Step 1: Write the service**
 
 ```python
 """Description service: enqueue, generate, backfill."""
@@ -1017,7 +1019,7 @@ class DescriptionService:
         return self._store.get_description_queue_status(conn)
 ```
 
-- [ ] **Step 2: Write failing test**
+- [x] **Step 2: Write failing test**
 
 ```python
 """tests/test_description_service.py"""
@@ -1038,7 +1040,7 @@ class TestDescriptionService:
 Run: `pytest tests/test_description_service.py -v`
 Expected: PASS (mocked)
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add openrecall/server/description/service.py tests/test_description_service.py
@@ -1052,7 +1054,7 @@ git commit -m "feat(description): add DescriptionService with enqueue, generate,
 **Files:**
 - Create: `openrecall/server/description/worker.py`
 
-- [ ] **Step 1: Write the worker**
+- [x] **Step 1: Write the worker**
 
 ```python
 """Background worker for frame description generation."""
@@ -1146,7 +1148,7 @@ class DescriptionWorker(threading.Thread):
             self.service.mark_failed(conn, task_id, frame_id, str(e), retry_count)
 ```
 
-- [ ] **Step 2: Write worker test**
+- [x] **Step 2: Write worker test**
 
 ```python
 """tests/test_description_worker.py"""
@@ -1166,7 +1168,7 @@ class TestDescriptionWorker:
 Run: `pytest tests/test_description_worker.py -v`
 Expected: PASS
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add openrecall/server/description/worker.py tests/test_description_worker.py
@@ -1182,7 +1184,7 @@ git commit -m "feat(description): add DescriptionWorker thread"
 
 Add the following methods to the `FramesStore` class (at the end, before any private helpers):
 
-- [ ] **Step 1: Add insert_description_task()**
+- [x] **Step 1: Add insert_description_task()**
 
 ```python
 def insert_description_task(self, conn: sqlite3.Connection, frame_id: int) -> None:
@@ -1205,7 +1207,7 @@ def insert_description_task(self, conn: sqlite3.Connection, frame_id: int) -> No
     )
 ```
 
-- [ ] **Step 2: Add claim_description_task()**
+- [x] **Step 2: Add claim_description_task()**
 
 ```python
 def claim_description_task(
@@ -1236,7 +1238,7 @@ def claim_description_task(
     return {"id": row[0], "frame_id": row[1], "retry_count": row[2]}
 ```
 
-- [ ] **Step 3: Add insert_frame_description()**
+- [x] **Step 3: Add insert_frame_description()**
 
 ```python
 def insert_frame_description(
@@ -1260,7 +1262,7 @@ def insert_frame_description(
     )
 ```
 
-- [ ] **Step 4: Add complete_description_task()**
+- [x] **Step 4: Add complete_description_task()**
 
 ```python
 def complete_description_task(
@@ -1285,7 +1287,7 @@ def complete_description_task(
     )
 ```
 
-- [ ] **Step 5: Add reschedule_description_task() and fail_description_task()**
+- [x] **Step 5: Add reschedule_description_task() and fail_description_task()**
 
 ```python
 def reschedule_description_task(
@@ -1328,7 +1330,7 @@ def fail_description_task(
     )
 ```
 
-- [ ] **Step 6: Add enqueue_pending_descriptions() for backfill**
+- [x] **Step 6: Add enqueue_pending_descriptions() for backfill**
 
 ```python
 def enqueue_pending_descriptions(self, conn: sqlite3.Connection) -> int:
@@ -1354,7 +1356,7 @@ def enqueue_pending_descriptions(self, conn: sqlite3.Connection) -> int:
     return cursor.rowcount
 ```
 
-- [ ] **Step 7: Add get_description_queue_status()**
+- [x] **Step 7: Add get_description_queue_status()**
 
 ```python
 def get_description_queue_status(self, conn: sqlite3.Connection) -> dict[str, int]:
@@ -1372,7 +1374,7 @@ def get_description_queue_status(self, conn: sqlite3.Connection) -> dict[str, in
     return result
 ```
 
-- [ ] **Step 8: Add get_frame_description()**
+- [x] **Step 8: Add get_frame_description()**
 
 ```python
 def get_frame_description(
@@ -1402,7 +1404,7 @@ def get_frame_description(
     }
 ```
 
-- [ ] **Step 9: Add get_frame_by_id() helper (used by worker)**
+- [x] **Step 9: Add get_frame_by_id() helper (used by worker)**
 
 ```python
 def get_frame_by_id(self, conn: sqlite3.Connection, frame_id: int) -> Optional[dict]:
@@ -1427,7 +1429,7 @@ def get_frame_by_id(self, conn: sqlite3.Connection, frame_id: int) -> Optional[d
     }
 ```
 
-- [ ] **Step 10: Write test for CRUD methods**
+- [x] **Step 10: Write test for CRUD methods**
 
 ```python
 """tests/test_description_store.py"""
@@ -1500,7 +1502,7 @@ class TestDescriptionCRUD:
 Run: `pytest tests/test_description_store.py -v`
 Expected: PASS
 
-- [ ] **Step 11: Commit**
+- [x] **Step 11: Commit**
 
 ```bash
 git add openrecall/server/database/frames_store.py tests/test_description_store.py
@@ -1514,7 +1516,7 @@ git commit -m "feat(description): add FramesStore description CRUD methods"
 **Files:**
 - Modify: `openrecall/server/api_v1.py`
 
-- [ ] **Step 1: Extend `/v1/frames/<frame_id>/context` response** (api_v1.py, around `get_frame_context` at line 600)
+- [x] **Step 1: Extend `/v1/frames/<frame_id>/context` response** (api_v1.py, around `get_frame_context` at line 600)
 
 Find the existing `get_frame_context()` function in `api_v1.py` (around line 600). Modify the `result` dict construction to add `description_status` and `description` fields. The `description` is `None` unless `description_status == 'completed'`, in which case call `store.get_frame_description(conn, frame_id)`.
 
@@ -1536,7 +1538,7 @@ Find the existing `get_frame_context()` function in `api_v1.py` (around line 600
     return jsonify(result)
 ```
 
-- [ ] **Step 2: Extend `/v1/activity-summary` response** (api_v1.py, around `activity_summary` at line 1007)
+- [x] **Step 2: Extend `/v1/activity-summary` response** (api_v1.py, around `activity_summary` at line 1007)
 
 In the `activity_summary()` function, after building the `result` dict, add:
 
@@ -1549,7 +1551,7 @@ In the `activity_summary()` function, after building the `result` dict, add:
 
 Note: `store.get_recent_descriptions()` is added in Step 3 below.
 
-- [ ] **Step 3: Add `get_recent_descriptions()` to FramesStore**
+- [x] **Step 3: Add `get_recent_descriptions()` to FramesStore**
 
 > This method is needed by Step 2 above. Add it as a new method in `frames_store.py`:
 
@@ -1583,7 +1585,7 @@ def get_recent_descriptions(
 
 > **Placement**: Add this method to `frames_store.py` alongside the other description CRUD methods from Task 9. It is part of FramesStore, not the API layer.
 
-- [ ] **Step 4: Add POST /v1/frames/<frame_id>/description endpoint**
+- [x] **Step 4: Add POST /v1/frames/<frame_id>/description endpoint**
 
 ```python
 @v1_bp.route("/frames/<int:frame_id>/description", methods=["POST"])
@@ -1640,7 +1642,7 @@ def trigger_description(frame_id: int):
 
 > **Bug fix vs. draft**: The original draft called `claim_description_task(conn)` which atomically claims (status→processing) a pending task, returning nothing useful for the POST endpoint. The corrected version queries the task after enqueue to get the `task_id`.
 
-- [ ] **Step 5: Add GET /v1/description/tasks/status endpoint**
+- [x] **Step 5: Add GET /v1/description/tasks/status endpoint**
 
 ```python
 @v1_bp.route("/description/tasks/status", methods=["GET"])
@@ -1654,7 +1656,7 @@ def description_queue_status():
         conn.close()
 ```
 
-- [ ] **Step 6: Add POST /v1/admin/description/backfill endpoint**
+- [x] **Step 6: Add POST /v1/admin/description/backfill endpoint**
 
 ```python
 @v1_bp.route("/admin/description/backfill", methods=["POST"])
@@ -1676,7 +1678,7 @@ def description_backfill():
         conn.close()
 ```
 
-- [ ] **Step 7: Write API test**
+- [x] **Step 7: Write API test**
 
 ```python
 """tests/test_description_api.py"""
@@ -1694,7 +1696,7 @@ class TestDescriptionAPI:
         pass  # TODO: full integration test with running server
 ```
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add openrecall/server/api_v1.py tests/test_description_api.py
@@ -1709,7 +1711,7 @@ git commit -m "feat(api): extend /frames/<id>/context and /activity-summary with
 - Modify: `openrecall/server/api_v1.py` (ingest endpoint)
 - Modify: `openrecall/server/database/frames_store.py`
 
-- [ ] **Step 1: Modify ingest() to enqueue description task**
+- [x] **Step 1: Modify ingest() to enqueue description task**
 
 Find the ingest() endpoint. After `finalize_claimed_frame()` succeeds, add:
 
@@ -1723,7 +1725,7 @@ if settings.description_enabled:
         logger.warning(f"Failed to enqueue description task: {e}")
 ```
 
-- [ ] **Step 2: Commit**
+- [x] **Step 2: Commit**
 
 ```bash
 git add openrecall/server/api_v1.py
@@ -1740,7 +1742,7 @@ git commit -m "feat(ingest): auto-enqueue description task on frame ingest"
 
 The server has three startup modes. DescriptionWorker should start alongside the existing worker in all modes. At module level, store a reference so shutdown can stop it.
 
-- [ ] **Step 1: Add module-level worker reference in `__main__.py`**
+- [x] **Step 1: Add module-level worker reference in `__main__.py`**
 
 After line 17 (`logger = configure_logging...`), add:
 
@@ -1748,7 +1750,7 @@ After line 17 (`logger = configure_logging...`), add:
 _description_worker = None  # module-level reference for shutdown
 ```
 
-- [ ] **Step 2: Modify `_start_noop_mode()` in `__main__.py`**
+- [x] **Step 2: Modify `_start_noop_mode()` in `__main__.py`**
 
 After line 106 (`return driver`), add:
 
@@ -1763,7 +1765,7 @@ After line 106 (`return driver`), add:
         logger.info("DescriptionWorker started (noop mode)")
 ```
 
-- [ ] **Step 3: Modify `_start_ocr_mode()` in `__main__.py`**
+- [x] **Step 3: Modify `_start_ocr_mode()` in `__main__.py`**
 
 After line 138 (`worker.start()`), add:
 
@@ -1776,7 +1778,7 @@ After line 138 (`worker.start()`), add:
         logger.info("DescriptionWorker started (ocr mode)")
 ```
 
-- [ ] **Step 4: Modify `init_background_worker()` in `app.py` (legacy mode)**
+- [x] **Step 4: Modify `init_background_worker()` in `app.py` (legacy mode)**
 
 At line 157 where `worker = ProcessingWorker()`, add after that line:
 
@@ -1793,7 +1795,7 @@ At line 157 where `worker = ProcessingWorker()`, add after that line:
 
 Note: `ProcessingWorker` and `V3ProcessingWorker` do not expose a `_store` attribute. Always create a new `FramesStore()` instance for `DescriptionWorker`.
 
-- [ ] **Step 5: Wire shutdown in `shutdown_handler()` in `__main__.py`**
+- [x] **Step 5: Wire shutdown in `shutdown_handler()` in `__main__.py`**
 
 In the `shutdown_handler()` function, inside the try block after line 191 (`worker.stop()`), add:
 
@@ -1808,7 +1810,7 @@ In the `shutdown_handler()` function, inside the try block after line 191 (`work
 
 Also update `_cleanup_worker()` (line 209) to stop `_description_worker` if running.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add openrecall/server/__main__.py openrecall/server/app.py
@@ -1818,16 +1820,16 @@ git commit -m "feat(server): start and stop DescriptionWorker with server"
 
 ## Task 13: Final Integration Test
 
-- [ ] **Step 1: Run all description tests**
+- [x] **Step 1: Run all description tests**
 
 ```bash
 pytest tests/test_description_store.py tests/test_description_service.py tests/test_description_provider.py tests/test_description_worker.py -v
 ```
 
-- [ ] **Step 2: Run full test suite**
+- [x] **Step 2: Run full test suite**
 
 ```bash
 pytest -m "not model and not e2e and not perf and not security" -v
 ```
 
-- [ ] **Step 3: Commit all remaining changes**
+- [x] **Step 3: Commit all remaining changes**
