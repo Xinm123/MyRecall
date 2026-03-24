@@ -888,3 +888,52 @@ class SearchEngine:
         except sqlite3.Error as e:
             logger.error("Count failed: %s", e)
             return 0
+
+    def count_by_type(
+        self,
+        q: str = "",
+        start_time: Optional[str] = None,
+        end_time: Optional[str] = None,
+        app_name: Optional[str] = None,
+        window_name: Optional[str] = None,
+        focused: Optional[bool] = None,
+        min_length: Optional[int] = None,
+        max_length: Optional[int] = None,
+        browser_url: Optional[str] = None,
+    ) -> dict[str, int]:
+        """Count matching frames by content type without returning results.
+
+        Args:
+            Same as search() except limit/offset/content_type
+
+        Returns:
+            Dict with "ocr" and "accessibility" counts
+        """
+        params = SearchParams(
+            q=q,
+            start_time=start_time,
+            end_time=end_time,
+            app_name=app_name,
+            window_name=window_name,
+            focused=focused,
+            min_length=min_length,
+            max_length=max_length,
+            browser_url=browser_url,
+        )
+
+        try:
+            with self._connect() as conn:
+                # Get OCR count
+                ocr_sql, ocr_params = self._build_ocr_query(params, is_count=True)
+                ocr_row = conn.execute(ocr_sql, ocr_params).fetchone()
+                ocr_count = ocr_row["total"] if ocr_row else 0
+
+                # Get accessibility count
+                ax_sql, ax_params = self._build_accessibility_query(params, is_count=True)
+                ax_row = conn.execute(ax_sql, ax_params).fetchone()
+                ax_count = ax_row["total"] if ax_row else 0
+
+                return {"ocr": ocr_count, "accessibility": ax_count}
+        except sqlite3.Error as e:
+            logger.error("Count by type failed: %s", e)
+            return {"ocr": 0, "accessibility": 0}
