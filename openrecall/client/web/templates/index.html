@@ -1457,6 +1457,9 @@
       init() {
         this.syncLastCheckFromEntries(this.entries);
 
+        // 立即获取数据，避免 5 秒延迟
+        this.refreshRecent();
+
         window.addEventListener("openrecall-config-changed", () => {
           this.refreshRecent();
           setTimeout(() => this.refreshRecent(), 500);

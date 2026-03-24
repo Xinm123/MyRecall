@@ -529,8 +529,18 @@ class FramesStore:
                            f.snapshot_path, f.status, f.ingested_at, f.last_known_app,
                            f.last_known_window, f.text_source, f.processed_at,
                            f.capture_trigger, f.device_name, f.error_message,
-                           o.text_length, o.ocr_engine, o.text AS ocr_text,
-                           SUBSTR(o.text, 1, 100) AS ocr_text_preview
+                           f.accessibility_text, f.ocr_text, f.browser_url, f.focused,
+                           o.text_length, o.ocr_engine,
+                           CASE
+                             WHEN f.text_source = 'accessibility' THEN SUBSTR(f.accessibility_text, 1, 100)
+                             WHEN f.text_source = 'ocr' THEN SUBSTR(f.ocr_text, 1, 100)
+                             ELSE NULL
+                           END AS text_preview,
+                           CASE
+                             WHEN f.text_source = 'accessibility' THEN LENGTH(f.accessibility_text)
+                             WHEN f.text_source = 'ocr' THEN LENGTH(f.ocr_text)
+                             ELSE 0
+                           END AS text_length_computed
                     FROM frames f
                     LEFT JOIN ocr_text o ON f.id = o.frame_id
                     ORDER BY f.timestamp DESC
@@ -555,12 +565,16 @@ class FramesStore:
                             "window_title": row["window_name"] or "",
                             "last_known_app": row["last_known_app"] or "",
                             "last_known_window": row["last_known_window"] or "",
-                            # P1-S3 additions
+                            # Text source and content
                             "text_source": row["text_source"] or "",
-                            "text_length": row["text_length"] or 0,
+                            "text_length": row["text_length_computed"] or 0,
+                            "accessibility_text": row["accessibility_text"] or "",
                             "ocr_text": row["ocr_text"] or "",
-                            "ocr_text_preview": row["ocr_text_preview"] or "",
+                            "text_preview": row["text_preview"] or "",
                             "ocr_engine": row["ocr_engine"] or "",
+                            # Additional metadata
+                            "browser_url": row["browser_url"] or "",
+                            "focused": bool(row["focused"]) if row["focused"] is not None else False,
                             "processed_at": row["processed_at"] or "",
                             "capture_trigger": row["capture_trigger"] or "",
                             "device_name": row["device_name"] or "",

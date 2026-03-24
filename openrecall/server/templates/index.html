@@ -410,6 +410,27 @@
     color: var(--text-secondary, #666);
   }
 
+  .text-panel-header .source-info {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .text-panel-header .source-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 4px;
+  }
+
+  .text-panel-header .source-badge.ax {
+    background: rgba(52, 199, 89, 0.15);
+    color: #28a745;
+  }
+
   .copy-btn {
     padding: 4px 12px;
     font-size: 12px;
@@ -726,12 +747,26 @@
     gap: 8px;
   }
 
-  /* 第一行右侧：相对时间 */
-  .context-row .relative-time {
+  /* 第一行右侧：frame_id */
+  .context-row .frame-id {
+    font-size: 11px;
+    color: var(--text-tertiary, #8E8E93);
+    font-weight: 600;
+    font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
+    flex-shrink: 0;
+  }
+
+  /* 第三行：相对时间 */
+  .time-row .relative-time {
     font-size: 11px;
     color: var(--text-tertiary, #8E8E93);
     font-weight: 500;
     flex-shrink: 0;
+  }
+  .time-row .relative-time::before {
+    content: '·';
+    margin: 0 4px;
+    color: var(--text-tertiary, #8E8E93);
   }
 
   .timestamp {
@@ -767,6 +802,92 @@
     display: -webkit-box;
     -webkit-line-clamp: 2;
     -webkit-box-orient: vertical;
+  }
+
+  /* Text source badge */
+  .text-source-badge {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 4px;
+  }
+
+  .source-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    padding: 2px 6px;
+    border-radius: 4px;
+  }
+
+  .source-badge.ax {
+    background: rgba(52, 199, 89, 0.15);
+    color: #28a745;
+  }
+
+  .source-badge.ocr {
+    background: rgba(0, 122, 255, 0.12);
+    color: #007aff;
+  }
+
+  .char-count {
+    font-size: 0.7rem;
+    color: var(--text-tertiary, #8E8E93);
+  }
+
+  /* Text preview */
+  .text-preview {
+    font-size: 0.8rem;
+    color: #333;
+    line-height: 1.4;
+    max-height: 3em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    margin-bottom: 4px;
+  }
+
+  /* Meta row for browser URL */
+  .meta-row {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-top: 4px;
+    font-size: 0.75rem;
+  }
+
+  .meta-icon {
+    flex-shrink: 0;
+  }
+
+  .browser-url {
+    color: var(--accent-color, #007AFF);
+    text-decoration: none;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 200px;
+  }
+
+  .browser-url:hover {
+    text-decoration: underline;
+  }
+
+  /* Focused badge */
+  .focused-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 0.7rem;
+    color: #FF9500;
+    background: rgba(255, 149, 0, 0.12);
+    padding: 2px 6px;
+    border-radius: 4px;
+    margin-top: 4px;
   }
 
   /* Error message display */
@@ -839,16 +960,16 @@
         <template x-for="(entry, i) in entries" :key="entry.id ?? (entry.timestamp + '-' + i)">
           <article class="memory-card" :data-frame-status="entry.status ? entry.status.toLowerCase() : 'pending'">
             <div class="card-header-v2">
-              <!-- 第一行：应用 + 触发器 + [last known] + 相对时间 -->
+              <!-- 第一行：应用 + 触发器 + [last known] + frame_id -->
               <div class="header-row context-row">
                 <div class="context-left">
-                  <span class="app-name" 
+                  <span class="app-name"
                         :class="{ 'fallback': !entry.app_name && !entry.app && entry.last_known_app }"
-                        x-text="getAppDisplay(entry)" 
+                        x-text="getAppDisplay(entry)"
                         :title="getAppNameTooltip(entry)"
                   ></span>
-                  <span class="trigger-label" 
-                        x-text="entry.capture_trigger" 
+                  <span class="trigger-label"
+                        x-text="entry.capture_trigger"
                         x-show="entry.capture_trigger"
                         :data-trigger="entry.capture_trigger"
                   ></span>
@@ -856,22 +977,23 @@
                         x-show="!entry.app_name && !entry.app && entry.last_known_app"
                   >last known</span>
                 </div>
-                <span class="relative-time" x-text="formatRelativeTime(entry.timestamp)"
-                ></span>
+                <span class="frame-id" x-text="'#' + entry.frame_id"></span>
               </div>
-              
+
               <!-- 第二行：窗口标题（始终显示，无内容时占位） -->
               <div class="header-row window-row">
-                <span class="window-name" 
+                <span class="window-name"
                       x-text="entry.window_title || entry.title || entry.last_known_window || ''"
                 ></span>
               </div>
-              
-              <!-- 第三行：绝对时间 + 设备名称 -->
+
+              <!-- 第三行：绝对时间 + 相对时间 + 设备名称 -->
               <div class="header-row time-row">
                 <span class="timestamp" x-text="formatTime(entry.timestamp)"
                 ></span>
-                <span class="device-name" 
+                <span class="relative-time" x-text="formatRelativeTime(entry.timestamp)"
+                ></span>
+                <span class="device-name"
                       x-text="entry.device_name"
                       x-show="entry.device_name"
                 ></span>
@@ -911,20 +1033,35 @@
               </template>
               <template x-if="entry.status === 'COMPLETED'">
                 <div style="width: 100%;">
-                  <!-- OCR Info -->
-                  <div class="ocr-info" x-show="entry.ocr_engine || entry.text_length">
-                    <span class="ocr-info-item" x-show="entry.ocr_engine">
+                  <!-- Text Source Badge -->
+                  <div class="text-source-badge" x-show="entry.text_source">
+                    <span x-show="entry.text_source === 'accessibility'" class="source-badge ax">
+                      <span>📱</span>
+                      <span>AX</span>
+                    </span>
+                    <span x-show="entry.text_source === 'ocr'" class="source-badge ocr">
                       <span>📝</span>
-                      <span x-text="entry.ocr_engine"></span>
+                      <span>OCR</span>
                     </span>
-                    <span class="ocr-info-item" x-show="entry.text_length">
-                      <span x-text="entry.text_length + ' chars'"></span>
-                    </span>
+                    <span class="char-count" x-text="entry.text_length + ' chars'"></span>
                   </div>
-                  <!-- OCR Text Preview -->
-                  <div class="ocr-text-preview" x-show="entry.ocr_text_preview" x-text="entry.ocr_text_preview"></div>
-                  <!-- Fallback for completed without OCR -->
-                  <span class="fallback-text" x-show="!entry.ocr_text_preview && !entry.error_message">Image captured</span>
+                  <!-- Text Preview (based on text_source) -->
+                  <div class="text-preview" x-show="entry.text_preview" x-text="entry.text_preview"></div>
+                  <!-- Browser URL -->
+                  <div class="meta-row" x-show="entry.browser_url">
+                    <span class="meta-icon">🔗</span>
+                    <a class="browser-url" :href="entry.browser_url" target="_blank" rel="noopener"
+                       x-text="entry.browser_url.length > 40 ? entry.browser_url.substring(0, 40) + '...' : entry.browser_url"
+                       :title="entry.browser_url"
+                    ></a>
+                  </div>
+                  <!-- Focused Status -->
+                  <div class="focused-badge" x-show="entry.focused">
+                    <span>⭐</span>
+                    <span>focused</span>
+                  </div>
+                  <!-- Fallback for completed without text -->
+                  <span class="fallback-text" x-show="!entry.text_preview && !entry.error_message">Image captured</span>
                 </div>
               </template>
             </div>
@@ -960,6 +1097,13 @@
               @click="modalTab = 'text'"
               x-show="selectedEntry?.status === 'COMPLETED'"
             >文本</button>
+            <button
+              type="button"
+              class="modal-tab"
+              :class="{ 'active': modalTab === 'accessibility' }"
+              @click="modalTab = 'accessibility'"
+              x-show="selectedEntry?.status === 'COMPLETED' && selectedEntry?.text_source === 'accessibility'"
+            >Accessibility</button>
             <button
               type="button"
               class="modal-tab"
@@ -1005,6 +1149,26 @@
                 >复制</button>
               </div>
               <div class="text-panel-content" x-text="selectedEntry?.ocr_text || '无 OCR 文本'"></div>
+            </div>
+
+            <!-- Accessibility Tab -->
+            <div x-show="modalTab === 'accessibility'" class="modal-text-panel">
+              <div class="text-panel-header">
+                <div class="source-info">
+                  <span class="source-badge ax" x-show="selectedEntry?.text_source === 'accessibility'">
+                    <span>📱</span>
+                    <span>AX</span>
+                  </span>
+                  <span x-text="`${selectedEntry?.text_length || 0} 字符`"></span>
+                </div>
+                <button
+                  type="button"
+                  class="copy-btn"
+                  @click="copyAccessibilityText()"
+                  x-show="selectedEntry?.accessibility_text"
+                >复制</button>
+              </div>
+              <div class="text-panel-content" x-text="selectedEntry?.accessibility_text || '无 Accessibility 文本'"></div>
             </div>
 
             <!-- 元数据 Tab -->
@@ -1240,6 +1404,26 @@
         navigator.clipboard.writeText(text).then(() => {
           // 可选：显示复制成功提示
           const btn = document.querySelector('.copy-btn');
+          if (btn) {
+            const originalText = btn.textContent;
+            btn.textContent = '已复制';
+            setTimeout(() => {
+              btn.textContent = originalText;
+            }, 1500);
+          }
+        }).catch(err => {
+          console.error('复制失败:', err);
+        });
+      },
+
+      /**
+       * 复制 Accessibility 文本到剪贴板
+       */
+      copyAccessibilityText() {
+        const text = this.selectedEntry?.accessibility_text;
+        if (!text) return;
+        navigator.clipboard.writeText(text).then(() => {
+          const btn = document.querySelector('.modal-text-panel .copy-btn');
           if (btn) {
             const originalText = btn.textContent;
             btn.textContent = '已复制';

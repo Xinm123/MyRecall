@@ -18,27 +18,27 @@
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
     margin-bottom: 12px;
   }
-  
+
   .slider {
     width: 86%;
     margin: 8px 0;
   }
-  
+
   .slider-value {
     margin-top: 6px;
     font-size: 1.2em;
     color: var(--text-primary);
   }
-  
+
   .image-container {
     margin-top: 12px;
     text-align: center;
     background: var(--bg-card);
     border-radius: 12px;
-    padding: 10px 12px;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+    padding: 10px 12px;
   }
-  
+
   .image-container img {
     max-width: 100%;
     max-height: calc(72vh);
@@ -49,7 +49,7 @@
     display: block;
     margin: 0 auto;
   }
-  
+
   .alert {
     background: var(--bg-card);
     border: 1px solid var(--border-color);
@@ -57,58 +57,87 @@
     padding: 20px;
     color: var(--text-primary);
   }
+
+  .timeline-loading {
+    text-align: center;
+    padding: 40px;
+    color: var(--text-secondary);
+  }
 </style>
 {% endblock %}
 
 {% block content %}
-{% if timeline_frames|length > 0 %}
-  <div class="slider-container">
-    <input type="range" class="slider" id="discreteSlider" min="0" max="{{timeline_frames|length - 1}}" step="1" value="{{timeline_frames|length - 1}}">
-    <div class="slider-value" id="sliderValue">{{timeline_frames[0].timestamp | timestamp_to_human_readable }}</div>
+<div x-data="timelineView()" x-init="init()" x-cloak>
+  <!-- Loading state -->
+  <div x-show="loading" class="timeline-loading">
+    Loading timeline...
   </div>
-  <div class="image-container">
-    <img id="timestampImage" src="${EDGE_BASE_URL}/v1/frames/{{timeline_frames[0].frame_id}}" alt="Screenshot at selected time">
-  </div>
-{% else %}
-  <div class="alert" role="alert">
+
+  <!-- No data -->
+  <div x-show="!loading && frames.length === 0" class="alert" role="alert">
     Nothing recorded yet, wait a few seconds.
   </div>
-{% endif %}
+
+  <!-- Timeline -->
+  <div x-show="!loading && frames.length > 0">
+    <div class="slider-container">
+      <input type="range" class="slider" id="discreteSlider"
+        x-model="currentIndex"
+        :min="0" :max="frames.length - 1" step="1">
+      <div class="slider-value" x-text="formattedTime"></div>
+    </div>
+    <div class="image-container">
+      <img id="timestampImage"
+        :src="currentFrame ? `${EDGE_BASE_URL}/v1/frames/${currentFrame.frame_id}` : ''"
+        alt="Screenshot">
+    </div>
+  </div>
+</div>
 {% endblock %}
 
 {% block extra_body %}
-{% if timeline_frames|length > 0 %}
-<script type="application/json" id="timelineFramesData">{{ timeline_frames|tojson }}</script>
 <script>
-  const timelineFrames = JSON.parse(document.getElementById('timelineFramesData').textContent);
-  const slider = document.getElementById('discreteSlider');
-  const sliderValue = document.getElementById('sliderValue');
-  const timestampImage = document.getElementById('timestampImage');
+  function timelineView() {
+    return {
+      frames: [],
+      currentIndex: 0,
+      loading: true,
 
-  // Format date to 24-hour format (YYYY-MM-DD HH:MM:SS)
-  function formatDate24Hour(date) {
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    const hours = String(date.getHours()).padStart(2, '0');
-    const minutes = String(date.getMinutes()).padStart(2, '0');
-    const seconds = String(date.getSeconds()).padStart(2, '0');
-    return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+      get currentFrame() {
+        if (this.frames.length === 0) return null;
+        // frames are newest-first; slider shows oldest on left
+        const reversed = this.frames.length - 1 - this.currentIndex;
+        return this.frames[reversed];
+      },
+
+      get formattedTime() {
+        const frame = this.currentFrame;
+        if (!frame) return '';
+        const date = new Date(frame.timestamp);
+        if (isNaN(date.getTime())) return 'Invalid timestamp';
+        const y = date.getFullYear();
+        const mo = String(date.getMonth() + 1).padStart(2, '0');
+        const d = String(date.getDate()).padStart(2, '0');
+        const h = String(date.getHours()).padStart(2, '0');
+        const mi = String(date.getMinutes()).padStart(2, '0');
+        const s = String(date.getSeconds()).padStart(2, '0');
+        return `${y}-${mo}-${d} ${h}:${mi}:${s}`;
+      },
+
+      async init() {
+        try {
+          const resp = await fetch(`${EDGE_BASE_URL}/v1/timeline?limit=5000`);
+          if (resp.ok) {
+            this.frames = await resp.json();
+            this.currentIndex = this.frames.length - 1;
+          }
+        } catch (e) {
+          console.error('Failed to load timeline:', e);
+        } finally {
+          this.loading = false;
+        }
+      }
+    };
   }
-
-  slider.addEventListener('input', function() {
-    const reversedIndex = timelineFrames.length - 1 - slider.value;
-    const frame = timelineFrames[reversedIndex];
-    const date = new Date(frame.timestamp);
-    sliderValue.textContent = Number.isNaN(date.getTime()) ? 'Invalid timestamp' : formatDate24Hour(date);
-    timestampImage.src = `${EDGE_BASE_URL}/v1/frames/${frame.frame_id}`;
-  });
-
-  // Initialize the slider with a default value
-  slider.value = timelineFrames.length - 1;
-  const initialDate = new Date(timelineFrames[0].timestamp);
-  sliderValue.textContent = Number.isNaN(initialDate.getTime()) ? 'Invalid timestamp' : formatDate24Hour(initialDate);
-  timestampImage.src = `${EDGE_BASE_URL}/v1/frames/${timelineFrames[0].frame_id}`;
 </script>
-{% endif %}
 {% endblock %}

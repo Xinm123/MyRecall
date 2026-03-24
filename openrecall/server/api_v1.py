@@ -973,6 +973,25 @@ def search():
 # ---------------------------------------------------------------------------
 # GET /v1/search/keyword - 404 Guard Route
 # ---------------------------------------------------------------------------
+# Timeline
+# ---------------------------------------------------------------------------
+
+@v1_bp.route("/timeline", methods=["GET"])
+def timeline():
+    """Return frames for timeline view.
+
+    Query Parameters:
+        limit: Max results (default 5000, max 10000)
+    """
+    limit = request.args.get("limit", 5000, type=int)
+    store = _get_frames_store()
+    try:
+        frames = store.get_timeline_frames(limit=limit)
+        return jsonify(frames), 200
+    except Exception:
+        logger.exception("Error fetching timeline frames")
+        return jsonify({"error": "failed to fetch timeline frames"}), 500
+
 
 # IMPORTANT: This route MUST be registered AFTER /v1/search to avoid shadowing
 # the main search route. Flask matches routes in registration order, and
