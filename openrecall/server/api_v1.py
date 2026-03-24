@@ -357,7 +357,28 @@ def ingest():
         )
 
     # ------------------------------------------------------------------
-    # Step 6: Build success response (2xx — no "code" field)
+    # Step 6: Enqueue description task if enabled
+    # ------------------------------------------------------------------
+    if settings.description_enabled:
+        try:
+            with store._connect() as conn:
+                store.insert_description_task(conn, frame_id)
+                conn.commit()
+                logger.debug(
+                    "ingest: description task enqueued capture_id=%s frame_id=%d",
+                    capture_id_raw,
+                    frame_id,
+                )
+        except Exception as e:
+            logger.warning(
+                "ingest: failed to enqueue description task capture_id=%s frame_id=%d: %s",
+                capture_id_raw,
+                frame_id,
+                e,
+            )
+
+    # ------------------------------------------------------------------
+    # Step 7: Build success response (2xx — no "code" field)
     # ------------------------------------------------------------------
     logger.info(
         "ingest: 201 Created capture_id=%s frame_id=%d request_id=%s",
@@ -637,6 +658,8 @@ def get_frame_context(frame_id: int):
             pass
 
     store = _get_frames_store()
+
+    # Get basic context (handles its own connection internally)
     context = store.get_frame_context(frame_id, include_nodes, max_text_length, max_nodes)
 
     if context is None:
@@ -646,6 +669,34 @@ def get_frame_context(frame_id: int):
             404,
             request_id=request_id,
         )
+
+    # Add description info
+    description_status = None
+    description = None
+    try:
+        with store._connect() as conn:
+            # Get description_status from frames table
+            row = conn.execute(
+                "SELECT description_status FROM frames WHERE id = ?",
+                (frame_id,),
+            ).fetchone()
+            if row:
+                description_status = row["description_status"]
+            # Get description if completed
+            if description_status == "completed":
+                desc_row = store.get_frame_description(conn, frame_id)
+                if desc_row:
+                    description = {
+                        "narrative": desc_row["narrative"],
+                        "entities": desc_row["entities"],
+                        "intent": desc_row["intent"],
+                        "summary": desc_row["summary"],
+                    }
+    except Exception as e:
+        logger.warning(f"Failed to get description for frame {frame_id}: {e}")
+
+    context["description_status"] = description_status
+    context["description"] = description
 
     return jsonify(context)
 
@@ -971,6 +1022,92 @@ def search():
 
 
 # ---------------------------------------------------------------------------
+# GET /v1/search/counts
+# ---------------------------------------------------------------------------
+
+@v1_bp.route("/search/counts", methods=["GET"])
+def search_counts():
+    """Return per-type result counts without frame data.
+
+    Query Parameters:
+        q: Text query
+        start_time: ISO8601 UTC start timestamp
+        end_time: ISO8601 UTC end timestamp
+        app_name: Filter by app name
+        window_name: Filter by window name
+        browser_url: Filter by browser URL
+        focused: Filter by focused state
+        min_length: Minimum text length
+        max_length: Maximum text length
+
+    Returns:
+        {"counts": {"ocr": 142, "accessibility": 23}}
+    """
+    # Parse query parameters (same as search endpoint)
+    q = request.args.get("q", "").strip()
+
+    # Parse time range
+    start_time = request.args.get("start_time")
+    if start_time:
+        start_time = start_time.strip() or None
+
+    end_time = request.args.get("end_time")
+    if end_time:
+        end_time = end_time.strip() or None
+
+    # Parse metadata filters
+    app_name = request.args.get("app_name")
+    if app_name:
+        app_name = app_name.strip() or None
+
+    window_name = request.args.get("window_name")
+    if window_name:
+        window_name = window_name.strip() or None
+
+    browser_url = request.args.get("browser_url")
+    if browser_url:
+        browser_url = browser_url.strip() or None
+
+    # Parse focused
+    focused_str = request.args.get("focused")
+    focused = None
+    if focused_str:
+        focused_lower = focused_str.strip().lower()
+        if focused_lower in ("true", "1", "yes"):
+            focused = True
+        elif focused_lower in ("false", "0", "no"):
+            focused = False
+
+    # Parse text length
+    min_length = None
+    max_length = None
+    try:
+        min_length = int(request.args.get("min_length", 0)) or None
+    except (ValueError, TypeError):
+        pass
+    try:
+        max_length = int(request.args.get("max_length", 0)) or None
+    except (ValueError, TypeError):
+        pass
+
+    # Execute counts
+    engine = _get_search_engine()
+    counts = engine.count_by_type(
+        q=q,
+        start_time=start_time,
+        end_time=end_time,
+        app_name=app_name,
+        window_name=window_name,
+        browser_url=browser_url,
+        focused=focused,
+        min_length=min_length,
+        max_length=max_length,
+    )
+
+    return jsonify({"counts": counts})
+
+
+# ---------------------------------------------------------------------------
 # GET /v1/search/keyword - 404 Guard Route
 # ---------------------------------------------------------------------------
 # Timeline
@@ -1080,10 +1217,108 @@ def activity_summary():
         app_name=app_name,
     )
 
+    # Get recent descriptions within the time range
+    max_descriptions = request.args.get("max_descriptions", 20, type=int)
+    max_descriptions = min(max_descriptions, 100)
+    with store._connect() as conn:
+        descriptions = store.get_recent_descriptions(
+            conn, start_time, end_time, max_descriptions
+        )
+
     return jsonify({
         "apps": apps,
         "recent_texts": recent_texts,
         "audio_summary": {"segment_count": 0, "speakers": []},
         "total_frames": total_frames,
         "time_range": time_range or {"start": start_time, "end": end_time},
+        "descriptions": descriptions,
     })
+
+
+# ---------------------------------------------------------------------------
+# POST /v1/frames/<frame_id>/description — manual trigger
+# ---------------------------------------------------------------------------
+
+
+@v1_bp.route("/frames/<int:frame_id>/description", methods=["POST"])
+def trigger_description(frame_id: int):
+    """Manually trigger description generation for a frame."""
+    request_id = str(uuid.uuid4())
+    store = _get_frames_store()
+
+    frame = store.get_frame_by_id(frame_id)
+    if frame is None:
+        return make_error_response(
+            f"Frame {frame_id} not found",
+            "NOT_FOUND",
+            404,
+            request_id=request_id,
+        )
+
+    description_status = frame.get("description_status")
+    if description_status == "completed":
+        return jsonify({
+            "error": "Description already completed",
+            "code": "ALREADY_COMPLETED",
+            "request_id": request_id,
+        }), 409
+    if description_status in ("pending", "processing"):
+        return jsonify({
+            "error": "Description already queued/processing",
+            "code": "ALREADY_QUEUED",
+            "request_id": request_id,
+        }), 409
+
+    with store._connect() as conn:
+        store.insert_description_task(conn, frame_id)
+        conn.commit()
+
+        row = conn.execute(
+            "SELECT id, status FROM description_tasks WHERE frame_id = ? ORDER BY id DESC LIMIT 1",
+            (frame_id,),
+        ).fetchone()
+        task_id = row[0] if row else 0
+
+    return jsonify({
+        "task_id": task_id,
+        "frame_id": frame_id,
+        "status": "pending",
+        "message": "Description generation queued",
+        "request_id": request_id,
+    }), 202
+
+
+# ---------------------------------------------------------------------------
+# GET /v1/description/tasks/status — queue statistics
+# ---------------------------------------------------------------------------
+
+
+@v1_bp.route("/description/tasks/status", methods=["GET"])
+def description_queue_status():
+    """Return description task queue statistics."""
+    store = _get_frames_store()
+    with store._connect() as conn:
+        status = store.get_description_queue_status(conn)
+        return jsonify(status)
+
+
+# ---------------------------------------------------------------------------
+# POST /v1/admin/description/backfill — bulk backfill
+# ---------------------------------------------------------------------------
+
+
+@v1_bp.route("/admin/description/backfill", methods=["POST"])
+def description_backfill():
+    """Trigger backfill of descriptions for all historical frames."""
+    request_id = str(uuid.uuid4())
+    store = _get_frames_store()
+    with store._connect() as conn:
+        from openrecall.server.description.service import DescriptionService
+
+        svc = DescriptionService(store)
+        count = svc.backfill(conn)
+        return jsonify({
+            "message": "Backfill started",
+            "estimated_count": count,
+            "request_id": request_id,
+        }), 202
