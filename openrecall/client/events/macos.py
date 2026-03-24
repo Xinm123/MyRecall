@@ -540,6 +540,31 @@ def get_frontmost_app_name() -> str:
         return ""
 
 
+def get_all_windows_info() -> list[dict]:
+    """Return list of window info dicts for all on-screen windows.
+
+    Uses kCGWindowListOptionAll to include windows on all Spaces.
+    Each dict contains: kCGWindowNumber, kCGWindowOwnerName, kCGWindowLayer, kCGWindowBounds, kCGWindowName.
+
+    Returns:
+        List of window dicts. Returns [] if Quartz unavailable or call fails.
+    """
+    if Quartz is None:
+        return []
+
+    try:
+        cg_window_list = getattr(Quartz, "CGWindowListCopyWindowInfo", None)
+        kcg_window_list_option_all = getattr(Quartz, "kCGWindowListOptionAll", None)
+        null_window_id = getattr(Quartz, "kCGNullWindowID", None)
+
+        if None in (cg_window_list, kcg_window_list_option_all, null_window_id):
+            return []
+
+        return cg_window_list(kcg_window_list_option_all, null_window_id) or []
+    except Exception:
+        return []
+
+
 def get_active_app_monitor(
     monitors: list[MonitorDescriptor],
     target_app_name: str | None = None,
