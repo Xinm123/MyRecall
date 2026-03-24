@@ -178,25 +178,21 @@ def init_background_worker(app_instance):
 def add_cors_headers(response):
     """Allow cross-origin requests from the client web UI.
 
-    Supports both localhost and 127.0.0.1 origins to handle
-    different ways users may access the client web UI.
+    Echoes back the Origin header so browsers can access Edge API from any origin.
+    In same-machine mode: Origin = http://localhost:8883 (or 127.0.0.1)
+    In distributed mode: Origin = http://<client-ip>:8883
+
+    The Edge API itself is still protected by other auth mechanisms (future work).
     """
-    # Get the actual origin from the request
     request_origin = request.headers.get('Origin', '')
 
-    # Define allowed origins
-    allowed_origins = [
-        settings.client_cors_origin,  # e.g., http://localhost:8883
-        settings.client_cors_origin.replace('localhost', '127.0.0.1'),  # http://127.0.0.1:8883
-    ]
-
-    # If the request origin matches our allowed patterns, use it
-    # Otherwise fall back to the configured origin
-    if request_origin in allowed_origins:
+    # Echo back the requesting origin if present, otherwise allow all (for direct curl/etc)
+    if request_origin:
         response.headers["Access-Control-Allow-Origin"] = request_origin
     else:
-        response.headers["Access-Control-Allow-Origin"] = settings.client_cors_origin
+        response.headers["Access-Control-Allow-Origin"] = "*"
 
     response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
     response.headers["Access-Control-Allow-Headers"] = "Content-Type"
+    response.headers["Access-Control-Allow-Credentials"] = "true"
     return response
