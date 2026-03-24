@@ -4,9 +4,12 @@ import os
 from typing import Optional, Union
 from pathlib import Path
 import tempfile
+import logging
 
 from pydantic import Field, model_validator, field_validator
 from pydantic_settings import BaseSettings
+
+logger = logging.getLogger(__name__)
 
 
 class Settings(BaseSettings):
@@ -464,9 +467,13 @@ class Settings(BaseSettings):
         description="Enable client web UI server",
     )
     edge_base_url: str = Field(
-        default="http://localhost:8083",
+        default="",
         alias="OPENRECALL_EDGE_BASE_URL",
-        description="Base URL for Edge API server (used by client web UI)",
+        description=(
+            "Base URL for Edge API server (used by client web UI). "
+            "Auto-derived from OPENRECALL_API_URL if not set. "
+            "Example: http://localhost:8083"
+        ),
     )
     client_cors_origin: str = Field(
         default="http://localhost:8883",
@@ -487,6 +494,21 @@ class Settings(BaseSettings):
         if v is None:
             return None
         return Path(str(v)).expanduser().resolve()
+
+    @model_validator(mode="after")
+    @classmethod
+    def derive_edge_base_url(cls, values):
+        """Auto-derive edge_base_url from api_url if not explicitly set."""
+        edge_base_url = getattr(values, 'edge_base_url', None) or ""
+        api_url = getattr(values, 'api_url', None) or ""
+
+        if not edge_base_url and api_url:
+            # Strip /api suffix: http://localhost:8083/api → http://localhost:8083
+            derived = api_url.rstrip('/api').rstrip('/')
+            values.edge_base_url = derived
+            logger.info(f"Auto-derived EDGE_BASE_URL={derived} from API_URL={api_url}")
+
+        return values
 
     model_config = {
         "env_prefix": "",
