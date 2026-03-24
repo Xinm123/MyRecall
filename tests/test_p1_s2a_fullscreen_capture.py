@@ -178,3 +178,58 @@ def test_detect_fullscreen_window_skips_overlay_layers(monkeypatch):
         monitor = MonitorDescriptor(stable_id="1", left=0, top=0, width=2560, height=1600, is_primary=True)
         window_id = recorder._detect_fullscreen_window_on_monitor(monitor)
         assert window_id is None
+
+
+@pytest.mark.unit
+def test_capture_single_monitor_uses_window_capture_for_fullscreen(monkeypatch):
+    """_capture_single_monitor uses screencapture when fullscreen window detected."""
+    from PIL import Image
+
+    mock_windows = [
+        {
+            "kCGWindowNumber": 123,
+            "kCGWindowOwnerName": "Arc",
+            "kCGWindowLayer": 0,
+            "kCGWindowBounds": {"X": 0, "Y": 0, "Width": 2560, "Height": 1600},
+        },
+    ]
+
+    # Fake screencapture output — blue image, distinct from any mss fallback
+    test_img = Image.new("RGB", (2560, 1600), color="blue")
+    captured_cmd = [None]  # Track what command was passed to subprocess.run
+
+    def fake_run(cmd, *a, **kw):
+        nonlocal captured_cmd
+        captured_cmd = cmd
+        # Only intercept the screencapture call with -l flag
+        if "-l" in cmd:
+            test_img.save("/tmp/myrecall_window_cap.jpg", "JPEG")
+        return MagicMock(returncode=0, stderr=b"")
+
+    # Use safe os.path.exists that only returns True for our known temp file
+    real_exists = os.path.exists
+    def fake_exists(p):
+        if "/tmp/myrecall_window_cap.jpg" in str(p):
+            return True
+        return real_exists(p)
+
+    with patch("openrecall.client.recorder.get_all_windows_info", return_value=mock_windows):
+        monkeypatch.setattr(subprocess, "run", fake_run)
+        monkeypatch.setattr(os.path, "exists", fake_exists)
+
+        from openrecall.client.recorder import ScreenRecorder
+        recorder = ScreenRecorder()
+        monitor = MonitorDescriptor(stable_id="1", left=0, top=0, width=2560, height=1600, is_primary=True)
+        result = recorder._capture_single_monitor(monitor)
+
+        # Strong assertion: screencapture was called with -l 123
+        assert captured_cmd[0] == "screencapture"
+        assert "-l" in captured_cmd
+        assert "123" in captured_cmd
+        assert result is not None
+        assert isinstance(result, np.ndarray)
+        # Pixel at (0,0) should be blue (BGR order). JPEG compression introduces
+        # minor artifacts, so use a wide tolerance instead of exact values.
+        assert result[0, 0, 0] >= 200   # B channel dominant (blue)
+        assert result[0, 0, 1] <= 10    # G channel near zero
+        assert result[0, 0, 2] <= 10    # R channel near zero

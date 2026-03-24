@@ -882,6 +882,14 @@ class ScreenRecorder:
         return True
 
     def _capture_single_monitor(self, monitor: MonitorDescriptor) -> ImageArray:
+        # Try window-level capture for fullscreen windows first
+        fullscreen_window_id = self._detect_fullscreen_window_on_monitor(monitor)
+        if fullscreen_window_id is not None:
+            screenshot = self._capture_window_by_id(fullscreen_window_id)
+            if screenshot is not None:
+                return screenshot
+            # Fall through to mss fallback if screencapture failed
+
         captures = self._capture_monitors([monitor])
         screenshot = captures.get(monitor.device_name)
         if screenshot is None:
