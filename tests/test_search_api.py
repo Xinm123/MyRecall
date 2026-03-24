@@ -4,9 +4,11 @@ Tests cover:
 - Basic endpoint functionality
 - Parameter parsing
 - Edge cases and error handling
+- Integration with real SearchEngine and database
 """
 
 import json
+import sqlite3
 from unittest.mock import patch, MagicMock
 
 import pytest
@@ -156,3 +158,265 @@ class TestSearchCountsAPI:
             client.get("/v1/search/counts?q=test&focused=no")
             call_args = mock_search_engine.count_by_type.call_args
             assert call_args.kwargs.get("focused") is False
+
+
+# ---------------------------------------------------------------------------
+# Integration tests: real SearchEngine with real database
+# ---------------------------------------------------------------------------
+
+@pytest.fixture
+def integration_test_db(tmp_path):
+    """Create a test database with frames, OCR, accessibility, and FTS tables."""
+    db_path = tmp_path / "integration_test.db"
+
+    with sqlite3.connect(str(db_path)) as conn:
+        conn.execute("""
+            CREATE TABLE frames (
+                id INTEGER PRIMARY KEY,
+                timestamp TEXT NOT NULL,
+                app_name TEXT,
+                window_name TEXT,
+                browser_url TEXT,
+                focused INTEGER,
+                device_name TEXT,
+                text_source TEXT,
+                status TEXT DEFAULT 'completed'
+            )
+        """)
+
+        conn.execute("""
+            CREATE TABLE ocr_text (
+                id INTEGER PRIMARY KEY,
+                frame_id INTEGER NOT NULL,
+                text TEXT,
+                text_length INTEGER DEFAULT 0,
+                app_name TEXT,
+                window_name TEXT,
+                FOREIGN KEY (frame_id) REFERENCES frames(id)
+            )
+        """)
+
+        conn.execute("""
+            CREATE TABLE accessibility (
+                id INTEGER PRIMARY KEY,
+                frame_id INTEGER NOT NULL,
+                text_content TEXT,
+                text_length INTEGER DEFAULT 0,
+                app_name TEXT,
+                window_name TEXT,
+                browser_url TEXT,
+                FOREIGN KEY (frame_id) REFERENCES frames(id)
+            )
+        """)
+
+        conn.execute("""
+            CREATE VIRTUAL TABLE ocr_text_fts USING fts5(
+                text,
+                app_name,
+                window_name,
+                frame_id UNINDEXED,
+                tokenize='unicode61'
+            )
+        """)
+
+        conn.execute("""
+            CREATE VIRTUAL TABLE frames_fts USING fts5(
+                app_name,
+                window_name,
+                browser_url,
+                focused,
+                id UNINDEXED,
+                tokenize='unicode61'
+            )
+        """)
+
+        conn.execute("""
+            CREATE VIRTUAL TABLE accessibility_fts USING fts5(
+                text_content,
+                app_name,
+                window_name,
+                browser_url,
+                content='accessibility',
+                content_rowid='id',
+                tokenize='unicode61'
+            )
+        """)
+
+        conn.commit()
+
+    return db_path
+
+
+@pytest.fixture
+def app_with_real_engine(integration_test_db):
+    """Flask app with a real SearchEngine backed by integration_test_db."""
+    engine = SearchEngine(db_path=integration_test_db)
+
+    app = Flask(__name__)
+    app.register_blueprint(v1_bp)
+
+    original_engine = None
+    _api_v1 = None
+    try:
+        import openrecall.server.api_v1 as _api_v1
+        original_engine = _api_v1._search_engine
+        _api_v1._search_engine = engine
+        yield app
+    finally:
+        if _api_v1 is not None and original_engine is not None:
+            _api_v1._search_engine = original_engine
+
+
+class TestSearchCountsIntegration:
+    """Integration tests for GET /v1/search/counts with real database."""
+
+    def _insert_ocr_frame(self, conn, text, app_name, timestamp):
+        """Insert a completed OCR frame with FTS data."""
+        cursor = conn.execute(
+            """INSERT INTO frames (timestamp, app_name, text_source, status)
+               VALUES (?, ?, 'ocr', 'completed')""",
+            (timestamp, app_name),
+        )
+        frame_id = cursor.lastrowid
+        conn.execute(
+            "INSERT INTO ocr_text (frame_id, text, text_length) VALUES (?, ?, ?)",
+            (frame_id, text, len(text)),
+        )
+        conn.execute(
+            "INSERT INTO ocr_text_fts (frame_id, text, app_name, window_name) VALUES (?, ?, ?, ?)",
+            (frame_id, text, app_name, None),
+        )
+        # frames_fts is used by _build_ocr_query for metadata filtering
+        conn.execute(
+            "INSERT INTO frames_fts (id, app_name, window_name, browser_url, focused) VALUES (?, ?, ?, ?, ?)",
+            (frame_id, app_name, None, None, None),
+        )
+        return frame_id
+
+    def _insert_ax_frame(self, conn, text, app_name, timestamp):
+        """Insert a completed accessibility frame with FTS data."""
+        cursor = conn.execute(
+            """INSERT INTO frames (timestamp, app_name, text_source, status)
+               VALUES (?, ?, 'accessibility', 'completed')""",
+            (timestamp, app_name),
+        )
+        frame_id = cursor.lastrowid
+        cursor = conn.execute(
+            "INSERT INTO accessibility (frame_id, text_content, text_length, app_name) VALUES (?, ?, ?, ?)",
+            (frame_id, text, len(text), app_name),
+        )
+        ax_id = cursor.lastrowid
+        conn.execute(
+            "INSERT INTO accessibility_fts (rowid, text_content, app_name, window_name, browser_url) "
+            "VALUES (?, ?, ?, ?, ?)",
+            (ax_id, text, app_name, None, None),
+        )
+        # frames_fts is used by _build_ocr_query for metadata filtering
+        conn.execute(
+            "INSERT INTO frames_fts (id, app_name, window_name, browser_url, focused) VALUES (?, ?, ?, ?, ?)",
+            (frame_id, app_name, None, None, None),
+        )
+        return frame_id
+
+    def test_returns_correct_counts_for_ocr_frames(self, app_with_real_engine, integration_test_db):
+        """Integration: /v1/search/counts with q=python returns correct OCR count."""
+        with sqlite3.connect(str(integration_test_db)) as conn:
+            self._insert_ocr_frame(conn, "python is great", "Safari", "2024-01-01T00:00:00Z")
+            self._insert_ocr_frame(conn, "python tutorial", "Chrome", "2024-01-01T00:00:01Z")
+            self._insert_ax_frame(conn, "rust programming", "Terminal", "2024-01-01T00:00:02Z")
+            conn.commit()
+
+        client = app_with_real_engine.test_client()
+        response = client.get("/v1/search/counts?q=python")
+
+        assert response.status_code == 200
+        data = json.loads(response.data)
+        assert data["counts"]["ocr"] == 2
+        assert data["counts"]["accessibility"] == 0
+
+    def test_returns_correct_counts_for_accessibility_frames(self, app_with_real_engine, integration_test_db):
+        """Integration: /v1/search/counts returns correct accessibility count."""
+        with sqlite3.connect(str(integration_test_db)) as conn:
+            self._insert_ocr_frame(conn, "javascript code", "VSCode", "2024-01-01T00:00:00Z")
+            self._insert_ax_frame(conn, "swift programming", "Xcode", "2024-01-01T00:00:01Z")
+            self._insert_ax_frame(conn, "swift language basics", "Xcode", "2024-01-01T00:00:02Z")
+            self._insert_ax_frame(conn, "swift tutorial overview", "Safari", "2024-01-01T00:00:03Z")
+            conn.commit()
+
+        client = app_with_real_engine.test_client()
+        response = client.get("/v1/search/counts?q=swift")
+
+        assert response.status_code == 200
+        data = json.loads(response.data)
+        assert data["counts"]["ocr"] == 0
+        assert data["counts"]["accessibility"] == 3
+
+    def test_returns_correct_counts_for_both_types(self, app_with_real_engine, integration_test_db):
+        """Integration: /v1/search/counts returns correct counts for both types."""
+        with sqlite3.connect(str(integration_test_db)) as conn:
+            self._insert_ocr_frame(conn, "golang concurrency", "Terminal", "2024-01-01T00:00:00Z")
+            self._insert_ax_frame(conn, "golang channels", "Terminal", "2024-01-01T00:00:01Z")
+            conn.commit()
+
+        client = app_with_real_engine.test_client()
+        response = client.get("/v1/search/counts?q=golang")
+
+        assert response.status_code == 200
+        data = json.loads(response.data)
+        assert data["counts"]["ocr"] == 1
+        assert data["counts"]["accessibility"] == 1
+
+    def test_returns_zeros_for_empty_database(self, app_with_real_engine):
+        """Integration: /v1/search/counts returns zeros on empty database."""
+        client = app_with_real_engine.test_client()
+        response = client.get("/v1/search/counts?q=python")
+
+        assert response.status_code == 200
+        data = json.loads(response.data)
+        assert data["counts"]["ocr"] == 0
+        assert data["counts"]["accessibility"] == 0
+
+    def test_returns_zeros_for_no_matching_query(self, app_with_real_engine, integration_test_db):
+        """Integration: /v1/search/counts returns zeros when no frames match."""
+        with sqlite3.connect(str(integration_test_db)) as conn:
+            self._insert_ocr_frame(conn, "python code", "Safari", "2024-01-01T00:00:00Z")
+            conn.commit()
+
+        client = app_with_real_engine.test_client()
+        response = client.get("/v1/search/counts?q=rust")
+
+        assert response.status_code == 200
+        data = json.loads(response.data)
+        assert data["counts"]["ocr"] == 0
+        assert data["counts"]["accessibility"] == 0
+
+    def test_empty_query_returns_all_counts(self, app_with_real_engine, integration_test_db):
+        """Integration: /v1/search/counts with no q returns counts for all frames."""
+        with sqlite3.connect(str(integration_test_db)) as conn:
+            self._insert_ocr_frame(conn, "any text", "Safari", "2024-01-01T00:00:00Z")
+            self._insert_ocr_frame(conn, "other text", "Chrome", "2024-01-01T00:00:01Z")
+            self._insert_ax_frame(conn, "ax text", "Xcode", "2024-01-01T00:00:02Z")
+            conn.commit()
+
+        client = app_with_real_engine.test_client()
+        response = client.get("/v1/search/counts")
+
+        assert response.status_code == 200
+        data = json.loads(response.data)
+        assert data["counts"]["ocr"] == 2
+        assert data["counts"]["accessibility"] == 1
+
+    def test_app_name_filter_affects_counts(self, app_with_real_engine, integration_test_db):
+        """Integration: /v1/search/counts respects app_name filter."""
+        with sqlite3.connect(str(integration_test_db)) as conn:
+            self._insert_ocr_frame(conn, "python code", "Safari", "2024-01-01T00:00:00Z")
+            self._insert_ocr_frame(conn, "python code", "Chrome", "2024-01-01T00:00:01Z")
+            conn.commit()
+
+        client = app_with_real_engine.test_client()
+        response = client.get("/v1/search/counts?q=python&app_name=Safari")
+
+        assert response.status_code == 200
+        data = json.loads(response.data)
+        assert data["counts"]["ocr"] == 1
+        assert data["counts"]["accessibility"] == 0

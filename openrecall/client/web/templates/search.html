@@ -137,7 +137,6 @@
     color: #007AFF;
   }
 
-  .type-badge.type-ax,
   .type-badge.type-accessibility {
     background: rgba(175, 82, 222, 0.1);
     color: #AF52DE;
@@ -659,8 +658,8 @@
   prevBtn.addEventListener('click', showPrev);
   nextBtn.addEventListener('click', showNext);
 
-  // Build query string from form
-  function buildQueryString(offset = 0) {
+  // Extract shared form filter params to avoid duplication
+  function getFormFilterParams() {
     const params = new URLSearchParams();
     const q = document.getElementById('q').value.trim();
     const startTime = document.getElementById('start_time').value;
@@ -679,6 +678,13 @@
     if (focused) params.set('focused', focused);
     if (minLength) params.set('min_length', minLength);
     if (maxLength) params.set('max_length', maxLength);
+
+    return params;
+  }
+
+  // Build query string from form
+  function buildQueryString(offset = 0) {
+    const params = getFormFilterParams();
 
     // Add content type filter (default 'all' is omitted)
     if (selectedContentType !== 'all') {
@@ -693,24 +699,7 @@
 
   // Fetch type counts for current filters
   async function fetchCounts() {
-    const params = new URLSearchParams();
-    const q = document.getElementById('q').value.trim();
-    const startTime = document.getElementById('start_time').value;
-    const endTime = document.getElementById('end_time').value;
-    const appName = document.getElementById('app_name').value.trim();
-    const windowName = document.getElementById('window_name').value.trim();
-    const focused = document.getElementById('focused').value;
-    const minLength = document.getElementById('min_length').value;
-    const maxLength = document.getElementById('max_length').value;
-
-    if (q) params.set('q', q);
-    if (startTime) params.set('start_time', startTime + ':00');
-    if (endTime) params.set('end_time', endTime + ':00');
-    if (appName) params.set('app_name', appName);
-    if (windowName) params.set('window_name', windowName);
-    if (focused) params.set('focused', focused);
-    if (minLength) params.set('min_length', minLength);
-    if (maxLength) params.set('max_length', maxLength);
+    const params = getFormFilterParams();
 
     const url = `${EDGE_BASE_URL}/v1/search/counts?${params.toString()}`;
 

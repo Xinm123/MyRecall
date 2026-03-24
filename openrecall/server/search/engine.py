@@ -695,7 +695,7 @@ class SearchEngine:
 
             if has_text_query:
                 sanitized_q = sanitize_fts5_query(params.q)
-                fts_parts.append(f"({sanitized_q})")
+                fts_parts.append(sanitized_q)
 
             if params.app_name:
                 safe_app = _sanitize_fts_value(params.app_name)
