@@ -29,7 +29,7 @@ MyRecall v3 is a privacy-first alternative to proprietary digital memory solutio
 ./run_client.sh --debug
 ```
 
-Open browser: http://localhost:8083
+Open browser: http://localhost:8883
 
 **Configuration:**
 - Server: `myrecall_server.env` or environment variables
@@ -102,10 +102,8 @@ pip install -e ".[test]"    # Include test dependencies
 **Entry Point:** `python -m openrecall.server`
 
 **Web Routes:**
-- `/` - Grid view (default)
-- `/search` - Search interface
-- `/timeline` - Timeline view
-- `/v1/*` - API endpoints
+- Web UI (served by Client on port 8883): `/` (Grid), `/search`, `/timeline` — browser fetches API from Edge directly
+- Server (port 8083) serves API only: `/v1/*`, `/api/*` — web UI routes are disabled (`DISABLE_SERVER_WEB=True`)
 
 ### Key Data Structures
 
@@ -188,7 +186,8 @@ openrecall/
 Key settings (see `openrecall/shared/config.py`):
 - `OPENRECALL_SERVER_DATA_DIR`: Edge data directory (default: ~/MRS)
 - `OPENRECALL_CLIENT_DATA_DIR`: Host spool directory (default: ~/MRC)
-- `OPENRECALL_PORT`: Web server port (default: 8083)
+- `OPENRECALL_PORT`: Edge API server port (default: 8083, API only — web UI disabled)
+- `OPENRECALL_CLIENT_WEB_PORT`: Client web UI port (default: 8883)
 - `OPENRECALL_DEBUG`: Enable debug logging
 - `OPENRECALL_AI_PROVIDER`: AI provider (local/dashscope/openai)
 - `OPENRECALL_DEVICE`: Inference device (cpu/cuda/mps)
