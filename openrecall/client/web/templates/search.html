@@ -81,6 +81,68 @@
     border-color: var(--accent-color);
   }
 
+  /* Content type pill filters */
+  .content-type-pills {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+
+  .pill {
+    padding: 6px 14px;
+    border: 1px solid var(--border-color);
+    border-radius: 16px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    background: var(--bg-body);
+    color: var(--text-secondary);
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .pill:hover {
+    border-color: var(--accent-color);
+    color: var(--accent-color);
+  }
+
+  .pill.active {
+    background: var(--accent-color);
+    color: white;
+    border-color: var(--accent-color);
+  }
+
+  .pill .count {
+    font-size: 11px;
+    font-weight: 400;
+    opacity: 0.7;
+    min-width: 16px;
+    text-align: center;
+  }
+
+  /* Type badge on result cards */
+  .type-badge {
+    font-size: 10px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .type-badge.type-ocr {
+    background: rgba(0, 122, 255, 0.1);
+    color: #007AFF;
+  }
+
+  .type-badge.type-ax,
+  .type-badge.type-accessibility {
+    background: rgba(175, 82, 222, 0.1);
+    color: #AF52DE;
+  }
+
   /* Spinner Animation */
   @keyframes spin {
     0% { transform: rotate(0deg); }
@@ -441,6 +503,12 @@
   <button type="submit" class="btn-search">Search</button>
 </form>
 
+<div class="content-type-pills">
+  <button type="button" class="pill active" data-type="all">All</button>
+  <button type="button" class="pill" data-type="ocr">OCR <span class="count">—</span></button>
+  <button type="button" class="pill" data-type="accessibility">AX <span class="count">—</span></button>
+</div>
+
 <div class="results-grid" id="resultsGrid">
   <!-- Results will be populated by JavaScript -->
   <div class="empty-state">
@@ -474,6 +542,9 @@
   let currentResults = [];
   let currentPagination = { limit: 20, offset: 0, total: 0 };
 
+  // Content type filter state
+  let selectedContentType = 'all';
+
   // Modal elements
   const modal = document.getElementById('imageModal');
   const modalImage = document.getElementById('modalImage');
@@ -492,6 +563,45 @@
   const prevPageBtn = document.getElementById('prevPage');
   const nextPageBtn = document.getElementById('nextPage');
   const pageInfo = document.getElementById('pageInfo');
+
+  // Content type pills
+  const contentTypePills = document.querySelectorAll('.content-type-pills .pill');
+  const ocrCountSpan = document.querySelector('.pill[data-type="ocr"] .count');
+  const axCountSpan = document.querySelector('.pill[data-type="accessibility"] .count');
+
+  // Initialize content type from URL
+  function initContentTypeFromUrl() {
+    const params = new URLSearchParams(window.location.search);
+    const urlContentType = params.get('content_type');
+    if (urlContentType && ['ocr', 'accessibility', 'all'].includes(urlContentType)) {
+      selectedContentType = urlContentType;
+      updatePillActiveState();
+    }
+  }
+
+  // Update pill active state
+  function updatePillActiveState() {
+    contentTypePills.forEach(pill => {
+      const type = pill.dataset.type;
+      if (type === selectedContentType) {
+        pill.classList.add('active');
+      } else {
+        pill.classList.remove('active');
+      }
+    });
+  }
+
+  // Handle pill click
+  contentTypePills.forEach(pill => {
+    pill.addEventListener('click', () => {
+      const newType = pill.dataset.type;
+      if (newType !== selectedContentType) {
+        selectedContentType = newType;
+        updatePillActiveState();
+        performSearch(0);
+      }
+    });
+  });
 
   function isModalOpen() {
     return modal.classList.contains('active');
@@ -569,11 +679,61 @@
     if (focused) params.set('focused', focused);
     if (minLength) params.set('min_length', minLength);
     if (maxLength) params.set('max_length', maxLength);
-    
+
+    // Add content type filter (default 'all' is omitted)
+    if (selectedContentType !== 'all') {
+      params.set('content_type', selectedContentType);
+    }
+
     params.set('limit', '20');
     params.set('offset', offset.toString());
 
     return params.toString();
+  }
+
+  // Fetch type counts for current filters
+  async function fetchCounts() {
+    const params = new URLSearchParams();
+    const q = document.getElementById('q').value.trim();
+    const startTime = document.getElementById('start_time').value;
+    const endTime = document.getElementById('end_time').value;
+    const appName = document.getElementById('app_name').value.trim();
+    const windowName = document.getElementById('window_name').value.trim();
+    const focused = document.getElementById('focused').value;
+    const minLength = document.getElementById('min_length').value;
+    const maxLength = document.getElementById('max_length').value;
+
+    if (q) params.set('q', q);
+    if (startTime) params.set('start_time', startTime + ':00');
+    if (endTime) params.set('end_time', endTime + ':00');
+    if (appName) params.set('app_name', appName);
+    if (windowName) params.set('window_name', windowName);
+    if (focused) params.set('focused', focused);
+    if (minLength) params.set('min_length', minLength);
+    if (maxLength) params.set('max_length', maxLength);
+
+    const url = `${EDGE_BASE_URL}/v1/search/counts?${params.toString()}`;
+
+    try {
+      const response = await fetch(url);
+      if (!response.ok) {
+        throw new Error(`Counts fetch failed: ${response.status}`);
+      }
+      const data = await response.json();
+
+      // Update count spans
+      if (ocrCountSpan) {
+        ocrCountSpan.textContent = data.counts.ocr;
+      }
+      if (axCountSpan) {
+        axCountSpan.textContent = data.counts.accessibility;
+      }
+    } catch (error) {
+      console.error('Counts fetch error:', error);
+      // Silently leave as '—' on error
+      if (ocrCountSpan) ocrCountSpan.textContent = '—';
+      if (axCountSpan) axCountSpan.textContent = '—';
+    }
   }
 
   // Format relative time
@@ -660,6 +820,7 @@
               <span class="rank-label">Rank</span>
               <span class="rank-value">${content.fts_rank !== null && content.fts_rank !== undefined ? Number(content.fts_rank).toFixed(4) : '—'}</span>
             </div>
+            <span class="type-badge type-${item.type.toLowerCase()}">${item.type === 'Accessibility' ? 'AX' : item.type}</span>
             <div class="result-position">#${idx + 1} / ${pagination.total}</div>
           </div>
         </article>
@@ -707,6 +868,9 @@
       }
       const result = await response.json();
       renderResults(result.data, result.pagination);
+
+      // Fetch counts after successful search
+      fetchCounts();
     } catch (error) {
       console.error('Search error:', error);
       resultsGrid.innerHTML = `
@@ -741,6 +905,9 @@
       performSearch(newOffset);
     }
   });
+
+  // Initialize content type from URL
+  initContentTypeFromUrl();
 
   // Load initial results if URL has params
   if (window.location.search) {
