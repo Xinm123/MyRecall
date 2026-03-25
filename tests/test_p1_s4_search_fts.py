@@ -439,3 +439,40 @@ class TestUnifiedFtsSearch:
         assert len(results_ocr) >= 1
         assert len(results_ax) >= 1
         assert len(results_all) >= 1
+
+    def test_count_by_type_returns_ocr_and_accessibility_keys(self, unified_db):
+        """Verify count_by_type returns a dict with 'ocr' and 'accessibility' keys."""
+        from openrecall.server.search.engine import SearchEngine
+
+        engine = SearchEngine(db_path=unified_db)
+        result = engine.count_by_type(q="")
+
+        assert isinstance(result, dict)
+        assert "ocr" in result
+        assert "accessibility" in result
+        assert result["ocr"] >= 0
+        assert result["accessibility"] >= 0
+
+    def test_count_by_type_with_text_query(self, unified_db):
+        """Verify count_by_type works with a text query."""
+        from openrecall.server.search.engine import SearchEngine
+
+        engine = SearchEngine(db_path=unified_db)
+        result = engine.count_by_type(q="alice")
+
+        assert isinstance(result, dict)
+        # Should find the accessibility frame with "alice"
+        assert result["accessibility"] >= 1
+        assert result["ocr"] == 0
+
+    def test_count_by_type_with_app_name_filter(self, unified_db):
+        """Verify count_by_type works with metadata filter."""
+        from openrecall.server.search.engine import SearchEngine
+
+        engine = SearchEngine(db_path=unified_db)
+        result = engine.count_by_type(q="", app_name="Mail")
+
+        assert isinstance(result, dict)
+        # Should only match the Mail accessibility frame
+        assert result["accessibility"] == 1
+        assert result["ocr"] == 0

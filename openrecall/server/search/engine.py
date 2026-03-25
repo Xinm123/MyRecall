@@ -113,6 +113,64 @@ class SearchEngine:
         conn.execute("PRAGMA journal_mode=WAL")
         return conn
 
+    def _build_where_clause(
+        self, params: SearchParams
+    ) -> tuple[str, list[Any]]:
+        """Build WHERE clause and parameters for frames JOIN frames_fts query.
+
+        Shared helper used by both _build_query and count_by_type to avoid
+        duplicating the filter-building logic.
+
+        Args:
+            params: Search parameters
+
+        Returns:
+            Tuple of (WHERE clause string, parameters list)
+        """
+        has_text_query = bool(params.q and params.q.strip())
+        where_parts = ["frames.status = 'completed'", "frames.full_text IS NOT NULL"]
+        params_list: list[Any] = []
+
+        if has_text_query:
+            sanitized_q = sanitize_fts5_query(params.q)
+            where_parts.append("frames_fts MATCH ?")
+            params_list.append(sanitized_q)
+
+        metadata_parts = []
+        if params.app_name:
+            safe_app = _sanitize_fts_value(params.app_name)
+            metadata_parts.append(f'app_name:"{safe_app}"')
+        if params.window_name:
+            safe_window = _sanitize_fts_value(params.window_name)
+            metadata_parts.append(f'window_name:"{safe_window}"')
+        if params.browser_url:
+            safe_url = _sanitize_fts_value(params.browser_url)
+            metadata_parts.append(f'browser_url:"{safe_url}"')
+
+        if metadata_parts:
+            where_parts.append("frames_fts MATCH ?")
+            params_list.append(" ".join(metadata_parts))
+
+        if params.focused is not None:
+            where_parts.append("frames.focused = ?")
+            params_list.append(1 if params.focused else 0)
+
+        if params.start_time:
+            where_parts.append("frames.timestamp >= ?")
+            params_list.append(params.start_time)
+        if params.end_time:
+            where_parts.append("frames.timestamp <= ?")
+            params_list.append(params.end_time)
+
+        if params.min_length is not None:
+            where_parts.append("LENGTH(frames.full_text) >= ?")
+            params_list.append(params.min_length)
+        if params.max_length is not None:
+            where_parts.append("LENGTH(frames.full_text) <= ?")
+            params_list.append(params.max_length)
+
+        return " AND ".join(where_parts), params_list
+
     def _build_query(
         self, params: SearchParams, is_count: bool = False
     ) -> tuple[str, list[Any]]:
@@ -149,56 +207,13 @@ class SearchEngine:
 
         from_clause = "FROM frames"
         join_clauses = ["INNER JOIN frames_fts ON frames.id = frames_fts.id"]
-        where_clauses = ["frames.status = 'completed'", "frames.full_text IS NOT NULL"]
-        params_list: list[Any] = []
 
-        # FTS MATCH on frames_fts
-        if has_text_query:
-            sanitized_q = sanitize_fts5_query(params.q)
-            where_clauses.append("frames_fts MATCH ?")
-            params_list.append(sanitized_q)
-
-        # Metadata filters (app_name, window_name, browser_url via frames_fts)
-        metadata_parts = []
-        if params.app_name:
-            safe_app = _sanitize_fts_value(params.app_name)
-            metadata_parts.append(f'app_name:"{safe_app}"')
-        if params.window_name:
-            safe_window = _sanitize_fts_value(params.window_name)
-            metadata_parts.append(f'window_name:"{safe_window}"')
-        if params.browser_url:
-            safe_url = _sanitize_fts_value(params.browser_url)
-            metadata_parts.append(f'browser_url:"{safe_url}"')
-
-        if metadata_parts:
-            where_clauses.append("frames_fts MATCH ?")
-            params_list.append(" ".join(metadata_parts))
-
-        # focused filter (not in frames_fts, filter directly on frames)
-        if params.focused is not None:
-            where_clauses.append("frames.focused = ?")
-            params_list.append(1 if params.focused else 0)
-
-        # Time range filtering
-        if params.start_time:
-            where_clauses.append("frames.timestamp >= ?")
-            params_list.append(params.start_time)
-        if params.end_time:
-            where_clauses.append("frames.timestamp <= ?")
-            params_list.append(params.end_time)
-
-        # Text length filtering (on full_text)
-        if params.min_length is not None:
-            where_clauses.append("LENGTH(frames.full_text) >= ?")
-            params_list.append(params.min_length)
-        if params.max_length is not None:
-            where_clauses.append("LENGTH(frames.full_text) <= ?")
-            params_list.append(params.max_length)
+        where_clause, params_list = self._build_where_clause(params)
 
         # Build the full query
         sql_parts = [select_clause, from_clause]
         sql_parts.extend(join_clauses)
-        sql_parts.append("WHERE " + " AND ".join(where_clauses))
+        sql_parts.append("WHERE " + where_clause)
 
         if not is_count:
             sql_parts.append("GROUP BY frames.id")
@@ -258,8 +273,8 @@ class SearchEngine:
             content_type = "all"
 
         # Log deprecation warning for non-default content_type
-        if content_type != "all":
-            logger.warning(
+        if content_type != "all" and settings.debug:
+            logger.debug(
                 "content_type parameter is deprecated and ignored. "
                 "All content is now searched via unified frames_fts. q='%s'",
                 q[:50] if q else "",
@@ -424,51 +439,7 @@ class SearchEngine:
 
         try:
             with self._connect() as conn:
-                has_text_query = bool(params.q and params.q.strip())
-
-                # Build WHERE clause parts for reuse
-                where_parts = ["frames.status = 'completed'", "frames.full_text IS NOT NULL"]
-                query_params: list[Any] = []
-
-                if has_text_query:
-                    sanitized_q = sanitize_fts5_query(params.q)
-                    where_parts.append("frames_fts MATCH ?")
-                    query_params.append(sanitized_q)
-
-                metadata_parts = []
-                if params.app_name:
-                    safe_app = _sanitize_fts_value(params.app_name)
-                    metadata_parts.append(f'app_name:"{safe_app}"')
-                if params.window_name:
-                    safe_window = _sanitize_fts_value(params.window_name)
-                    metadata_parts.append(f'window_name:"{safe_window}"')
-                if params.browser_url:
-                    safe_url = _sanitize_fts_value(params.browser_url)
-                    metadata_parts.append(f'browser_url:"{safe_url}"')
-
-                if metadata_parts:
-                    where_parts.append("frames_fts MATCH ?")
-                    query_params.append(" ".join(metadata_parts))
-
-                if params.focused is not None:
-                    where_parts.append("frames.focused = ?")
-                    query_params.append(1 if params.focused else 0)
-
-                if params.start_time:
-                    where_parts.append("frames.timestamp >= ?")
-                    query_params.append(params.start_time)
-                if params.end_time:
-                    where_parts.append("frames.timestamp <= ?")
-                    query_params.append(params.end_time)
-
-                if params.min_length is not None:
-                    where_parts.append("LENGTH(frames.full_text) >= ?")
-                    query_params.append(params.min_length)
-                if params.max_length is not None:
-                    where_parts.append("LENGTH(frames.full_text) <= ?")
-                    query_params.append(params.max_length)
-
-                where_clause = " AND ".join(where_parts)
+                where_clause, query_params = self._build_where_clause(params)
 
                 # Count by text_source
                 sql = f"""
