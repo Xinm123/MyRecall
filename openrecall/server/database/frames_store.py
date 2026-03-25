@@ -895,6 +895,32 @@ class FramesStore:
             )
             return False
 
+    def update_full_text(self, frame_id: int, text: str) -> bool:
+        """Update the full_text field for a frame.
+
+        Called after OCR completion to set full_text = ocr_text.
+
+        Args:
+            frame_id: The frame ID
+            text: The text to set as full_text
+
+        Returns:
+            True if updated, False otherwise
+        """
+        try:
+            with self._connect() as conn:
+                cursor = conn.execute(
+                    "UPDATE frames SET full_text = ? WHERE id = ?",
+                    (text, frame_id),
+                )
+                conn.commit()
+                return cursor.rowcount > 0
+        except sqlite3.Error as e:
+            logger.error(
+                "update_full_text failed frame_id=%d: %s", frame_id, e
+            )
+            return False
+
     def check_ocr_text_exists(self, frame_id: int) -> bool:
         """Check if an ocr_text row exists for a frame.
 
@@ -977,6 +1003,7 @@ class FramesStore:
                     """
                     UPDATE frames SET
                         accessibility_text = ?,
+                        full_text = ?,
                         text_source = 'accessibility',
                         accessibility_tree_json = ?,
                         browser_url = COALESCE(?, browser_url),
@@ -987,6 +1014,7 @@ class FramesStore:
                     WHERE id = ?
                     """,
                     (
+                        text,
                         text,
                         accessibility_tree_json,
                         browser_url,

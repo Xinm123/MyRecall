@@ -129,3 +129,79 @@ class TestTextSourceMark:
             ).fetchone()
             assert row["status"] == "completed"
             assert row["text_source"] == "ocr"
+
+    def test_complete_accessibility_frame_sets_full_text(self, temp_db: Path):
+        """Verify complete_accessibility_frame sets full_text."""
+        from openrecall.server.database.frames_store import FramesStore
+
+        store = FramesStore(db_path=temp_db)
+
+        # Create a pending frame
+        conn = sqlite3.connect(str(temp_db))
+        conn.execute(
+            """
+            INSERT INTO frames (capture_id, timestamp, status)
+            VALUES ('test-ax-full', '2026-03-25T12:00:00Z', 'pending')
+            """
+        )
+        conn.commit()
+        frame_id = conn.execute(
+            "SELECT id FROM frames WHERE capture_id = 'test-ax-full'"
+        ).fetchone()[0]
+        conn.close()
+
+        # Complete with accessibility
+        store.complete_accessibility_frame(
+            frame_id=frame_id,
+            text="Accessibility content here",
+            browser_url=None,
+            content_hash=None,
+            simhash=None,
+            accessibility_tree_json="[]",
+            accessibility_text_content="Accessibility content here",
+            accessibility_node_count=1,
+            accessibility_truncated=False,
+            elements=[],
+        )
+
+        # Verify full_text is set
+        conn = sqlite3.connect(str(temp_db))
+        row = conn.execute(
+            "SELECT full_text, text_source FROM frames WHERE id = ?", (frame_id,)
+        ).fetchone()
+        conn.close()
+
+        assert row[0] == "Accessibility content here"
+        assert row[1] == "accessibility"
+
+    def test_update_full_text_after_ocr(self, temp_db: Path):
+        """Verify update_full_text sets full_text for OCR frames."""
+        from openrecall.server.database.frames_store import FramesStore
+
+        store = FramesStore(db_path=temp_db)
+
+        # Create a frame
+        conn = sqlite3.connect(str(temp_db))
+        conn.execute(
+            """
+            INSERT INTO frames (capture_id, timestamp, status, ocr_text)
+            VALUES ('test-ocr-full', '2026-03-25T12:00:00Z', 'completed', 'OCR content')
+            """
+        )
+        conn.commit()
+        frame_id = conn.execute(
+            "SELECT id FROM frames WHERE capture_id = 'test-ocr-full'"
+        ).fetchone()[0]
+        conn.close()
+
+        # Update full_text
+        store.update_full_text(frame_id, "OCR content")
+
+        # Verify
+        conn = sqlite3.connect(str(temp_db))
+        row = conn.execute(
+            "SELECT full_text FROM frames WHERE id = ?", (frame_id,)
+        ).fetchone()
+        conn.close()
+
+        assert row[0] == "OCR content"
