@@ -295,6 +295,9 @@ class V3ProcessingWorker:
         # --- Step 9: Write ocr_text to frames table ---
         self._store.update_frames_ocr_text(frame_id, result.text)
 
+        # --- Step 9b: Set full_text for FTS indexing ---
+        self._store.update_full_text(frame_id, result.text)
+
         ok = self._store.advance_frame_status(frame_id, "processing", "completed")
         if not ok:
             logger.error(

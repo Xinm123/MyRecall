@@ -5,6 +5,7 @@ Tests the worker lifecycle: start, stop, status transitions.
 SSOT: design.md D1
 """
 
+import shutil
 import sqlite3
 import time
 from pathlib import Path
@@ -14,6 +15,13 @@ import pytest
 from openrecall.server.database.frames_store import FramesStore
 from openrecall.server.database.migrations_runner import run_migrations
 from openrecall.server.processing.v3_worker import V3ProcessingWorker
+
+
+@pytest.fixture
+def sample_jpeg_path() -> Path:
+    """Path to sample JPEG test fixture."""
+    fixtures_dir = Path(__file__).resolve().parent.parent / "tests/fixtures/images"
+    return fixtures_dir / "sample_jpeg.jpg"
 
 
 @pytest.fixture
@@ -235,3 +243,42 @@ class TestV3WorkerStatusTransitions:
             # Should be failed due to invalid trigger
             if row["status"] == "failed":
                 assert "INVALID_TRIGGER" in row["error_message"]
+
+
+def test_worker_sets_full_text_after_ocr(sample_jpeg_path: Path, temp_db: Path, tmp_path: Path):
+    """Verify worker sets full_text after OCR completion."""
+    if not sample_jpeg_path.exists():
+        pytest.skip("Sample JPEG fixture not found")
+
+    # Create a pending frame with snapshot
+    snapshot_path = str(tmp_path / "test_frame.jpg")
+    shutil.copy(sample_jpeg_path, snapshot_path)
+
+    conn = sqlite3.connect(str(temp_db))
+    conn.execute(
+        """
+        INSERT INTO frames (capture_id, timestamp, status, snapshot_path, capture_trigger)
+        VALUES ('test-full-text', '2026-03-25T12:00:00Z', 'pending', ?, 'manual')
+        """,
+        (snapshot_path,),
+    )
+    conn.commit()
+    conn.close()
+
+    # Run worker for one iteration
+    worker = V3ProcessingWorker(db_path=temp_db, poll_interval=0.1)
+    worker.start()
+    time.sleep(2)  # Wait for processing
+    worker.stop()
+    worker.join(timeout=3)
+
+    # Verify full_text is set
+    conn = sqlite3.connect(str(temp_db))
+    row = conn.execute(
+        "SELECT full_text, text_source FROM frames WHERE capture_id = 'test-full-text'"
+    ).fetchone()
+    conn.close()
+
+    # OCR should have set full_text
+    assert row[0] is not None  # full_text is set
+    assert row[1] == "ocr"  # text_source is ocr
