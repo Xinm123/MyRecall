@@ -920,6 +920,13 @@ def search():
     if content_type not in ("ocr", "accessibility", "all"):
         content_type = "all"
 
+    # Log deprecation warning for content_type (debug mode only)
+    if content_type != "all" and settings.debug:
+        logger.debug(
+            "MRV3 deprecated_param content_type=%s (parameter is ignored)",
+            content_type,
+        )
+
     # Parse limit (default 20, max 100)
     try:
         limit = int(request.args.get("limit", 20))
