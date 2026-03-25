@@ -143,7 +143,11 @@ class TestOcrTextWrite:
         assert "refusing empty text" in str(exc_info.value)
 
     def test_insert_ocr_text_fts_populated(self, store: FramesStore, temp_db: Path):
-        """Test that FTS trigger populates ocr_text_fts."""
+        """Test that update_full_text populates frames_fts (post-unification).
+
+        After FTS unification, the ocr_text_fts trigger is dropped.
+        The new path: insert_ocr_text -> update_full_text -> frames_au trigger -> frames_fts.
+        """
         frame_id, _ = store.claim_frame(
             capture_id="test-capture-004",
             metadata={
@@ -153,6 +157,7 @@ class TestOcrTextWrite:
             },
         )
 
+        # Insert OCR text
         store.insert_ocr_text(
             frame_id=frame_id,
             text="This is searchable text",
@@ -162,16 +167,19 @@ class TestOcrTextWrite:
             window_name="SearchWindow",
         )
 
-        # Verify FTS table was populated via trigger
+        # Set full_text via update_full_text (this triggers frames_au → frames_fts)
+        store.update_full_text(frame_id=frame_id, text="This is searchable text")
+
+        # Verify frames_fts table was populated via frames_au trigger
         with sqlite3.connect(str(temp_db)) as conn:
             conn.row_factory = sqlite3.Row
             rows = conn.execute(
-                "SELECT * FROM ocr_text_fts WHERE ocr_text_fts MATCH 'searchable'",
+                "SELECT * FROM frames_fts WHERE frames_fts MATCH 'searchable'",
             ).fetchall()
 
-            assert len(rows) == 1
-            assert rows[0]["frame_id"] == frame_id
-            assert "searchable" in rows[0]["text"]
+            assert len(rows) == 1, "frames_fts should have 1 entry after update_full_text"
+            assert rows[0]["id"] == frame_id
+            assert "searchable" in (rows[0]["full_text"] or "")
 
     def test_unique_constraint_on_frame_id(self, store: FramesStore, temp_db: Path):
         """Test that UNIQUE constraint prevents duplicate frame_id in ocr_text."""

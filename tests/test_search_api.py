@@ -9,6 +9,7 @@ Tests cover:
 
 import json
 import sqlite3
+from pathlib import Path
 from unittest.mock import patch, MagicMock
 
 import pytest
@@ -166,81 +167,28 @@ class TestSearchCountsAPI:
 
 @pytest.fixture
 def integration_test_db(tmp_path):
-    """Create a test database with frames, OCR, accessibility, and FTS tables."""
+    """Create a test database with frames, full_text, and frames_fts via migrations."""
     db_path = tmp_path / "integration_test.db"
 
     with sqlite3.connect(str(db_path)) as conn:
-        conn.execute("""
-            CREATE TABLE frames (
-                id INTEGER PRIMARY KEY,
-                timestamp TEXT NOT NULL,
-                app_name TEXT,
-                window_name TEXT,
-                browser_url TEXT,
-                focused INTEGER,
-                device_name TEXT,
-                text_source TEXT,
-                status TEXT DEFAULT 'completed'
-            )
-        """)
+        # Run initial schema
+        init_sql = Path("openrecall/server/database/migrations/20260227000001_initial_schema.sql").read_text()
+        conn.executescript(init_sql)
 
-        conn.execute("""
-            CREATE TABLE ocr_text (
-                id INTEGER PRIMARY KEY,
-                frame_id INTEGER NOT NULL,
-                text TEXT,
-                text_length INTEGER DEFAULT 0,
-                app_name TEXT,
-                window_name TEXT,
-                FOREIGN KEY (frame_id) REFERENCES frames(id)
-            )
-        """)
+        # Run intermediate migrations
+        for mig in [
+            "20260310121000_add_event_ts_to_frames.sql",
+            "20260315140000_add_last_known_context_to_frames.sql",
+            "20260317000001_ocr_text_unique_frame_id.sql",
+            "20260321120000_dual_hash_storage.sql",
+            "20260324120000_add_frame_description.sql",
+        ]:
+            mig_sql = Path(f"openrecall/server/database/migrations/{mig}").read_text()
+            conn.executescript(mig_sql)
 
-        conn.execute("""
-            CREATE TABLE accessibility (
-                id INTEGER PRIMARY KEY,
-                frame_id INTEGER NOT NULL,
-                text_content TEXT,
-                text_length INTEGER DEFAULT 0,
-                app_name TEXT,
-                window_name TEXT,
-                browser_url TEXT,
-                FOREIGN KEY (frame_id) REFERENCES frames(id)
-            )
-        """)
-
-        conn.execute("""
-            CREATE VIRTUAL TABLE ocr_text_fts USING fts5(
-                text,
-                app_name,
-                window_name,
-                frame_id UNINDEXED,
-                tokenize='unicode61'
-            )
-        """)
-
-        conn.execute("""
-            CREATE VIRTUAL TABLE frames_fts USING fts5(
-                app_name,
-                window_name,
-                browser_url,
-                focused,
-                id UNINDEXED,
-                tokenize='unicode61'
-            )
-        """)
-
-        conn.execute("""
-            CREATE VIRTUAL TABLE accessibility_fts USING fts5(
-                text_content,
-                app_name,
-                window_name,
-                browser_url,
-                content='accessibility',
-                content_rowid='id',
-                tokenize='unicode61'
-            )
-        """)
+        # Run FTS unification migration
+        fts_sql = Path("openrecall/server/database/migrations/20260325120000_consolidate_fts_to_full_text.sql").read_text()
+        conn.executescript(fts_sql)
 
         conn.commit()
 
@@ -271,52 +219,28 @@ class TestSearchCountsIntegration:
     """Integration tests for GET /v1/search/counts with real database."""
 
     def _insert_ocr_frame(self, conn, text, app_name, timestamp):
-        """Insert a completed OCR frame with FTS data."""
+        """Insert a completed OCR frame with full_text and frames_fts.
+
+        After FTS unification: full_text is set on frames, triggering frames_ai → frames_fts.
+        """
         cursor = conn.execute(
-            """INSERT INTO frames (timestamp, app_name, text_source, status)
-               VALUES (?, ?, 'ocr', 'completed')""",
-            (timestamp, app_name),
+            """INSERT INTO frames (capture_id, timestamp, app_name, text_source, status, full_text)
+               VALUES (?, ?, ?, 'ocr', 'completed', ?)""",
+            (f"cap-ocr-{timestamp}", timestamp, app_name, text),
         )
-        frame_id = cursor.lastrowid
-        conn.execute(
-            "INSERT INTO ocr_text (frame_id, text, text_length) VALUES (?, ?, ?)",
-            (frame_id, text, len(text)),
-        )
-        conn.execute(
-            "INSERT INTO ocr_text_fts (frame_id, text, app_name, window_name) VALUES (?, ?, ?, ?)",
-            (frame_id, text, app_name, None),
-        )
-        # frames_fts is used by _build_ocr_query for metadata filtering
-        conn.execute(
-            "INSERT INTO frames_fts (id, app_name, window_name, browser_url, focused) VALUES (?, ?, ?, ?, ?)",
-            (frame_id, app_name, None, None, None),
-        )
-        return frame_id
+        return cursor.lastrowid
 
     def _insert_ax_frame(self, conn, text, app_name, timestamp):
-        """Insert a completed accessibility frame with FTS data."""
+        """Insert a completed accessibility frame with full_text and frames_fts.
+
+        After FTS unification: full_text is set on frames, triggering frames_ai → frames_fts.
+        """
         cursor = conn.execute(
-            """INSERT INTO frames (timestamp, app_name, text_source, status)
-               VALUES (?, ?, 'accessibility', 'completed')""",
-            (timestamp, app_name),
+            """INSERT INTO frames (capture_id, timestamp, app_name, text_source, status, full_text)
+               VALUES (?, ?, ?, 'accessibility', 'completed', ?)""",
+            (f"cap-ax-{timestamp}", timestamp, app_name, text),
         )
-        frame_id = cursor.lastrowid
-        cursor = conn.execute(
-            "INSERT INTO accessibility (frame_id, text_content, text_length, app_name) VALUES (?, ?, ?, ?)",
-            (frame_id, text, len(text), app_name),
-        )
-        ax_id = cursor.lastrowid
-        conn.execute(
-            "INSERT INTO accessibility_fts (rowid, text_content, app_name, window_name, browser_url) "
-            "VALUES (?, ?, ?, ?, ?)",
-            (ax_id, text, app_name, None, None),
-        )
-        # frames_fts is used by _build_ocr_query for metadata filtering
-        conn.execute(
-            "INSERT INTO frames_fts (id, app_name, window_name, browser_url, focused) VALUES (?, ?, ?, ?, ?)",
-            (frame_id, app_name, None, None, None),
-        )
-        return frame_id
+        return cursor.lastrowid
 
     def test_returns_correct_counts_for_ocr_frames(self, app_with_real_engine, integration_test_db):
         """Integration: /v1/search/counts with q=python returns correct OCR count."""

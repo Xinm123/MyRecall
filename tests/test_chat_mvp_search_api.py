@@ -83,8 +83,8 @@ def temp_db_with_mixed_frames(tmp_path: Path) -> Path:
         # Insert frame with ocr_text column
         conn.execute("""
             INSERT INTO frames (capture_id, timestamp, app_name, window_name, browser_url,
-                                focused, device_name, ocr_text, text_source, status)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'completed')
+                                focused, device_name, ocr_text, text_source, status, full_text)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'completed', ?)
         """, (
             frame_data["capture_id"],
             frame_data["timestamp"],
@@ -95,13 +95,14 @@ def temp_db_with_mixed_frames(tmp_path: Path) -> Path:
             frame_data["device_name"],
             frame_data["text"],
             frame_data["text_source"],
+            frame_data["text"],
         ))
         frame_id = conn.execute(
             "SELECT id FROM frames WHERE capture_id = ?",
             (frame_data["capture_id"],)
         ).fetchone()["id"]
 
-        # Insert ocr_text
+        # Insert ocr_text (for completeness)
         conn.execute("""
             INSERT INTO ocr_text (frame_id, text, text_length, app_name, window_name)
             VALUES (?, ?, ?, ?, ?)
@@ -151,11 +152,11 @@ def temp_db_with_mixed_frames(tmp_path: Path) -> Path:
     ]
 
     for frame_data in ax_frames:
-        # Insert frame with accessibility_text column
+        # Insert frame with accessibility_text column AND full_text
         conn.execute("""
             INSERT INTO frames (capture_id, timestamp, app_name, window_name, browser_url,
-                                focused, device_name, accessibility_text, text_source, status)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'completed')
+                                focused, device_name, accessibility_text, text_source, status, full_text)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'completed', ?)
         """, (
             frame_data["capture_id"],
             frame_data["timestamp"],
@@ -166,13 +167,14 @@ def temp_db_with_mixed_frames(tmp_path: Path) -> Path:
             frame_data["device_name"],
             frame_data["text"],
             frame_data["text_source"],
+            frame_data["text"],
         ))
         frame_id = conn.execute(
             "SELECT id FROM frames WHERE capture_id = ?",
             (frame_data["capture_id"],)
         ).fetchone()["id"]
 
-        # Insert accessibility
+        # Insert accessibility (for completeness)
         conn.execute("""
             INSERT INTO accessibility (frame_id, timestamp, app_name, window_name, browser_url, text_content, text_length)
             VALUES (?, ?, ?, ?, ?, ?, ?)
@@ -205,8 +207,14 @@ def search_engine(temp_db_with_mixed_frames: Path, tmp_path: Path) -> SearchEngi
 # ============================================================================
 
 class TestSearchContentTypeAccessibility:
-    """Tests for content_type=accessibility search."""
+    """Tests for content_type=accessibility search.
 
+    Note: After FTS unification, content_type is deprecated and ignored.
+    These tests verify the search still functions (returns results) but
+    the content_type filter is no longer applied.
+    """
+
+    @pytest.mark.skip(reason="content_type filtering is deprecated and ignored after FTS unification")
     def test_search_content_type_accessibility_returns_accessibility_results(
         self, search_engine: SearchEngine
     ):
@@ -225,6 +233,7 @@ class TestSearchContentTypeAccessibility:
         for r in results:
             assert r.get("text_source") == "accessibility"
 
+    @pytest.mark.skip(reason="content_type filtering is deprecated and ignored after FTS unification")
     def test_search_accessibility_with_query_matches_text(
         self, search_engine: SearchEngine
     ):
@@ -260,8 +269,12 @@ class TestSearchContentTypeAccessibility:
 # ============================================================================
 
 class TestSearchContentTypeOcr:
-    """Tests for content_type=ocr search."""
+    """Tests for content_type=ocr search.
 
+    Note: After FTS unification, content_type is deprecated and ignored.
+    """
+
+    @pytest.mark.skip(reason="content_type filtering is deprecated and ignored after FTS unification")
     def test_search_content_type_ocr_returns_ocr_results(
         self, search_engine: SearchEngine
     ):
@@ -407,16 +420,19 @@ class TestSearchBrowserUrlFilter:
     def test_search_browser_url_filter_works_for_ocr(
         self, search_engine: SearchEngine
     ):
-        """browser_url filter should work for OCR frames."""
+        """browser_url filter should work for OCR frames.
+
+        Note: content_type=ocr is deprecated/ignored; use q= to filter OCR vs AX.
+        """
         results, total = search_engine.search(
-            q="",
+            q="Search",
             content_type="ocr",
             browser_url="example.com",
             limit=20,
             offset=0,
         )
 
-        # Should match the Safari OCR frame with browser_url
+        # Should match the Safari OCR frame (full_text contains "Search")
         assert total == 1
         assert results[0].get("app_name") == "Safari"
 

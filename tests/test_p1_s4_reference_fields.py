@@ -37,7 +37,10 @@ pytestmark = [pytest.mark.integration, pytest.mark.search]
 
 @pytest.fixture
 def temp_db_with_frames():
-    """Create a temporary database with test frames for reference field testing."""
+    """Create a temporary database with test frames for reference field testing.
+
+    Uses actual migrations to ensure correct post-FTS-unification schema.
+    """
     with tempfile.TemporaryDirectory() as tmpdir:
         db_path = Path(tmpdir) / "edge.db"
         frames_dir = Path(tmpdir) / "frames"
@@ -46,82 +49,26 @@ def temp_db_with_frames():
         conn = sqlite3.connect(str(db_path))
         conn.row_factory = sqlite3.Row
 
-        # Create schema matching production
-        conn.executescript("""
-            CREATE TABLE IF NOT EXISTS frames (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                capture_id TEXT NOT NULL UNIQUE,
-                timestamp TEXT NOT NULL,
-                app_name TEXT DEFAULT NULL,
-                window_name TEXT DEFAULT NULL,
-                browser_url TEXT DEFAULT NULL,
-                focused BOOLEAN DEFAULT NULL,
-                device_name TEXT NOT NULL DEFAULT 'monitor_0',
-                snapshot_path TEXT DEFAULT NULL,
-                status TEXT NOT NULL DEFAULT 'completed',
-                text_source TEXT DEFAULT NULL,
-                ingested_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
-            );
+        # Use actual migrations for correct schema
+        init_sql = Path("openrecall/server/database/migrations/20260227000001_initial_schema.sql").read_text()
+        conn.executescript(init_sql)
 
-            CREATE TABLE IF NOT EXISTS ocr_text (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                frame_id INTEGER NOT NULL,
-                text TEXT NOT NULL DEFAULT '',
-                text_length INTEGER DEFAULT 0,
-                ocr_engine TEXT,
-                app_name TEXT DEFAULT NULL,
-                window_name TEXT DEFAULT NULL,
-                FOREIGN KEY (frame_id) REFERENCES frames(id) ON DELETE CASCADE
-            );
+        for mig in [
+            "20260310121000_add_event_ts_to_frames.sql",
+            "20260315140000_add_last_known_context_to_frames.sql",
+            "20260317000001_ocr_text_unique_frame_id.sql",
+            "20260321120000_dual_hash_storage.sql",
+            "20260324120000_add_frame_description.sql",
+        ]:
+            mig_sql = Path(f"openrecall/server/database/migrations/{mig}").read_text()
+            conn.executescript(mig_sql)
 
-            CREATE VIRTUAL TABLE IF NOT EXISTS frames_fts USING fts5(
-                app_name, window_name, browser_url, focused, accessibility_text,
-                id UNINDEXED, tokenize='unicode61'
-            );
-
-            CREATE VIRTUAL TABLE IF NOT EXISTS ocr_text_fts USING fts5(
-                text, app_name, window_name, frame_id UNINDEXED, tokenize='unicode61'
-            );
-
-            -- Accessibility table for content_type=accessibility search
-            CREATE TABLE IF NOT EXISTS accessibility (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                frame_id INTEGER NOT NULL,
-                timestamp TEXT NOT NULL,
-                app_name TEXT NOT NULL,
-                window_name TEXT NOT NULL,
-                browser_url TEXT,
-                text_content TEXT NOT NULL,
-                text_length INTEGER DEFAULT 0,
-                FOREIGN KEY (frame_id) REFERENCES frames(id) ON DELETE CASCADE
-            );
-
-            CREATE VIRTUAL TABLE IF NOT EXISTS accessibility_fts USING fts5(
-                text_content, app_name, window_name, browser_url,
-                content='accessibility', content_rowid='id', tokenize='unicode61'
-            );
-
-            CREATE INDEX IF NOT EXISTS idx_frames_timestamp ON frames(timestamp);
-            CREATE INDEX IF NOT EXISTS idx_ocr_text_frame_id ON ocr_text(frame_id);
-            CREATE INDEX IF NOT EXISTS idx_accessibility_frame_id ON accessibility(frame_id);
-
-            -- FTS triggers
-            CREATE TRIGGER IF NOT EXISTS frames_ai AFTER INSERT ON frames BEGIN
-                INSERT INTO frames_fts(id, app_name, window_name, browser_url, focused)
-                VALUES (NEW.id, COALESCE(NEW.app_name, ''), COALESCE(NEW.window_name, ''),
-                        COALESCE(NEW.browser_url, ''), COALESCE(NEW.focused, 0));
-            END;
-
-            CREATE TRIGGER IF NOT EXISTS ocr_text_ai AFTER INSERT ON ocr_text
-            WHEN NEW.text IS NOT NULL AND NEW.text != '' BEGIN
-                INSERT INTO ocr_text_fts(frame_id, text, app_name, window_name)
-                VALUES (NEW.frame_id, NEW.text, COALESCE(NEW.app_name, ''), COALESCE(NEW.window_name, ''));
-            END;
-        """)
+        fts_sql = Path("openrecall/server/database/migrations/20260325120000_consolidate_fts_to_full_text.sql").read_text()
+        conn.executescript(fts_sql)
 
         # Insert diverse test frames covering various scenarios
         test_frames = [
-            # (frame_id, capture_id, timestamp, app_name, window_name, focused, ocr_text)
+            # (frame_id, capture_id, timestamp, app_name, window_name, focused, full_text, text_source)
             (
                 1,
                 "cap-001",
@@ -130,6 +77,7 @@ def temp_db_with_frames():
                 "Web Browser",
                 True,
                 "Hello world from Safari browser",
+                "ocr",
             ),
             (
                 2,
@@ -139,6 +87,7 @@ def temp_db_with_frames():
                 "main.py - Project",
                 True,
                 "def hello(): return 'world'",
+                "ocr",
             ),
             (
                 3,
@@ -148,6 +97,7 @@ def temp_db_with_frames():
                 "bash - ~/work",
                 False,
                 "git status && git commit -m 'hello'",
+                "ocr",
             ),
             (
                 4,
@@ -157,6 +107,7 @@ def temp_db_with_frames():
                 "Google Search",
                 True,
                 "search query hello world results",
+                "ocr",
             ),
             (
                 5,
@@ -166,6 +117,7 @@ def temp_db_with_frames():
                 "#general",
                 True,
                 "meeting at 3pm hello team",
+                "ocr",
             ),
             (
                 6,
@@ -175,6 +127,7 @@ def temp_db_with_frames():
                 "Inbox",
                 True,
                 "Subject: Project update hello",
+                "ocr",
             ),
             (
                 7,
@@ -184,6 +137,7 @@ def temp_db_with_frames():
                 "Meeting Notes",
                 False,
                 "Discussion points hello all",
+                "ocr",
             ),
             (
                 8,
@@ -193,6 +147,7 @@ def temp_db_with_frames():
                 "Documents",
                 True,
                 "file.txt hello document",
+                "ocr",
             ),
             (
                 9,
@@ -202,6 +157,7 @@ def temp_db_with_frames():
                 "report.pdf",
                 True,
                 "Page 1: Introduction hello world",
+                "ocr",
             ),
             (
                 10,
@@ -211,19 +167,15 @@ def temp_db_with_frames():
                 "Today",
                 False,
                 "Event: hello sync meeting",
+                "ocr",
             ),
         ]
 
-        for frame_id, capture_id, ts, app, window, focused, ocr_text in test_frames:
+        for frame_id, capture_id, ts, app, window, focused, full_text, text_source in test_frames:
             conn.execute(
-                """INSERT INTO frames (id, capture_id, timestamp, app_name, window_name, browser_url, focused, status, text_source)
-                   VALUES (?, ?, ?, ?, ?, NULL, ?, 'completed', 'ocr')""",
-                (frame_id, capture_id, ts, app, window, focused),
-            )
-            conn.execute(
-                """INSERT INTO ocr_text (frame_id, text, text_length, ocr_engine)
-                   VALUES (?, ?, ?, 'test')""",
-                (frame_id, ocr_text, len(ocr_text)),
+                """INSERT INTO frames (id, capture_id, timestamp, app_name, window_name, browser_url, focused, status, text_source, full_text)
+                   VALUES (?, ?, ?, ?, ?, NULL, ?, 'completed', ?, ?)""",
+                (frame_id, capture_id, ts, app, window, focused, text_source, full_text),
             )
 
         conn.commit()

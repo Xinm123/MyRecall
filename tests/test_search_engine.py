@@ -1,7 +1,6 @@
 """Tests for SearchEngine class."""
 
 import sqlite3
-import tempfile
 from pathlib import Path
 
 import pytest
@@ -11,87 +10,28 @@ from openrecall.server.search.engine import SearchEngine
 
 @pytest.fixture
 def test_db(tmp_path):
-    """Create a test database with required schema."""
+    """Create a test database with required schema via migrations."""
     db_path = tmp_path / "test.db"
 
     with sqlite3.connect(str(db_path)) as conn:
-        # Create frames table
-        conn.execute("""
-            CREATE TABLE frames (
-                id INTEGER PRIMARY KEY,
-                timestamp TEXT NOT NULL,
-                app_name TEXT,
-                window_name TEXT,
-                browser_url TEXT,
-                focused INTEGER,
-                device_name TEXT,
-                text_source TEXT,
-                status TEXT DEFAULT 'completed'
-            )
-        """)
+        # Run initial schema
+        init_sql = Path("openrecall/server/database/migrations/20260227000001_initial_schema.sql").read_text()
+        conn.executescript(init_sql)
 
-        # Create ocr_text table
-        conn.execute("""
-            CREATE TABLE ocr_text (
-                id INTEGER PRIMARY KEY,
-                frame_id INTEGER NOT NULL,
-                text TEXT,
-                text_length INTEGER DEFAULT 0,
-                app_name TEXT,
-                window_name TEXT,
-                FOREIGN KEY (frame_id) REFERENCES frames(id)
-            )
-        """)
+        # Run intermediate migrations
+        for mig in [
+            "20260310121000_add_event_ts_to_frames.sql",
+            "20260315140000_add_last_known_context_to_frames.sql",
+            "20260317000001_ocr_text_unique_frame_id.sql",
+            "20260321120000_dual_hash_storage.sql",
+            "20260324120000_add_frame_description.sql",
+        ]:
+            mig_sql = Path(f"openrecall/server/database/migrations/{mig}").read_text()
+            conn.executescript(mig_sql)
 
-        # Create accessibility table
-        conn.execute("""
-            CREATE TABLE accessibility (
-                id INTEGER PRIMARY KEY,
-                frame_id INTEGER NOT NULL,
-                text_content TEXT,
-                text_length INTEGER DEFAULT 0,
-                app_name TEXT,
-                window_name TEXT,
-                browser_url TEXT,
-                FOREIGN KEY (frame_id) REFERENCES frames(id)
-            )
-        """)
-
-        # Create FTS5 tables matching actual schema
-        conn.execute("""
-            CREATE VIRTUAL TABLE ocr_text_fts USING fts5(
-                text,
-                app_name,
-                window_name,
-                frame_id UNINDEXED,
-                tokenize='unicode61'
-            )
-        """)
-
-        conn.execute("""
-            CREATE VIRTUAL TABLE frames_fts USING fts5(
-                app_name,
-                window_name,
-                browser_url,
-                focused,
-                id UNINDEXED,
-                tokenize='unicode61'
-            )
-        """)
-
-        conn.execute("""
-            CREATE VIRTUAL TABLE accessibility_fts USING fts5(
-                text_content,
-                app_name,
-                window_name,
-                browser_url,
-                content='accessibility',
-                content_rowid='id',
-                tokenize='unicode61'
-            )
-        """)
-
-        conn.commit()
+        # Run FTS unification migration
+        fts_sql = Path("openrecall/server/database/migrations/20260325120000_consolidate_fts_to_full_text.sql").read_text()
+        conn.executescript(fts_sql)
 
     return db_path
 
@@ -100,39 +40,29 @@ def test_count_by_type_returns_ocr_and_accessibility_counts(test_db):
     """Test count_by_type returns counts for both content types."""
     engine = SearchEngine(db_path=test_db)
 
-    # Insert test data - One OCR frame with matching text
+    # Insert test data - One OCR frame and one accessibility frame, both with full_text
     with sqlite3.connect(str(test_db)) as conn:
-        # Insert OCR frame
-        cursor = conn.execute(
-            """INSERT INTO frames (timestamp, app_name, window_name, text_source, status)
-               VALUES ('2024-01-01T00:00:00Z', 'TestApp', 'TestWindow', 'ocr', 'completed')"""
+        # Insert OCR frame with full_text
+        conn.execute(
+            """INSERT INTO frames (capture_id, timestamp, app_name, window_name, device_name, text_source, status, ingested_at, full_text)
+               VALUES ('cap-ocr-001', '2024-01-01T00:00:00Z', 'TestApp', 'TestWindow', 'monitor_0', 'ocr', 'completed', '2024-01-01T00:00:00.000Z', 'test ocr content')"""
         )
-        frame_id_ocr = cursor.lastrowid
+        frame_id_ocr = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
+        # Also insert into ocr_text for completeness (FramesStore may still do this)
         conn.execute(
             "INSERT INTO ocr_text (frame_id, text, text_length) VALUES (?, ?, ?)",
             (frame_id_ocr, "test ocr content", 16)
         )
-        # Insert into FTS - ocr_text_fts uses frame_id column, not rowid
-        conn.execute(
-            "INSERT INTO ocr_text_fts (frame_id, text, app_name, window_name) VALUES (?, ?, ?, ?)",
-            (frame_id_ocr, "test ocr content", "TestApp", "TestWindow")
-        )
 
-        # Insert accessibility frame
-        cursor = conn.execute(
-            """INSERT INTO frames (timestamp, app_name, window_name, text_source, status)
-               VALUES ('2024-01-01T00:00:01Z', 'TestApp', 'TestWindow', 'accessibility', 'completed')"""
-        )
-        frame_id_ax = cursor.lastrowid
-        cursor = conn.execute(
-            "INSERT INTO accessibility (frame_id, text_content, text_length) VALUES (?, ?, ?)",
-            (frame_id_ax, "test accessibility content", 26)
-        )
-        accessibility_id = cursor.lastrowid
-        # Insert into FTS - use accessibility.id as rowid
+        # Insert accessibility frame with full_text
         conn.execute(
-            "INSERT INTO accessibility_fts (rowid, text_content, app_name, window_name, browser_url) VALUES (?, ?, ?, ?, ?)",
-            (accessibility_id, "test accessibility content", "TestApp", "TestWindow", None)
+            """INSERT INTO frames (capture_id, timestamp, app_name, window_name, device_name, text_source, status, ingested_at, full_text)
+               VALUES ('cap-ax-001', '2024-01-01T00:00:01Z', 'TestApp', 'TestWindow', 'monitor_0', 'accessibility', 'completed', '2024-01-01T00:00:01.000Z', 'test accessibility content')"""
+        )
+        frame_id_ax = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
+        conn.execute(
+            "INSERT INTO accessibility (frame_id, text_content, text_length, app_name, window_name) VALUES (?, ?, ?, ?, ?)",
+            (frame_id_ax, "test accessibility content", 26, "TestApp", "TestWindow")
         )
 
         conn.commit()

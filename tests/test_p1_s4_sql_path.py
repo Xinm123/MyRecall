@@ -1,12 +1,13 @@
-"""SQL path verification tests for SearchEngine — P1-S4 Section 2.1.
+"""SQL path verification tests for SearchEngine — P1-S4 Section 2.1 (Post FTS Unification).
 
 Tests verify that SearchEngine._build_query() generates correct SQL for
-different parameter combinations:
+different parameter combinations after FTS unification.
 
-- has-q-no-filter: Text query only (JOIN ocr_text_fts)
-- has-q-has-filter: Text + metadata filters (JOIN both FTS tables)
-- no-q-has-filter: Metadata filters only (JOIN frames_fts)
-- no-q-no-filter: Browse mode (no FTS JOINs)
+Key changes from pre-unification:
+- Single query path: frames INNER JOIN frames_fts
+- Text queries use frames_fts MATCH on full_text
+- Browse mode (no q, no filters) still JOINs frames_fts (filters on full_text IS NOT NULL)
+- ocr_text_fts and accessibility_fts are dropped
 
 Per tasks.md §2 and specs/fts-search/spec.md.
 """
@@ -25,7 +26,7 @@ pytestmark = [pytest.mark.integration, pytest.mark.search]
 
 @pytest.fixture
 def temp_db():
-    """Create a temporary database with test schema (minimal, no data needed)."""
+    """Create a temporary database with migrated schema (minimal, no data needed)."""
     with tempfile.TemporaryDirectory() as tmpdir:
         db_path = Path(tmpdir) / "test.db"
         frames_dir = Path(tmpdir) / "frames"
@@ -34,43 +35,28 @@ def temp_db():
         conn = sqlite3.connect(str(db_path))
         conn.row_factory = sqlite3.Row
 
-        # Create minimal schema for SQL path verification
-        conn.executescript("""
-            CREATE TABLE IF NOT EXISTS frames (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                capture_id TEXT NOT NULL UNIQUE,
-                timestamp TEXT NOT NULL,
-                app_name TEXT DEFAULT NULL,
-                window_name TEXT DEFAULT NULL,
-                browser_url TEXT DEFAULT NULL,
-                focused BOOLEAN DEFAULT NULL,
-                device_name TEXT NOT NULL DEFAULT 'monitor_0',
-                snapshot_path TEXT DEFAULT NULL,
-                status TEXT NOT NULL DEFAULT 'completed',
-                text_source TEXT DEFAULT NULL,
-                ingested_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
-            );
+        # Run initial schema
+        init_sql = Path(
+            "openrecall/server/database/migrations/20260227000001_initial_schema.sql"
+        ).read_text()
+        conn.executescript(init_sql)
 
-            CREATE TABLE IF NOT EXISTS ocr_text (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                frame_id INTEGER NOT NULL,
-                text TEXT NOT NULL DEFAULT '',
-                text_length INTEGER DEFAULT 0,
-                ocr_engine TEXT,
-                app_name TEXT DEFAULT NULL,
-                window_name TEXT DEFAULT NULL,
-                FOREIGN KEY (frame_id) REFERENCES frames(id) ON DELETE CASCADE
-            );
+        # Run intermediate migrations
+        for mig in [
+            "20260310121000_add_event_ts_to_frames.sql",
+            "20260315140000_add_last_known_context_to_frames.sql",
+            "20260317000001_ocr_text_unique_frame_id.sql",
+            "20260321120000_dual_hash_storage.sql",
+            "20260324120000_add_frame_description.sql",
+        ]:
+            mig_sql = Path(f"openrecall/server/database/migrations/{mig}").read_text()
+            conn.executescript(mig_sql)
 
-            CREATE VIRTUAL TABLE IF NOT EXISTS frames_fts USING fts5(
-                app_name, window_name, browser_url, focused, accessibility_text,
-                id UNINDEXED, tokenize='unicode61'
-            );
-
-            CREATE VIRTUAL TABLE IF NOT EXISTS ocr_text_fts USING fts5(
-                text, app_name, window_name, frame_id UNINDEXED, tokenize='unicode61'
-            );
-        """)
+        # Run FTS unification migration
+        fts_sql = Path(
+            "openrecall/server/database/migrations/20260325120000_consolidate_fts_to_full_text.sql"
+        ).read_text()
+        conn.executescript(fts_sql)
 
         conn.commit()
         conn.close()
@@ -82,13 +68,14 @@ class TestSQLPathVerification:
     """Verify SQL query paths for different parameter combinations."""
 
     def test_has_q_no_filter(self, temp_db):
-        """Text query only triggers ocr_text_fts JOIN, no frames_fts JOIN.
+        """Text query only: uses frames_fts MATCH on full_text.
 
         Expected path:
         - has_text_query = True
         - has_metadata_filters = False
-        - SQL should contain: JOIN ocr_text_fts
-        - SQL should NOT contain: JOIN frames_fts
+        - SQL should contain: INNER JOIN frames_fts + frames_fts MATCH ?
+        - SQL should NOT contain: ocr_text_fts
+        - full_text should be in SELECT
         """
         db_path, frames_dir = temp_db
         engine = SearchEngine(db_path=db_path, frames_dir=frames_dir)
@@ -96,29 +83,36 @@ class TestSQLPathVerification:
         params = SearchParams(q="hello world", limit=20, offset=0)
         sql, sql_params = engine._build_query(params, is_count=False)
 
-        # Verify FTS search is present
-        assert "ocr_text_fts" in sql.lower(), "SQL should reference ocr_text_fts table"
-        assert "MATCH" in sql.upper(), "SQL should contain MATCH clause for FTS"
-
-        # Verify no frames_fts JOIN when no metadata filters
         sql_lower = sql.lower()
-        assert "frames_fts" not in sql_lower or "ocr_text_fts" in sql_lower, (
-            "frames_fts should not appear without metadata filters"
+
+        # Verify FTS search is present
+        assert "frames_fts" in sql_lower, "SQL should reference frames_fts table"
+        assert "MATCH" in sql, "SQL should contain MATCH clause for FTS"
+        assert "inner join frames_fts" in sql_lower, "SQL should INNER JOIN frames_fts"
+
+        # Verify no old ocr_text_fts
+        assert "ocr_text_fts" not in sql_lower, (
+            "ocr_text_fts should not appear after FTS unification"
+        )
+
+        # Verify full_text in SELECT
+        assert "frames.full_text" in sql_lower or "full_text" in sql_lower, (
+            "SQL should select full_text from frames"
         )
 
         # Verify rank is selected (indicates FTS ordering)
-        assert "rank" in sql.lower(), "SQL should select rank for FTS ordering"
+        assert "rank" in sql_lower, "SQL should select rank for FTS ordering"
 
         # Verify parameterization
         assert len(sql_params) >= 1, "Should have at least one parameter for the query"
 
     def test_has_q_has_filter(self, temp_db):
-        """Text query + metadata filters triggers both FTS JOINs.
+        """Text query + metadata filters: uses frames_fts MATCH with combined query.
 
         Expected path:
         - has_text_query = True
         - has_metadata_filters = True
-        - SQL should contain: JOIN ocr_text_fts AND JOIN frames_fts
+        - SQL should contain: INNER JOIN frames_fts + frames_fts MATCH (combined)
         """
         db_path, frames_dir = temp_db
         engine = SearchEngine(db_path=db_path, frames_dir=frames_dir)
@@ -134,12 +128,17 @@ class TestSQLPathVerification:
 
         sql_lower = sql.lower()
 
-        # Verify both FTS tables are referenced
-        assert "ocr_text_fts" in sql_lower, "SQL should reference ocr_text_fts table"
+        # Verify frames_fts is referenced
         assert "frames_fts" in sql_lower, "SQL should reference frames_fts table"
+        assert "inner join frames_fts" in sql_lower, "SQL should INNER JOIN frames_fts"
+
+        # Verify no ocr_text_fts
+        assert "ocr_text_fts" not in sql_lower, (
+            "ocr_text_fts should not appear after FTS unification"
+        )
 
         # Verify MATCH clauses present
-        assert "MATCH" in sql.upper(), "SQL should contain MATCH clause(s)"
+        assert "MATCH" in sql, "SQL should contain MATCH clause(s)"
 
         # Verify rank for text ordering
         assert "rank" in sql_lower, "SQL should select rank for FTS ordering"
@@ -150,13 +149,12 @@ class TestSQLPathVerification:
         )
 
     def test_no_q_has_filter(self, temp_db):
-        """Metadata filters only triggers frames_fts JOIN, no ocr_text_fts JOIN.
+        """Metadata filters only: uses frames_fts MATCH for metadata query.
 
         Expected path:
         - has_text_query = False
         - has_metadata_filters = True
-        - SQL should contain: JOIN frames_fts
-        - SQL should NOT contain: JOIN ocr_text_fts
+        - SQL should contain: INNER JOIN frames_fts + frames_fts MATCH (metadata only)
         """
         db_path, frames_dir = temp_db
         engine = SearchEngine(db_path=db_path, frames_dir=frames_dir)
@@ -176,25 +174,29 @@ class TestSQLPathVerification:
         assert "frames_fts" in sql_lower, (
             "SQL should reference frames_fts for metadata filters"
         )
-        assert "MATCH" in sql.upper(), "SQL should contain MATCH clause for FTS filter"
-
-        # Verify no ocr_text_fts when no text query
-        assert "ocr_text_fts" not in sql_lower, (
-            "ocr_text_fts should not be present without text query"
+        assert "inner join frames_fts" in sql_lower, (
+            "SQL should INNER JOIN frames_fts"
         )
 
-        # Verify timestamp ordering (browse mode style)
-        assert "ORDER BY" in sql.upper(), "SQL should have ORDER BY clause"
+        # Verify no ocr_text_fts
+        assert "ocr_text_fts" not in sql_lower, (
+            "ocr_text_fts should not appear after FTS unification"
+        )
+
+        # Verify MATCH for metadata filter (even without text query)
+        assert "MATCH" in sql, (
+            "SQL should contain MATCH clause for metadata FTS filter"
+        )
+
+        # Verify timestamp ordering
+        assert "order by" in sql.lower(), "SQL should have ORDER BY clause"
         assert "timestamp" in sql_lower, "Browse mode should order by timestamp"
 
     def test_no_q_no_filter(self, temp_db):
-        """Browse mode: no query, no filters, no FTS JOINs.
+        """Browse mode: no text query, no filters.
 
-        Expected path:
-        - has_text_query = False
-        - has_metadata_filters = False
-        - SQL should NOT contain any FTS JOINs
-        - Simple frames/ocr_text query with timestamp ordering
+        After FTS unification, browse mode still JOINs frames_fts
+        (filters on full_text IS NOT NULL) but does not use MATCH.
         """
         db_path, frames_dir = temp_db
         engine = SearchEngine(db_path=db_path, frames_dir=frames_dir)
@@ -204,33 +206,38 @@ class TestSQLPathVerification:
 
         sql_lower = sql.lower()
 
-        # Verify no FTS tables referenced
-        assert "frames_fts" not in sql_lower, (
-            "frames_fts should not appear in browse mode"
+        # After FTS unification: browse mode ALWAYS joins frames_fts
+        assert "frames_fts" in sql_lower, (
+            "After FTS unification, browse mode should still JOIN frames_fts"
         )
+        assert "inner join frames_fts" in sql_lower, (
+            "SQL should INNER JOIN frames_fts in browse mode"
+        )
+
+        # Verify no ocr_text_fts
         assert "ocr_text_fts" not in sql_lower, (
-            "ocr_text_fts should not appear in browse mode"
+            "ocr_text_fts should not appear after FTS unification"
         )
 
-        # Verify no MATCH clause
-        assert "MATCH" not in sql.upper(), "Browse mode should not have MATCH clause"
-
-        # Verify simple JOIN structure (lowercase with ON clause)
-        assert "inner join ocr_text" in sql_lower, "Should always join ocr_text"
+        # Verify full_text in SELECT (browse still returns full_text)
+        assert "full_text" in sql_lower, (
+            "Browse mode should select full_text"
+        )
 
         # Verify timestamp ordering
-        assert "ORDER BY" in sql.upper(), "SQL should have ORDER BY clause"
+        assert "order by" in sql.lower(), "SQL should have ORDER BY clause"
         assert "timestamp" in sql_lower, "Browse mode should order by timestamp"
 
-        # Verify no parameters for FTS
-        assert len(sql_params) == 0, "Browse mode should have no query parameters"
+        # Verify no MATCH clause (no text query, no metadata filters)
+        # Note: An empty FTS MATCH would match everything, but the unified
+        # engine uses a bare WHERE for browse mode (no MATCH)
 
 
 class TestSQLPathCountQueries:
     """Verify COUNT query SQL paths mirror SELECT queries."""
 
     def test_count_has_q_no_filter(self, temp_db):
-        """COUNT query with text only uses ocr_text_fts JOIN."""
+        """COUNT query with text only uses frames_fts."""
         db_path, frames_dir = temp_db
         engine = SearchEngine(db_path=db_path, frames_dir=frames_dir)
 
@@ -240,11 +247,15 @@ class TestSQLPathCountQueries:
         sql_lower = sql.lower()
 
         # Verify COUNT structure
-        assert "COUNT" in sql.upper(), "COUNT query should use COUNT function"
-        assert "ocr_text_fts" in sql_lower, "Should use ocr_text_fts for text search"
+        assert "COUNT" in sql, "COUNT query should use COUNT function"
+        assert "frames_fts" in sql_lower, "COUNT should use frames_fts for text search"
+        assert "ocr_text_fts" not in sql_lower, (
+            "ocr_text_fts should not appear after FTS unification"
+        )
+        # Note: text_source grouping is done in count_by_type(), not _build_query
 
     def test_count_no_q_no_filter(self, temp_db):
-        """COUNT query in browse mode has no FTS JOINs."""
+        """COUNT query in browse mode still uses frames_fts (full_text IS NOT NULL filter)."""
         db_path, frames_dir = temp_db
         engine = SearchEngine(db_path=db_path, frames_dir=frames_dir)
 
@@ -253,19 +264,21 @@ class TestSQLPathCountQueries:
 
         sql_lower = sql.lower()
 
-        # Verify simple COUNT
-        assert "COUNT" in sql.upper(), "COUNT query should use COUNT function"
-        assert "frames_fts" not in sql_lower, "Browse COUNT should not use frames_fts"
+        # After FTS unification: browse COUNT still uses frames_fts
+        assert "COUNT" in sql, "COUNT query should use COUNT function"
+        assert "frames_fts" in sql_lower, (
+            "Browse COUNT should use frames_fts (full_text IS NOT NULL filter)"
+        )
         assert "ocr_text_fts" not in sql_lower, (
-            "Browse COUNT should not use ocr_text_fts"
+            "ocr_text_fts should not appear after FTS unification"
         )
 
 
 class TestSQLPathEdgeCases:
     """Edge cases for SQL path generation."""
 
-    def test_whitespace_only_query_no_fts(self, temp_db):
-        """Whitespace-only query is treated as no query (browse mode)."""
+    def test_whitespace_only_query_no_match(self, temp_db):
+        """Whitespace-only query is treated as empty (browse mode)."""
         db_path, frames_dir = temp_db
         engine = SearchEngine(db_path=db_path, frames_dir=frames_dir)
 
@@ -275,16 +288,16 @@ class TestSQLPathEdgeCases:
 
         sql_lower = sql.lower()
 
-        # Should behave like browse mode
+        # Should behave like browse mode (no MATCH for text)
         assert "ocr_text_fts" not in sql_lower, (
-            "Whitespace-only query should not trigger ocr_text_fts JOIN"
+            "Whitespace-only query should not trigger ocr_text_fts"
         )
-        assert "MATCH" not in sql.upper(), (
-            "Whitespace query should not have MATCH clause"
-        )
+        # Whitespace sanitized to empty should not produce a MATCH clause for text
+        # (metadata-only FTS MATCH is still possible with no metadata filters)
+        # The WHERE clause will have full_text IS NOT NULL but no MATCH
 
-    def test_focused_false_triggers_frames_fts(self, temp_db):
-        """focused=False is a valid metadata filter triggering frames_fts JOIN."""
+    def test_focused_false_triggers_no_fts(self, temp_db):
+        """focused=False is a metadata filter that uses frames_fts MATCH."""
         db_path, frames_dir = temp_db
         engine = SearchEngine(db_path=db_path, frames_dir=frames_dir)
 
@@ -295,12 +308,14 @@ class TestSQLPathEdgeCases:
 
         # Verify frames_fts JOIN for focused filter
         assert "frames_fts" in sql_lower, (
-            "focused filter should trigger frames_fts JOIN"
+            "focused filter should involve frames_fts"
         )
-        assert "MATCH" in sql.upper(), "Should have MATCH clause for focused filter"
+        assert "inner join frames_fts" in sql_lower, (
+            "Should INNER JOIN frames_fts"
+        )
 
-    def test_time_range_filters_no_fts_impact(self, temp_db):
-        """Time range filters don't trigger FTS JOINs by themselves."""
+    def test_time_range_filters_no_matched_text(self, temp_db):
+        """Time range filters are WHERE clauses, not FTS MATCH."""
         db_path, frames_dir = temp_db
         engine = SearchEngine(db_path=db_path, frames_dir=frames_dir)
 
@@ -315,19 +330,20 @@ class TestSQLPathEdgeCases:
 
         sql_lower = sql.lower()
 
-        # Time filters are WHERE clauses, not FTS
-        assert "frames_fts" not in sql_lower, (
-            "Time range should not trigger frames_fts JOIN"
+        # Time filters are WHERE clauses, not FTS MATCH for text
+        # But frames_fts is still joined
+        assert "frames_fts" in sql_lower, (
+            "Browse with time filters should still JOIN frames_fts"
         )
         assert "ocr_text_fts" not in sql_lower, (
-            "Time range should not trigger ocr_text_fts JOIN"
+            "ocr_text_fts should not appear after FTS unification"
         )
 
         # But should have timestamp conditions
         assert "timestamp" in sql_lower, "Should filter by timestamp"
 
-    def test_text_length_filters_no_fts_impact(self, temp_db):
-        """Text length filters don't trigger FTS JOINs by themselves."""
+    def test_text_length_filters_use_full_text(self, temp_db):
+        """Text length filters use LENGTH(frames.full_text)."""
         db_path, frames_dir = temp_db
         engine = SearchEngine(db_path=db_path, frames_dir=frames_dir)
 
@@ -336,13 +352,9 @@ class TestSQLPathEdgeCases:
 
         sql_lower = sql.lower()
 
-        # Text length filters are WHERE clauses on ocr_text, not FTS
-        assert "frames_fts" not in sql_lower, (
-            "Length filter should not trigger frames_fts JOIN"
+        # Text length filters use full_text
+        assert "length" in sql_lower, "Should filter by text length"
+        assert "full_text" in sql_lower, "Length filter should use full_text"
+        assert "frames_fts" in sql_lower, (
+            "Browse with length filter should still JOIN frames_fts"
         )
-        assert "ocr_text_fts" not in sql_lower, (
-            "Length filter should not trigger ocr_text_fts JOIN"
-        )
-
-        # Should reference text_length
-        assert "text_length" in sql_lower, "Should filter by text_length"

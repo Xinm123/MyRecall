@@ -100,16 +100,21 @@ class TestOcrPipeline:
                 assert row["text"] == result.text
                 assert row["ocr_engine"] == "rapidocr"
 
-            # 6. Verify FTS auto-population
+            # 6. Verify FTS auto-population via frames_fts (post-unification)
+            # After FTS unification: ocr_text_fts is dropped, full_text is indexed via frames_fts
             with sqlite3.connect(str(temp_db)) as conn:
                 conn.row_factory = sqlite3.Row
-                # Search for any text from the OCR result
+                # First set full_text on the frame (this is what V3ProcessingWorker does)
+                store.update_full_text(frame_id=frame_id, text=result.text)
+
+                # Search for text in frames_fts
                 if result.text:
+                    search_term = result.text.split()[0] if result.text.split() else result.text
                     rows = conn.execute(
-                        "SELECT * FROM ocr_text_fts WHERE ocr_text_fts MATCH ?",
-                        (result.text.split()[0] if result.text.split() else result.text,),
+                        "SELECT * FROM frames_fts WHERE frames_fts MATCH ?",
+                        (search_term,),
                     ).fetchall()
-                    # FTS should have indexed the text
+                    # FTS should have indexed the text via frames_au trigger
                     assert len(rows) >= 1
 
     def test_ocr_pipeline_with_missing_file(self, store: FramesStore):

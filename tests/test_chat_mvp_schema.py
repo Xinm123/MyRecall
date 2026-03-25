@@ -131,12 +131,12 @@ class TestFramesFts:
     """Tests for frames_fts MVP shape."""
 
     def test_frames_fts_is_metadata_only(self, sqlite_conn):
-        """frames_fts should only index metadata fields, not text content."""
+        """frames_fts should index full_text and metadata fields (post FTS unification)."""
         indexed = get_fts_indexed_columns(sqlite_conn, "frames_fts")
-        expected = {"app_name", "window_name", "browser_url", "focused", "id"}
-        # Allow for id being UNINDEXED (common pattern)
-        assert indexed == expected or indexed == {"app_name", "window_name", "browser_url", "focused"}, \
-            f"frames_fts should only index metadata, got: {indexed}"
+        # After FTS unification: frames_fts indexes full_text + metadata
+        expected = {"app_name", "window_name", "browser_url", "full_text", "id"}
+        assert indexed == expected or indexed == {"app_name", "window_name", "browser_url", "full_text"}, \
+            f"frames_fts should index full_text + metadata, got: {indexed}"
 
     def test_frames_fts_no_text_columns(self, sqlite_conn):
         """frames_fts should not index text columns (text is in dedicated FTS tables)."""
@@ -164,9 +164,9 @@ class TestAccessibilityTable:
         assert "text_length" in cols, "accessibility.text_length is required for MVP"
 
     def test_accessibility_fts_indexes_browser_url(self, sqlite_conn):
-        """accessibility_fts must index browser_url for URL-based search."""
-        indexed = get_fts_indexed_columns(sqlite_conn, "accessibility_fts")
-        assert "browser_url" in indexed, "accessibility_fts should index browser_url"
+        """Post FTS unification: browser_url is indexed in frames_fts (accessibility_fts dropped)."""
+        indexed = get_fts_indexed_columns(sqlite_conn, "frames_fts")
+        assert "browser_url" in indexed, "frames_fts should index browser_url (post FTS unification)"
 
     def test_accessibility_no_focused(self, sqlite_conn):
         """accessibility.focused should be removed (focused is per-frame, not per-accessibility)."""
