@@ -76,20 +76,47 @@ CREATE VIRTUAL TABLE frames_fts USING fts5(
 
 Migration file: `20260325120000_consolidate_fts_to_full_text.sql`
 
+**Important:** Steps must run in this exact order to ensure hybrid frames get merged text, not just accessibility_text.
+
 #### Step 1: Add column
 
 ```sql
 ALTER TABLE frames ADD COLUMN full_text TEXT DEFAULT NULL;
 ```
 
-#### Step 2: Backfill from accessibility_text (AX-first path)
+#### Step 2: Merge for hybrid frames (MUST run before Step 3)
+
+Detect frames with BOTH text sources populated and merge them first.
+- If `accessibility_text` AND `ocr_text` (column or table) both exist → merge both
+- Order: accessibility_text first, then OCR text
+
+```sql
+-- Merge when both frames.accessibility_text and frames.ocr_text exist
+UPDATE frames SET full_text = accessibility_text || char(10) || frames.ocr_text
+WHERE accessibility_text IS NOT NULL AND accessibility_text != ''
+  AND frames.ocr_text IS NOT NULL AND frames.ocr_text != '';
+
+-- Merge when accessibility_text exists with ocr_text table row (but no frames.ocr_text column)
+UPDATE frames SET full_text = accessibility_text || char(10) || (
+    SELECT ot.text FROM ocr_text ot WHERE ot.frame_id = frames.id LIMIT 1
+)
+WHERE full_text IS NULL
+  AND accessibility_text IS NOT NULL AND accessibility_text != ''
+  AND (frames.ocr_text IS NULL OR frames.ocr_text = '')
+  AND EXISTS (SELECT 1 FROM ocr_text ot WHERE ot.frame_id = frames.id AND ot.text != '');
+```
+
+#### Step 3: Backfill from accessibility_text (AX-only path)
+
+After hybrid frames are handled, backfill accessibility-only frames:
 
 ```sql
 UPDATE frames SET full_text = accessibility_text
-WHERE accessibility_text IS NOT NULL AND accessibility_text != '';
+WHERE full_text IS NULL
+  AND accessibility_text IS NOT NULL AND accessibility_text != '';
 ```
 
-#### Step 3: Backfill from ocr_text column (OCR-fallback path)
+#### Step 4: Backfill from ocr_text column (OCR-only path)
 
 MyRecall stores OCR text in two locations:
 - `ocr_text.text` table (with bounding boxes in `text_json`)
@@ -109,29 +136,6 @@ UPDATE frames SET full_text = (
 )
 WHERE full_text IS NULL
   AND EXISTS (SELECT 1 FROM ocr_text ot WHERE ot.frame_id = frames.id);
-```
-
-#### Step 4: Merge for hybrid frames
-
-Detect frames with BOTH text sources populated (regardless of `text_source` value):
-- If `accessibility_text` AND `ocr_text` (column or table) both exist → merge both
-- Order: accessibility_text first, then OCR text
-
-```sql
--- Merge when both frames.accessibility_text and frames.ocr_text exist
-UPDATE frames SET full_text = accessibility_text || char(10) || frames.ocr_text
-WHERE accessibility_text IS NOT NULL AND accessibility_text != ''
-  AND frames.ocr_text IS NOT NULL AND frames.ocr_text != ''
-  AND full_text IS NULL;
-
--- Merge when accessibility_text exists with ocr_text table row
-UPDATE frames SET full_text = accessibility_text || char(10) || (
-    SELECT ot.text FROM ocr_text ot WHERE ot.frame_id = frames.id LIMIT 1
-)
-WHERE accessibility_text IS NOT NULL AND accessibility_text != ''
-  AND frames.ocr_text IS NULL
-  AND EXISTS (SELECT 1 FROM ocr_text ot WHERE ot.frame_id = frames.id AND ot.text != '')
-  AND full_text IS NULL;
 ```
 
 #### Step 5: Rebuild frames_fts
@@ -208,7 +212,7 @@ DROP TABLE IF EXISTS accessibility_fts;
 | `accessibility` | Yes | Stores accessibility tree for chat context |
 | `frames.accessibility_text` | Yes | Source of truth for AX-first frames |
 | `frames.ocr_text` | Yes | Source of truth for OCR-fallback frames |
-| `frames.text_source` | Yes | Tracks which source provided canonical text |
+| `frames.text_source` | Yes | Tracks which source provided canonical text (`'accessibility'`/`'ocr'`/`'hybrid'`) |
 | `ocr_text_fts` | No | Replaced by `frames_fts` |
 | `accessibility_fts` | No | Replaced by `frames_fts` |
 
