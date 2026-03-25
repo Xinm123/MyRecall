@@ -126,23 +126,22 @@ pip install -e ".[test]"    # Include test dependencies
 - capture_trigger (idle/app_switch/manual/click)
 - accessibility_text (text from AX, if AX-first succeeded)
 - ocr_text (text from OCR fallback)
-- text_source ('accessibility'|'ocr')
+- full_text (merged text from accessibility_text + ocr_text, indexed by frames_fts)
+- text_source ('accessibility'|'ocr'|'hybrid')
 - accessibility_tree_json (full AX tree as JSON)
 - processing_status (pending/processing/completed/failed)
 - event_ts (capture event timestamp, separate from frame timestamp)
 ```
 
 **FTS5 Tables**:
-- `ocr_text_fts`: Full-text index on OCR text
-- `accessibility_fts`: Full-text index on accessibility text (includes browser_url)
-- `frames_fts`: Full-text index on metadata only (app_name, window_name, browser_url, focused)
+- `frames_fts`: Full-text index on full_text + metadata (app_name, window_name, browser_url)
 
 ## Key Architecture Decisions
 
 Key decisions embedded in this document:
 - **Edge-Centric**: Host captures/uploads, Edge processes/indexes/searches
 - **Vision + AX + OCR**: AX-first text extraction with OCR fallback; both indexed separately
-- **FTS5 Search**: Full-text search on both OCR and accessibility text via `content_type` filter
+- **FTS5 Search**: Full-text search via `frames_fts` indexing `frames.full_text` (merged accessibility + OCR text)
 
 Architecture baselines: `docs/baselines/` (chat, search)
 
