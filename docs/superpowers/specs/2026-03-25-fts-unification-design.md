@@ -70,6 +70,8 @@ CREATE VIRTUAL TABLE frames_fts USING fts5(
 - Add `full_text` column (primary searchable text)
 - Remove `focused` column (boolean, not useful for text search)
 
+**Note:** `focused` is only removed from FTS indexing, not from the `frames` table. Search results still include `frames.focused` in the response.
+
 ### 2. Data Migration
 
 Migration file: `20260325120000_consolidate_fts_to_full_text.sql`
@@ -87,9 +89,21 @@ UPDATE frames SET full_text = accessibility_text
 WHERE accessibility_text IS NOT NULL AND accessibility_text != '';
 ```
 
-#### Step 3: Backfill from ocr_text table (OCR-fallback path)
+#### Step 3: Backfill from ocr_text column (OCR-fallback path)
+
+MyRecall stores OCR text in two locations:
+- `ocr_text.text` table (with bounding boxes in `text_json`)
+- `frames.ocr_text` column (denormalized for quick access)
+
+Check both locations, preferring the column (may be more recent):
 
 ```sql
+-- First try frames.ocr_text column
+UPDATE frames SET full_text = frames.ocr_text
+WHERE full_text IS NULL
+  AND frames.ocr_text IS NOT NULL AND frames.ocr_text != '';
+
+-- Then try ocr_text table as fallback
 UPDATE frames SET full_text = (
     SELECT ot.text FROM ocr_text ot WHERE ot.frame_id = frames.id LIMIT 1
 )
@@ -99,13 +113,25 @@ WHERE full_text IS NULL
 
 #### Step 4: Merge for hybrid frames
 
+Detect frames with BOTH text sources populated (regardless of `text_source` value):
+- If `accessibility_text` AND `ocr_text` (column or table) both exist → merge both
+- Order: accessibility_text first, then OCR text
+
 ```sql
+-- Merge when both frames.accessibility_text and frames.ocr_text exist
+UPDATE frames SET full_text = accessibility_text || char(10) || frames.ocr_text
+WHERE accessibility_text IS NOT NULL AND accessibility_text != ''
+  AND frames.ocr_text IS NOT NULL AND frames.ocr_text != ''
+  AND full_text IS NULL;
+
+-- Merge when accessibility_text exists with ocr_text table row
 UPDATE frames SET full_text = accessibility_text || char(10) || (
     SELECT ot.text FROM ocr_text ot WHERE ot.frame_id = frames.id LIMIT 1
 )
-WHERE text_source = 'hybrid'
-  AND accessibility_text IS NOT NULL AND accessibility_text != ''
-  AND EXISTS (SELECT 1 FROM ocr_text ot WHERE ot.frame_id = frames.id AND ot.text != '');
+WHERE accessibility_text IS NOT NULL AND accessibility_text != ''
+  AND frames.ocr_text IS NULL
+  AND EXISTS (SELECT 1 FROM ocr_text ot WHERE ot.frame_id = frames.id AND ot.text != '')
+  AND full_text IS NULL;
 ```
 
 #### Step 5: Rebuild frames_fts
@@ -185,6 +211,8 @@ DROP TABLE IF EXISTS accessibility_fts;
 | `frames.text_source` | Yes | Tracks which source provided canonical text |
 | `ocr_text_fts` | No | Replaced by `frames_fts` |
 | `accessibility_fts` | No | Replaced by `frames_fts` |
+
+**Divergence from screenpipe:** screenpipe drops the `accessibility` table entirely after FTS consolidation. MyRecall retains it because the chat feature uses the full accessibility tree for context. The `accessibility` table continues to receive new writes during ingest.
 
 ### 4. Search Engine Changes
 
