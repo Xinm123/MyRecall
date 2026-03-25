@@ -57,7 +57,11 @@ class TestSanitizeFtsValue:
 
 @pytest.fixture
 def temp_db():
-    """Create a temporary database with test data."""
+    """Create a temporary database with migrated schema and test data.
+
+    Uses the actual migration files to ensure the schema matches production
+    after FTS unification.
+    """
     with tempfile.TemporaryDirectory() as tmpdir:
         db_path = Path(tmpdir) / "edge.db"
         frames_dir = Path(tmpdir) / "frames"
@@ -66,79 +70,33 @@ def temp_db():
         conn = sqlite3.connect(str(db_path))
         conn.row_factory = sqlite3.Row
 
-        # Create schema (simplified for tests)
-        conn.executescript("""
-            CREATE TABLE IF NOT EXISTS frames (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                capture_id TEXT NOT NULL UNIQUE,
-                timestamp TEXT NOT NULL,
-                app_name TEXT DEFAULT NULL,
-                window_name TEXT DEFAULT NULL,
-                browser_url TEXT DEFAULT NULL,
-                focused BOOLEAN DEFAULT NULL,
-                device_name TEXT NOT NULL DEFAULT 'monitor_0',
-                snapshot_path TEXT DEFAULT NULL,
-                status TEXT NOT NULL DEFAULT 'completed',
-                text_source TEXT DEFAULT NULL,
-                ingested_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
-            );
+        # Run initial schema
+        init_sql = Path(
+            "openrecall/server/database/migrations/20260227000001_initial_schema.sql"
+        ).read_text()
+        conn.executescript(init_sql)
 
-            CREATE TABLE IF NOT EXISTS ocr_text (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                frame_id INTEGER NOT NULL,
-                text TEXT NOT NULL DEFAULT '',
-                text_length INTEGER DEFAULT 0,
-                ocr_engine TEXT,
-                app_name TEXT DEFAULT NULL,
-                window_name TEXT DEFAULT NULL,
-                FOREIGN KEY (frame_id) REFERENCES frames(id) ON DELETE CASCADE
-            );
+        # Run FTS unification migration
+        migration_sql = Path(
+            "openrecall/server/database/migrations/20260325120000_consolidate_fts_to_full_text.sql"
+        ).read_text()
+        conn.executescript(migration_sql)
 
-            CREATE VIRTUAL TABLE IF NOT EXISTS frames_fts USING fts5(
-                app_name, window_name, browser_url, focused, accessibility_text,
-                id UNINDEXED, tokenize='unicode61'
-            );
-
-            CREATE VIRTUAL TABLE IF NOT EXISTS ocr_text_fts USING fts5(
-                text, app_name, window_name, frame_id UNINDEXED, tokenize='unicode61'
-            );
-
-            CREATE INDEX IF NOT EXISTS idx_frames_timestamp ON frames(timestamp);
-            CREATE INDEX IF NOT EXISTS idx_ocr_text_frame_id ON ocr_text(frame_id);
-
-            -- FTS triggers
-            CREATE TRIGGER IF NOT EXISTS frames_ai AFTER INSERT ON frames BEGIN
-                INSERT INTO frames_fts(id, app_name, window_name, browser_url, focused, accessibility_text)
-                VALUES (NEW.id, COALESCE(NEW.app_name, ''), COALESCE(NEW.window_name, ''),
-                        COALESCE(NEW.browser_url, ''), COALESCE(NEW.focused, 0), '');
-            END;
-
-            CREATE TRIGGER IF NOT EXISTS ocr_text_ai AFTER INSERT ON ocr_text
-            WHEN NEW.text IS NOT NULL AND NEW.text != '' BEGIN
-                INSERT INTO ocr_text_fts(frame_id, text, app_name, window_name)
-                VALUES (NEW.frame_id, NEW.text, COALESCE(NEW.app_name, ''), COALESCE(NEW.window_name, ''));
-            END;
-        """)
-
-        # Insert test frames with OCR
+        # Insert test frames with full_text populated (post-migration schema)
+        # These mirror the test data from the old fixture, but use full_text
         test_frames = [
-            (1, "capture-001", "2026-03-18T10:00:00Z", "Safari", "Web Browser", None, True, "Hello world from Safari"),
-            (2, "capture-002", "2026-03-18T11:00:00Z", "VSCode", "main.py", None, True, "def hello(): pass # code here"),
-            (3, "capture-003", "2026-03-18T12:00:00Z", "Terminal", "bash", None, False, "git status && git commit"),
-            (4, "capture-004", "2026-03-18T13:00:00Z", "Safari", "Google Search", None, True, "search query hello world"),
-            (5, "capture-005", "2026-03-18T14:00:00Z", "Slack", "#general", None, True, "meeting at 3pm hello team"),
+            (1, "capture-001", "2026-03-18T10:00:00Z", "Safari", "Web Browser", None, True, "Hello world from Safari", "ocr"),
+            (2, "capture-002", "2026-03-18T11:00:00Z", "VSCode", "main.py", None, True, "def hello(): pass # code here", "ocr"),
+            (3, "capture-003", "2026-03-18T12:00:00Z", "Terminal", "bash", None, False, "git status && git commit", "ocr"),
+            (4, "capture-004", "2026-03-18T13:00:00Z", "Safari", "Google Search", None, True, "search query hello world", "ocr"),
+            (5, "capture-005", "2026-03-18T14:00:00Z", "Slack", "#general", None, True, "meeting at 3pm hello team", "ocr"),
         ]
 
-        for frame_id, capture_id, ts, app, window, url, focused, ocr_text in test_frames:
+        for frame_id, capture_id, ts, app, window, url, focused, full_text, text_source in test_frames:
             conn.execute(
-                """INSERT INTO frames (id, capture_id, timestamp, app_name, window_name, browser_url, focused, status, text_source)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, 'completed', 'ocr')""",
-                (frame_id, capture_id, ts, app, window, url, focused),
-            )
-            conn.execute(
-                """INSERT INTO ocr_text (frame_id, text, text_length, ocr_engine)
-                   VALUES (?, ?, ?, 'test')""",
-                (frame_id, ocr_text, len(ocr_text)),
+                """INSERT INTO frames (id, capture_id, timestamp, app_name, window_name, browser_url, focused, status, text_source, full_text)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, 'completed', ?, ?)""",
+                (frame_id, capture_id, ts, app, window, url, focused, text_source, full_text),
             )
 
         conn.commit()
@@ -404,3 +362,80 @@ class TestSearchEngineCount:
 
         total = engine.count(q="", app_name="Safari")
         assert total == 2
+
+
+class TestUnifiedFtsSearch:
+    """Tests for unified FTS search using frames.full_text."""
+
+    @pytest.fixture
+    def unified_db(self, tmp_path):
+        """Create a database with migrated schema and test data."""
+        db_path = tmp_path / "unified.db"
+        conn = sqlite3.connect(str(db_path))
+
+        # Run initial schema
+        init_sql = Path(
+            "openrecall/server/database/migrations/20260227000001_initial_schema.sql"
+        ).read_text()
+        conn.executescript(init_sql)
+
+        # Run FTS unification migration
+        migration_sql = Path(
+            "openrecall/server/database/migrations/20260325120000_consolidate_fts_to_full_text.sql"
+        ).read_text()
+        conn.executescript(migration_sql)
+
+        # Insert test frames with full_text
+        conn.execute(
+            """
+            INSERT INTO frames (capture_id, timestamp, full_text, app_name, window_name, status, text_source)
+            VALUES ('ax-1', '2026-03-25T10:00:00Z', 'Email from alice@example.com about project', 'Mail', 'Inbox', 'completed', 'accessibility')
+            """
+        )
+        conn.execute(
+            """
+            INSERT INTO frames (capture_id, timestamp, full_text, app_name, window_name, status, text_source)
+            VALUES ('ocr-1', '2026-03-25T11:00:00Z', 'Meeting notes from yesterday standup', 'Notes', 'Meeting', 'completed', 'ocr')
+            """
+        )
+        conn.commit()
+        conn.close()
+
+        return db_path
+
+    def test_search_finds_text_in_full_text(self, unified_db):
+        """Verify search finds text in full_text column."""
+        from openrecall.server.search.engine import SearchEngine
+
+        engine = SearchEngine(db_path=unified_db)
+        results, total = engine.search(q="alice")
+
+        assert total >= 1
+        assert any("alice" in r.get("text", "").lower() for r in results)
+
+    def test_search_with_metadata_filter(self, unified_db):
+        """Verify search with app_name filter works."""
+        from openrecall.server.search.engine import SearchEngine
+
+        engine = SearchEngine(db_path=unified_db)
+        results, total = engine.search(q="project", app_name="Mail")
+
+        assert total >= 1
+        for r in results:
+            assert r.get("app_name") == "Mail"
+
+    def test_content_type_param_ignored(self, unified_db):
+        """Verify content_type parameter is accepted but ignored."""
+        from openrecall.server.search.engine import SearchEngine
+
+        engine = SearchEngine(db_path=unified_db)
+
+        # All these should return the same results
+        results_ocr, _ = engine.search(q="project", content_type="ocr")
+        results_ax, _ = engine.search(q="project", content_type="accessibility")
+        results_all, _ = engine.search(q="project", content_type="all")
+
+        # All should find the email frame
+        assert len(results_ocr) >= 1
+        assert len(results_ax) >= 1
+        assert len(results_all) >= 1

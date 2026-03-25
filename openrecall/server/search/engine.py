@@ -1,13 +1,9 @@
-"""FTS5-only Search Engine for P1-S4.
+"""Unified FTS5 Search Engine for P1-S4.
 
-This module replaces the v2 hybrid search with a pure FTS5 implementation:
-- Dynamic SQL builder with conditional JOINs
-- BM25 ranking when query present
-- Metadata filtering via frames_fts
-- Time range and text length filtering
-- Pagination with COUNT
+After FTS unification, there is a single `frames_fts` table with `full_text` column.
+This module provides a single query path that queries `frames` JOIN `frames_fts`.
 
-Per data-model.md §3.0.3 and specs/fts-search/spec.md.
+Per spec: docs/superpowers/specs/2026-03-25-fts-unification-design.md
 """
 
 import logging
@@ -58,7 +54,7 @@ class SearchParams:
     min_length: Optional[int] = None
     max_length: Optional[int] = None
     browser_url: Optional[str] = None
-    content_type: str = "all"  # "ocr", "accessibility", or "all"
+    content_type: str = "all"  # Deprecated, accepted but ignored
 
 
 @dataclass
@@ -79,14 +75,14 @@ class SearchResult:
 
 
 class SearchEngine:
-    """FTS5-only search engine for OCR text with metadata filtering.
+    """Unified FTS5 search engine using frames_fts with full_text.
 
-    Per data-model.md §3.0.3 JOIN strategy:
-    - frames INNER JOIN ocr_text (always)
-    - frames_fts JOIN (when metadata filters present)
-    - ocr_text_fts JOIN (when q non-empty)
+    After FTS unification:
+    - Single `frames_fts` table indexes `frames.full_text` + metadata
+    - Single query path: `frames INNER JOIN frames_fts`
+    - content_type parameter accepted but ignored (deprecated)
 
-    Uses GROUP BY frames.id to prevent JOIN explosion.
+    Per spec: docs/superpowers/specs/2026-03-25-fts-unification-design.md
     """
 
     # Pagination limits
@@ -120,7 +116,9 @@ class SearchEngine:
     def _build_query(
         self, params: SearchParams, is_count: bool = False
     ) -> tuple[str, list[Any]]:
-        """Build the SQL query with dynamic JOINs.
+        """Build unified SQL query against frames JOIN frames_fts.
+
+        Uses `frames.full_text` for text search, indexed via `frames_fts`.
 
         Args:
             params: Search parameters
@@ -129,78 +127,57 @@ class SearchEngine:
         Returns:
             Tuple of (SQL string, parameters list)
         """
-        # Determine which JOINs are needed
         has_text_query = bool(params.q and params.q.strip())
-        has_metadata_filters = bool(
-            params.app_name or params.window_name or params.focused is not None
-        )
 
-        # Base tables
         if is_count:
             select_clause = "SELECT COUNT(DISTINCT frames.id) AS total"
         else:
             select_clause = """
                 SELECT frames.id AS frame_id,
                        frames.timestamp,
-                       ocr_text.text,
+                       frames.full_text,
                        frames.app_name,
                        frames.window_name,
                        frames.browser_url,
                        frames.focused,
                        frames.device_name,
                        frames.text_source"""
-            # Include FTS rank when text query present
             if has_text_query:
-                select_clause += (
-                    ",\n                       ocr_text_fts.rank AS fts_rank"
-                )
+                select_clause += ",\n                       frames_fts.rank AS fts_rank"
             else:
                 select_clause += ",\n                       NULL AS fts_rank"
 
-        # Always join frames with ocr_text
-        from_clause = "FROM frames INNER JOIN ocr_text ON frames.id = ocr_text.frame_id"
-
-        # Conditional JOINs
-        join_clauses = []
-        where_clauses = ["frames.status = 'completed'"]
+        from_clause = "FROM frames"
+        join_clauses = ["INNER JOIN frames_fts ON frames.id = frames_fts.id"]
+        where_clauses = ["frames.status = 'completed'", "frames.full_text IS NOT NULL"]
         params_list: list[Any] = []
 
-        # JOIN frames_fts when metadata filters present
-        if has_metadata_filters:
-            join_clauses.append("INNER JOIN frames_fts ON frames.id = frames_fts.id")
-
-        # JOIN ocr_text_fts when text query present
-        if has_text_query:
-            join_clauses.append(
-                "INNER JOIN ocr_text_fts ON ocr_text.frame_id = ocr_text_fts.frame_id"
-            )
-
-        # Build FTS MATCH clauses
-        fts_match_parts = []
-
+        # FTS MATCH on frames_fts
         if has_text_query:
             sanitized_q = sanitize_fts5_query(params.q)
-            fts_match_parts.append(f"ocr_text_fts MATCH ?")
+            where_clauses.append("frames_fts MATCH ?")
             params_list.append(sanitized_q)
 
-        if has_metadata_filters:
-            frames_fts_parts = []
-            if params.app_name:
-                safe_app = _sanitize_fts_value(params.app_name)
-                frames_fts_parts.append(f'app_name:"{safe_app}"')
-            if params.window_name:
-                safe_window = _sanitize_fts_value(params.window_name)
-                frames_fts_parts.append(f'window_name:"{safe_window}"')
-            if params.focused is not None:
-                focused_val = 1 if params.focused else 0
-                frames_fts_parts.append(f"focused:{focused_val}")
+        # Metadata filters (app_name, window_name, browser_url via frames_fts)
+        metadata_parts = []
+        if params.app_name:
+            safe_app = _sanitize_fts_value(params.app_name)
+            metadata_parts.append(f'app_name:"{safe_app}"')
+        if params.window_name:
+            safe_window = _sanitize_fts_value(params.window_name)
+            metadata_parts.append(f'window_name:"{safe_window}"')
+        if params.browser_url:
+            safe_url = _sanitize_fts_value(params.browser_url)
+            metadata_parts.append(f'browser_url:"{safe_url}"')
 
-            if frames_fts_parts:
-                fts_match_parts.append(f"frames_fts MATCH ?")
-                params_list.append(" ".join(frames_fts_parts))
+        if metadata_parts:
+            where_clauses.append("frames_fts MATCH ?")
+            params_list.append(" ".join(metadata_parts))
 
-        if fts_match_parts:
-            where_clauses.append(f"({' AND '.join(fts_match_parts)})")
+        # focused filter (not in frames_fts, filter directly on frames)
+        if params.focused is not None:
+            where_clauses.append("frames.focused = ?")
+            params_list.append(1 if params.focused else 0)
 
         # Time range filtering
         if params.start_time:
@@ -210,12 +187,12 @@ class SearchEngine:
             where_clauses.append("frames.timestamp <= ?")
             params_list.append(params.end_time)
 
-        # Text length filtering
+        # Text length filtering (on full_text)
         if params.min_length is not None:
-            where_clauses.append("ocr_text.text_length >= ?")
+            where_clauses.append("LENGTH(frames.full_text) >= ?")
             params_list.append(params.min_length)
         if params.max_length is not None:
-            where_clauses.append("ocr_text.text_length <= ?")
+            where_clauses.append("LENGTH(frames.full_text) <= ?")
             params_list.append(params.max_length)
 
         # Build the full query
@@ -224,18 +201,13 @@ class SearchEngine:
         sql_parts.append("WHERE " + " AND ".join(where_clauses))
 
         if not is_count:
-            # GROUP BY to prevent JOIN explosion
             sql_parts.append("GROUP BY frames.id")
 
-            # ORDER BY
             if has_text_query:
-                # BM25 rank when query present
-                sql_parts.append("ORDER BY ocr_text_fts.rank, frames.timestamp DESC")
+                sql_parts.append("ORDER BY frames_fts.rank, frames.timestamp DESC")
             else:
-                # Timestamp DESC when browsing
                 sql_parts.append("ORDER BY frames.timestamp DESC")
 
-            # Pagination
             limit = min(max(1, params.limit), self.MAX_LIMIT)
             offset = max(0, params.offset)
             sql_parts.append(f"LIMIT {limit} OFFSET {offset}")
@@ -258,7 +230,10 @@ class SearchEngine:
         browser_url: Optional[str] = None,
         content_type: str = "all",
     ) -> tuple[list[dict[str, Any]], int]:
-        """Execute FTS5 search with metadata filtering.
+        """Execute unified FTS5 search.
+
+        After FTS unification, content_type is accepted but ignored.
+        All frames with full_text are searched via the single frames_fts table.
 
         Args:
             q: Text query (sanitized via sanitize_fts5_query)
@@ -269,82 +244,28 @@ class SearchEngine:
             app_name: Filter by app name (exact match via FTS)
             window_name: Filter by window name (exact match via FTS)
             focused: Filter by focused state
-            min_length: Minimum OCR text length
-            max_length: Maximum OCR text length
+            min_length: Minimum full_text length
+            max_length: Maximum full_text length
             browser_url: Filter by browser URL
-            content_type: "ocr", "accessibility", or "all" (default: "all")
+            content_type: Deprecated, accepted but ignored
 
         Returns:
             Tuple of (results list, total count)
         """
-        # Normalize content_type
+        # Normalize content_type (deprecated, ignored)
         content_type = content_type.strip().lower() if content_type else "all"
         if content_type not in ("ocr", "accessibility", "all"):
             content_type = "all"
 
-        if content_type == "ocr":
-            return self._search_ocr(
-                q=q,
-                limit=limit,
-                offset=offset,
-                start_time=start_time,
-                end_time=end_time,
-                app_name=app_name,
-                window_name=window_name,
-                focused=focused,
-                min_length=min_length,
-                max_length=max_length,
-                browser_url=browser_url,
-            )
-        elif content_type == "accessibility":
-            return self._search_accessibility(
-                q=q,
-                limit=limit,
-                offset=offset,
-                start_time=start_time,
-                end_time=end_time,
-                app_name=app_name,
-                window_name=window_name,
-                focused=focused,
-                min_length=min_length,
-                max_length=max_length,
-                browser_url=browser_url,
-            )
-        else:
-            return self._search_all(
-                q=q,
-                limit=limit,
-                offset=offset,
-                start_time=start_time,
-                end_time=end_time,
-                app_name=app_name,
-                window_name=window_name,
-                focused=focused,
-                min_length=min_length,
-                max_length=max_length,
-                browser_url=browser_url,
+        # Log deprecation warning for non-default content_type
+        if content_type != "all":
+            logger.warning(
+                "content_type parameter is deprecated and ignored. "
+                "All content is now searched via unified frames_fts. q='%s'",
+                q[:50] if q else "",
             )
 
-    def _search_ocr(
-        self,
-        q: str = "",
-        limit: int = DEFAULT_LIMIT,
-        offset: int = 0,
-        start_time: Optional[str] = None,
-        end_time: Optional[str] = None,
-        app_name: Optional[str] = None,
-        window_name: Optional[str] = None,
-        focused: Optional[bool] = None,
-        min_length: Optional[int] = None,
-        max_length: Optional[int] = None,
-        browser_url: Optional[str] = None,
-    ) -> tuple[list[dict[str, Any]], int]:
-        """Search OCR-canonical frames (text_source='ocr').
-
-        Uses ocr_text_fts for text search and frames_fts for metadata filtering.
-        """
         start_ts = time.perf_counter()
-
         params = SearchParams(
             q=q,
             limit=limit,
@@ -357,7 +278,7 @@ class SearchEngine:
             min_length=min_length,
             max_length=max_length,
             browser_url=browser_url,
-            content_type="ocr",
+            content_type=content_type,
         )
 
         results = []
@@ -366,7 +287,7 @@ class SearchEngine:
         try:
             with self._connect() as conn:
                 # Execute search query
-                sql, sql_params = self._build_ocr_query(params, is_count=False)
+                sql, sql_params = self._build_query(params, is_count=False)
                 rows = conn.execute(sql, sql_params).fetchall()
 
                 for row in rows:
@@ -376,8 +297,8 @@ class SearchEngine:
                     result = {
                         "frame_id": frame_id,
                         "timestamp": ts,
-                        "text": row["text"] or "",
-                        "text_source": "ocr",
+                        "text": row["full_text"] or "",
+                        "text_source": row["text_source"],
                         "app_name": row["app_name"],
                         "window_name": row["window_name"],
                         "browser_url": row["browser_url"],
@@ -395,30 +316,28 @@ class SearchEngine:
                     results.append(result)
 
                 # Execute count query
-                count_sql, count_params = self._build_ocr_query(params, is_count=True)
+                count_sql, count_params = self._build_query(params, is_count=True)
                 count_start = time.perf_counter()
                 count_row = conn.execute(count_sql, count_params).fetchone()
                 count_elapsed_ms = (time.perf_counter() - count_start) * 1000.0
 
                 total = count_row["total"] if count_row else 0
 
-                # Log COUNT latency warning if exceeds threshold
                 if count_elapsed_ms > self.COUNT_WARNING_THRESHOLD_MS:
                     logger.warning(
-                        "MRV3 count_latency_warning count_ms=%.1f q='%s' content_type=ocr",
+                        "MRV3 count_latency_warning count_ms=%.1f q='%s'",
                         count_elapsed_ms,
                         q[:50] if q else "",
                     )
 
         except sqlite3.Error as e:
-            logger.error("OCR search failed: %s", e)
+            logger.error("Unified search failed: %s", e)
             return [], 0
 
-        # Log latency
         elapsed_ms = (time.perf_counter() - start_ts) * 1000.0
         query_type = "standard" if q else "browse"
         logger.info(
-            "MRV3 search_latency_ms=%.1f query_type=%s q_present=%s limit=%d offset=%d total=%d content_type=ocr",
+            "MRV3 search_latency_ms=%.1f query_type=%s q_present=%s limit=%d offset=%d total=%d",
             elapsed_ms,
             query_type,
             bool(q),
@@ -428,427 +347,6 @@ class SearchEngine:
         )
 
         return results, total
-
-    def _build_ocr_query(
-        self, params: SearchParams, is_count: bool = False
-    ) -> tuple[str, list[Any]]:
-        """Build SQL query for OCR-canonical frames.
-
-        Filters: frames.text_source='ocr'
-        FTS: ocr_text_fts for text, frames_fts for metadata + browser_url
-        """
-        has_text_query = bool(params.q and params.q.strip())
-        has_metadata_filters = bool(
-            params.app_name or params.window_name or params.focused is not None or params.browser_url
-        )
-
-        if is_count:
-            select_clause = "SELECT COUNT(DISTINCT frames.id) AS total"
-        else:
-            select_clause = """
-                SELECT frames.id AS frame_id,
-                       frames.timestamp,
-                       ocr_text.text,
-                       frames.app_name,
-                       frames.window_name,
-                       frames.browser_url,
-                       frames.focused,
-                       frames.device_name,
-                       frames.text_source"""
-            if has_text_query:
-                select_clause += ",\n                       ocr_text_fts.rank AS fts_rank"
-            else:
-                select_clause += ",\n                       NULL AS fts_rank"
-
-        from_clause = "FROM frames INNER JOIN ocr_text ON frames.id = ocr_text.frame_id"
-
-        join_clauses = []
-        where_clauses = ["frames.status = 'completed'", "frames.text_source = 'ocr'"]
-        params_list: list[Any] = []
-
-        if has_metadata_filters:
-            join_clauses.append("INNER JOIN frames_fts ON frames.id = frames_fts.id")
-
-        if has_text_query:
-            join_clauses.append(
-                "INNER JOIN ocr_text_fts ON ocr_text.frame_id = ocr_text_fts.frame_id"
-            )
-
-        # Build FTS MATCH clauses
-        fts_match_parts = []
-
-        if has_text_query:
-            sanitized_q = sanitize_fts5_query(params.q)
-            fts_match_parts.append("ocr_text_fts MATCH ?")
-            params_list.append(sanitized_q)
-
-        if has_metadata_filters:
-            frames_fts_parts = []
-            if params.app_name:
-                safe_app = _sanitize_fts_value(params.app_name)
-                frames_fts_parts.append(f'app_name:"{safe_app}"')
-            if params.window_name:
-                safe_window = _sanitize_fts_value(params.window_name)
-                frames_fts_parts.append(f'window_name:"{safe_window}"')
-            if params.focused is not None:
-                focused_val = 1 if params.focused else 0
-                frames_fts_parts.append(f"focused:{focused_val}")
-            if params.browser_url:
-                safe_url = _sanitize_fts_value(params.browser_url)
-                frames_fts_parts.append(f'browser_url:"{safe_url}"')
-
-            if frames_fts_parts:
-                fts_match_parts.append("frames_fts MATCH ?")
-                params_list.append(" ".join(frames_fts_parts))
-
-        if fts_match_parts:
-            where_clauses.append(f"({' AND '.join(fts_match_parts)})")
-
-        # Time range filtering
-        if params.start_time:
-            where_clauses.append("frames.timestamp >= ?")
-            params_list.append(params.start_time)
-        if params.end_time:
-            where_clauses.append("frames.timestamp <= ?")
-            params_list.append(params.end_time)
-
-        # Text length filtering
-        if params.min_length is not None:
-            where_clauses.append("ocr_text.text_length >= ?")
-            params_list.append(params.min_length)
-        if params.max_length is not None:
-            where_clauses.append("ocr_text.text_length <= ?")
-            params_list.append(params.max_length)
-
-        # Build the full query
-        sql_parts = [select_clause, from_clause]
-        sql_parts.extend(join_clauses)
-        sql_parts.append("WHERE " + " AND ".join(where_clauses))
-
-        if not is_count:
-            sql_parts.append("GROUP BY frames.id")
-
-            if has_text_query:
-                sql_parts.append("ORDER BY ocr_text_fts.rank, frames.timestamp DESC")
-            else:
-                sql_parts.append("ORDER BY frames.timestamp DESC")
-
-            limit = min(max(1, params.limit), self.MAX_LIMIT)
-            offset = max(0, params.offset)
-            sql_parts.append(f"LIMIT {limit} OFFSET {offset}")
-
-        sql = "\n".join(sql_parts)
-        return sql, params_list
-
-    def _search_accessibility(
-        self,
-        q: str = "",
-        limit: int = DEFAULT_LIMIT,
-        offset: int = 0,
-        start_time: Optional[str] = None,
-        end_time: Optional[str] = None,
-        app_name: Optional[str] = None,
-        window_name: Optional[str] = None,
-        focused: Optional[bool] = None,
-        min_length: Optional[int] = None,
-        max_length: Optional[int] = None,
-        browser_url: Optional[str] = None,
-    ) -> tuple[list[dict[str, Any]], int]:
-        """Search accessibility-canonical frames (text_source='accessibility').
-
-        Uses accessibility_fts for text and metadata search.
-        """
-        start_ts = time.perf_counter()
-
-        params = SearchParams(
-            q=q,
-            limit=limit,
-            offset=offset,
-            start_time=start_time,
-            end_time=end_time,
-            app_name=app_name,
-            window_name=window_name,
-            focused=focused,
-            min_length=min_length,
-            max_length=max_length,
-            browser_url=browser_url,
-            content_type="accessibility",
-        )
-
-        results = []
-        total = 0
-
-        try:
-            with self._connect() as conn:
-                # Execute search query
-                sql, sql_params = self._build_accessibility_query(params, is_count=False)
-                rows = conn.execute(sql, sql_params).fetchall()
-
-                for row in rows:
-                    frame_id = row["frame_id"]
-                    ts = row["timestamp"]
-
-                    result = {
-                        "frame_id": frame_id,
-                        "timestamp": ts,
-                        "text": row["text_content"] or "",
-                        "text_source": "accessibility",
-                        "app_name": row["app_name"],
-                        "window_name": row["window_name"],
-                        "browser_url": row["browser_url"],
-                        "focused": bool(row["focused"])
-                        if row["focused"] is not None
-                        else None,
-                        "device_name": row["device_name"] or "monitor_0",
-                        "file_path": f"{ts}.jpg",
-                        "frame_url": f"/v1/frames/{frame_id}",
-                        "tags": [],  # Reserved, always empty in P1
-                        "fts_rank": float(row["fts_rank"])
-                        if row["fts_rank"] is not None
-                        else None,
-                    }
-                    results.append(result)
-
-                # Execute count query
-                count_sql, count_params = self._build_accessibility_query(params, is_count=True)
-                count_start = time.perf_counter()
-                count_row = conn.execute(count_sql, count_params).fetchone()
-                count_elapsed_ms = (time.perf_counter() - count_start) * 1000.0
-
-                total = count_row["total"] if count_row else 0
-
-                if count_elapsed_ms > self.COUNT_WARNING_THRESHOLD_MS:
-                    logger.warning(
-                        "MRV3 count_latency_warning count_ms=%.1f q='%s' content_type=accessibility",
-                        count_elapsed_ms,
-                        q[:50] if q else "",
-                    )
-
-        except sqlite3.Error as e:
-            logger.error("Accessibility search failed: %s", e)
-            return [], 0
-
-        # Log latency
-        elapsed_ms = (time.perf_counter() - start_ts) * 1000.0
-        query_type = "standard" if q else "browse"
-        logger.info(
-            "MRV3 search_latency_ms=%.1f query_type=%s q_present=%s limit=%d offset=%d total=%d content_type=accessibility",
-            elapsed_ms,
-            query_type,
-            bool(q),
-            params.limit,
-            params.offset,
-            total,
-        )
-
-        return results, total
-
-    def _build_accessibility_query(
-        self, params: SearchParams, is_count: bool = False
-    ) -> tuple[str, list[Any]]:
-        """Build SQL query for accessibility-canonical frames.
-
-        Filters: frames.text_source='accessibility'
-        FTS: accessibility_fts for text_content, app_name, window_name, browser_url
-        """
-        has_text_query = bool(params.q and params.q.strip())
-        has_filters = bool(
-            params.app_name or params.window_name or params.browser_url or params.focused is not None
-        )
-
-        if is_count:
-            select_clause = "SELECT COUNT(DISTINCT frames.id) AS total"
-        else:
-            select_clause = """
-                SELECT frames.id AS frame_id,
-                       frames.timestamp,
-                       accessibility.text_content,
-                       accessibility.app_name,
-                       accessibility.window_name,
-                       accessibility.browser_url,
-                       frames.focused,
-                       frames.device_name,
-                       frames.text_source"""
-            # Only return fts_rank when there's an actual text query for relevance scoring
-            # Metadata-only filtering doesn't produce meaningful BM25 ranks
-            if has_text_query:
-                select_clause += ",\n                       accessibility_fts.rank AS fts_rank"
-            else:
-                select_clause += ",\n                       NULL AS fts_rank"
-
-        from_clause = """FROM frames
-            INNER JOIN accessibility ON frames.id = accessibility.frame_id"""
-
-        join_clauses = []
-        where_clauses = ["frames.status = 'completed'", "frames.text_source = 'accessibility'"]
-        params_list: list[Any] = []
-
-        # Always join accessibility_fts when we have filters or text query
-        if has_text_query or has_filters:
-            join_clauses.append(
-                "INNER JOIN accessibility_fts ON accessibility.id = accessibility_fts.rowid"
-            )
-
-        # Build FTS MATCH clause
-        if has_text_query or has_filters:
-            fts_parts = []
-
-            if has_text_query:
-                sanitized_q = sanitize_fts5_query(params.q)
-                fts_parts.append(sanitized_q)
-
-            if params.app_name:
-                safe_app = _sanitize_fts_value(params.app_name)
-                fts_parts.append(f'app_name:"{safe_app}"')
-            if params.window_name:
-                safe_window = _sanitize_fts_value(params.window_name)
-                fts_parts.append(f'window_name:"{safe_window}"')
-            if params.browser_url:
-                safe_url = _sanitize_fts_value(params.browser_url)
-                fts_parts.append(f'browser_url:"{safe_url}"')
-
-            if fts_parts:
-                where_clauses.append(f"accessibility_fts MATCH ?")
-                params_list.append(" ".join(fts_parts))
-
-        # focused filter (not in accessibility_fts, filter directly)
-        if params.focused is not None:
-            where_clauses.append("frames.focused = ?")
-            params_list.append(1 if params.focused else 0)
-
-        # Time range filtering
-        if params.start_time:
-            where_clauses.append("frames.timestamp >= ?")
-            params_list.append(params.start_time)
-        if params.end_time:
-            where_clauses.append("frames.timestamp <= ?")
-            params_list.append(params.end_time)
-
-        # Text length filtering
-        if params.min_length is not None:
-            where_clauses.append("accessibility.text_length >= ?")
-            params_list.append(params.min_length)
-        if params.max_length is not None:
-            where_clauses.append("accessibility.text_length <= ?")
-            params_list.append(params.max_length)
-
-        # Build the full query
-        sql_parts = [select_clause, from_clause]
-        sql_parts.extend(join_clauses)
-        sql_parts.append("WHERE " + " AND ".join(where_clauses))
-
-        if not is_count:
-            sql_parts.append("GROUP BY frames.id")
-
-            # Only order by FTS rank when there's an actual text query
-            # Metadata-only filtering doesn't produce meaningful BM25 ranks
-            if has_text_query:
-                sql_parts.append("ORDER BY accessibility_fts.rank, frames.timestamp DESC")
-            else:
-                sql_parts.append("ORDER BY frames.timestamp DESC")
-
-            limit = min(max(1, params.limit), self.MAX_LIMIT)
-            offset = max(0, params.offset)
-            sql_parts.append(f"LIMIT {limit} OFFSET {offset}")
-
-        sql = "\n".join(sql_parts)
-        return sql, params_list
-
-    def _search_all(
-        self,
-        q: str = "",
-        limit: int = DEFAULT_LIMIT,
-        offset: int = 0,
-        start_time: Optional[str] = None,
-        end_time: Optional[str] = None,
-        app_name: Optional[str] = None,
-        window_name: Optional[str] = None,
-        focused: Optional[bool] = None,
-        min_length: Optional[int] = None,
-        max_length: Optional[int] = None,
-        browser_url: Optional[str] = None,
-    ) -> tuple[list[dict[str, Any]], int]:
-        """Search both OCR and accessibility frames, merge results.
-
-        Per mvp.md:
-        - Fetch limit + offset candidates from each sub-search with offset=0
-        - Merge results
-        - Deduplicate by frame_id
-        - Sort globally by timestamp DESC
-        - Apply pagination after merge
-        - Total count is sum of counts from both sources (since no overlap)
-        """
-        start_ts = time.perf_counter()
-
-        # Clamp limit like other search methods
-        limit = min(max(1, limit), self.MAX_LIMIT)
-        offset = max(0, offset)
-
-        # Fetch enough rows from each source for the global window
-        fetch_limit = limit + offset
-
-        # Fetch from both sources with offset=0, getting counts too
-        ocr_results, ocr_total = self._search_ocr(
-            q=q,
-            limit=fetch_limit,
-            offset=0,
-            start_time=start_time,
-            end_time=end_time,
-            app_name=app_name,
-            window_name=window_name,
-            focused=focused,
-            min_length=min_length,
-            max_length=max_length,
-            browser_url=browser_url,
-        )
-
-        ax_results, ax_total = self._search_accessibility(
-            q=q,
-            limit=fetch_limit,
-            offset=0,
-            start_time=start_time,
-            end_time=end_time,
-            app_name=app_name,
-            window_name=window_name,
-            focused=focused,
-            min_length=min_length,
-            max_length=max_length,
-            browser_url=browser_url,
-        )
-
-        # Merge and deduplicate by frame_id
-        merged = []
-        seen_ids = set()
-        for r in ocr_results + ax_results:
-            fid = r.get("frame_id")
-            if fid not in seen_ids:
-                seen_ids.add(fid)
-                merged.append(r)
-
-        # Sort globally by timestamp DESC
-        merged.sort(key=lambda x: x.get("timestamp", ""), reverse=True)
-
-        # Apply pagination after merge
-        paginated = merged[offset:offset + limit]
-
-        # Total is the sum of counts from both sources
-        # (OCR and accessibility frames are mutually exclusive per text_source)
-        total = ocr_total + ax_total
-
-        # Log latency
-        elapsed_ms = (time.perf_counter() - start_ts) * 1000.0
-        query_type = "standard" if q else "browse"
-        logger.info(
-            "MRV3 search_latency_ms=%.1f query_type=%s q_present=%s limit=%d offset=%d total=%d content_type=all",
-            elapsed_ms,
-            query_type,
-            bool(q),
-            limit,
-            offset,
-            total,
-        )
-
-        return paginated, total
 
     def count(
         self,
@@ -901,7 +399,10 @@ class SearchEngine:
         max_length: Optional[int] = None,
         browser_url: Optional[str] = None,
     ) -> dict[str, int]:
-        """Count matching frames by content type without returning results.
+        """Count matching frames by text_source.
+
+        After FTS unification, content_type is not filterable via FTS.
+        This method groups results by frames.text_source for API compatibility.
 
         Args:
             Same as search() except limit/offset/content_type
@@ -923,17 +424,72 @@ class SearchEngine:
 
         try:
             with self._connect() as conn:
-                # Get OCR count
-                ocr_sql, ocr_params = self._build_ocr_query(params, is_count=True)
-                ocr_row = conn.execute(ocr_sql, ocr_params).fetchone()
-                ocr_count = ocr_row["total"] if ocr_row else 0
+                has_text_query = bool(params.q and params.q.strip())
 
-                # Get accessibility count
-                ax_sql, ax_params = self._build_accessibility_query(params, is_count=True)
-                ax_row = conn.execute(ax_sql, ax_params).fetchone()
-                ax_count = ax_row["total"] if ax_row else 0
+                # Build WHERE clause parts for reuse
+                where_parts = ["frames.status = 'completed'", "frames.full_text IS NOT NULL"]
+                query_params: list[Any] = []
 
-                return {"ocr": ocr_count, "accessibility": ax_count}
+                if has_text_query:
+                    sanitized_q = sanitize_fts5_query(params.q)
+                    where_parts.append("frames_fts MATCH ?")
+                    query_params.append(sanitized_q)
+
+                metadata_parts = []
+                if params.app_name:
+                    safe_app = _sanitize_fts_value(params.app_name)
+                    metadata_parts.append(f'app_name:"{safe_app}"')
+                if params.window_name:
+                    safe_window = _sanitize_fts_value(params.window_name)
+                    metadata_parts.append(f'window_name:"{safe_window}"')
+                if params.browser_url:
+                    safe_url = _sanitize_fts_value(params.browser_url)
+                    metadata_parts.append(f'browser_url:"{safe_url}"')
+
+                if metadata_parts:
+                    where_parts.append("frames_fts MATCH ?")
+                    query_params.append(" ".join(metadata_parts))
+
+                if params.focused is not None:
+                    where_parts.append("frames.focused = ?")
+                    query_params.append(1 if params.focused else 0)
+
+                if params.start_time:
+                    where_parts.append("frames.timestamp >= ?")
+                    query_params.append(params.start_time)
+                if params.end_time:
+                    where_parts.append("frames.timestamp <= ?")
+                    query_params.append(params.end_time)
+
+                if params.min_length is not None:
+                    where_parts.append("LENGTH(frames.full_text) >= ?")
+                    query_params.append(params.min_length)
+                if params.max_length is not None:
+                    where_parts.append("LENGTH(frames.full_text) <= ?")
+                    query_params.append(params.max_length)
+
+                where_clause = " AND ".join(where_parts)
+
+                # Count by text_source
+                sql = f"""
+                    SELECT frames.text_source, COUNT(DISTINCT frames.id) AS cnt
+                    FROM frames
+                    INNER JOIN frames_fts ON frames.id = frames_fts.id
+                    WHERE {where_clause}
+                    GROUP BY frames.text_source
+                """
+                rows = conn.execute(sql, query_params).fetchall()
+
+                result = {"ocr": 0, "accessibility": 0}
+                for row in rows:
+                    source = row["text_source"] or "ocr"
+                    if source in result:
+                        result[source] = row["cnt"]
+                    else:
+                        # Handle 'hybrid' or other text_source values
+                        pass
+
+                return result
         except sqlite3.Error as e:
             logger.error("Count by type failed: %s", e)
             return {"ocr": 0, "accessibility": 0}
