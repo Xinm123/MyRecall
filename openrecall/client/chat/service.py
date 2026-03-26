@@ -150,10 +150,11 @@ class ChatService:
 
     def get_pi_status(self) -> PiStatus:
         """Get Pi process status."""
-        if self._pi_manager and self._pi_manager.is_running():
+        mgr = self._get_or_create_pi_manager()
+        if mgr.is_running():
             return PiStatus(
                 running=True,
-                pid=self._pi_manager.process.pid if self._pi_manager.process else None,
+                pid=mgr.process.pid if mgr.process else None,
                 session_id="chat",
             )
         return PiStatus(running=False)
@@ -193,7 +194,7 @@ class ChatService:
                 conv = self.create_conversation()
 
             # Ensure Pi is running (with auto-restart on failure)
-            self._ensure_pi_with_retry()
+            pi_mgr = self._ensure_pi_with_retry()
 
             # Save user message
             add_message(conv, role="user", content=message, tool_calls=None)
@@ -213,7 +214,7 @@ class ChatService:
 
         try:
             # Send prompt to Pi
-            self._pi_manager.send_prompt(message, images)
+            pi_mgr.send_prompt(message, images)
 
             # Accumulate assistant response
             assistant_content = ""
@@ -281,19 +282,21 @@ class ChatService:
             # Clean up event queue
             self._event_queues.pop(queue_id, None)
 
-    def _ensure_pi_with_retry(self) -> None:
+    def _ensure_pi_with_retry(self) -> PiRpcManager:
         """Start Pi with exponential backoff retry on failure."""
         import time
 
         for attempt in range(self._MAX_RETRIES):
             try:
                 self.ensure_pi_running()
-                return
+                return self._pi_manager  # type: ignore[return-value]
             except Exception as e:
                 if attempt == self._MAX_RETRIES - 1:
                     raise RuntimeError(f"Pi failed to start after {self._MAX_RETRIES} attempts: {e}")
                 backoff = self._INITIAL_BACKOFF * (2 ** attempt)
                 time.sleep(backoff)
+        # satisfy type checker — unreachable
+        return self._pi_manager  # type: ignore[return-value]
 
     def shutdown(self) -> None:
         """Shutdown the service and clean up resources."""
