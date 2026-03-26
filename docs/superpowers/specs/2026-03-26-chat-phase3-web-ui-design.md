@@ -317,13 +317,12 @@ window.addEventListener('beforeunload', () => reader.cancel());
       expanded: false          // UI state for collapse
     }
   ],
-  isLoading: false             // True for streaming assistant messages
 }
 ```
 
 **Content population rules:**
 - **User messages:** `content = rawContent` (plain text, no Markdown)
-- **New assistant messages (streaming):** accumulate `delta` into `rawContent` during SSE stream; apply `marked.parse(rawContent)` only when `agent_end` arrives
+- **New assistant messages (streaming):** accumulate `delta` into `rawContent` during SSE stream; apply `marked.parse(rawContent)` incrementally on each `message_update` event (marked.parse is idempotent — safe to call repeatedly); finalize by pushing to `messages` array on `agent_end`
 - **Loaded from API:** `GET /chat/api/conversations/{id}` returns messages with raw content; apply `marked.parse()` to each assistant message's `content` field before adding to `messages` array
 
 ## File Deliverables
@@ -348,15 +347,28 @@ window.addEventListener('beforeunload', () => reader.cancel());
 
 ## Navigation Integration
 
-In `layout.html`, add Chat to the nav links:
+In `layout.html`, add Chat to the toolbar-icons-container (next to the existing Grid and Timeline links):
 
 ```html
-<nav class="nav-links">
-  <a href="/">Grid</a>
-  <a href="/search">Search</a>
-  <a href="/timeline">Timeline</a>
-  <a href="/chat">Chat</a>  <!-- New -->
-</nav>
+<div class="toolbar-icons-container">
+  <a href="/" class="toolbar-icon-link" title="Grid View">
+    {{ icons.icon_grid() }}
+  </a>
+  <a href="/timeline" class="toolbar-icon-link" title="Timeline View">
+    {{ icons.icon_timeline() }}
+  </a>
+  <a href="/chat" class="toolbar-icon-link" title="Chat">
+    {{ icons.icon_chat() }}
+  </a>
+</div>
+```
+
+Also add `icon_chat()` to `icons.html` and add the chat highlight CSS rule:
+```css
+html[data-current-view="chat"] a[href="/chat"] {
+  background-color: rgba(0, 0, 0, 0.12);
+  color: #1D1D1F;
+}
 ```
 
 ## Acceptance Criteria

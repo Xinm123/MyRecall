@@ -264,6 +264,9 @@ curl "http://localhost:8083/v1/frames/42/context?include_nodes=true&max_nodes=20
 ```json
 {
   "frame_id": 42,
+  "timestamp": "2026-03-25T10:30:00Z",
+  "app_name": "Claude Code",
+  "window_name": "Claude Code — ~/chat/MyRecall",
   "text": "Reviewing pull request #123 in the GitHub web interface...",
   "text_source": "accessibility",
   "urls": ["https://github.com/pulls/123"],
@@ -283,6 +286,9 @@ curl "http://localhost:8083/v1/frames/42/context?include_nodes=true&max_nodes=20
 ```json
 {
   "frame_id": 42,
+  "timestamp": "2026-03-25T10:30:00Z",
+  "app_name": "Claude Code",
+  "window_name": "Claude Code — ~/chat/MyRecall",
   "text": "Reviewing pull request #123 in the GitHub web interface...",
   "text_source": "accessibility",
   "urls": ["https://github.com/pulls/123"],
@@ -307,6 +313,9 @@ curl "http://localhost:8083/v1/frames/42/context?include_nodes=true&max_nodes=20
 
 | Field | Description |
 |-------|-------------|
+| `timestamp` | ISO8601 UTC capture time of the frame |
+| `app_name` | Application name at capture time (e.g. "Claude Code", "Chrome") |
+| `window_name` | Window title at capture time |
 | `text` | Full text captured from the frame |
 | `text_source` | `accessibility` (preferred) or `ocr` (fallback) |
 | `nodes` | **Only present when `include_nodes=true`**. UI element tree with `role`, `text`, `depth`, and optional `url`. Nodes with empty text are filtered out. |

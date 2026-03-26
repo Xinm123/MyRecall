@@ -203,6 +203,11 @@
       background-color: rgba(0, 0, 0, 0.12);
       color: #1D1D1F;
     }
+
+    html[data-current-view="chat"] a[href="/chat"] {
+      background-color: rgba(0, 0, 0, 0.12);
+      color: #1D1D1F;
+    }
     
     /* Right Group: Icons */
     .toolbar-right-group {
@@ -420,6 +425,9 @@
         <a href="/timeline" class="toolbar-icon-link" title="Timeline View">
           {{ icons.icon_timeline() }}
         </a>
+        <a href="/chat" class="toolbar-icon-link" title="Chat">
+          {{ icons.icon_chat() }}
+        </a>
       </div>
       <a href="/search" class="toolbar-icon-link" title="Search">
         {{ icons.icon_search() }}
@@ -606,6 +614,8 @@
       currentView = 'timeline';
     } else if (currentPath === '/search') {
       currentView = 'search';
+    } else if (currentPath === '/chat') {
+      currentView = 'chat';
     }
     document.documentElement.setAttribute('data-current-view', currentView);
     

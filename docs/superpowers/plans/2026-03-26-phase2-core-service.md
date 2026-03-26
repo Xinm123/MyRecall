@@ -8,6 +8,8 @@
 
 **Tech Stack:** Python 3, subprocess threading, SSE (Flask Response stream), `@mariozechner/pi-coding-agent@0.60.0`
 
+**Risks:** See `docs/v3/chat/phase2-core-service/spec.md` for risk assessment and mitigation strategies.
+
 ---
 
 ## Prerequisites
@@ -1086,6 +1088,10 @@ git commit -m "feat(chat): add Pi RPC manager for subprocess communication"
 
 **Estimated effort:** Large
 
+**Additional requirements**:
+- Auto-restart on Pi crash with exponential backoff (max 3 retries)
+- Concurrent request protection (reject with error when busy)
+
 - [ ] **Step 1: Create `tests/test_chat_service.py`**
 
 ```python
@@ -1206,6 +1212,7 @@ import json
 import os
 import queue
 import threading
+import time
 from datetime import datetime
 from pathlib import Path
 from typing import AsyncGenerator, Optional
@@ -1232,7 +1239,13 @@ class ChatService:
     - Handle SSE streaming
     - Manage conversation persistence
     - Error handling and recovery
+    - Auto-restart Pi on crash (exponential backoff)
+    - Reject concurrent requests
     """
+
+    # Auto-restart configuration
+    _MAX_RETRIES = 3
+    _INITIAL_BACKOFF = 1.0  # seconds
 
     def __init__(self, data_dir: Path):
         """
@@ -1250,6 +1263,10 @@ class ChatService:
 
         # Event queues for streaming
         self._event_queues: dict[str, queue.Queue] = {}
+
+        # Concurrent request protection
+        self._active_request = False
+        self._request_lock = threading.Lock()
 
     @property
     def chats_dir(self) -> Path:
@@ -1363,13 +1380,21 @@ class ChatService:
         """
         import uuid
 
-        # Load or create conversation
-        conv = self.get_conversation(conversation_id)
-        if not conv:
-            conv = self.create_conversation()
+        # Reject concurrent requests
+        with self._request_lock:
+            if self._active_request:
+                yield {"type": "error", "message": "Request already in progress", "code": "BUSY"}
+                return
+            self._active_request = True
 
-        # Ensure Pi is running
-        self.ensure_pi_running()
+        try:
+            # Load or create conversation
+            conv = self.get_conversation(conversation_id)
+            if not conv:
+                conv = self.create_conversation()
+
+            # Ensure Pi is running (with auto-restart on failure)
+            self._ensure_pi_with_retry()
 
         # Save user message
         add_message(conv, role="user", content=message, tool_calls=None)
@@ -1389,12 +1414,22 @@ class ChatService:
             tool_calls = []
 
             # Yield events until agent_end
+            KEEPALIVE_INTERVAL = 15  # seconds
+            MAX_TIMEOUT = 300  # 5 minutes total timeout
+            start_time = time.time()
+
             while True:
-                try:
-                    event = event_queue.get(timeout=300)  # 5 minute timeout
-                except queue.Empty:
+                # Check for max timeout
+                if time.time() - start_time > MAX_TIMEOUT:
                     yield {"type": "error", "message": "Timeout", "code": "TIMEOUT"}
                     break
+
+                try:
+                    event = event_queue.get(timeout=KEEPALIVE_INTERVAL)
+                except queue.Empty:
+                    # Send keepalive event (SSE comment)
+                    yield {"type": "keepalive"}
+                    continue
 
                 yield event
 
@@ -1433,8 +1468,25 @@ class ChatService:
                     break
 
         finally:
+            # Release request lock
+            with self._request_lock:
+                self._active_request = False
             # Clean up event queue
             self._event_queues.pop(queue_id, None)
+
+    def _ensure_pi_with_retry(self) -> None:
+        """Start Pi with exponential backoff retry on failure."""
+        import time
+
+        for attempt in range(self._MAX_RETRIES):
+            try:
+                self.ensure_pi_running()
+                return
+            except Exception as e:
+                if attempt == self._MAX_RETRIES - 1:
+                    raise RuntimeError(f"Pi failed to start after {self._MAX_RETRIES} attempts: {e}")
+                backoff = self._INITIAL_BACKOFF * (2 ** attempt)
+                time.sleep(backoff)
 
     def shutdown(self) -> None:
         """Shutdown the service and clean up resources."""
@@ -1466,6 +1518,10 @@ git commit -m "feat(chat): add Chat Service orchestrator with SSE streaming"
 - Create: `tests/test_chat_routes.py`
 
 **Estimated effort:** Medium
+
+**Additional requirements**:
+- SSE keepalive: Send comment lines (`: keepalive\n\n`) every 15 seconds
+- Proper error handling with JSON error events
 
 - [ ] **Step 1: Create `tests/test_chat_routes.py`**
 
@@ -1649,11 +1705,23 @@ def stream():
     service = get_chat_service()
 
     def generate():
+        """Generate SSE events with keepalive support.
+
+        Keepalive is handled by yielding from service every 15 seconds
+        if no real events are available.
+        """
         try:
             for event in service.stream_response(conversation_id, message, images):
                 event_type = event.get("type", "message")
+
+                # Handle keepalive as SSE comment (not an event)
+                if event_type == "keepalive":
+                    yield ": keepalive\n\n"
+                    continue
+
                 yield f"event: {event_type}\n"
                 yield f"data: {json.dumps(event)}\n\n"
+
         except Exception as e:
             error_event = {"type": "error", "message": str(e), "code": "INTERNAL_ERROR"}
             yield f"event: error\ndata: {json.dumps(error_event)}\n\n"
@@ -1730,8 +1798,8 @@ Read the current app.py first, then add the blueprint registration.
 # Add near other imports:
 from openrecall.client.chat.routes import chat_bp
 
-# Add after app creation:
-app.register_blueprint(chat_bp)
+# Add after client_app creation:
+client_app.register_blueprint(chat_bp)
 ```
 
 - [ ] **Step 5: Run tests to verify they pass**
@@ -1936,17 +2004,20 @@ git commit -m "test(chat): add Phase 2 integration tests"
 ## Implementation Order
 
 ```
-Task 2.1 (Types) ──────────────┐
-                               │
-Task 2.2 (Conversation) ───────┼──► Task 2.4 (Chat Service) ──► Task 2.5 (Routes)
-                               │           │
-Task 2.3 (Pi RPC) ─────────────┘           │
-                                           │
-                                           └──► Task 2.6 (Integration Tests)
+Task 2.1 (Types) ──────────────────────┐
+                                       │
+Task 2.2 (Conversation) ◄── depends ───┤
+                                       │
+Task 2.3 (Pi RPC) ◄── depends ─────────┤
+                                       │
+                                       └──► Task 2.4 (Chat Service) ──► Task 2.5 (Routes)
+                                                   │
+                                                   └──► Task 2.6 (Integration Tests)
 ```
 
 **Parallel opportunities:**
-- Tasks 2.1, 2.2, 2.3 can be developed in parallel
+- Task 2.1 must complete first (foundation types)
+- Tasks 2.2 and 2.3 can run in parallel after 2.1
 - Task 2.4 depends on 2.1, 2.2, 2.3
 - Task 2.5 depends on 2.4
 - Task 2.6 runs after all others
@@ -1960,12 +2031,13 @@ Task 2.3 (Pi RPC) ─────────────┘           │
 - [ ] Integration tests pass: `pytest tests/test_chat_integration.py -v -m integration`
 - [ ] `curl` can POST to `/chat/api/stream` and receive SSE events
 - [ ] Pi process starts automatically on first message
-- [ ] Pi process restarts on crash (with backoff)
+- [ ] Pi process restarts on crash with exponential backoff (max 3 retries)
 - [ ] Conversation files are created in `~/MRC/chats/`
 - [ ] Conversation listing returns results sorted by updated_at DESC
 - [ ] `POST /chat/api/new-session` resets Pi context
 - [ ] Error cases return meaningful JSON errors
-- [ ] SSE connection handles keepalive and timeout
+- [ ] SSE connection handles keepalive (15s interval) and timeout (5 min)
+- [ ] Concurrent requests are rejected with `{"type": "error", "code": "BUSY"}`
 - [ ] Pi process is killed on service shutdown
 
 ---
@@ -1974,11 +2046,12 @@ Task 2.3 (Pi RPC) ─────────────┘           │
 
 | Question | Status | Resolution |
 |----------|--------|------------|
-| SSE keepalive | **Resolved** | Send comment lines (`: keepalive`) every 15 seconds |
-| Max concurrent requests | **Resolved** | MVP uses single Pi session, reject concurrent prompts with 429 |
+| SSE keepalive | **Resolved** | Service yields `{"type": "keepalive"}` every 15s via queue timeout; routes emit SSE comment |
+| Max concurrent requests | **Resolved** | Reject with `{"type": "error", "code": "BUSY"}` when request in progress |
 | Conversation title generation | **Resolved** | Auto-generate from first 50 chars of first user message |
 | Image support | **Resolved** | Support base64 images in Phase 2 MVP |
-| Streaming timeout | **Resolved** | 5 minute timeout per message (configurable) |
+| Streaming timeout | **Resolved** | 5 minute total timeout per message |
+| Pi auto-restart | **Resolved** | Exponential backoff retry (1s, 2s, 4s) with max 3 attempts |
 
 ---
 
@@ -1992,3 +2065,18 @@ Task 2.3 (Pi RPC) ─────────────┘           │
 - **Screenpipe Event Handler**: `_ref/screenpipe/apps/screenpipe-app-tauri/lib/pi-event-handler.ts`
 - **Screenpipe Chat Storage**: `_ref/screenpipe/apps/screenpipe-app-tauri/lib/chat-storage.ts`
 - **Pi Session Format**: `_ref/pi-mono/packages/coding-agent/docs/session.md`
+
+---
+
+## Change History
+
+| Date | Change |
+|------|--------|
+| 2026-03-26 | Initial plan created |
+| 2026-03-26 | Added SSE keepalive implementation (service yields, routes emits comment) |
+| 2026-03-26 | Added concurrent request protection with BUSY error |
+| 2026-03-26 | Added auto-restart logic with exponential backoff |
+| 2026-03-26 | Fixed task dependency diagram: Tasks 2.2 and 2.3 depend on 2.1 |
+| 2026-03-26 | Updated Definition of Done with specific metrics |
+| 2026-03-26 | 文档一致性修正：SSE 端点描述统一为 `/chat/api/stream` |
+| 2026-03-26 | 文档一致性修正：blueprint 注册代码示例使用正确的 `client_app` 变量名 |

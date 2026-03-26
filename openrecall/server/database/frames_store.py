@@ -1476,7 +1476,8 @@ class FramesStore:
                 row = conn.execute(
                     """
                     SELECT f.id, f.accessibility_text, f.ocr_text, f.text_source,
-                           f.accessibility_tree_json, f.browser_url, f.status
+                           f.accessibility_tree_json, f.browser_url, f.status,
+                           f.timestamp, f.app_name, f.window_name
                     FROM frames f
                     WHERE f.id = ?
                     """,
@@ -1496,6 +1497,9 @@ class FramesStore:
                 tree_json = row["accessibility_tree_json"]
                 browser_url = row["browser_url"]
                 status = row["status"]
+                timestamp = row["timestamp"]
+                app_name = row["app_name"]
+                window_name = row["window_name"]
 
                 raw_nodes: list[dict] = []
                 urls: list[str] = []
@@ -1548,6 +1552,9 @@ class FramesStore:
 
                 result = {
                     "frame_id": frame_id_val,
+                    "timestamp": timestamp,
+                    "app_name": app_name,
+                    "window_name": window_name,
                     "text": result_text,
                     "text_source": text_source,
                     "urls": urls,

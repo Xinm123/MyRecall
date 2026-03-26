@@ -28,6 +28,7 @@ Phase 2 implements the Chat Service backend logic for MyRecall v3, enabling user
 | **Single Session** | Fixed `session_id="chat"` for MVP simplicity |
 | **Auto-start** | Pi starts on first message if not running |
 | **Auto-restart** | Pi restarts on crash with exponential backoff |
+| **Version Lock** | `@mariozechner/pi-coding-agent@0.60.0` pinned for stability |
 
 **Alignment**: Matches screenpipe's approach exactly.
 
@@ -54,6 +55,7 @@ When switching conversations:
 |--------|-----------|
 | **Passthrough** | Directly forward Pi's raw JSON events to frontend |
 | **No Transformation** | Reduces backend complexity, frontend handles parsing |
+| **Keepalive** | Send SSE comment lines (`: keepalive\n\n`) every 15 seconds to prevent connection timeout |
 
 **Alignment**: Matches screenpipe's approach exactly.
 
@@ -89,19 +91,19 @@ class PiRpcManager:
     def __init__(self, workspace_dir: Path, event_callback: Callable[[dict], None]):
         """Initialize with workspace directory and event callback."""
 
-    async def start(self, provider: str, model: str) -> bool:
+    def start(self, provider: str, model: str) -> bool:
         """Start Pi process in RPC mode."""
 
-    async def stop(self) -> None:
+    def stop(self) -> None:
         """Stop Pi process gracefully."""
 
-    async def send_prompt(self, content: str, images: list[str] | None = None) -> str:
+    def send_prompt(self, content: str, images: list[str] | None = None) -> str:
         """Send prompt, return request_id."""
 
-    async def new_session(self) -> None:
+    def new_session(self) -> None:
         """Reset Pi session (clear context)."""
 
-    async def abort(self) -> None:
+    def abort(self) -> None:
         """Abort current operation."""
 
     def is_running(self) -> bool:
@@ -143,18 +145,18 @@ class ChatService:
     def __init__(self, data_dir: Path):
         """Initialize with data directory."""
 
-    async def stream_response(
+    def stream_response(
         self,
         conversation_id: str,
         message: str,
         images: list[str] | None = None
-    ) -> AsyncGenerator[dict, None]:
+    ) -> Generator[dict, None, None]:
         """Stream response via SSE events."""
 
-    async def ensure_pi_running(self) -> None:
+    def ensure_pi_running(self) -> None:
         """Start Pi if not running."""
 
-    async def switch_conversation(self, conversation_id: str) -> None:
+    def switch_conversation(self, conversation_id: str) -> None:
         """Switch to different conversation (resets Pi context)."""
 
     def get_pi_status(self) -> PiStatus:
@@ -235,7 +237,7 @@ def delete_conversation(conversation_id: str) -> bool:
 
 ```python
 @blueprint.route("/api/stream", methods=["POST"])
-async def stream():
+def stream():
     """
     Request:
         {
@@ -334,10 +336,13 @@ User clicks different conversation in UI
 - [ ] `curl` can POST to `/chat/api/stream` and receive SSE events
 - [ ] Pi process starts automatically on first message
 - [ ] Conversation files are created and updated correctly
-- [ ] Tool calls are displayed in the event stream
 - [ ] `piNewSession` correctly resets Pi context
 - [ ] Pi process is killed on service shutdown
 - [ ] Error cases return meaningful error messages
+- [ ] Concurrent requests are rejected with SSE event `{"type": "error", "code": "BUSY"}`
+
+**Phase 3 (Web UI) acceptance criteria**:
+- [ ] Tool calls are displayed in the event stream (UI rendering)
 
 ## Dependencies
 
@@ -360,10 +365,14 @@ User clicks different conversation in UI
 | Stdout buffer overflow | Use async reading with backpressure |
 | Process orphan on crash | Use process groups, cleanup on startup |
 | SSE connection timeout | Send keepalive events |
-| Concurrent prompt requests | Queue prompts, reject when busy |
+| Concurrent prompt requests | Busy flag, emit BUSY SSE event |
 
 ## Change History
 
 | Date | Change |
 |------|--------|
 | 2026-03-26 | Initial spec created based on design discussion |
+| 2026-03-26 | Added Pi version lock, SSE keepalive specification |
+| 2026-03-26 | Moved "Tool calls displayed" to Phase 3 acceptance criteria |
+| 2026-03-26 | Added concurrent request rejection (BUSY SSE event) to acceptance criteria |
+| 2026-03-26 | 修正并发拒绝行为：SSE BUSY 事件（而非 HTTP 429）；修正 PiRpcManager/ChatService 方法签名为 sync（与 plan 和 screenpipe 对齐） |

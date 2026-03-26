@@ -529,7 +529,7 @@ Create `openrecall/client/web/templates/chat.html`:
 
 - [ ] **Step 2: Add message bubble and tool call styles**
 
-Add to the `<style>` block in `chat.html` (append after the existing styles):
+> **Note:** Append the following CSS *inside* the `<style>` block that was opened in Step 1 (before the closing `</style>` tag).
 
 ```css
   /* === Message Bubbles === */

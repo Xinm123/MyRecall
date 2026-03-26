@@ -234,7 +234,12 @@ def normalize_bounds(
     width = max(0.0, min(1.0, elem_w / window_w))
     height = max(0.0, min(1.0, elem_h / window_h))
 
-    return NodeBounds(left=left, top=top, width=width, height=height)
+    return NodeBounds(
+        left=round(left, 3),
+        top=round(top, 3),
+        width=round(width, 3),
+        height=round(height, 3),
+    )
 
 
 # =============================================================================

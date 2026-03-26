@@ -35,6 +35,11 @@ def timeline():
     return render_template("timeline.html", timeline_frames=[])
 
 
+@client_app.route("/chat")
+def chat():
+    return render_template("chat.html")
+
+
 @client_app.route("/vendor/<path:filename>")
 def vendor(filename):
     return send_from_directory("vendor", filename)

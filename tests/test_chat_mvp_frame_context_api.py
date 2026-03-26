@@ -42,6 +42,9 @@ def _seed_accessibility_context():
     """Return sample frame context for accessibility frame."""
     return {
         "frame_id": 1,
+        "timestamp": "2026-03-26T10:00:00Z",
+        "app_name": "Claude Code",
+        "window_name": "Claude Code — ~/chat",
         "text": "Hello World",
         "text_source": "accessibility",
         "nodes": [
@@ -70,6 +73,10 @@ class TestFrameContextAPI:
             assert "nodes" in body
             assert "urls" in body
             assert body["text_source"] == "accessibility"
+            # New fields
+            assert body["timestamp"] == "2026-03-26T10:00:00Z"
+            assert body["app_name"] == "Claude Code"
+            assert body["window_name"] == "Claude Code — ~/chat"
 
     def test_frame_context_returns_404_for_missing_frame(self, app_with_context_route, mock_store):
         """Endpoint returns 404 for non-existent frame."""
@@ -88,6 +95,9 @@ class TestFrameContextAPI:
         long_text = "A" * 1000
         mock_store.get_frame_context.return_value = {
             "frame_id": 1,
+            "timestamp": "2026-03-26T10:00:00Z",
+            "app_name": "Claude Code",
+            "window_name": "Claude Code Window",
             "text": long_text[:100] + "...",
             "text_source": "accessibility",
             "nodes": [],
@@ -107,6 +117,9 @@ class TestFrameContextAPI:
         """Endpoint respects max_nodes query parameter."""
         mock_store.get_frame_context.return_value = {
             "frame_id": 1,
+            "timestamp": "2026-03-26T10:00:00Z",
+            "app_name": "Claude Code",
+            "window_name": "Claude Code Window",
             "text": "Test",
             "text_source": "accessibility",
             "nodes": [
@@ -166,6 +179,9 @@ class TestFrameContextAPI:
         """Endpoint returns OCR data when accessibility unavailable."""
         mock_store.get_frame_context.return_value = {
             "frame_id": 3,
+            "timestamp": "2026-03-26T10:00:00Z",
+            "app_name": "Terminal",
+            "window_name": "zsh — 120×40",
             "text": "OCR extracted text with https://ocr-url.com link",
             "text_source": "ocr",
             "nodes": [],
@@ -187,6 +203,9 @@ class TestFrameContextAPI:
         """Endpoint includes browser_url when available."""
         mock_store.get_frame_context.return_value = {
             "frame_id": 1,
+            "timestamp": "2026-03-26T10:00:00Z",
+            "app_name": "Chrome",
+            "window_name": "GitHub — MyRecall",
             "text": "Page content",
             "text_source": "accessibility",
             "nodes": [],
@@ -206,6 +225,9 @@ class TestFrameContextAPI:
         """When include_nodes=false, response has no nodes key."""
         mock_store.get_frame_context.return_value = {
             "frame_id": 1,
+            "timestamp": "2026-03-26T10:00:00Z",
+            "app_name": "Claude Code",
+            "window_name": "Claude Code Window",
             "text": "Hello World",
             "text_source": "accessibility",
             "urls": [],
@@ -230,6 +252,9 @@ class TestFrameContextAPI:
         """include_nodes=false query param is passed to store."""
         mock_store.get_frame_context.return_value = {
             "frame_id": 1,
+            "timestamp": "2026-03-26T10:00:00Z",
+            "app_name": "Claude Code",
+            "window_name": "Claude Code Window",
             "text": "Hello",
             "text_source": "accessibility",
             "urls": [],
@@ -247,6 +272,9 @@ class TestFrameContextAPI:
         """include_nodes=true query param is passed to store."""
         mock_store.get_frame_context.return_value = {
             "frame_id": 1,
+            "timestamp": "2026-03-26T10:00:00Z",
+            "app_name": "Claude Code",
+            "window_name": "Claude Code Window",
             "text": "Hello",
             "text_source": "accessibility",
             "nodes": [],

@@ -48,6 +48,9 @@
 | Field | Type | Always Present | Description |
 |-------|------|:--------------:|-------------|
 | `frame_id` | `int` | Yes | Frame identifier |
+| `timestamp` | `string \| null` | Yes | ISO8601 UTC capture timestamp, from `frames.timestamp` |
+| `app_name` | `string \| null` | Yes | Application name at capture time, from `frames.app_name` |
+| `window_name` | `string \| null` | Yes | Window title at capture time, from `frames.window_name` |
 | `text` | `string \| null` | Yes | `accessibility_text` if AX-first succeeded, else `ocr_text`, truncated by `max_text_length` if specified |
 | `text_source` | `string` | Yes | `"accessibility"` \| `"ocr"` \| `"hybrid"` (lowercase) |
 | `urls` | `string[]` | Yes | Extracted URLs from AX link nodes + regex fallback on text. Deduplicated. |
@@ -67,11 +70,11 @@ Each node object:
 | `role` | `string` | Yes | AX role (e.g., `"AXStaticText"`, `"AXButton"`, `"AXLink"`) |
 | `text` | `string` | Yes | Text content of the node |
 | `depth` | `int` | Yes | Depth in accessibility tree (0 = root) |
-| `bounds` | `object \| null` | No | Bounding box relative to monitor |
-| `bounds.left` | `number` | — | Left coordinate (pixels) |
-| `bounds.top` | `number` | — | Top coordinate (pixels) |
-| `bounds.width` | `number` | — | Width (pixels) |
-| `bounds.height` | `number` | — | Height (pixels) |
+| `bounds` | `object \| null` | No | Bounding box relative to focused window (normalized 0.0–1.0), rounded to 3 decimal places |
+| `bounds.left` | `number` | — | Left coordinate (0.0–1.0) |
+| `bounds.top` | `number` | — | Top coordinate (0.0–1.0) |
+| `bounds.width` | `number` | — | Width (0.0–1.0) |
+| `bounds.height` | `number` | — | Height (0.0–1.0) |
 | `properties` | `object \| null` | **No** | AX properties (automation_id, class_name, value, help_text, url, placeholder, role_description, subrole, is_enabled, is_focused, is_selected, is_expanded, is_password, is_keyboard_focusable, accelerator_key, access_key). **Currently not populated in MyRecall** — reserved for future. This field is **never included** in the response (not even as `null`). |
 
 ### Description Object (when `description_status == "completed"`)
@@ -99,6 +102,9 @@ Each node object:
 
 {
   "frame_id": 42,
+  "timestamp": "2026-03-26T14:32:05Z",
+  "app_name": "Claude Code",
+  "window_name": "Claude Code — ~/chat/MyRecall",
   "text": "MyRecall v3 Chat API MyRecall Search Claude Code Today 14:32",
   "text_source": "accessibility",
   "urls": [
@@ -122,6 +128,9 @@ Each node object:
 
 {
   "frame_id": 42,
+  "timestamp": "2026-03-26T14:32:05Z",
+  "app_name": "Claude Code",
+  "window_name": "Claude Code — ~/chat/MyRecall",
   "text": "MyRecall v3 Chat API MyRecall Search Claude Code Today 14:32",
   "text_source": "accessibility",
   "urls": [],
@@ -140,13 +149,13 @@ Each node object:
       "role": "AXWindow",
       "text": "Claude Code — ~/chat/MyRecall",
       "depth": 0,
-      "bounds": { "left": 0, "top": 25, "width": 3024, "height": 1961 }
+      "bounds": { "left": 0.0, "top": 0.012, "width": 1.0, "height": 0.988 }
     },
     {
       "role": "AXStaticText",
       "text": "MyRecall v3 Chat API",
       "depth": 1,
-      "bounds": { "left": 24, "top": 80, "width": 200, "height": 22 }
+      "bounds": { "left": 0.008, "top": 0.038, "width": 0.066, "height": 0.011 }
     },
     {
       "role": "AXButton",
@@ -172,9 +181,6 @@ Each node object:
 
 ### Known Gaps (vs screenpipe)
 
-- ❌ `app_name` — not returned (present in DB but omitted from response)
-- ❌ `window_name` — not returned (present in DB but omitted from response)
-- ❌ `timestamp` — not returned (present in DB but omitted from response)
 - ❌ `device_name` / `monitor_index` — not returned
 - ❌ `capture_trigger` — not returned
 - ❌ `nodes[].properties` — schema defined but not populated; field is **never present** in response (not even as `null`)
@@ -523,3 +529,4 @@ This document is the **authoritative reference** for field names. When adding, r
 | 2026-03-26 | Fixed `descriptions[]` to include `narrative` and `entities` (was missing in `get_recent_descriptions`). Added error response body examples for `GET /v1/frames/{id}`. Clarified snapshot path source. Documented `minutes` rounding to 2 decimal places. Documented `null` text_source mapping to `"OCR"` type. |
 | 2026-03-26 | Removed `properties` field from `nodes[]` example JSON (it is never included in response, not even as `null`). Clarified `nodes[].properties` description. Added `hybrid` to text_source description. |
 | 2026-03-26 | Fixed three doc/code inconsistencies: (1) corrected `max_descriptions` description — it limits `descriptions` count, not `recent_texts` (which has a separate fixed cap of 10); (2) documented `apps[].name` fallback to `"Unknown"` when DB `app_name` is NULL; (3) documented that `descriptions` returns `[]` when no frames in range have completed descriptions. |
+| 2026-03-26 | Added `timestamp`, `app_name`, `window_name` fields to `GET /v1/frames/{id}/context` response. Fixed bounds description: normalized 0.0–1.0 floats, rounded to 3 decimal places. Removed resolved gaps from Known Gaps table. |

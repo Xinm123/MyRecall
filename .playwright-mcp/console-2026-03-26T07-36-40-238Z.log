@@ -1,0 +1,304 @@
+[    5070ms] [WARNING] Alpine Expression Error: Cannot read properties of undefined (reading 'length')
+
+Expression: "entry.browser_url.length > 40 ? entry.browser_url.substring(0, 40) + '...' : entry.browser_url"
+
+ JSHandle@node @ http://localhost:8883/vendor/alpine.min.js:0
+[    5073ms] TypeError: Cannot read properties of undefined (reading 'length')
+    at [Alpine] entry.browser_url.length > 40 ? entry.browser_url.substring(0, 40) + '...' : entry.browser_url (eval at <anonymous> (http://localhost:8883/vendor/alpine.min.js:5:738), <anonymous>:3:50)
+    at http://localhost:8883/vendor/alpine.min.js:5:1153
+    at or (http://localhost:8883/vendor/alpine.min.js:1:4956)
+    at http://localhost:8883/vendor/alpine.min.js:5:34188
+    at r (http://localhost:8883/vendor/alpine.min.js:5:19496)
+    at Object.ln [as effect] (http://localhost:8883/vendor/alpine.min.js:5:19284)
+    at N (http://localhost:8883/vendor/alpine.min.js:1:398)
+    at http://localhost:8883/vendor/alpine.min.js:1:511
+    at Function.<anonymous> (http://localhost:8883/vendor/alpine.min.js:5:34181)
+    at r (http://localhost:8883/vendor/alpine.min.js:5:3070)
+[   45078ms] [WARNING] Alpine Expression Error: Cannot read properties of undefined (reading 'length')
+
+Expression: "entry.browser_url.length > 40 ? entry.browser_url.substring(0, 40) + '...' : entry.browser_url"
+
+ JSHandle@node @ http://localhost:8883/vendor/alpine.min.js:0
+[   45087ms] TypeError: Cannot read properties of undefined (reading 'length')
+    at [Alpine] entry.browser_url.length > 40 ? entry.browser_url.substring(0, 40) + '...' : entry.browser_url (eval at <anonymous> (http://localhost:8883/vendor/alpine.min.js:5:738), <anonymous>:3:50)
+    at http://localhost:8883/vendor/alpine.min.js:5:1153
+    at or (http://localhost:8883/vendor/alpine.min.js:1:4956)
+    at http://localhost:8883/vendor/alpine.min.js:5:34188
+    at r (http://localhost:8883/vendor/alpine.min.js:5:19496)
+    at Object.ln [as effect] (http://localhost:8883/vendor/alpine.min.js:5:19284)
+    at N (http://localhost:8883/vendor/alpine.min.js:1:398)
+    at http://localhost:8883/vendor/alpine.min.js:1:511
+    at Function.<anonymous> (http://localhost:8883/vendor/alpine.min.js:5:34181)
+    at r (http://localhost:8883/vendor/alpine.min.js:5:3070)
+[  135079ms] [WARNING] Alpine Expression Error: Cannot read properties of undefined (reading 'length')
+
+Expression: "entry.browser_url.length > 40 ? entry.browser_url.substring(0, 40) + '...' : entry.browser_url"
+
+ JSHandle@node @ http://localhost:8883/vendor/alpine.min.js:0
+[  135087ms] TypeError: Cannot read properties of undefined (reading 'length')
+    at [Alpine] entry.browser_url.length > 40 ? entry.browser_url.substring(0, 40) + '...' : entry.browser_url (eval at <anonymous> (http://localhost:8883/vendor/alpine.min.js:5:738), <anonymous>:3:50)
+    at http://localhost:8883/vendor/alpine.min.js:5:1153
+    at or (http://localhost:8883/vendor/alpine.min.js:1:4956)
+    at http://localhost:8883/vendor/alpine.min.js:5:34188
+    at r (http://localhost:8883/vendor/alpine.min.js:5:19496)
+    at Object.ln [as effect] (http://localhost:8883/vendor/alpine.min.js:5:19284)
+    at N (http://localhost:8883/vendor/alpine.min.js:1:398)
+    at http://localhost:8883/vendor/alpine.min.js:1:511
+    at Function.<anonymous> (http://localhost:8883/vendor/alpine.min.js:5:34181)
+    at r (http://localhost:8883/vendor/alpine.min.js:5:3070)
+[  190073ms] [WARNING] Alpine Expression Error: Cannot read properties of undefined (reading 'length')
+
+Expression: "entry.browser_url.length > 40 ? entry.browser_url.substring(0, 40) + '...' : entry.browser_url"
+
+ JSHandle@node @ http://localhost:8883/vendor/alpine.min.js:0
+[  190079ms] TypeError: Cannot read properties of undefined (reading 'length')
+    at [Alpine] entry.browser_url.length > 40 ? entry.browser_url.substring(0, 40) + '...' : entry.browser_url (eval at <anonymous> (http://localhost:8883/vendor/alpine.min.js:5:738), <anonymous>:3:50)
+    at http://localhost:8883/vendor/alpine.min.js:5:1153
+    at or (http://localhost:8883/vendor/alpine.min.js:1:4956)
+    at http://localhost:8883/vendor/alpine.min.js:5:34188
+    at r (http://localhost:8883/vendor/alpine.min.js:5:19496)
+    at Object.ln [as effect] (http://localhost:8883/vendor/alpine.min.js:5:19284)
+    at N (http://localhost:8883/vendor/alpine.min.js:1:398)
+    at http://localhost:8883/vendor/alpine.min.js:1:511
+    at Function.<anonymous> (http://localhost:8883/vendor/alpine.min.js:5:34181)
+    at r (http://localhost:8883/vendor/alpine.min.js:5:3070)
+[  220071ms] [WARNING] Alpine Expression Error: Cannot read properties of undefined (reading 'length')
+
+Expression: "entry.browser_url.length > 40 ? entry.browser_url.substring(0, 40) + '...' : entry.browser_url"
+
+ JSHandle@node @ http://localhost:8883/vendor/alpine.min.js:0
+[  220073ms] TypeError: Cannot read properties of undefined (reading 'length')
+    at [Alpine] entry.browser_url.length > 40 ? entry.browser_url.substring(0, 40) + '...' : entry.browser_url (eval at <anonymous> (http://localhost:8883/vendor/alpine.min.js:5:738), <anonymous>:3:50)
+    at http://localhost:8883/vendor/alpine.min.js:5:1153
+    at or (http://localhost:8883/vendor/alpine.min.js:1:4956)
+    at http://localhost:8883/vendor/alpine.min.js:5:34188
+    at r (http://localhost:8883/vendor/alpine.min.js:5:19496)
+    at Object.ln [as effect] (http://localhost:8883/vendor/alpine.min.js:5:19284)
+    at N (http://localhost:8883/vendor/alpine.min.js:1:398)
+    at http://localhost:8883/vendor/alpine.min.js:1:511
+    at Function.<anonymous> (http://localhost:8883/vendor/alpine.min.js:5:34181)
+    at r (http://localhost:8883/vendor/alpine.min.js:5:3070)
+[  255074ms] [WARNING] Alpine Expression Error: Cannot read properties of undefined (reading 'length')
+
+Expression: "entry.browser_url.length > 40 ? entry.browser_url.substring(0, 40) + '...' : entry.browser_url"
+
+ JSHandle@node @ http://localhost:8883/vendor/alpine.min.js:0
+[  255083ms] TypeError: Cannot read properties of undefined (reading 'length')
+    at [Alpine] entry.browser_url.length > 40 ? entry.browser_url.substring(0, 40) + '...' : entry.browser_url (eval at <anonymous> (http://localhost:8883/vendor/alpine.min.js:5:738), <anonymous>:3:50)
+    at http://localhost:8883/vendor/alpine.min.js:5:1153
+    at or (http://localhost:8883/vendor/alpine.min.js:1:4956)
+    at http://localhost:8883/vendor/alpine.min.js:5:34188
+    at r (http://localhost:8883/vendor/alpine.min.js:5:19496)
+    at Object.ln [as effect] (http://localhost:8883/vendor/alpine.min.js:5:19284)
+    at N (http://localhost:8883/vendor/alpine.min.js:1:398)
+    at http://localhost:8883/vendor/alpine.min.js:1:511
+    at Function.<anonymous> (http://localhost:8883/vendor/alpine.min.js:5:34181)
+    at r (http://localhost:8883/vendor/alpine.min.js:5:3070)
+[  270074ms] [WARNING] Alpine Expression Error: Cannot read properties of undefined (reading 'length')
+
+Expression: "entry.browser_url.length > 40 ? entry.browser_url.substring(0, 40) + '...' : entry.browser_url"
+
+ JSHandle@node @ http://localhost:8883/vendor/alpine.min.js:0
+[  270084ms] TypeError: Cannot read properties of undefined (reading 'length')
+    at [Alpine] entry.browser_url.length > 40 ? entry.browser_url.substring(0, 40) + '...' : entry.browser_url (eval at <anonymous> (http://localhost:8883/vendor/alpine.min.js:5:738), <anonymous>:3:50)
+    at http://localhost:8883/vendor/alpine.min.js:5:1153
+    at or (http://localhost:8883/vendor/alpine.min.js:1:4956)
+    at http://localhost:8883/vendor/alpine.min.js:5:34188
+    at r (http://localhost:8883/vendor/alpine.min.js:5:19496)
+    at Object.ln [as effect] (http://localhost:8883/vendor/alpine.min.js:5:19284)
+    at N (http://localhost:8883/vendor/alpine.min.js:1:398)
+    at http://localhost:8883/vendor/alpine.min.js:1:511
+    at Function.<anonymous> (http://localhost:8883/vendor/alpine.min.js:5:34181)
+    at r (http://localhost:8883/vendor/alpine.min.js:5:3070)
+[  325071ms] [WARNING] Alpine Expression Error: Cannot read properties of undefined (reading 'length')
+
+Expression: "entry.browser_url.length > 40 ? entry.browser_url.substring(0, 40) + '...' : entry.browser_url"
+
+ JSHandle@node @ http://localhost:8883/vendor/alpine.min.js:0
+[  325080ms] TypeError: Cannot read properties of undefined (reading 'length')
+    at [Alpine] entry.browser_url.length > 40 ? entry.browser_url.substring(0, 40) + '...' : entry.browser_url (eval at <anonymous> (http://localhost:8883/vendor/alpine.min.js:5:738), <anonymous>:3:50)
+    at http://localhost:8883/vendor/alpine.min.js:5:1153
+    at or (http://localhost:8883/vendor/alpine.min.js:1:4956)
+    at http://localhost:8883/vendor/alpine.min.js:5:34188
+    at r (http://localhost:8883/vendor/alpine.min.js:5:19496)
+    at Object.ln [as effect] (http://localhost:8883/vendor/alpine.min.js:5:19284)
+    at N (http://localhost:8883/vendor/alpine.min.js:1:398)
+    at http://localhost:8883/vendor/alpine.min.js:1:511
+    at Function.<anonymous> (http://localhost:8883/vendor/alpine.min.js:5:34181)
+    at r (http://localhost:8883/vendor/alpine.min.js:5:3070)
+[  330075ms] [WARNING] Alpine Expression Error: Cannot read properties of undefined (reading 'length')
+
+Expression: "entry.browser_url.length > 40 ? entry.browser_url.substring(0, 40) + '...' : entry.browser_url"
+
+ JSHandle@node @ http://localhost:8883/vendor/alpine.min.js:0
+[  330093ms] TypeError: Cannot read properties of undefined (reading 'length')
+    at [Alpine] entry.browser_url.length > 40 ? entry.browser_url.substring(0, 40) + '...' : entry.browser_url (eval at <anonymous> (http://localhost:8883/vendor/alpine.min.js:5:738), <anonymous>:3:50)
+    at http://localhost:8883/vendor/alpine.min.js:5:1153
+    at or (http://localhost:8883/vendor/alpine.min.js:1:4956)
+    at http://localhost:8883/vendor/alpine.min.js:5:34188
+    at r (http://localhost:8883/vendor/alpine.min.js:5:19496)
+    at Object.ln [as effect] (http://localhost:8883/vendor/alpine.min.js:5:19284)
+    at N (http://localhost:8883/vendor/alpine.min.js:1:398)
+    at http://localhost:8883/vendor/alpine.min.js:1:511
+    at Function.<anonymous> (http://localhost:8883/vendor/alpine.min.js:5:34181)
+    at r (http://localhost:8883/vendor/alpine.min.js:5:3070)
+[  450079ms] [WARNING] Alpine Expression Error: Cannot read properties of undefined (reading 'length')
+
+Expression: "entry.browser_url.length > 40 ? entry.browser_url.substring(0, 40) + '...' : entry.browser_url"
+
+ JSHandle@node @ http://localhost:8883/vendor/alpine.min.js:0
+[  450085ms] TypeError: Cannot read properties of undefined (reading 'length')
+    at [Alpine] entry.browser_url.length > 40 ? entry.browser_url.substring(0, 40) + '...' : entry.browser_url (eval at <anonymous> (http://localhost:8883/vendor/alpine.min.js:5:738), <anonymous>:3:50)
+    at http://localhost:8883/vendor/alpine.min.js:5:1153
+    at or (http://localhost:8883/vendor/alpine.min.js:1:4956)
+    at http://localhost:8883/vendor/alpine.min.js:5:34188
+    at r (http://localhost:8883/vendor/alpine.min.js:5:19496)
+    at Object.ln [as effect] (http://localhost:8883/vendor/alpine.min.js:5:19284)
+    at N (http://localhost:8883/vendor/alpine.min.js:1:398)
+    at http://localhost:8883/vendor/alpine.min.js:1:511
+    at Function.<anonymous> (http://localhost:8883/vendor/alpine.min.js:5:34181)
+    at r (http://localhost:8883/vendor/alpine.min.js:5:3070)
+[  520078ms] [WARNING] Alpine Expression Error: Cannot read properties of undefined (reading 'length')
+
+Expression: "entry.browser_url.length > 40 ? entry.browser_url.substring(0, 40) + '...' : entry.browser_url"
+
+ JSHandle@node @ http://localhost:8883/vendor/alpine.min.js:0
+[  520088ms] TypeError: Cannot read properties of undefined (reading 'length')
+    at [Alpine] entry.browser_url.length > 40 ? entry.browser_url.substring(0, 40) + '...' : entry.browser_url (eval at <anonymous> (http://localhost:8883/vendor/alpine.min.js:5:738), <anonymous>:3:50)
+    at http://localhost:8883/vendor/alpine.min.js:5:1153
+    at or (http://localhost:8883/vendor/alpine.min.js:1:4956)
+    at http://localhost:8883/vendor/alpine.min.js:5:34188
+    at r (http://localhost:8883/vendor/alpine.min.js:5:19496)
+    at Object.ln [as effect] (http://localhost:8883/vendor/alpine.min.js:5:19284)
+    at N (http://localhost:8883/vendor/alpine.min.js:1:398)
+    at http://localhost:8883/vendor/alpine.min.js:1:511
+    at Function.<anonymous> (http://localhost:8883/vendor/alpine.min.js:5:34181)
+    at r (http://localhost:8883/vendor/alpine.min.js:5:3070)
+[  540073ms] [WARNING] Alpine Expression Error: Cannot read properties of undefined (reading 'length')
+
+Expression: "entry.browser_url.length > 40 ? entry.browser_url.substring(0, 40) + '...' : entry.browser_url"
+
+ JSHandle@node @ http://localhost:8883/vendor/alpine.min.js:0
+[  540077ms] TypeError: Cannot read properties of undefined (reading 'length')
+    at [Alpine] entry.browser_url.length > 40 ? entry.browser_url.substring(0, 40) + '...' : entry.browser_url (eval at <anonymous> (http://localhost:8883/vendor/alpine.min.js:5:738), <anonymous>:3:50)
+    at http://localhost:8883/vendor/alpine.min.js:5:1153
+    at or (http://localhost:8883/vendor/alpine.min.js:1:4956)
+    at http://localhost:8883/vendor/alpine.min.js:5:34188
+    at r (http://localhost:8883/vendor/alpine.min.js:5:19496)
+    at Object.ln [as effect] (http://localhost:8883/vendor/alpine.min.js:5:19284)
+    at N (http://localhost:8883/vendor/alpine.min.js:1:398)
+    at http://localhost:8883/vendor/alpine.min.js:1:511
+    at Function.<anonymous> (http://localhost:8883/vendor/alpine.min.js:5:34181)
+    at r (http://localhost:8883/vendor/alpine.min.js:5:3070)
+[  590080ms] [WARNING] Alpine Expression Error: Cannot read properties of undefined (reading 'length')
+
+Expression: "entry.browser_url.length > 40 ? entry.browser_url.substring(0, 40) + '...' : entry.browser_url"
+
+ JSHandle@node @ http://localhost:8883/vendor/alpine.min.js:0
+[  590086ms] TypeError: Cannot read properties of undefined (reading 'length')
+    at [Alpine] entry.browser_url.length > 40 ? entry.browser_url.substring(0, 40) + '...' : entry.browser_url (eval at <anonymous> (http://localhost:8883/vendor/alpine.min.js:5:738), <anonymous>:3:50)
+    at http://localhost:8883/vendor/alpine.min.js:5:1153
+    at or (http://localhost:8883/vendor/alpine.min.js:1:4956)
+    at http://localhost:8883/vendor/alpine.min.js:5:34188
+    at r (http://localhost:8883/vendor/alpine.min.js:5:19496)
+    at Object.ln [as effect] (http://localhost:8883/vendor/alpine.min.js:5:19284)
+    at N (http://localhost:8883/vendor/alpine.min.js:1:398)
+    at http://localhost:8883/vendor/alpine.min.js:1:511
+    at Function.<anonymous> (http://localhost:8883/vendor/alpine.min.js:5:34181)
+    at r (http://localhost:8883/vendor/alpine.min.js:5:3070)
+[  615076ms] [WARNING] Alpine Expression Error: Cannot read properties of undefined (reading 'length')
+
+Expression: "entry.browser_url.length > 40 ? entry.browser_url.substring(0, 40) + '...' : entry.browser_url"
+
+ JSHandle@node @ http://localhost:8883/vendor/alpine.min.js:0
+[  615086ms] TypeError: Cannot read properties of undefined (reading 'length')
+    at [Alpine] entry.browser_url.length > 40 ? entry.browser_url.substring(0, 40) + '...' : entry.browser_url (eval at <anonymous> (http://localhost:8883/vendor/alpine.min.js:5:738), <anonymous>:3:50)
+    at http://localhost:8883/vendor/alpine.min.js:5:1153
+    at or (http://localhost:8883/vendor/alpine.min.js:1:4956)
+    at http://localhost:8883/vendor/alpine.min.js:5:34188
+    at r (http://localhost:8883/vendor/alpine.min.js:5:19496)
+    at Object.ln [as effect] (http://localhost:8883/vendor/alpine.min.js:5:19284)
+    at N (http://localhost:8883/vendor/alpine.min.js:1:398)
+    at http://localhost:8883/vendor/alpine.min.js:1:511
+    at Function.<anonymous> (http://localhost:8883/vendor/alpine.min.js:5:34181)
+    at r (http://localhost:8883/vendor/alpine.min.js:5:3070)
+[  665081ms] [WARNING] Alpine Expression Error: Cannot read properties of undefined (reading 'length')
+
+Expression: "entry.browser_url.length > 40 ? entry.browser_url.substring(0, 40) + '...' : entry.browser_url"
+
+ JSHandle@node @ http://localhost:8883/vendor/alpine.min.js:0
+[  665090ms] TypeError: Cannot read properties of undefined (reading 'length')
+    at [Alpine] entry.browser_url.length > 40 ? entry.browser_url.substring(0, 40) + '...' : entry.browser_url (eval at <anonymous> (http://localhost:8883/vendor/alpine.min.js:5:738), <anonymous>:3:50)
+    at http://localhost:8883/vendor/alpine.min.js:5:1153
+    at or (http://localhost:8883/vendor/alpine.min.js:1:4956)
+    at http://localhost:8883/vendor/alpine.min.js:5:34188
+    at r (http://localhost:8883/vendor/alpine.min.js:5:19496)
+    at Object.ln [as effect] (http://localhost:8883/vendor/alpine.min.js:5:19284)
+    at N (http://localhost:8883/vendor/alpine.min.js:1:398)
+    at http://localhost:8883/vendor/alpine.min.js:1:511
+    at Function.<anonymous> (http://localhost:8883/vendor/alpine.min.js:5:34181)
+    at r (http://localhost:8883/vendor/alpine.min.js:5:3070)
+[  675082ms] [WARNING] Alpine Expression Error: Cannot read properties of undefined (reading 'length')
+
+Expression: "entry.browser_url.length > 40 ? entry.browser_url.substring(0, 40) + '...' : entry.browser_url"
+
+ JSHandle@node @ http://localhost:8883/vendor/alpine.min.js:0
+[  675089ms] TypeError: Cannot read properties of undefined (reading 'length')
+    at [Alpine] entry.browser_url.length > 40 ? entry.browser_url.substring(0, 40) + '...' : entry.browser_url (eval at <anonymous> (http://localhost:8883/vendor/alpine.min.js:5:738), <anonymous>:3:50)
+    at http://localhost:8883/vendor/alpine.min.js:5:1153
+    at or (http://localhost:8883/vendor/alpine.min.js:1:4956)
+    at http://localhost:8883/vendor/alpine.min.js:5:34188
+    at r (http://localhost:8883/vendor/alpine.min.js:5:19496)
+    at Object.ln [as effect] (http://localhost:8883/vendor/alpine.min.js:5:19284)
+    at N (http://localhost:8883/vendor/alpine.min.js:1:398)
+    at http://localhost:8883/vendor/alpine.min.js:1:511
+    at Function.<anonymous> (http://localhost:8883/vendor/alpine.min.js:5:34181)
+    at r (http://localhost:8883/vendor/alpine.min.js:5:3070)
+[  720081ms] [WARNING] Alpine Expression Error: Cannot read properties of undefined (reading 'length')
+
+Expression: "entry.browser_url.length > 40 ? entry.browser_url.substring(0, 40) + '...' : entry.browser_url"
+
+ JSHandle@node @ http://localhost:8883/vendor/alpine.min.js:0
+[  720089ms] TypeError: Cannot read properties of undefined (reading 'length')
+    at [Alpine] entry.browser_url.length > 40 ? entry.browser_url.substring(0, 40) + '...' : entry.browser_url (eval at <anonymous> (http://localhost:8883/vendor/alpine.min.js:5:738), <anonymous>:3:50)
+    at http://localhost:8883/vendor/alpine.min.js:5:1153
+    at or (http://localhost:8883/vendor/alpine.min.js:1:4956)
+    at http://localhost:8883/vendor/alpine.min.js:5:34188
+    at r (http://localhost:8883/vendor/alpine.min.js:5:19496)
+    at Object.ln [as effect] (http://localhost:8883/vendor/alpine.min.js:5:19284)
+    at N (http://localhost:8883/vendor/alpine.min.js:1:398)
+    at http://localhost:8883/vendor/alpine.min.js:1:511
+    at Function.<anonymous> (http://localhost:8883/vendor/alpine.min.js:5:34181)
+    at r (http://localhost:8883/vendor/alpine.min.js:5:3070)
+[  755080ms] [WARNING] Alpine Expression Error: Cannot read properties of undefined (reading 'length')
+
+Expression: "entry.browser_url.length > 40 ? entry.browser_url.substring(0, 40) + '...' : entry.browser_url"
+
+ JSHandle@node @ http://localhost:8883/vendor/alpine.min.js:0
+[  755089ms] TypeError: Cannot read properties of undefined (reading 'length')
+    at [Alpine] entry.browser_url.length > 40 ? entry.browser_url.substring(0, 40) + '...' : entry.browser_url (eval at <anonymous> (http://localhost:8883/vendor/alpine.min.js:5:738), <anonymous>:3:50)
+    at http://localhost:8883/vendor/alpine.min.js:5:1153
+    at or (http://localhost:8883/vendor/alpine.min.js:1:4956)
+    at http://localhost:8883/vendor/alpine.min.js:5:34188
+    at r (http://localhost:8883/vendor/alpine.min.js:5:19496)
+    at Object.ln [as effect] (http://localhost:8883/vendor/alpine.min.js:5:19284)
+    at N (http://localhost:8883/vendor/alpine.min.js:1:398)
+    at http://localhost:8883/vendor/alpine.min.js:1:511
+    at Function.<anonymous> (http://localhost:8883/vendor/alpine.min.js:5:34181)
+    at r (http://localhost:8883/vendor/alpine.min.js:5:3070)
+[  780074ms] [WARNING] Alpine Expression Error: Cannot read properties of undefined (reading 'length')
+
+Expression: "entry.browser_url.length > 40 ? entry.browser_url.substring(0, 40) + '...' : entry.browser_url"
+
+ JSHandle@node @ http://localhost:8883/vendor/alpine.min.js:0
+[  780083ms] TypeError: Cannot read properties of undefined (reading 'length')
+    at [Alpine] entry.browser_url.length > 40 ? entry.browser_url.substring(0, 40) + '...' : entry.browser_url (eval at <anonymous> (http://localhost:8883/vendor/alpine.min.js:5:738), <anonymous>:3:50)
+    at http://localhost:8883/vendor/alpine.min.js:5:1153
+    at or (http://localhost:8883/vendor/alpine.min.js:1:4956)
+    at http://localhost:8883/vendor/alpine.min.js:5:34188
+    at r (http://localhost:8883/vendor/alpine.min.js:5:19496)
+    at Object.ln [as effect] (http://localhost:8883/vendor/alpine.min.js:5:19284)
+    at N (http://localhost:8883/vendor/alpine.min.js:1:398)
+    at http://localhost:8883/vendor/alpine.min.js:1:511
+    at Function.<anonymous> (http://localhost:8883/vendor/alpine.min.js:5:34181)
+    at r (http://localhost:8883/vendor/alpine.min.js:5:3070)

@@ -30,6 +30,7 @@
 | 决策项 | 方案 |
 |--------|------|
 | 集成方式 | A: Subprocess (RPC mode) |
+| Pi版本 | `@mariozechner/pi-coding-agent@0.60.0` (锁定) |
 | Pi安装位置 | A2: 内嵌到 `~/.myrecall/pi-agent/` (独立于数据目录) |
 | 通信协议 | RPC mode (stdin JSON 命令, stdout JSONL 事件流) |
 | Session 管理 | 固定 `session_id="chat"`，N:1 映射 |
@@ -140,11 +141,11 @@
 
 | 任务 | 描述 | 交付物 |
 |------|------|--------|
-| 2.1 Types & Data Models | Conversation, Message, ToolCall 数据结构 | `openrecall/client/chat/types.py` |
+| 2.1 Types & Data Models | Conversation, Message, ToolCall, PiStatus 数据结构 | `openrecall/client/chat/types.py` |
 | 2.2 Conversation Manager | 创建/列表/删除/保存对话 | `openrecall/client/chat/conversation.py` |
 | 2.3 Pi RPC Manager | RPC 模式进程管理、stdin/stdout 通信 | `openrecall/client/chat/pi_rpc.py` |
 | 2.4 Chat Service | 流式响应协调、错误恢复 | `openrecall/client/chat/service.py` |
-| 2.5 SSE Routes | `/chat/api/stream` 等端点 | `openrecall/client/chat/routes.py` |
+| 2.5 SSE Routes | `/chat/api/stream` 等端点 + 注册 blueprint | `openrecall/client/chat/routes.py` + `openrecall/client/web/app.py` |
 | 2.6 Integration Tests | 端到端测试 | `tests/test_chat_integration.py` |
 
 详细设计见 `phase2-core-service/spec.md` 和 `phase2-core-service/plan.md`。
@@ -153,12 +154,13 @@
 
 - [ ] `curl` 可以 POST 到 `/chat/api/stream` 并收到 SSE 事件流
 - [ ] Pi 进程自动启动（首次消息时）
-- [ ] Pi 进程崩溃后自动重启（指数退避）
+- [ ] Pi 进程崩溃后自动重启（指数退避，最多3次）
 - [ ] Conversation 文件正确创建在 `~/MRC/chats/`
 - [ ] Conversation 列表按 `updated_at` 降序返回
 - [ ] `POST /chat/api/new-session` 正确重置 Pi 上下文
 - [ ] 错误场景返回有意义的 JSON 错误
-- [ ] SSE 连接支持 keepalive 和超时处理
+- [ ] SSE 连接支持 keepalive（15秒间隔）和超时处理（5分钟）
+- [ ] 并发请求被拒绝并返回 `{"type": "error", "code": "BUSY"}`
 - [ ] Pi 进程在服务关闭时被正确终止
 
 ---
@@ -171,11 +173,12 @@
 
 | 任务 | 描述 | 交付物 |
 |------|------|--------|
-| 3.1 Chat 路由 | `/chat` 页面 | `openrecall/client/web/templates/chat.html` |
-| 3.2 消息组件 | 消息输入、发送、展示 | Alpine.js 组件 (内嵌于 chat.html) |
-| 3.3 流式渲染 | SSE 事件处理、逐字显示 | `openrecall/client/web/static/js/chat-stream.js` |
-| 3.4 Markdown 渲染 | GFM 支持 | marked.js 集成 |
-| 3.5 Tool Call 展示 | 折叠式的工具调用详情 | UI 组件 (内嵌于 chat.html) |
+| 3.1 Chat 路由 + 导航 | `/chat` 页面路由 + header 导航集成 | `app.py`, `layout.html`, `icons.html` |
+| 3.2 chat.html 模板 | 侧边栏 + 消息展示 + SSE 流式 + Markdown + ToolCall，全部内嵌于单一模板文件 | `openrecall/client/web/templates/chat.html` |
+| 3.3 UI 测试 | 模板渲染测试 | `tests/test_chat_ui.py` |
+| 3.4 导航集成验证 | 确认 header Chat 链接正常工作 | — |
+
+> **说明**：SSE 流式逻辑内嵌于 `chat.html` 的 Alpine.js 中，不使用独立 JS 文件。设计决策与现有 `search.html` / `timeline.html` 保持一致，无构建步骤。
 
 ### 验收标准
 
@@ -386,7 +389,7 @@ MyRecall 现有数据目录配置：
 | 阶段 | 目标 | 状态 |
 |------|------|------|
 | 阶段1 | Pi 集成基础设施就绪 | ✅ 已完成 (2026-03-26) |
-| 阶段2 | Chat Service 后端可用 | 🚧 进行中 — Plan: `docs/superpowers/plans/2026-03-26-phase2-core-service.md` |
+| 阶段2 | Chat Service 后端可用 | ✅ 已完成 (2026-03-26) |
 | 阶段3 | Web UI 可用 | ⏳ 待开始 |
 | 阶段4 | 体验完善 | ⏳ 待开始 |
 
@@ -401,7 +404,11 @@ MyRecall 现有数据目录配置：
 | 2026-03-25 | 补充 LLM Provider 对比表，更新 Pi 关键文档引用 |
 | 2026-03-25 | 添加 minimax 作为默认 Provider，kimi-coding 作为备用 |
 | 2026-03-26 | Phase 1 完成验收，更新验收标准状态 |
+| 2026-03-26 | Phase 2 完成，所有后端文件、API 端点和测试已就绪 |
 | 2026-03-26 | 更新决策2：从 JSON mode 改为 RPC mode（与 screenpipe 对齐） |
 | 2026-03-26 | 更新决策3：Conversation:Session 映射改为 N:1，固定 workspace |
 | 2026-03-26 | 更新阶段2任务清单和验收标准，与 plan.md 对齐 |
 | 2026-03-26 | 更新架构图和目录结构，反映 RPC 模式设计 |
+| 2026-03-26 | 决策2添加 Pi 版本锁定说明 (`@0.60.0`) |
+| 2026-03-26 | 完善验收标准：添加 keepalive 间隔、并发请求处理、重启次数限制 |
+| 2026-03-26 | Phase 2 文档一致性修正：Task 2.1 添加 PiStatus 数据类；Task 2.5 补充 `web/app.py` blueprint 注册交付物 |

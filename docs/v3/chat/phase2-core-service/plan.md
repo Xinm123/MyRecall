@@ -308,13 +308,14 @@ pytest tests/test_chat_service.py -v -k "test_stream"
 1. Create Flask Blueprint `chat_bp`
    - URL prefix: `/chat`
 
-2. Implement `POST /api/stream` (SSE endpoint)
+2. Implement `POST /chat/api/stream` (SSE endpoint)
    - Parse JSON body: `{conversation_id, message, images?}`
    - Validate required fields
    - Get or create ChatService instance
    - Return `text/event-stream` response
    - Yield events from `service.stream_response()`
    - Handle errors gracefully
+   - Send keepalive comments (`: keepalive`) every 15 seconds to prevent timeout
 
 3. Implement `GET /api/conversations`
    - Return list of conversation metadata
@@ -427,17 +428,20 @@ pytest tests/test_chat_integration.py -v -m integration
 ## Implementation Order
 
 ```
-Task 2.1 (Types) ──────────────┐
-                               │
-Task 2.2 (Conversation) ───────┼──► Task 2.4 (Chat Service) ──► Task 2.5 (Routes)
-                               │           │
-Task 2.3 (Pi RPC) ─────────────┘           │
-                                           │
-                                           └──► Task 2.6 (Integration Tests)
+Task 2.1 (Types) ──────────────────────┐
+                                       │
+Task 2.2 (Conversation) ◄── depends ───┤
+                                       │
+Task 2.3 (Pi RPC) ◄── depends ─────────┤
+                                       │
+                                       └──► Task 2.4 (Chat Service) ──► Task 2.5 (Routes)
+                                                   │
+                                                   └──► Task 2.6 (Integration Tests)
 ```
 
 **Parallel opportunities**:
-- Tasks 2.1, 2.2, 2.3 can be developed in parallel
+- Task 2.1 must complete first (foundation types)
+- Tasks 2.2 and 2.3 can run in parallel after 2.1
 - Task 2.4 depends on 2.1, 2.2, 2.3
 - Task 2.5 depends on 2.4
 - Task 2.6 runs after all others
@@ -446,7 +450,7 @@ Task 2.3 (Pi RPC) ─────────────┘           │
 
 | Task | Dependencies | Parallel? | Estimated Effort |
 |------|--------------|-----------|------------------|
-| 2.1 Types | None | Yes | Small |
+| 2.1 Types | None | No (foundation) | Small |
 | 2.2 Conversation | 2.1 | Yes (with 2.3) | Medium |
 | 2.3 Pi RPC | 2.1 | Yes (with 2.2) | Large |
 | 2.4 Chat Service | 2.1, 2.2, 2.3 | No | Large |
@@ -515,13 +519,7 @@ tests/
 
 ## Open Questions
 
-| Question | Status | Resolution |
-|----------|--------|------------|
-| SSE keepalive | **Resolved** | Send comment lines (`: keepalive`) every 15 seconds |
-| Max concurrent requests | **Resolved** | MVP uses single Pi session, reject concurrent prompts with 429 |
-| Conversation title generation | **Resolved** | Auto-generate from first 50 chars of first user message |
-| Image support | **Resolved** | Support base64 images in Phase 2 MVP |
-| Streaming timeout | **Resolved** | 5 minute timeout per message (configurable) |
+> See `docs/superpowers/plans/2026-03-26-phase2-core-service.md` for resolved open questions.
 
 ## Notes
 
@@ -539,6 +537,8 @@ data: {"type":"tool_execution_start","toolCallId":"xxx","toolName":"bash","args"
 event: agent_end
 data: {"type":"agent_end"}
 ```
+
+**Keepalive**: Send SSE comment lines (`: keepalive\n\n`) every 15 seconds to prevent connection timeout.
 
 ### Error Event Format
 
@@ -580,3 +580,12 @@ Following screenpipe's approach:
 - **Screenpipe Event Handler**: `_ref/screenpipe/apps/screenpipe-app-tauri/lib/pi-event-handler.ts`
 - **Screenpipe Chat Storage**: `_ref/screenpipe/apps/screenpipe-app-tauri/lib/chat-storage.ts`
 - **Pi Session Format**: `_ref/pi-mono/packages/coding-agent/docs/session.md`
+
+## Change History
+
+| Date | Change |
+|------|--------|
+| 2026-03-26 | Initial plan created |
+| 2026-03-26 | Added SSE keepalive specification, streamlined Open Questions |
+| 2026-03-26 | Fixed task dependency diagram: Tasks 2.2 and 2.3 depend on 2.1, not fully parallel |
+| 2026-03-26 | 文档一致性修正：SSE 端点描述统一为 `/chat/api/stream` |

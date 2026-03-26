@@ -388,6 +388,74 @@ class TestGetFrameContext:
         assert len(context["urls"]) == 1
 
 
+class TestGetFrameContextMetadataFields:
+    """Tests for get_frame_context new metadata fields (timestamp, app_name, window_name)."""
+
+    def test_get_frame_context_includes_timestamp(
+        self, store: FramesStore
+    ):
+        """Frame context should include timestamp from frames table."""
+        frame_id = _create_completed_frame_with_accessibility(
+            store, "cap-ts", "2026-03-26T14:32:05Z", "Safari", "Test text"
+        )
+
+        context = store.get_frame_context(frame_id)
+
+        assert context is not None
+        assert context["timestamp"] == "2026-03-26T14:32:05Z"
+
+    def test_get_frame_context_includes_app_name(
+        self, store: FramesStore
+    ):
+        """Frame context should include app_name from frames table."""
+        frame_id = _create_completed_frame_with_accessibility(
+            store, "cap-app", "2026-03-26T14:32:05Z", "Chrome", "Test text"
+        )
+
+        context = store.get_frame_context(frame_id)
+
+        assert context is not None
+        assert context["app_name"] == "Chrome"
+
+    def test_get_frame_context_includes_window_name(
+        self, store: FramesStore
+    ):
+        """Frame context should include window_name from frames table."""
+        # window_name is set as "{app_name} Window" by _create_completed_frame_with_accessibility
+        frame_id = _create_completed_frame_with_accessibility(
+            store, "cap-win", "2026-03-26T14:32:05Z", "VSCode", "Test text"
+        )
+
+        context = store.get_frame_context(frame_id)
+
+        assert context is not None
+        assert context["window_name"] == "VSCode Window"
+
+
+class TestGetFrameContextBoundsPrecision:
+    """Tests for get_frame_context bounds precision (3 decimal places)."""
+
+    def test_normalize_bounds_rounds_to_3_decimals(self):
+        """normalize_bounds should round all values to 3 decimal places."""
+        from openrecall.client.accessibility.macos import normalize_bounds
+
+        bounds = normalize_bounds(
+            elem_x=100.0, elem_y=50.0, elem_w=800.0, elem_h=600.0,
+            window_x=0.0, window_y=0.0, window_w=1920.0, window_h=1080.0,
+        )
+        assert bounds is not None
+        # Verify rounding: values should have at most 3 decimal places
+        assert bounds.left == round(100.0 / 1920.0, 3)
+        assert bounds.top == round(50.0 / 1080.0, 3)
+        assert bounds.width == round(800.0 / 1920.0, 3)
+        assert bounds.height == round(600.0 / 1080.0, 3)
+        # Explicit check: no more than 3 decimal places
+        assert bounds.left == round(bounds.left, 3)
+        assert bounds.top == round(bounds.top, 3)
+        assert bounds.width == round(bounds.width, 3)
+        assert bounds.height == round(bounds.height, 3)
+
+
 class TestGetFrameContextTruncation:
     """Tests for get_frame_context truncation parameters (screenpipe-aligned)."""
 
