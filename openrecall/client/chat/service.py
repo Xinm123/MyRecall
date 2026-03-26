@@ -239,10 +239,11 @@ class ChatService:
 
                 yield event
 
-                # Accumulate response
+                # Accumulate response — only text deltas, skip thinking
                 if event.get("type") == "message_update":
-                    delta = event.get("assistantMessageEvent", {}).get("delta", "")
-                    assistant_content += delta
+                    msg_evt = event.get("assistantMessageEvent", {})
+                    if msg_evt.get("type") == "text_delta":
+                        assistant_content += msg_evt.get("delta", "")
 
                 elif event.get("type") == "tool_execution_start":
                     tool_calls.append({
