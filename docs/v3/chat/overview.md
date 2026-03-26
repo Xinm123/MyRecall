@@ -152,16 +152,16 @@
 
 ### 验收标准
 
-- [ ] `curl` 可以 POST 到 `/chat/api/stream` 并收到 SSE 事件流
-- [ ] Pi 进程自动启动（首次消息时）
-- [ ] Pi 进程崩溃后自动重启（指数退避，最多3次）
-- [ ] Conversation 文件正确创建在 `~/MRC/chats/`
-- [ ] Conversation 列表按 `updated_at` 降序返回
-- [ ] `POST /chat/api/new-session` 正确重置 Pi 上下文
-- [ ] 错误场景返回有意义的 JSON 错误
-- [ ] SSE 连接支持 keepalive（15秒间隔）和超时处理（5分钟）
-- [ ] 并发请求被拒绝并返回 `{"type": "error", "code": "BUSY"}`
-- [ ] Pi 进程在服务关闭时被正确终止
+- [x] `curl` 可以 POST 到 `/chat/api/stream` 并收到 SSE 事件流
+- [x] Pi 进程自动启动（首次消息时）
+- [x] Pi 进程崩溃后自动重启（指数退避，最多3次）
+- [x] Conversation 文件正确创建在 `~/MRC/chats/`
+- [x] Conversation 列表按 `updated_at` 降序返回
+- [x] `POST /chat/api/new-session` 正确重置 Pi 上下文
+- [x] 错误场景返回有意义的 JSON 错误
+- [x] SSE 连接支持 keepalive（15秒间隔）和超时处理（5分钟）
+- [x] 并发请求被拒绝并返回 `{"type": "error", "code": "BUSY"}`
+- [x] Pi 进程在服务关闭时被正确终止
 
 ---
 
@@ -390,7 +390,7 @@ MyRecall 现有数据目录配置：
 |------|------|------|
 | 阶段1 | Pi 集成基础设施就绪 | ✅ 已完成 (2026-03-26) |
 | 阶段2 | Chat Service 后端可用 | ✅ 已完成 (2026-03-26) |
-| 阶段3 | Web UI 可用 | ⏳ 待开始 |
+| 阶段3 | Web UI 可用 | ✅ 已完成 (2026-03-26) |
 | 阶段4 | 体验完善 | ⏳ 待开始 |
 
 ---
