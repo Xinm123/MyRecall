@@ -29,7 +29,7 @@ class PiRpcManager:
     Manages Pi subprocess in RPC mode.
 
     RPC Protocol:
-    - Commands (stdin): {"type": "prompt", "id": "...", "content": "..."}
+    - Commands (stdin): {"type": "prompt", "id": "...", "message": "..."}
     - Events (stdout): {"type": "message_update", ...}
     """
 
@@ -167,7 +167,7 @@ class PiRpcManager:
         cmd: dict[str, object] = {
             "type": "prompt",
             "id": request_id,
-            "content": content,
+            "message": content,
         }
         if images:
             cmd["images"] = images
