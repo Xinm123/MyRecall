@@ -25,6 +25,7 @@ PROVIDER_ENV_MAP: dict[str, str] = {
     "kimi-coding": "KIMI_API_KEY",
     "anthropic": "ANTHROPIC_API_KEY",
     "openai": "OPENAI_API_KEY",
+    "qianfan": "QIANFAN_API_KEY",
     "custom": "CUSTOM_API_KEY",
 }
 
@@ -57,12 +58,12 @@ def get_api_key(provider: str) -> Optional[str]:
 
 def get_default_provider() -> str:
     """Return default LLM provider name."""
-    return "minimax-cn"
+    return "qianfan"
 
 
 def get_default_model() -> str:
     """Return default LLM model ID."""
-    return "MiniMax-M2.7"
+    return "deepseek-r1-250528"
 
 
 def validate_pi_config(provider: str, model: str, api_key: str) -> None:

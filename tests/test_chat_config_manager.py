@@ -14,11 +14,11 @@ from openrecall.client.chat.config_manager import (
 
 
 def test_get_default_provider():
-    assert get_default_provider() == "minimax-cn"
+    assert get_default_provider() == "qianfan"
 
 
 def test_get_default_model():
-    assert get_default_model() == "MiniMax-M2.7"
+    assert get_default_model() == "deepseek-r1-250528"
 
 
 def test_get_api_key_from_env_var(monkeypatch):
@@ -60,3 +60,4 @@ def test_provider_env_map():
     assert PROVIDER_ENV_MAP["kimi-coding"] == "KIMI_API_KEY"
     assert PROVIDER_ENV_MAP["anthropic"] == "ANTHROPIC_API_KEY"
     assert PROVIDER_ENV_MAP["openai"] == "OPENAI_API_KEY"
+    assert PROVIDER_ENV_MAP["qianfan"] == "QIANFAN_API_KEY"

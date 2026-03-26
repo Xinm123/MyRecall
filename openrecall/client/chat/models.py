@@ -7,8 +7,8 @@ default provider/model constants — no model metadata dictionary
 is maintained here.
 """
 
-DEFAULT_PROVIDER = "minimax-cn"
-"""Default LLM provider. Pi provides built-in minimax-cn + kimi-coding providers."""
+DEFAULT_PROVIDER = "qianfan"
+"""Default LLM provider. Configured via ~/.pi/agent/models.json."""
 
-DEFAULT_MODEL = "MiniMax-M2.7"
-"""Default model ID for minimax-cn provider."""
+DEFAULT_MODEL = "deepseek-r1-250528"
+"""Default model ID for qianfan provider (DeepSeek R1)."""
