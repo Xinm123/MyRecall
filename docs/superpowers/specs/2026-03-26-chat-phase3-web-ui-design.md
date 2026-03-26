@@ -140,6 +140,7 @@ Phase 3 implements the user-facing chat interface for MyRecall v3, building the 
   - Each item: title (truncated to 30 chars), relative timestamp, delete icon
   - Click: loads conversation, calls `POST /chat/api/new-session` to reset Pi context
   - Active conversation: highlighted background
+- **Conversation switch during streaming:** If a stream is active, clicking a different conversation should cancel the stream (abort the fetch ReadableStream reader) before switching. The frontend cancels via `reader.cancel()` and sets `isStreaming = false`.
 - **Delete:** `DELETE /chat/api/conversations/{id}` with confirmation
 
 ### Message Display
@@ -224,16 +225,19 @@ OPENRECALL_PORT=8083
 
 ```javascript
 // SSE stream handler using fetch + ReadableStream
+// SSE format: lines like "event: message_update\ndata: {...}\n\n"
 async function streamChat(conversationId, message) {
   const response = await fetch('/chat/api/stream', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ conversation_id: conversationId, message })
+    // Note: images field reserved for Phase 4 (screenshot attachment): { images: ["base64..."] }
   });
 
   const reader = response.body.getReader();
   const decoder = new TextDecoder();
   let buffer = '';
+  let pendingEventType = 'message'; // default event type
 
   while (true) {
     const { done, value } = await reader.read();
@@ -244,15 +248,16 @@ async function streamChat(conversationId, message) {
     buffer = lines.pop(); // keep incomplete line in buffer
 
     for (const line of lines) {
-      if (!line.startsWith('data: ')) continue;
-      const data = line.slice(6);
-      if (!data) continue;
-
-      const eventMatch = /* find preceding "event: XXX" line */;
-      const eventType = eventMatch ? eventMatch : 'message';
-      const payload = JSON.parse(data);
-
-      handleEvent(eventType, payload);
+      if (line.startsWith('event: ')) {
+        // Track the event type for the next data: line
+        pendingEventType = line.slice(7).trim();
+      } else if (line.startsWith('data: ')) {
+        const data = line.slice(6);
+        if (!data) continue;
+        const payload = JSON.parse(data);
+        handleEvent(pendingEventType, payload);
+      }
+      // Ignore comment lines (": keepalive") and empty lines
     }
   }
 }
