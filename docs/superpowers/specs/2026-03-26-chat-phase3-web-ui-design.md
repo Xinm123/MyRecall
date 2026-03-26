@@ -180,8 +180,22 @@ OPENRECALL_PORT=8083
 ```
 
 - **Collapsed:** `{icon} {tool_name} {args_preview}`
-- **Expanded:** Full JSON args + result (truncated at 500 chars)
+- **Expanded:** Full JSON args + result (truncated at 500 chars with `...` suffix)
 - **Toggle:** Click anywhere on the summary row
+
+**Result truncation:** If `result.length > 500`, show first 500 chars + `\n... (truncated)`.
+
+**Error code display:**
+
+| Code | Display | Message |
+|------|---------|---------|
+| `BUSY` | Yellow card | "Another request is in progress." |
+| `PI_CRASH` | Red card | "Pi crashed. Retrying..." |
+| `TIMEOUT` | Orange card | "Response timed out." |
+| `API_ERROR` | Red card | "{message}" |
+| `INTERNAL_ERROR` | Red card | "Something went wrong." |
+
+**Mobile sidebar:** Hamburger icon (☰) in header when viewport < 768px. Sidebar overlays content. Close on click outside or conversation selection.
 
 ### Input Area
 
@@ -202,43 +216,82 @@ OPENRECALL_PORT=8083
 | Delete conversation | DELETE | `/chat/api/conversations/{id}` | Remove from sidebar |
 | Switch conversation | POST | `/chat/api/new-session` | Reset Pi context |
 | Stream response | POST | `/chat/api/stream` | SSE streaming chat |
+| Get Pi status | GET | `/chat/api/pi-status` | Show Pi running state |
 
 ### SSE Event Handling
 
+> **Note:** Browser `EventSource` does not support POST requests. Use `fetch()` with `ReadableStream` for SSE over POST.
+
 ```javascript
-// Alpine.js data
-{
-  messages: [],           // Array of message objects
-  isStreaming: false,     // True during SSE stream
-  currentConvId: null,   // Active conversation ID
-  inputText: '',         // Input field value
+// SSE stream handler using fetch + ReadableStream
+async function streamChat(conversationId, message) {
+  const response = await fetch('/chat/api/stream', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ conversation_id: conversationId, message })
+  });
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split('\n');
+    buffer = lines.pop(); // keep incomplete line in buffer
+
+    for (const line of lines) {
+      if (!line.startsWith('data: ')) continue;
+      const data = line.slice(6);
+      if (!data) continue;
+
+      const eventMatch = /* find preceding "event: XXX" line */;
+      const eventType = eventMatch ? eventMatch : 'message';
+      const payload = JSON.parse(data);
+
+      handleEvent(eventType, payload);
+    }
+  }
 }
 
-// SSE stream handler
-const eventSource = new EventSource('/chat/api/stream', {
-  method: 'POST',
-  body: JSON.stringify({ conversation_id, message })
-});
+// SSE event types from backend
+// event: message_update  →  payload: {type, assistantMessageEvent: {type, delta}}
+// event: tool_execution_start  →  payload: {type, toolCallId, toolName, args}
+// event: tool_execution_end  →  payload: {type, toolCallId, result, isError}
+// event: agent_end  →  payload: {type}
+// event: error  →  payload: {type, message, code}
 
-eventSource.addEventListener('message_update', (e) => {
-  // Accumulate text_delta into current assistant message
-});
+function handleEvent(eventType, payload) {
+  if (eventType === 'message_update' || eventType === 'message') {
+    // payload.assistantMessageEvent.delta contains the incremental text
+    const delta = payload.assistantMessageEvent?.delta ?? '';
+    // Accumulate delta into current assistant message's rawContent
+  }
 
-eventSource.addEventListener('tool_execution_start', (e) => {
-  // Add tool call to current message
-});
+  if (eventType === 'tool_execution_start') {
+    // payload.toolCallId, payload.toolName, payload.args
+  }
 
-eventSource.addEventListener('tool_execution_end', (e) => {
-  // Update tool call status
-});
+  if (eventType === 'tool_execution_end') {
+    // Update tool call status: payload.isError ? 'error' : 'done'
+    // payload.result contains the result content
+  }
 
-eventSource.addEventListener('agent_end', (e) => {
-  // Finalize message, enable input
-});
+  if (eventType === 'agent_end') {
+    // Finalize message: apply marked.parse() to rawContent, enable input
+  }
 
-eventSource.addEventListener('error', (e) => {
-  // Show inline error card
-});
+  if (eventType === 'error') {
+    // payload.code: 'BUSY' | 'PI_CRASH' | 'TIMEOUT' | 'API_ERROR' | 'INTERNAL_ERROR'
+    // Display error card with appropriate messaging
+  }
+}
+
+// Cleanup: close reader and abort on page leave
+window.addEventListener('beforeunload', () => reader.cancel());
 ```
 
 ### Message Object Shape (Alpine.js)
@@ -247,8 +300,8 @@ eventSource.addEventListener('error', (e) => {
 {
   id: 'uuid',
   role: 'user' | 'assistant',
-  content: 'string',           // Rendered content (Markdown for assistant)
-  rawContent: 'string',        // Original content
+  rawContent: 'string',        // Original content (never modified after set)
+  content: 'string',           // Rendered HTML (Markdown → HTML for assistant, plain for user)
   toolCalls: [
     {
       id: 'string',
@@ -262,6 +315,11 @@ eventSource.addEventListener('error', (e) => {
   isLoading: false             // True for streaming assistant messages
 }
 ```
+
+**Content population rules:**
+- **User messages:** `content = rawContent` (plain text, no Markdown)
+- **New assistant messages (streaming):** accumulate `delta` into `rawContent` during SSE stream; apply `marked.parse(rawContent)` only when `agent_end` arrives
+- **Loaded from API:** `GET /chat/api/conversations/{id}` returns messages with raw content; apply `marked.parse()` to each assistant message's `content` field before adding to `messages` array
 
 ## File Deliverables
 
@@ -309,15 +367,20 @@ In `layout.html`, add Chat to the nav links:
 - [ ] Loading state ("正在思考...") appears during stream
 - [ ] Input clears after sending
 - [ ] Input is disabled during streaming
-- [ ] Error events show inline error cards
-- [ ] Clicking a conversation loads its history
+- [ ] Error events show inline error cards with correct type-specific styling
+- [ ] Clicking a conversation loads its history with Markdown rendered
 - [ ] Switching conversations resets Pi context
 - [ ] Deleting a conversation removes it from sidebar
 - [ ] Header has working Chat navigation link
-- [ ] Page works on mobile (sidebar collapses)
+- [ ] Page works on mobile (hamburger → sidebar overlay)
+- [ ] SSE connection is cleaned up on page navigation (beforeunload)
 
 ## Change History
 
 | Date | Change |
 |------|--------|
 | 2026-03-26 | Initial design created |
+| 2026-03-26 | Fix: SSE uses fetch+ReadableStream instead of EventSource POST; clarify event structure |
+| 2026-03-26 | Fix: add Markdown rendering for pre-loaded messages; clarify rawContent/content rules |
+| 2026-03-26 | Fix: add missing GET /chat/api/pi-status endpoint to table |
+| 2026-03-26 | Fix: add error code display table, mobile sidebar guidance, SSE cleanup |
