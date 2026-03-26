@@ -454,10 +454,12 @@ class SearchEngine:
                 result = {"ocr": 0, "accessibility": 0}
                 for row in rows:
                     source = row["text_source"] or "ocr"
-                    if source in result:
-                        result[source] = row["cnt"]
+                    if source == "accessibility" or source == "hybrid":
+                        result["accessibility"] += row["cnt"]
+                    elif source == "ocr":
+                        result["ocr"] += row["cnt"]
                     else:
-                        # Handle 'hybrid' or other text_source values
+                        # Handle unexpected text_source values
                         pass
 
                 return result

@@ -16,3 +16,4 @@ htmlcov
 # Environment files (may contain secrets)
 *.env
 !.env.example
+_ref/

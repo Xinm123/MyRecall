@@ -562,7 +562,7 @@ class FramesStore:
                             "app": row["app_name"] or "",
                             "title": row["window_name"] or "",
                             "status": (row["status"] or "pending").upper(),
-                            "filename": f"{ts}.png",
+                            "filename": f"{ts}.jpg",
                             "app_name": row["app_name"] or "",
                             "window_title": row["window_name"] or "",
                             "last_known_app": row["last_known_app"] or "",
@@ -625,7 +625,7 @@ class FramesStore:
                             "app": row["app_name"] or "",
                             "title": row["window_name"] or "",
                             "status": (row["status"] or "pending").upper(),
-                            "filename": f"{ts}.png",
+                            "filename": f"{ts}.jpg",
                             "app_name": row["app_name"] or "",
                             "window_title": row["window_name"] or "",
                             "last_known_app": row["last_known_app"] or "",
@@ -676,7 +676,7 @@ class FramesStore:
                             "app": row["app_name"] or "",
                             "title": row["window_name"] or "",
                             "status": (row["status"] or "pending").upper(),
-                            "filename": f"{ts}.png",
+                            "filename": f"{ts}.jpg",
                             "app_name": row["app_name"] or "",
                             "window_title": row["window_name"] or "",
                             "last_known_app": row["last_known_app"] or "",
@@ -1797,7 +1797,7 @@ class FramesStore:
         """Get recent frame descriptions within a time range."""
         cursor = conn.execute(
             """
-            SELECT fd.frame_id, fd.summary, fd.intent
+            SELECT fd.frame_id, fd.narrative, fd.entities_json, fd.intent, fd.summary
             FROM frame_descriptions fd
             JOIN frames f ON f.id = fd.frame_id
             WHERE f.timestamp BETWEEN ? AND ?
@@ -1808,7 +1808,17 @@ class FramesStore:
             (time_start, time_end, limit),
         )
         rows = cursor.fetchall()
-        return [
-            {"frame_id": r[0], "summary": r[1], "intent": r[2]}
-            for r in rows
-        ]
+        result = []
+        for r in rows:
+            try:
+                entities = json.loads(r[2])
+            except (json.JSONDecodeError, TypeError):
+                entities = []
+            result.append({
+                "frame_id": r[0],
+                "narrative": r[1],
+                "entities": entities,
+                "intent": r[3],
+                "summary": r[4],
+            })
+        return result

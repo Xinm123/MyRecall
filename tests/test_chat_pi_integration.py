@@ -125,7 +125,6 @@ class TestPiExecution:
                 str(workspace),
                 "--provider",
                 provider,
-                "--no-stream",
                 "-p",
                 "Use curl to call GET http://localhost:8083/v1/activity-summary "
                 "with start_time and end_time parameters (use date command to generate "

@@ -909,6 +909,7 @@ The endpoint returns a typed union.
 - `start_time`
 - `end_time`
 - `app_name` (optional)
+- `max_descriptions` (optional, integer, default 20, max 100) — limits the number of AI-generated frame descriptions returned
 
 ### Return Shape
 
@@ -925,8 +926,18 @@ The endpoint returns a typed union.
     {
       "frame_id": 123,
       "text": "Chat Capability Alignment",
+      "role": "AXStaticText",
       "app_name": "Cursor",
       "timestamp": "2026-03-19T10:21:35Z"
+    }
+  ],
+  "descriptions": [
+    {
+      "frame_id": 42,
+      "narrative": "User is reviewing a GitHub pull request...",
+      "summary": "GitHub PR review",
+      "entities": ["PR #123", "GitHub"],
+      "intent": "code_review"
     }
   ],
   "audio_summary": {
@@ -950,6 +961,8 @@ The endpoint returns a typed union.
 - `recent_texts` only includes `AXStaticText` role from accessibility elements
   - Note: `line` and `paragraph` are OCR hierarchy roles that only exist when `source='ocr'`. Since MVP only writes `source='accessibility'` elements, these roles never appear in MVP queries. They are reserved for future OCR elements support.
 - `recent_texts` returns recent text-like accessibility nodes, sorted by frame timestamp descending
+- `recent_texts` entries include a `role` field (e.g. `AXStaticText`) identifying the accessibility element type
+- `descriptions` contains AI-generated frame descriptions (`narrative`, `entities`, `intent`, `summary`) produced by the `DescriptionWorker`. Available when `description_status == "completed"`. Only includes frames with completed descriptions within the time range.
 - `audio_summary` is preserved as a shape-compatible empty shell in vision-only MVP
 - `time_range` always returns an object — when no frames exist in the queried range, the query bounds (`start_time`, `end_time`) are echoed back
 

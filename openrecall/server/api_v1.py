@@ -1009,7 +1009,7 @@ def search():
     for r in results:
         # Determine type based on text_source
         text_source = r.get("text_source")
-        if text_source == "accessibility":
+        if text_source in ("accessibility", "hybrid"):
             entry_type = "Accessibility"
         else:
             # Default to OCR for both "ocr" and null text_source
