@@ -21,7 +21,7 @@ from openrecall.client.chat.config_manager import (
     get_default_provider,
 )
 from openrecall.client.chat.pi_manager import (
-    PiInstallError,
+    PiInstallError,  # noqa: F401
     ensure_installed,
     find_bun_executable,
     find_pi_executable,

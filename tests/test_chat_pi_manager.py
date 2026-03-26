@@ -14,6 +14,7 @@ from openrecall.client.chat.pi_manager import (
 )
 
 
+@pytest.mark.unit
 def test_find_bun_executable_returns_path():
     """find_bun_executable returns a valid path when bun is installed."""
     result = find_bun_executable()
@@ -21,6 +22,7 @@ def test_find_bun_executable_returns_path():
         assert shutil.which(result) is not None
 
 
+@pytest.mark.unit
 def test_find_bun_executable_returns_none_when_missing(monkeypatch):
     """find_bun_executable returns None when bun is not installed."""
     monkeypatch.setattr(shutil, "which", lambda _: None)
@@ -30,6 +32,7 @@ def test_find_bun_executable_returns_none_when_missing(monkeypatch):
     assert result is None
 
 
+@pytest.mark.unit
 def test_find_pi_executable_returns_path_after_install(tmp_path, monkeypatch):
     """find_pi_executable returns cli.js path after installation."""
     import openrecall.client.chat.pi_manager as pm
@@ -49,6 +52,7 @@ def test_find_pi_executable_returns_path_after_install(tmp_path, monkeypatch):
     assert result == str(cli)
 
 
+@pytest.mark.unit
 def test_find_pi_executable_returns_none_when_not_installed(tmp_path, monkeypatch):
     """find_pi_executable returns None when Pi is not installed."""
     import openrecall.client.chat.pi_manager as pm
@@ -58,6 +62,7 @@ def test_find_pi_executable_returns_none_when_not_installed(tmp_path, monkeypatc
     assert result is None
 
 
+@pytest.mark.unit
 def test_is_version_current_false_when_not_installed(tmp_path, monkeypatch):
     """is_version_current returns False when Pi is not installed."""
     import openrecall.client.chat.pi_manager as pm
@@ -66,6 +71,7 @@ def test_is_version_current_false_when_not_installed(tmp_path, monkeypatch):
     assert pm.is_version_current() is False
 
 
+@pytest.mark.unit
 def test_is_version_current_true_when_matching(tmp_path, monkeypatch):
     """is_version_current returns True when version matches."""
     import openrecall.client.chat.pi_manager as pm
@@ -78,6 +84,7 @@ def test_is_version_current_true_when_matching(tmp_path, monkeypatch):
     assert pm.is_version_current() is True
 
 
+@pytest.mark.unit
 def test_is_version_current_false_when_version_mismatch(tmp_path, monkeypatch):
     """is_version_current returns False when version does not match."""
     import openrecall.client.chat.pi_manager as pm
@@ -90,6 +97,7 @@ def test_is_version_current_false_when_version_mismatch(tmp_path, monkeypatch):
     assert pm.is_version_current() is False
 
 
+@pytest.mark.unit
 def test_is_version_current_false_when_missing_dep(tmp_path, monkeypatch):
     """is_version_current returns False when dependency is missing."""
     import openrecall.client.chat.pi_manager as pm
@@ -100,6 +108,7 @@ def test_is_version_current_false_when_missing_dep(tmp_path, monkeypatch):
     assert pm.is_version_current() is False
 
 
+@pytest.mark.unit
 def test_ensure_installed_raises_when_bun_missing(monkeypatch):
     """ensure_installed raises PiInstallError when bun is not found."""
     import openrecall.client.chat.pi_manager as pm
