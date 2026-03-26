@@ -84,8 +84,8 @@ class TestApiKeyResolution:
 
     def test_default_provider_and_model(self):
         """Default provider and model constants are correct."""
-        assert get_default_provider() == "minimax-cn"
-        assert get_default_model() == "MiniMax-M2.7"
+        assert get_default_provider() == "qianfan"
+        assert get_default_model() == "glm-5"
 
 
 @pytest.mark.integration

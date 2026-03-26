@@ -26,7 +26,7 @@ from .conversation import (
     add_message,
 )
 from .pi_rpc import PiRpcManager
-from .types import Conversation, PiStatus
+from .types import Conversation, PiStatus, ToolCall
 
 
 class ChatService:
@@ -247,19 +247,19 @@ class ChatService:
                         assistant_content += msg_evt.get("delta", "")
 
                 elif event.get("type") == "tool_execution_start":
-                    tool_calls.append({
-                        "id": event.get("toolCallId", ""),
-                        "name": event.get("toolName", ""),
-                        "args": event.get("args", {}),
-                        "status": "running",
-                    })
+                    tool_calls.append(ToolCall(
+                        id=event.get("toolCallId", ""),
+                        name=event.get("toolName", ""),
+                        args=event.get("args", {}),
+                        status="running",
+                    ))
 
                 elif event.get("type") == "tool_execution_end":
                     tc_id = event.get("toolCallId")
                     for tc in tool_calls:
-                        if tc["id"] == tc_id:
-                            tc["status"] = "error" if event.get("isError") else "done"
-                            tc["result"] = event.get("result", {})
+                        if tc.id == tc_id:
+                            tc.status = "error" if event.get("isError") else "done"
+                            tc.result = event.get("result", {})
 
                 elif event.get("type") == "agent_end":
                     # Save assistant message

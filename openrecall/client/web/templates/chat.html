@@ -555,8 +555,8 @@
         </div>
       </template>
 
-      <!-- Loading indicator -->
-      <div class="message-bubble assistant-bubble" x-show="isStreaming && !currentAssistantMsg">
+      <!-- Loading indicator (shown while streaming but no content yet) -->
+      <div class="message-bubble assistant-bubble" x-show="isStreaming && currentAssistantMsg && !currentAssistantMsg.content">
         <div class="message-content">
           <span class="loading-dots">正在思考<span>.</span><span>.</span><span>.</span></span>
         </div>
@@ -809,8 +809,12 @@
               } else if (line.startsWith('data: ')) {
                 const data = line.slice(6);
                 if (!data) continue;
-                const payload = JSON.parse(data);
-                this.handleStreamEvent(pendingEventType, payload);
+                try {
+                  const payload = JSON.parse(data);
+                  this.handleStreamEvent(pendingEventType, payload);
+                } catch (parseErr) {
+                  console.error('Failed to parse SSE data:', data, parseErr);
+                }
               }
             }
           }
@@ -823,7 +827,10 @@
         if (eventType === 'keepalive') return;
 
         if (eventType === 'message_update' || eventType === 'message') {
-          const delta = payload.assistantMessageEvent?.delta ?? '';
+          const evt = payload.assistantMessageEvent;
+          // Only accumulate text_delta, skip thinking_start/thinking_delta/thinking_end
+          if (!evt || evt.type !== 'text_delta') return;
+          const delta = evt.delta ?? '';
           if (!delta) return;
           this.currentAssistantMsg.rawContent += delta;
           this.currentAssistantMsg.content = marked.parse(this.currentAssistantMsg.rawContent);
