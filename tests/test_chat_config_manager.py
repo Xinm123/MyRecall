@@ -18,7 +18,7 @@ def test_get_default_provider():
 
 
 def test_get_default_model():
-    assert get_default_model() == "deepseek-r1-250528"
+    assert get_default_model() == "glm-5"
 
 
 def test_get_api_key_from_env_var(monkeypatch):

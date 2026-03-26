@@ -6,4 +6,4 @@ def test_default_provider():
 
 
 def test_default_model():
-    assert DEFAULT_MODEL == "deepseek-r1-250528"
+    assert DEFAULT_MODEL == "glm-5"

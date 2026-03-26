@@ -63,7 +63,7 @@ def get_default_provider() -> str:
 
 def get_default_model() -> str:
     """Return default LLM model ID."""
-    return "deepseek-r1-250528"
+    return "glm-5"
 
 
 def validate_pi_config(provider: str, model: str, api_key: str) -> None:

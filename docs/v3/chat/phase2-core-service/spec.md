@@ -114,10 +114,12 @@ class PiRpcManager:
 
 Request format (stdin):
 ```json
-{"type": "prompt", "id": "req-uuid", "content": "user message", "images": [...]}
+{"type": "prompt", "id": "req-uuid", "message": "user message", "images": [...]}
 {"type": "new_session"}
 {"type": "abort"}
 ```
+
+> **Note**: The prompt command uses `"message"` field (not `"content"`) to match Pi's actual RPC API.
 
 Response format (stdout, JSONL):
 ```json
@@ -228,10 +230,11 @@ def delete_conversation(conversation_id: str) -> bool:
 |----------|--------|-------------|
 | `/chat/api/stream` | POST (SSE) | Stream chat response |
 | `/chat/api/conversations` | GET | List conversations |
+| `/chat/api/conversations` | POST | Create new conversation |
 | `/chat/api/conversations/{id}` | GET | Get conversation |
 | `/chat/api/conversations/{id}` | DELETE | Delete conversation |
-| `/chat/api/conversations` | POST | Create new conversation |
 | `/chat/api/new-session` | POST | Reset Pi session |
+| `/chat/api/pi-status` | GET | Get Pi process status |
 
 **Stream Endpoint**:
 
@@ -333,13 +336,13 @@ User clicks different conversation in UI
 
 ## Acceptance Criteria
 
-- [ ] `curl` can POST to `/chat/api/stream` and receive SSE events
-- [ ] Pi process starts automatically on first message
-- [ ] Conversation files are created and updated correctly
-- [ ] `piNewSession` correctly resets Pi context
-- [ ] Pi process is killed on service shutdown
-- [ ] Error cases return meaningful error messages
-- [ ] Concurrent requests are rejected with SSE event `{"type": "error", "code": "BUSY"}`
+- [x] `curl` can POST to `/chat/api/stream` and receive SSE events
+- [x] Pi process starts automatically on first message
+- [x] Conversation files are created and updated correctly
+- [x] `piNewSession` correctly resets Pi context
+- [x] Pi process is killed on service shutdown
+- [x] Error cases return meaningful error messages
+- [x] Concurrent requests are rejected with SSE event `{"type": "error", "code": "BUSY"}`
 
 **Phase 3 (Web UI) acceptance criteria**:
 - [ ] Tool calls are displayed in the event stream (UI rendering)
@@ -376,3 +379,4 @@ User clicks different conversation in UI
 | 2026-03-26 | Moved "Tool calls displayed" to Phase 3 acceptance criteria |
 | 2026-03-26 | Added concurrent request rejection (BUSY SSE event) to acceptance criteria |
 | 2026-03-26 | 修正并发拒绝行为：SSE BUSY 事件（而非 HTTP 429）；修正 PiRpcManager/ChatService 方法签名为 sync（与 plan 和 screenpipe 对齐） |
+| 2026-03-26 | Phase 2 验收完成，所有验收标准通过 |

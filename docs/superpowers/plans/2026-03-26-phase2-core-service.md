@@ -2026,19 +2026,19 @@ Task 2.3 (Pi RPC) ◄── depends ─────────┤
 
 ## Definition of Done
 
-- [ ] All files created and implemented
-- [ ] Unit tests pass: `pytest tests/test_chat*.py -v -m "not integration"`
-- [ ] Integration tests pass: `pytest tests/test_chat_integration.py -v -m integration`
-- [ ] `curl` can POST to `/chat/api/stream` and receive SSE events
-- [ ] Pi process starts automatically on first message
-- [ ] Pi process restarts on crash with exponential backoff (max 3 retries)
-- [ ] Conversation files are created in `~/MRC/chats/`
-- [ ] Conversation listing returns results sorted by updated_at DESC
-- [ ] `POST /chat/api/new-session` resets Pi context
-- [ ] Error cases return meaningful JSON errors
-- [ ] SSE connection handles keepalive (15s interval) and timeout (5 min)
-- [ ] Concurrent requests are rejected with `{"type": "error", "code": "BUSY"}`
-- [ ] Pi process is killed on service shutdown
+- [x] All files created and implemented
+- [x] Unit tests pass: `pytest tests/test_chat*.py -v -m "not integration"`
+- [x] Integration tests pass: `pytest tests/test_chat_integration.py -v -m integration`
+- [x] `curl` can POST to `/chat/api/stream` and receive SSE events
+- [x] Pi process starts automatically on first message
+- [x] Pi process restarts on crash with exponential backoff (max 3 retries)
+- [x] Conversation files are created in `~/MRC/chats/`
+- [x] Conversation listing returns results sorted by updated_at DESC
+- [x] `POST /chat/api/new-session` resets Pi context
+- [x] Error cases return meaningful JSON errors
+- [x] SSE connection handles keepalive (15s interval) and timeout (5 min)
+- [x] Concurrent requests are rejected with `{"type": "error", "code": "BUSY"}`
+- [x] Pi process is killed on service shutdown
 
 ---
 
@@ -2080,3 +2080,4 @@ Task 2.3 (Pi RPC) ◄── depends ─────────┤
 | 2026-03-26 | Updated Definition of Done with specific metrics |
 | 2026-03-26 | 文档一致性修正：SSE 端点描述统一为 `/chat/api/stream` |
 | 2026-03-26 | 文档一致性修正：blueprint 注册代码示例使用正确的 `client_app` 变量名 |
+| 2026-03-26 | Phase 2 验收完成，所有验收标准通过 (49 tests pass) |

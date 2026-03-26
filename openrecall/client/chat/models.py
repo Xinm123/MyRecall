@@ -10,5 +10,5 @@ is maintained here.
 DEFAULT_PROVIDER = "qianfan"
 """Default LLM provider. Configured via ~/.pi/agent/models.json."""
 
-DEFAULT_MODEL = "deepseek-r1-250528"
-"""Default model ID for qianfan provider (DeepSeek R1)."""
+DEFAULT_MODEL = "glm-5"
+"""Default model ID for qianfan provider (GLM-5)."""
