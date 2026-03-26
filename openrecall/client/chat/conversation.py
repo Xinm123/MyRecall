@@ -7,11 +7,15 @@ Handles CRUD operations for conversations stored as JSON files.
 import json
 import os
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
 from .types import Conversation, Message, ConversationMeta
+
+
+def _utc_now() -> datetime:
+    return datetime.now(timezone.utc)
 
 # Storage path: OPENRECALL_CLIENT_DATA_DIR/chats/ or ~/MRC/chats/
 _CLIENT_DATA_DIR = Path(os.environ.get("OPENRECALL_CLIENT_DATA_DIR", Path.home() / "MRC"))
@@ -31,8 +35,8 @@ def create_conversation() -> Conversation:
         id=str(uuid.uuid4()),
         title="",
         messages=[],
-        created_at=datetime.utcnow(),
-        updated_at=datetime.utcnow(),
+        created_at=_utc_now(),
+        updated_at=_utc_now(),
     )
     save_conversation(conv)
     return conv
@@ -54,7 +58,7 @@ def load_conversation(conversation_id: str) -> Optional[Conversation]:
 def save_conversation(conversation: Conversation) -> None:
     """Save conversation to JSON file with atomic write."""
     ensure_chats_dir()
-    conversation.updated_at = datetime.utcnow()
+    conversation.updated_at = _utc_now()
 
     path = CHATS_DIR / f"{conversation.id}.json"
     temp_path = CHATS_DIR / f".tmp_{conversation.id}.json"
@@ -108,10 +112,10 @@ def add_message(
         role=role,
         content=content,
         tool_calls=tool_calls,
-        created_at=datetime.utcnow(),
+        created_at=_utc_now(),
     )
     conversation.messages.append(msg)
-    conversation.updated_at = datetime.utcnow()
+    conversation.updated_at = _utc_now()
 
     # Auto-generate title from first user message
     if not conversation.title and role == "user":
