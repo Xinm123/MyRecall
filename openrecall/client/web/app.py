@@ -3,11 +3,13 @@
 import logging
 import threading
 from flask import Flask, render_template, send_from_directory
+from openrecall.client.chat.routes import chat_bp
 from openrecall.shared.config import settings
 
 logger = logging.getLogger(__name__)
 
 client_app = Flask(__name__, template_folder="templates")
+client_app.register_blueprint(chat_bp)
 
 
 @client_app.context_processor
