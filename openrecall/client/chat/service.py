@@ -7,16 +7,13 @@ Coordinates:
 - SSE streaming (event dispatch)
 """
 
-import json
-import os
 import queue
 import threading
 import time
-from datetime import datetime
 from pathlib import Path
-from typing import AsyncGenerator, Optional
+from typing import Optional
 
-from .config_manager import get_default_provider, get_default_model
+from .config_manager import get_user_provider, get_user_model, get_api_key
 from .conversation import (
     create_conversation as _create_conversation,
     load_conversation,
@@ -102,8 +99,8 @@ class ChatService:
         """Start Pi if not running."""
         mgr = self._get_or_create_pi_manager()
         if not mgr.is_running():
-            provider = get_default_provider()
-            model = get_default_model()
+            provider = get_user_provider()
+            model = get_user_model()
             mgr.start(provider, model)
 
     def create_conversation(self) -> Conversation:
@@ -183,11 +180,29 @@ class ChatService:
         # Reject concurrent requests
         with self._request_lock:
             if self._active_request:
-                yield {"type": "error", "message": "Request already in progress", "code": "BUSY"}
+                yield {
+                    "type": "error",
+                    "message": "Another request is in progress",
+                    "code": "BUSY"
+                }
                 return
             self._active_request = True
 
         try:
+            # Check if API key is configured
+            provider = get_user_provider()
+            api_key = get_api_key(provider)
+            if not api_key:
+                with self._request_lock:
+                    self._active_request = False
+                yield {
+                    "type": "error",
+                    "message": f"No API key configured for {provider}",
+                    "code": "NO_API_KEY",
+                    "action": "open_settings"
+                }
+                return
+
             # Load or create conversation
             conv = self.get_conversation(conversation_id)
             if not conv:
@@ -204,7 +219,22 @@ class ChatService:
             # Release request lock on setup failure
             with self._request_lock:
                 self._active_request = False
-            yield {"type": "error", "message": str(setup_error), "code": "PI_CRASH"}
+            error_msg = str(setup_error)
+            # Detect specific error types
+            if "not found" in error_msg.lower() or "not installed" in error_msg.lower():
+                yield {
+                    "type": "error",
+                    "message": "Pi Agent is not installed. Please restart the application.",
+                    "code": "PI_NOT_INSTALLED",
+                    "action": "restart_app"
+                }
+            else:
+                yield {
+                    "type": "error",
+                    "message": error_msg,
+                    "code": "PI_CRASH",
+                    "action": "retry"
+                }
             return
 
         # Create event queue for this request
@@ -228,7 +258,12 @@ class ChatService:
             while True:
                 # Check for max timeout
                 if time.time() - start_time > MAX_TIMEOUT:
-                    yield {"type": "error", "message": "Timeout", "code": "TIMEOUT"}
+                    yield {
+                        "type": "error",
+                        "message": "Response timed out. Please try again.",
+                        "code": "TIMEOUT",
+                        "action": "retry"
+                    }
                     break
 
                 try:
@@ -273,6 +308,46 @@ class ChatService:
                     break
 
                 elif event.get("type") == "error":
+                    # Enhance Pi error events with action hints
+                    error_msg = event.get("message", "")
+                    error_code = event.get("code", "API_ERROR")
+
+                    # Detect authentication errors
+                    if "401" in error_msg or "unauthorized" in error_msg.lower() or "invalid api key" in error_msg.lower():
+                        yield {
+                            "type": "error",
+                            "message": "API Key is invalid or expired. Please check your configuration.",
+                            "code": "AUTH_ERROR",
+                            "action": "open_settings"
+                        }
+                    # Detect rate limit
+                    elif "429" in error_msg or "rate limit" in error_msg.lower() or "too many requests" in error_msg.lower():
+                        yield {
+                            "type": "error",
+                            "message": "Rate limit exceeded. Please wait a moment and try again.",
+                            "code": "RATE_LIMIT",
+                            "action": "retry_later"
+                        }
+                    # Detect model errors
+                    elif "model" in error_msg.lower() and ("not found" in error_msg.lower() or "unavailable" in error_msg.lower()):
+                        yield {
+                            "type": "error",
+                            "message": f"Model error: {error_msg}",
+                            "code": "MODEL_ERROR",
+                            "action": "open_settings"
+                        }
+                    # Network errors
+                    elif "network" in error_msg.lower() or "connection" in error_msg.lower() or "timeout" in error_msg.lower():
+                        yield {
+                            "type": "error",
+                            "message": "Network error. Please check your connection.",
+                            "code": "NETWORK_ERROR",
+                            "action": "retry"
+                        }
+                    else:
+                        # Pass through with retry action
+                        event["action"] = "retry"
+                        yield event
                     break
 
         finally:

@@ -9,6 +9,8 @@ Endpoints:
 - DELETE /chat/api/conversations/<id> — Delete conversation
 - POST /chat/api/new-session — Reset Pi session
 - GET /chat/api/pi-status — Get Pi process status
+- GET /chat/api/config — Get LLM config
+- POST /chat/api/config — Save API key
 """
 
 import json
@@ -18,6 +20,7 @@ from pathlib import Path
 from typing import Optional
 
 from .service import ChatService
+from .config_manager import get_current_config, save_api_key, save_user_choice, SUPPORTED_PROVIDERS
 
 chat_bp = Blueprint("chat", __name__, url_prefix="/chat")
 
@@ -152,3 +155,68 @@ def pi_status():
     service = get_chat_service()
     status = service.get_pi_status()
     return jsonify(status.to_dict())
+
+
+@chat_bp.route("/api/config", methods=["GET"])
+def get_config():
+    """
+    Get current LLM configuration.
+
+    Returns:
+        {
+            "provider": "qianfan",
+            "model": "glm-5",
+            "has_api_key": true,
+            "supported_providers": [...]
+        }
+    """
+    config = get_current_config()
+    return jsonify(config)
+
+
+@chat_bp.route("/api/config", methods=["POST"])
+def save_config():
+    """
+    Save API key and model for a provider.
+
+    Request:
+        {
+            "provider": "qianfan",
+            "api_key": "your-api-key",
+            "model": "glm-5"  // optional
+        }
+
+    Returns:
+        {"success": true}
+    """
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "Missing JSON body"}), 400
+
+    provider = data.get("provider")
+    api_key = data.get("api_key")
+    model = data.get("model")
+
+    if not provider:
+        return jsonify({"error": "Missing provider"}), 400
+
+    # Validate provider
+    valid_providers = [p["id"] for p in SUPPORTED_PROVIDERS]
+    if provider not in valid_providers:
+        return jsonify({"error": f"Invalid provider. Must be one of: {', '.join(valid_providers)}"}), 400
+
+    try:
+        if api_key:
+            save_api_key(provider, api_key)
+        if model:
+            save_user_choice(provider, model)
+
+        # Restart Pi if running to apply new settings
+        service = get_chat_service()
+        if service._pi_manager and service._pi_manager.is_running():
+            service._pi_manager.stop()
+            service._pi_manager = None
+
+        return jsonify({"success": True})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500

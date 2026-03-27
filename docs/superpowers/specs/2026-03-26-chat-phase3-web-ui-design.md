@@ -46,10 +46,10 @@ Phase 3 implements the user-facing chat interface for MyRecall v3, building the 
 | Choice | Decision |
 |--------|----------|
 | Framework | Alpine.js (embedded in chat.html template) |
-| SSE Client | Native `EventSource` API |
+| SSE Client | `fetch()` + `ReadableStream` (EventSource 不支持 POST) |
 | State Management | Alpine.js reactive data (`messages`, `isStreaming`) |
 
-**Rationale:** Consistent with existing MyRecall frontend pattern. All existing pages use Alpine.js. No build step needed.
+**Rationale:** Consistent with existing MyRecall frontend pattern. All existing pages use Alpine.js. No build step needed. Note: Browser `EventSource` API does not support POST requests, so we use `fetch()` with `ReadableStream` for SSE over POST.
 
 ### Decision 5: Tool Call Display
 
@@ -373,24 +373,24 @@ html[data-current-view="chat"] a[href="/chat"] {
 
 ## Acceptance Criteria
 
-- [ ] `/chat` renders with sidebar + main chat area
-- [ ] Sidebar shows conversation list from API
-- [ ] New Chat button creates and selects a conversation
-- [ ] Sending a message triggers SSE stream
-- [ ] Assistant responses stream word-by-word
-- [ ] Markdown content renders correctly (code blocks, bold, lists)
-- [ ] Tool Calls appear inline and are collapsible
-- [ ] Tool Call status icons show correctly (⏳/✅/❌)
-- [ ] Loading state ("正在思考...") appears during stream
-- [ ] Input clears after sending
-- [ ] Input is disabled during streaming
-- [ ] Error events show inline error cards with correct type-specific styling
-- [ ] Clicking a conversation loads its history with Markdown rendered
-- [ ] Switching conversations resets Pi context
-- [ ] Deleting a conversation removes it from sidebar
-- [ ] Header has working Chat navigation link
-- [ ] Page works on mobile (hamburger → sidebar overlay)
-- [ ] SSE connection is cleaned up on page navigation (beforeunload)
+- [x] `/chat` renders with sidebar + main chat area
+- [x] Sidebar shows conversation list from API
+- [x] New Chat button creates and selects a conversation
+- [x] Sending a message triggers SSE stream
+- [x] Assistant responses stream word-by-word
+- [x] Markdown content renders correctly (code blocks, bold, lists)
+- [x] Tool Calls appear inline and are collapsible
+- [x] Tool Call status icons show correctly (⏳/✅/❌)
+- [x] Loading state ("正在思考...") appears during stream
+- [x] Input clears after sending
+- [x] Input is disabled during streaming
+- [x] Error events show inline error cards with correct type-specific styling
+- [x] Clicking a conversation loads its history with Markdown rendered
+- [x] Switching conversations resets Pi context
+- [x] Deleting a conversation removes it from sidebar
+- [x] Header has working Chat navigation link
+- [x] Page works on mobile (hamburger → sidebar overlay)
+- [x] SSE connection is cleaned up on page navigation (beforeunload)
 
 ## Change History
 
@@ -401,3 +401,4 @@ html[data-current-view="chat"] a[href="/chat"] {
 | 2026-03-26 | Fix: add Markdown rendering for pre-loaded messages; clarify rawContent/content rules |
 | 2026-03-26 | Fix: add missing GET /chat/api/pi-status endpoint to table |
 | 2026-03-26 | Fix: add error code display table, mobile sidebar guidance, SSE cleanup |
+| 2026-03-26 | Phase 3 验收通过，所有 Acceptance Criteria 完成 |

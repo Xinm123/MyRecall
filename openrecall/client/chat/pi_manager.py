@@ -70,7 +70,11 @@ def is_version_current() -> bool:
 
 
 def ensure_skill_installed():
-    """Copy myrecall-search skill to ~/.pi/agent/skills/."""
+    """Copy myrecall-search skill with dynamic URL substitution.
+
+    Replaces hardcoded localhost:8083 with the configured edge_base_url,
+    enabling distributed deployment where client and server run on different machines.
+    """
     source = (
         Path(__file__).parent / "skills" / "myrecall-search" / "SKILL.md"
     )
@@ -85,9 +89,14 @@ def ensure_skill_installed():
     if not source.exists():
         return
     dest.parent.mkdir(parents=True, exist_ok=True)
-    import shutil as sh
 
-    sh.copy2(source, dest)
+    # Dynamic URL substitution for distributed deployment
+    from openrecall.shared.config import settings
+    content = source.read_text()
+    edge_url = settings.edge_base_url or "http://localhost:8083"
+    content = content.replace("http://localhost:8083", edge_url)
+
+    dest.write_text(content)
 
 
 def ensure_installed():

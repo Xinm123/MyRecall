@@ -196,6 +196,24 @@
     cursor: not-allowed;
   }
 
+  .chat-model-indicator {
+    text-align: center;
+    margin-top: 8px;
+    max-width: 800px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  .model-badge {
+    display: inline-block;
+    font-size: 11px;
+    color: var(--text-secondary);
+    background: rgba(0, 0, 0, 0.04);
+    padding: 3px 8px;
+    border-radius: 4px;
+    font-family: 'SF Mono', Monaco, monospace;
+  }
+
   .chat-send-btn {
     padding: 12px 20px;
     background: var(--accent-color);
@@ -435,6 +453,37 @@
     color: #ff9500;
   }
 
+  .error-card.no_api_key,
+  .error-card.auth_error {
+    background: rgba(255, 59, 48, 0.08);
+    border-color: rgba(255, 59, 48, 0.3);
+    color: #ff3b30;
+  }
+
+  .error-card.rate_limit {
+    background: rgba(255, 149, 0, 0.08);
+    border-color: rgba(255, 149, 0, 0.3);
+    color: #ff9500;
+  }
+
+  .error-action-btn {
+    display: block;
+    margin-top: 10px;
+    padding: 6px 14px;
+    background: rgba(0, 122, 255, 0.1);
+    color: var(--accent-color);
+    border: 1px solid var(--accent-color);
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background-color 0.15s;
+  }
+
+  .error-action-btn:hover {
+    background: rgba(0, 122, 255, 0.2);
+  }
+
   /* === Mobile === */
   @media (max-width: 768px) {
     .chat-sidebar {
@@ -462,6 +511,212 @@
       display: none;
     }
   }
+
+  /* === Settings Button === */
+  .settings-btn {
+    background: none;
+    border: none;
+    padding: 6px;
+    cursor: pointer;
+    color: var(--text-secondary);
+    border-radius: 6px;
+    transition: background-color 0.15s, color 0.15s;
+  }
+
+  .settings-btn:hover {
+    background-color: rgba(0, 0, 0, 0.05);
+    color: var(--text-primary);
+  }
+
+  /* === Settings Modal === */
+  .settings-modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.4);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+  }
+
+  .settings-modal {
+    background: var(--bg-card);
+    border-radius: 12px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+    width: 100%;
+    max-width: 400px;
+    margin: 16px;
+  }
+
+  .settings-modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border-color);
+  }
+
+  .settings-modal-header h3 {
+    font-size: 16px;
+    font-weight: 600;
+    margin: 0;
+  }
+
+  .settings-modal-close {
+    background: none;
+    border: none;
+    padding: 4px;
+    cursor: pointer;
+    color: var(--text-secondary);
+    border-radius: 4px;
+  }
+
+  .settings-modal-close:hover {
+    background-color: rgba(0, 0, 0, 0.05);
+  }
+
+  .settings-modal-body {
+    padding: 20px;
+  }
+
+  .settings-field {
+    margin-bottom: 16px;
+  }
+
+  .settings-field:last-child {
+    margin-bottom: 0;
+  }
+
+  .settings-label {
+    display: block;
+    font-size: 13px;
+    font-weight: 500;
+    margin-bottom: 6px;
+    color: var(--text-secondary);
+  }
+
+  .settings-select {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    font-size: 14px;
+    background: var(--bg-body);
+    color: var(--text-primary);
+    cursor: pointer;
+  }
+
+  .settings-select:focus {
+    outline: none;
+    border-color: var(--accent-color);
+  }
+
+  .settings-input-group {
+    display: flex;
+    gap: 8px;
+  }
+
+  .settings-input {
+    flex: 1;
+    padding: 10px 12px;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    font-size: 14px;
+    background: var(--bg-body);
+    color: var(--text-primary);
+    font-family: 'SF Mono', Monaco, monospace;
+  }
+
+  .settings-input:focus {
+    outline: none;
+    border-color: var(--accent-color);
+  }
+
+  .settings-toggle-visibility {
+    padding: 10px;
+    background: var(--bg-body);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    cursor: pointer;
+    color: var(--text-secondary);
+  }
+
+  .settings-toggle-visibility:hover {
+    background-color: rgba(0, 0, 0, 0.05);
+  }
+
+  .settings-hint {
+    font-size: 12px;
+    color: var(--text-secondary);
+    margin-top: 6px;
+  }
+
+  .settings-model-info {
+    font-size: 13px;
+    color: var(--text-secondary);
+    padding: 8px 12px;
+    background: rgba(0, 0, 0, 0.03);
+    border-radius: 6px;
+  }
+
+  .settings-modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    padding: 16px 20px;
+    border-top: 1px solid var(--border-color);
+  }
+
+  .settings-btn-cancel {
+    padding: 8px 16px;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    font-size: 14px;
+    background: var(--bg-body);
+    color: var(--text-primary);
+    cursor: pointer;
+  }
+
+  .settings-btn-cancel:hover {
+    background-color: rgba(0, 0, 0, 0.05);
+  }
+
+  .settings-btn-save {
+    padding: 8px 16px;
+    border: none;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 500;
+    background: var(--accent-color);
+    color: white;
+    cursor: pointer;
+  }
+
+  .settings-btn-save:hover {
+    background-color: #005bb5;
+  }
+
+  .settings-btn-save:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  .settings-status {
+    font-size: 13px;
+    padding: 8px 12px;
+    border-radius: 6px;
+    margin-top: 12px;
+  }
+
+  .settings-status.success {
+    background: rgba(52, 199, 89, 0.1);
+    color: #34c759;
+  }
+
+  .settings-status.error {
+    background: rgba(255, 59, 48, 0.1);
+    color: #ff3b30;
+  }
 </style>
 {% endblock %}
 
@@ -475,7 +730,15 @@
   <!-- Sidebar -->
   <aside class="chat-sidebar" :class="{ 'open': sidebarOpen }">
     <div class="chat-sidebar-header">
-      <h2>Conversations</h2>
+      <div style="display: flex; align-items: center; justify-content: space-between;">
+        <h2>Conversations</h2>
+        <button @click="openSettings()" class="settings-btn" title="Settings">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="3"/>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+          </svg>
+        </button>
+      </div>
       <button @click="createNewChat()" class="new-chat-btn">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
         New Chat
@@ -613,8 +876,90 @@
           :disabled="!inputText.trim() || isStreaming"
         >Send</button>
       </div>
+      <div class="chat-model-indicator" x-show="currentModel">
+        <span class="model-badge" x-text="currentModel"></span>
+      </div>
     </div>
   </main>
+
+  <!-- Settings Modal (inside x-data scope) -->
+  <template x-if="settingsOpen">
+    <div class="settings-modal-overlay" @click.self="settingsOpen = false">
+      <div class="settings-modal">
+        <div class="settings-modal-header">
+          <h3>Settings</h3>
+          <button class="settings-modal-close" @click="settingsOpen = false">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="18" y1="6" x2="6" y2="18"/>
+              <line x1="6" y1="6" x2="18" y2="18"/>
+            </svg>
+          </button>
+        </div>
+        <div class="settings-modal-body">
+          <!-- Provider Selection -->
+          <div class="settings-field">
+            <label class="settings-label">LLM Provider</label>
+            <select class="settings-select" x-model="settingsProvider" @change="onProviderChange()">
+              <template x-for="p in supportedProviders" :key="p.id">
+                <option :value="p.id" x-text="p.name + (providerHasKey[p.id] ? ' ✓' : '')"></option>
+              </template>
+            </select>
+            <p class="settings-hint" style="margin-top: 6px;">
+              <span x-show="getCurrentProviderInfo()">
+                🔗 <a :href="getCurrentProviderInfo().url" target="_blank" x-text="getCurrentProviderInfo().url"></a>
+              </span>
+            </p>
+          </div>
+
+          <!-- API Key -->
+          <div class="settings-field">
+            <label class="settings-label">API Key</label>
+            <div class="settings-input-group">
+              <input
+                class="settings-input"
+                :type="settingsShowKey ? 'text' : 'password'"
+                x-model="settingsApiKey"
+                :placeholder="providerHasKey[settingsProvider] ? 'API key already configured' : 'Enter your API key'"
+              />
+              <button class="settings-toggle-visibility" @click="settingsShowKey = !settingsShowKey">
+                <svg x-show="!settingsShowKey" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                  <circle cx="12" cy="12" r="3"/>
+                </svg>
+                <svg x-show="settingsShowKey" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/>
+                  <line x1="1" y1="1" x2="23" y2="23"/>
+                </svg>
+              </button>
+            </div>
+            <p class="settings-hint" x-show="providerHasKey[settingsProvider]" style="color: #34c759;">
+              ✓ API key already configured. Leave blank to keep existing key.
+            </p>
+          </div>
+
+          <!-- Model Selection -->
+          <div class="settings-field">
+            <label class="settings-label">Model</label>
+            <select class="settings-select" x-model="settingsModel">
+              <template x-for="m in getCurrentProviderModels()" :key="m.id">
+                <option :value="m.id" x-text="m.name"></option>
+              </template>
+            </select>
+            <p class="settings-hint" style="margin-top: 4px;">
+              <span x-show="getCurrentProviderInfo()">API: <code x-text="getCurrentProviderInfo().api_base" style="background: rgba(0,0,0,0.05); padding: 2px 6px; border-radius: 4px; font-size: 12px;"></code></span>
+            </p>
+          </div>
+
+          <!-- Status Message -->
+          <div x-show="settingsStatus" class="settings-status" :class="settingsStatusType" x-text="settingsStatus"></div>
+        </div>
+        <div class="settings-modal-footer">
+          <button class="settings-btn-cancel" @click="settingsOpen = false">Cancel</button>
+          <button class="settings-btn-save" @click="saveSettings()" :disabled="settingsSaving" x-text="settingsSaving ? 'Saving...' : 'Save'"></button>
+        </div>
+      </div>
+    </div>
+  </template>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
@@ -631,6 +976,19 @@
       currentAssistantMsg: null,  // In-progress streaming message
       streamReader: null,         // SSE fetch reader for cancellation
 
+      // Settings state
+      settingsOpen: false,
+      settingsProvider: 'qianfan',
+      settingsModel: '',
+      settingsApiKey: '',
+      settingsShowKey: false,
+      settingsSaving: false,
+      settingsStatus: '',
+      settingsStatusType: 'success',
+      supportedProviders: [],
+      currentModel: '',  // Current model display
+      providerHasKey: {},  // Map of provider_id -> has_api_key
+
       // Helpers
       _msgIdCounter: 0,
       nextId() { return 'msg-' + (++this._msgIdCounter); },
@@ -638,6 +996,8 @@
       init() {
         // Load conversations
         this.loadConversations();
+        // Load current model config
+        this.loadCurrentModel();
         // Auto-select first conversation if any
         this.$watch('conversations', () => {
           if (!this.currentConvId && this.conversations.length > 0) {
@@ -648,6 +1008,17 @@
         window.addEventListener('beforeunload', () => {
           if (this.streamReader) this.streamReader.cancel();
         });
+      },
+
+      async loadCurrentModel() {
+        try {
+          const resp = await fetch('/chat/api/config');
+          const config = await resp.json();
+          this.currentModel = config.model;
+          this.supportedProviders = config.supported_providers;
+        } catch (e) {
+          console.error('Failed to load config:', e);
+        }
       },
 
       // --- Conversations ---
@@ -873,14 +1244,53 @@
         if (eventType === 'error') {
           this.currentAssistantMsg = null;
           this.isStreaming = false;
-          const msg = this.getErrorMessage(payload);
+          const errorHtml = this.renderError(payload);
           this.messages.push({
             id: this.nextId(),
             role: 'assistant',
-            content: `<div class="error-card ${payload.code?.toLowerCase()}">${msg}</div>`,
+            content: errorHtml,
             toolCalls: [],
+            errorAction: payload.action,  // Store action for button handling
           });
           this.scrollToBottom();
+        }
+      },
+
+      renderError(payload) {
+        const msg = this.getErrorMessage(payload);
+        const action = payload.action;
+        const code = payload.code?.toLowerCase() || '';
+
+        let actionBtn = '';
+        if (action === 'open_settings') {
+          actionBtn = `<button class="error-action-btn" onclick="Alpine.$data(document.querySelector('[x-data]')).handleErrorAction('open_settings')">打开设置</button>`;
+        } else if (action === 'retry') {
+          actionBtn = `<button class="error-action-btn" onclick="Alpine.$data(document.querySelector('[x-data]')).handleErrorAction('retry')">重试</button>`;
+        } else if (action === 'retry_later') {
+          actionBtn = `<button class="error-action-btn" onclick="Alpine.$data(document.querySelector('[x-data]')).handleErrorAction('retry_later')">稍后重试</button>`;
+        }
+
+        return `<div class="error-card ${code}">${msg}${actionBtn}</div>`;
+      },
+
+      handleErrorAction(action) {
+        if (action === 'open_settings') {
+          this.openSettings();
+        } else if (action === 'retry') {
+          // Retry the last message
+          if (this.messages.length > 0) {
+            const lastUserMsg = [...this.messages].reverse().find(m => m.role === 'user');
+            if (lastUserMsg) {
+              // Remove the error message
+              this.messages = this.messages.filter(m => m.role !== 'assistant' || !m.content.includes('error-card'));
+              // Resend
+              this.inputText = lastUserMsg.rawContent || lastUserMsg.content.replace(/<[^>]*>/g, '');
+              this.sendMessage();
+            }
+          }
+        } else if (action === 'retry_later') {
+          // Just close the error, user can retry manually
+          this.messages = this.messages.filter(m => m.role !== 'assistant' || !m.content.includes('error-card'));
         }
       },
 
@@ -917,13 +1327,19 @@
 
       getErrorMessage(payload) {
         const messages = {
-          BUSY: 'Another request is in progress.',
-          PI_CRASH: 'Pi agent crashed. Retrying…',
-          TIMEOUT: 'Response timed out.',
-          API_ERROR: payload.message || 'API error.',
-          INTERNAL_ERROR: 'Something went wrong.',
+          BUSY: '另一个请求正在进行中，请稍候。',
+          PI_CRASH: 'Pi Agent 崩溃，正在重试…',
+          PI_NOT_INSTALLED: 'Pi Agent 未安装，请重启应用。',
+          TIMEOUT: '响应超时，请重试。',
+          NO_API_KEY: '未配置 API Key，请先在设置中配置。',
+          AUTH_ERROR: 'API Key 无效或已过期，请检查配置。',
+          RATE_LIMIT: '请求过于频繁，请稍后重试。',
+          NETWORK_ERROR: '网络连接失败，请检查网络后重试。',
+          MODEL_ERROR: payload.message || '模型不可用，请切换模型。',
+          API_ERROR: payload.message || 'API 错误。',
+          INTERNAL_ERROR: '内部错误，请重试。',
         };
-        return messages[payload.code] || payload.message || 'Unknown error.';
+        return messages[payload.code] || payload.message || '未知错误。';
       },
 
       scrollToBottom() {
@@ -943,6 +1359,97 @@
         if (diff < 86400) return Math.floor(diff / 3600) + 'h ago';
         if (diff < 604800) return Math.floor(diff / 86400) + 'd ago';
         return date.toLocaleDateString();
+      },
+
+      // --- Settings ---
+      async openSettings() {
+        this.settingsStatus = '';
+        this.settingsStatusType = 'success';
+        try {
+          const resp = await fetch('/chat/api/config');
+          const config = await resp.json();
+          this.settingsProvider = config.provider;
+          this.settingsModel = config.model;
+          this.supportedProviders = config.supported_providers;
+          this.providerHasKey = config.provider_keys || {};
+          // Don't populate API key for security - user must re-enter
+          this.settingsApiKey = '';
+        } catch (e) {
+          console.error('Failed to load config:', e);
+        }
+        this.settingsOpen = true;
+      },
+
+      onProviderChange() {
+        // Clear API key when provider changes
+        this.settingsApiKey = '';
+        this.settingsStatus = '';
+        // Set first model for new provider
+        const models = this.getCurrentProviderModels();
+        if (models.length > 0) {
+          this.settingsModel = models[0].id;
+        }
+      },
+
+      getCurrentProviderModels() {
+        const provider = this.supportedProviders.find(p => p.id === this.settingsProvider);
+        return provider?.models || [];
+      },
+
+      getCurrentProviderInfo() {
+        return this.supportedProviders.find(p => p.id === this.settingsProvider);
+      },
+
+      async saveSettings() {
+        this.settingsSaving = true;
+        this.settingsStatus = '';
+
+        try {
+          // Check if we need an API key for this provider
+          const needsKey = !this.providerHasKey[this.settingsProvider] && !this.settingsApiKey.trim();
+          if (needsKey) {
+            this.settingsStatus = 'Please enter an API key for this provider';
+            this.settingsStatusType = 'error';
+            this.settingsSaving = false;
+            return;
+          }
+
+          const body = {
+            provider: this.settingsProvider,
+            model: this.settingsModel,
+          };
+          if (this.settingsApiKey.trim()) {
+            body.api_key = this.settingsApiKey;
+          }
+
+          const resp = await fetch('/chat/api/config', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+          });
+
+          if (resp.ok) {
+            this.settingsStatus = 'Saved successfully!';
+            this.settingsStatusType = 'success';
+            this.settingsApiKey = ''; // Clear for security
+            // Update current model display
+            this.currentModel = this.settingsModel;
+            // Update provider key status
+            this.providerHasKey[this.settingsProvider] = true;
+            setTimeout(() => {
+              this.settingsOpen = false;
+            }, 1000);
+          } else {
+            const data = await resp.json();
+            this.settingsStatus = data.error || 'Failed to save';
+            this.settingsStatusType = 'error';
+          }
+        } catch (e) {
+          this.settingsStatus = 'Network error';
+          this.settingsStatusType = 'error';
+        } finally {
+          this.settingsSaving = false;
+        }
       },
     };
   }

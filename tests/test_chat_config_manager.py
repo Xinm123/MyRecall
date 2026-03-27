@@ -6,10 +6,16 @@ import pytest  # noqa: F401
 from openrecall.client.chat.config_manager import (
     AUTH_JSON,  # noqa: F401
     PROVIDER_ENV_MAP,
+    SUPPORTED_PROVIDERS,
     get_api_key,
     get_default_model,
     get_default_provider,
-    validate_pi_config,
+    get_user_provider,
+    get_user_model,
+    get_provider_info,
+    save_api_key,
+    save_user_choice,
+    get_current_config,
 )
 
 
@@ -47,11 +53,72 @@ def test_get_api_key_falls_back_to_auth_json(tmp_path, monkeypatch):
     assert get_api_key("minimax-cn") == "sk-from-auth"
 
 
-def test_validate_pi_config_is_noop():
-    """validate_pi_config is a no-op stub in Phase 1."""
-    # Should not raise, should not write anything
-    validate_pi_config("minimax-cn", "MiniMax-M2.7", "sk-test")
-    validate_pi_config("kimi-coding", "k2p5", "sk-test")
+def test_save_api_key(tmp_path, monkeypatch):
+    """save_api_key writes to auth.json with merge."""
+    import openrecall.client.chat.config_manager as cm
+
+    monkeypatch.setattr(cm, "AUTH_JSON", tmp_path / "auth.json")
+    monkeypatch.setattr(cm, "PI_CONFIG_DIR", tmp_path)
+
+    # Create initial auth.json
+    (tmp_path / "auth.json").write_text('{"existing-provider": {"type": "api_key", "key": "existing-key"}}')
+
+    # Save new key
+    save_api_key("minimax-cn", "sk-new-key")
+
+    # Verify merge
+    data = json.loads((tmp_path / "auth.json").read_text())
+    assert data["minimax-cn"]["key"] == "sk-new-key"
+    assert data["existing-provider"]["key"] == "existing-key"  # Preserved
+
+
+def test_save_user_choice(tmp_path, monkeypatch):
+    """save_user_choice persists provider/model to myrecall-config.json."""
+    import openrecall.client.chat.config_manager as cm
+
+    monkeypatch.setattr(cm, "MYRECALL_CONFIG", tmp_path / "myrecall-config.json")
+    monkeypatch.setattr(cm, "PI_CONFIG_DIR", tmp_path)
+
+    save_user_choice("minimax-cn", "MiniMax-M2.7")
+
+    data = json.loads((tmp_path / "myrecall-config.json").read_text())
+    assert data["provider"] == "minimax-cn"
+    assert data["model"] == "MiniMax-M2.7"
+
+
+def test_get_user_provider_defaults(tmp_path, monkeypatch):
+    """get_user_provider returns default when no config exists."""
+    import openrecall.client.chat.config_manager as cm
+
+    monkeypatch.setattr(cm, "MYRECALL_CONFIG", tmp_path / "nonexistent.json")
+    assert get_user_provider() == "qianfan"
+
+
+def test_get_provider_info():
+    """get_provider_info returns provider details."""
+    info = get_provider_info("qianfan")
+    assert info is not None
+    assert info["id"] == "qianfan"
+    assert "models" in info
+
+    assert get_provider_info("nonexistent") is None
+
+
+def test_supported_providers_structure():
+    """SUPPORTED_PROVIDERS has expected structure."""
+    assert len(SUPPORTED_PROVIDERS) == 4
+
+    for p in SUPPORTED_PROVIDERS:
+        assert "id" in p
+        assert "name" in p
+        assert "url" in p
+        assert "api_base" in p
+        assert "models" in p
+        assert len(p["models"]) > 0
+
+        for m in p["models"]:
+            assert "id" in m
+            assert "name" in m
 
 
 def test_provider_env_map():

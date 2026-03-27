@@ -15,7 +15,7 @@ class ToolCall:
     name: str
     args: dict
     status: str  # "running" | "done" | "error"
-    result: Optional[str] = None
+    result: Optional[dict | str] = None  # Can be dict (from Pi) or str (for display)
 
     def to_dict(self) -> dict:
         return {
