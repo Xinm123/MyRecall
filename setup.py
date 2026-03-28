@@ -17,8 +17,8 @@ install_requires = [
     "torchvision>=0.17.0",
     "transformers>=4.45.0",
     "qwen-vl-utils",
-    "shapely==2.0.4",
-    "h5py==3.11.0",
+    "shapely>=2.0.5",  # rapidocr requires shapely!=2.0.4
+    "h5py>=3.12.0",
     "rapidfuzz==3.9.3",
     "Pillow==10.3.0",
     "pydantic>=2.0.0",

@@ -78,6 +78,10 @@ class ChatService:
         """Get or create Pi RPC manager."""
         with self._pi_lock:
             if self._pi_manager is None:
+                # Ensure Pi is installed and skill is updated with current edge_base_url
+                from .pi_manager import ensure_installed
+                ensure_installed()
+
                 self._pi_manager = PiRpcManager(
                     self.workspace_dir,
                     self._handle_pi_event,
@@ -192,7 +196,8 @@ class ChatService:
             # Check if API key is configured
             provider = get_user_provider()
             api_key = get_api_key(provider)
-            if not api_key:
+            # custom provider doesn't require an API key (local vLLM)
+            if not api_key and provider != "custom":
                 with self._request_lock:
                     self._active_request = False
                 yield {

@@ -246,14 +246,12 @@ class DashScopeProvider(AIProvider):
 
 class OpenAIProvider(AIProvider):
     def __init__(self, api_key: str, model_name: str, api_base: str = "") -> None:
-        api_key = api_key.strip().strip("`\"' ")
         model_name = model_name.strip().strip("`\"' ")
-        if not api_key:
-            raise AIProviderConfigError("OpenAI-compatible api_key is required")
+        # api_key can be empty for local vLLM without auth
+        self.api_key = api_key.strip().strip("`\"' ") if api_key else ""
         if not model_name:
             raise AIProviderConfigError("OpenAI-compatible model_name is required")
 
-        self.api_key = api_key
         self.model_name = model_name
         self.api_base = _normalize_api_base(api_base or "https://api.openai.com/v1")
         logger.info(f"OpenAIProvider configured: base={self.api_base} model={self.model_name}")
@@ -268,9 +266,10 @@ class OpenAIProvider(AIProvider):
 
         url = f"{self.api_base}/chat/completions"
         headers = {
-            "Authorization": f"Bearer {self.api_key}",
             "Content-Type": "application/json",
         }
+        if self.api_key:
+            headers["Authorization"] = f"Bearer {self.api_key}"
         payload = {
             "model": self.model_name,
             "messages": [
@@ -358,14 +357,12 @@ class LocalOCRProvider(OCRProvider):
 
 class OpenAIOCRProvider(OCRProvider):
     def __init__(self, api_key: str, model_name: str, api_base: str = "") -> None:
-        api_key = api_key.strip().strip("`\"' ")
         model_name = model_name.strip().strip("`\"' ")
-        if not api_key:
-            raise AIProviderConfigError("OpenAI-compatible api_key is required")
+        # api_key can be empty for local vLLM without auth
+        self.api_key = api_key.strip().strip("`\"' ") if api_key else ""
         if not model_name:
             raise AIProviderConfigError("OpenAI-compatible model_name is required")
 
-        self.api_key = api_key
         self.model_name = model_name
         self.api_base = _normalize_api_base(api_base or "https://api.openai.com/v1")
         logger.info(f"OpenAIOCRProvider configured: base={self.api_base} model={self.model_name}")
@@ -380,9 +377,10 @@ class OpenAIOCRProvider(OCRProvider):
 
         url = f"{self.api_base}/chat/completions"
         headers = {
-            "Authorization": f"Bearer {self.api_key}",
             "Content-Type": "application/json",
         }
+        if self.api_key:
+            headers["Authorization"] = f"Bearer {self.api_key}"
         payload = {
             "model": self.model_name,
             "messages": [
@@ -508,14 +506,12 @@ class LocalEmbeddingProvider(EmbeddingProvider):
 
 class OpenAIEmbeddingProvider(EmbeddingProvider):
     def __init__(self, api_key: str, model_name: str, api_base: str = "") -> None:
-        api_key = api_key.strip().strip("`\"' ")
         model_name = model_name.strip().strip("`\"' ")
-        if not api_key:
-            raise AIProviderConfigError("OpenAI-compatible api_key is required")
+        # api_key can be empty for local vLLM without auth
+        self.api_key = api_key.strip().strip("`\"' ") if api_key else ""
         if not model_name:
             raise AIProviderConfigError("OpenAI-compatible model_name is required")
 
-        self.api_key = api_key
         self.model_name = model_name
         self.api_base = _normalize_api_base(api_base or "https://api.openai.com/v1")
         logger.info(f"OpenAIEmbeddingProvider configured: base={self.api_base} model={self.model_name}")
@@ -526,9 +522,10 @@ class OpenAIEmbeddingProvider(EmbeddingProvider):
 
         url = f"{self.api_base}/embeddings"
         headers = {
-            "Authorization": f"Bearer {self.api_key}",
             "Content-Type": "application/json",
         }
+        if self.api_key:
+            headers["Authorization"] = f"Bearer {self.api_key}"
         payload = {"model": self.model_name, "input": text, "encoding_format": "float"}
 
         try:

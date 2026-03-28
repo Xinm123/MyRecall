@@ -457,7 +457,7 @@ class Settings(BaseSettings):
     )
     # Client Web UI Configuration
     client_web_port: int = Field(
-        default=8883,
+        default=8889,
         alias="OPENRECALL_CLIENT_WEB_PORT",
         description="Port for client web UI server",
     )

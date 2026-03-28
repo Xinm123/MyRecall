@@ -33,11 +33,10 @@ class OpenAIDescriptionProvider(DescriptionProvider):
         model_name: str,
         api_base: str = "",
     ) -> None:
-        if not api_key:
-            raise DescriptionProviderConfigError("api_key is required")
         if not model_name:
             raise DescriptionProviderConfigError("model_name is required")
-        self.api_key = api_key.strip()
+        # api_key can be empty for local vLLM without auth
+        self.api_key = api_key.strip() if api_key else ""
         self.model_name = model_name.strip()
         self.api_base = _normalize_api_base(api_base or "https://api.openai.com/v1")
 
@@ -60,9 +59,10 @@ class OpenAIDescriptionProvider(DescriptionProvider):
 
         url = f"{self.api_base}/chat/completions"
         headers = {
-            "Authorization": f"Bearer {self.api_key}",
             "Content-Type": "application/json",
         }
+        if self.api_key:
+            headers["Authorization"] = f"Bearer {self.api_key}"
         payload = {
             "model": self.model_name,
             "messages": [

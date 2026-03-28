@@ -65,6 +65,15 @@ SUPPORTED_PROVIDERS = [
             {"id": "claude-3-haiku-20240307", "name": "Claude 3 Haiku"},
         ]
     },
+    {
+        "id": "custom",
+        "name": "Custom (Self-hosted)",
+        "url": "",
+        "api_base": "",  # loaded from OPENRECALL_CHAT_API_BASE or ~/.pi/agent/auth.json
+        "models": [
+            {"id": "auto", "name": "Auto-detect"},
+        ]
+    },
 ]
 
 # Provider name → environment variable name mapping
@@ -76,6 +85,31 @@ PROVIDER_ENV_MAP: dict[str, str] = {
     "qianfan": "QIANFAN_API_KEY",
     "custom": "CUSTOM_API_KEY",
 }
+
+
+def get_chat_api_base() -> str:
+    """
+    Get custom chat API base URL.
+
+    Priority:
+      1. Environment variable OPENRECALL_CHAT_API_BASE
+      2. ~/.pi/agent/auth.json custom.api_base
+      3. "" (empty, uses provider default)
+    """
+    if env_val := os.environ.get("OPENRECALL_CHAT_API_BASE"):
+        return env_val.strip()
+
+    if AUTH_JSON.exists():
+        try:
+            auth_data = json.loads(AUTH_JSON.read_text())
+            custom_data = auth_data.get("custom", {})
+            api_base = custom_data.get("api_base")
+            if api_base:
+                return str(api_base).strip()
+        except (json.JSONDecodeError, OSError):
+            pass
+
+    return ""
 
 
 def get_api_key(provider: str) -> Optional[str]:
@@ -122,7 +156,7 @@ def get_provider_info(provider_id: str) -> Optional[dict]:
     return None
 
 
-def save_api_key(provider: str, api_key: str) -> None:
+def save_api_key(provider: str, api_key: str, api_base: Optional[str] = None) -> None:
     """
     Save API key for a provider to ~/.pi/agent/auth.json.
 
@@ -131,6 +165,8 @@ def save_api_key(provider: str, api_key: str) -> None:
     - Atomic write: temp file + rename
     - Sets permissions to 0o600
     - Also saves provider as user's current choice
+
+    For 'custom' provider, api_base is also saved.
     """
     # Ensure directory exists
     PI_CONFIG_DIR.mkdir(parents=True, exist_ok=True)
@@ -144,7 +180,10 @@ def save_api_key(provider: str, api_key: str) -> None:
             auth_data = {}
 
     # Merge the provider key
-    auth_data[provider] = {"type": "api_key", "key": api_key}
+    provider_entry: dict = {"type": "api_key", "key": api_key}
+    if provider == "custom" and api_base:
+        provider_entry["api_base"] = api_base
+    auth_data[provider] = provider_entry
 
     # Atomic write: temp file + rename
     temp_path = AUTH_JSON.with_suffix(".tmp")
@@ -231,7 +270,6 @@ def get_current_config() -> dict:
     # Get user's chosen provider and model
     provider = get_user_provider()
     model = get_user_model()
-    provider_info = get_provider_info(provider)
 
     # Check if API key is configured for this provider
     api_key = get_api_key(provider)
@@ -241,10 +279,18 @@ def get_current_config() -> dict:
     for p in SUPPORTED_PROVIDERS:
         provider_keys[p["id"]] = get_api_key(p["id"]) is not None
 
+    # Build supported_providers with dynamic api_base for custom
+    supported_providers = []
+    for p in SUPPORTED_PROVIDERS:
+        p_copy = dict(p)
+        if p["id"] == "custom":
+            p_copy["api_base"] = get_chat_api_base()
+        supported_providers.append(p_copy)
+
     return {
         "provider": provider,
         "model": model,
         "has_api_key": api_key is not None,
         "provider_keys": provider_keys,
-        "supported_providers": SUPPORTED_PROVIDERS,
+        "supported_providers": supported_providers,
     }

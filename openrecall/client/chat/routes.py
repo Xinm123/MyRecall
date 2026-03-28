@@ -157,6 +157,16 @@ def pi_status():
     return jsonify(status.to_dict())
 
 
+@chat_bp.route("/api/pi-restart", methods=["POST"])
+def pi_restart():
+    """Restart Pi process (reloads extension)."""
+    service = get_chat_service()
+    if service._pi_manager:
+        service._pi_manager.stop()
+        service._pi_manager = None
+    return jsonify({"success": True})
+
+
 @chat_bp.route("/api/config", methods=["GET"])
 def get_config():
     """
@@ -183,7 +193,8 @@ def save_config():
         {
             "provider": "qianfan",
             "api_key": "your-api-key",
-            "model": "glm-5"  // optional
+            "model": "glm-5",  // optional
+            "api_base": "http://..."  // for custom provider
         }
 
     Returns:
@@ -196,6 +207,7 @@ def save_config():
     provider = data.get("provider")
     api_key = data.get("api_key")
     model = data.get("model")
+    api_base = data.get("api_base")
 
     if not provider:
         return jsonify({"error": "Missing provider"}), 400
@@ -207,7 +219,10 @@ def save_config():
 
     try:
         if api_key:
-            save_api_key(provider, api_key)
+            save_api_key(provider, api_key, api_base)
+        elif api_base and provider == "custom":
+            # Save api_base even without new api_key (updates existing)
+            save_api_key(provider, "", api_base)
         if model:
             save_user_choice(provider, model)
 
