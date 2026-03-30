@@ -341,9 +341,6 @@ class ScreenRecorder:
         # Phase 8.2: Runtime configuration state
         self.recording_enabled: bool = True
         self.upload_enabled: bool = True
-        self.last_heartbeat_time: float = 0.0
-        self._last_permission_report_time: float = 0.0
-        self._last_trigger_report_time: float = 0.0
         self._warned_capture_issue: bool = False
         self.consumer: UploaderConsumer | None = consumer
         self._spool: SpoolQueue = get_spool()
@@ -370,6 +367,7 @@ class ScreenRecorder:
         self._last_permission_poll_time: float = 0.0
         self._event_tap: MacOSEventTap | None = None
         self._app_switch_monitor: MacOSAppSwitchMonitor | None = None
+        self._heartbeat_thread: HeartbeatThread | None = None
 
         # PHash-based visual similarity detection (Layer 2)
         # Note: Named _phash_cache (stores image perceptual hashes, not text simhash)
@@ -425,71 +423,14 @@ class ScreenRecorder:
         return self._stop_event.is_set()
 
     def start(self) -> None:
-        """Start the consumer thread."""
+        """Start the consumer thread and heartbeat thread."""
         if self.consumer is not None and not self.consumer.is_alive():
             self.consumer.start()
         if not self._spool_uploader.is_alive():
             self._spool_uploader.start()
-
-    def _send_heartbeat(
-        self,
-        *,
-        include_permission: bool = True,
-        include_trigger: bool = True,
-    ) -> None:
-        """Send heartbeat to server and sync runtime configuration.
-
-        Phase 8.2: Periodically registers client activity and fetches current
-        runtime settings (recording_enabled, upload_enabled, etc.) from server.
-        """
-        try:
-            url = f"{settings.api_url.rstrip('/')}/heartbeat"
-            payload: dict[str, object] = {}
-            if include_permission:
-                payload.update(
-                    {
-                        "capture_permission_status": self._last_permission_snapshot.status.value,
-                        "capture_permission_reason": self._last_permission_snapshot.reason,
-                        "last_permission_check_ts": self._last_permission_snapshot.last_check_ts,
-                    }
-                )
-            if include_trigger:
-                snapshot = self.trigger_channel_snapshot()
-                payload.update(
-                    {
-                        "queue_depth": snapshot.queue_depth,
-                        "queue_capacity": snapshot.queue_capacity,
-                        "collapse_trigger_count": snapshot.collapse_trigger_count,
-                        "overflow_drop_count": snapshot.overflow_drop_count,
-                    }
-                )
-            payload["capture_runtime"] = {
-                "topology_epoch": self._topology_epoch,
-                "primary_monitor_only": settings.primary_monitor_only,
-                "active_monitors": sorted(self._enabled_monitor_devices),
-                "last_capture_outcome": dict(self._last_capture_outcome),
-            }
-
-            response = requests.post(
-                url,
-                json=payload,
-                **_build_request_kwargs(url),
-            )
-            response.raise_for_status()
-
-            data = response.json()
-            config = data.get("config", {})
-            self.recording_enabled = config.get("recording_enabled", True)
-            self.upload_enabled = config.get("upload_enabled", True)
-            if settings.debug:
-                logger.debug(
-                    f"Heartbeat synced: recording={self.recording_enabled}, "
-                    f"upload={self.upload_enabled}"
-                )
-        except requests.RequestException as e:
-            logger.warning(f"Heartbeat failed (network): {e}")
-        except Exception as e:
-            logger.warning(f"Heartbeat failed: {e}")
+        if self._heartbeat_thread is None:
+            self._heartbeat_thread = HeartbeatThread(recorder=self, stop_event=self._stop_event)
+            self._heartbeat_thread.start()
 
     def _emit_trigger(self, event: TriggerEvent, *, now_ms: int | None = None) -> bool:
         event_time_ms = now_ms if now_ms is not None else int(time.time() * 1000)
@@ -599,6 +540,10 @@ class ScreenRecorder:
             self.consumer.join(timeout=2.0)
         if self._spool_uploader.is_alive():
             self._spool_uploader.join(timeout=2.0)
+
+        # Stop heartbeat thread
+        if self._heartbeat_thread is not None and self._heartbeat_thread.is_alive():
+            self._heartbeat_thread.join(timeout=2.0)
 
         # Clean up MSS instance
         if self._mss_instance is not None:
@@ -1241,23 +1186,10 @@ class ScreenRecorder:
         logger.info(f"   Tracking {len(monitors)} monitor(s)")
 
         while not self._stop_requested:
-            # Phase 8.2: Sync runtime configuration every 5 seconds
-            current_time = time.time()
-            include_trigger = current_time - self._last_trigger_report_time >= 5
-            include_permission = current_time - self._last_permission_report_time >= 5
-            if include_trigger or include_permission:
-                self._send_heartbeat(
-                    include_permission=include_permission,
-                    include_trigger=include_trigger,
-                )
-                self.last_heartbeat_time = current_time
-                if include_trigger:
-                    self._last_trigger_report_time = current_time
-                if include_permission:
-                    self._last_permission_report_time = current_time
-            self._poll_permissions(now_epoch=current_time)
+            self._poll_permissions(now_epoch=time.time())
 
             # Periodic stats logging
+            current_time = time.time()
             if (
                 current_time - self._last_stats_report_time
                 >= self._stats_report_interval_sec

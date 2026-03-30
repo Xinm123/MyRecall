@@ -414,7 +414,9 @@ def test_send_heartbeat_reports_permission_and_trigger_channel(monkeypatch):
 
     monkeypatch.setattr("openrecall.client.recorder.requests.post", _fake_post)
 
-    recorder._send_heartbeat()
+    stop_event = threading.Event()
+    heartbeat_thread = HeartbeatThread(recorder=recorder, stop_event=stop_event)
+    heartbeat_thread._send_heartbeat()
 
     assert captured_url.endswith("/heartbeat")
     payload = captured_payload
