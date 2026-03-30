@@ -89,8 +89,8 @@ class HeartbeatThread(threading.Thread):
         while not self._stop_event.is_set():
             try:
                 self._send_heartbeat()
-            except Exception:
-                logger.warning("HeartbeatThread: unexpected error: %s", exc_info=True)
+            except Exception as e:
+                logger.warning("HeartbeatThread: unexpected error: %s", e)
 
             # Wait for next interval or stop signal
             self._stop_event.wait(timeout=self.HEARTBEAT_INTERVAL_SEC)
