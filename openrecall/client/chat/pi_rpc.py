@@ -85,7 +85,7 @@ class PiRpcManager:
             if not pi_path:
                 raise RuntimeError("Pi executable not found. Run ensure_installed() first.")
 
-            # For custom provider: write config file and use openai+extension
+            # For custom provider: write config file and switch to zai provider
             effective_provider = provider
             if provider == "custom":
                 from .config_manager import get_chat_api_base, get_api_key
@@ -101,8 +101,10 @@ class PiRpcManager:
                     config_path.write_text(json.dumps(config_data, indent=2))
                     config_path.chmod(stat.S_IRUSR | stat.S_IWUSR)
                     logger.info(f"[PiRpc] wrote myrecall-llm.json: {config_data}")
-                    effective_provider = "myrecall-local"
-                    logger.info("[PiRpc] using --provider myrecall-local with local extension (streamSimple handles reasoning_content)")
+                    # Use built-in zai provider (model config from registry, baseUrl from plugin)
+                    effective_provider = "zai"
+                    model = "glm-4.5-flash"
+                    logger.info("[PiRpc] using --provider zai --model glm-4.5-flash (pi-agent native handles reasoning_content)")
                 else:
                     logger.warning("[PiRpc] no api_base for custom, using custom provider")
 
@@ -112,11 +114,9 @@ class PiRpcManager:
                 "--provider", effective_provider,
                 "--model", model,
                 "--workspace", str(self.workspace_dir),
-                # Enable tools in RPC mode (default is no tools, comma-separated)
-                "--tools", "read,bash,grep,find,ls",
             ]
 
-            if provider == "custom" and effective_provider == "myrecall-local":
+            if provider == "custom":
                 ext_path = Path.home() / ".myrecall" / "pi-agent" / "myrecall-llm-extension.ts"
                 logger.info(f"[PiRpc] extension: {ext_path} exists={ext_path.exists()}")
                 if ext_path.exists():

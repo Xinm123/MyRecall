@@ -67,11 +67,11 @@ SUPPORTED_PROVIDERS = [
     },
     {
         "id": "custom",
-        "name": "Custom (Self-hosted)",
+        "name": "Local GLM (Thinking)",
         "url": "",
         "api_base": "",  # loaded from OPENRECALL_CHAT_API_BASE or ~/.pi/agent/auth.json
         "models": [
-            {"id": "auto", "name": "Auto-detect"},
+            {"id": "glm-4.5-flash", "name": "GLM-4.5-Flash (Thinking)"},
         ]
     },
 ]

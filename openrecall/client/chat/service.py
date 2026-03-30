@@ -196,8 +196,8 @@ class ChatService:
             # Check if API key is configured
             provider = get_user_provider()
             api_key = get_api_key(provider)
-            # custom provider doesn't require an API key (local vLLM)
-            if not api_key and provider != "custom":
+            # custom and zai providers don't require an API key (local vLLM / local GGUF)
+            if not api_key and provider not in ("custom", "zai"):
                 with self._request_lock:
                     self._active_request = False
                 yield {
@@ -253,6 +253,7 @@ class ChatService:
 
             # Accumulate assistant response
             assistant_content = ""
+            assistant_thinking = ""  # accumulated thinking content (not persisted)
             tool_calls = []
 
             # Yield events until agent_end
@@ -280,11 +281,13 @@ class ChatService:
 
                 yield event
 
-                # Accumulate response — only text deltas, skip thinking
+                # Accumulate text and thinking deltas
                 if event.get("type") == "message_update":
                     msg_evt = event.get("assistantMessageEvent", {})
                     if msg_evt.get("type") == "text_delta":
                         assistant_content += msg_evt.get("delta", "")
+                    elif msg_evt.get("type") == "thinking_delta":
+                        assistant_thinking += msg_evt.get("delta", "")
 
                 elif event.get("type") == "tool_execution_start":
                     tool_calls.append(ToolCall(

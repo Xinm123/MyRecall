@@ -476,7 +476,7 @@ class Settings(BaseSettings):
         ),
     )
     client_cors_origin: str = Field(
-        default="http://localhost:8883",
+        default="http://localhost:8889",
         alias="OPENRECALL_CLIENT_CORS_ORIGIN",
         description="Allowed CORS origin for Edge server (client web UI origin)",
     )

@@ -1685,7 +1685,7 @@
 
       async refreshRecent() {
         try {
-          const res = await fetch(`${EDGE_BASE_URL}/api/memories/recent?limit=200`);
+          const res = await fetch(`${EDGE_BASE_URL}/api/memories/recent?limit=500`);
           if (!res.ok) return;
           const recent = await res.json();
           if (!Array.isArray(recent) || recent.length === 0) return;

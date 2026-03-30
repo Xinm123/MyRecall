@@ -16,7 +16,7 @@ from openrecall.shared.utils import human_readable_time, timestamp_to_human_read
 
 logger = logging.getLogger(__name__)
 
-# Web UI is now served by the Client (port 8883). Set DISABLE_SERVER_WEB=False to re-enable.
+# Web UI is now served by the Client (port 8889). Set DISABLE_SERVER_WEB=False to re-enable.
 DISABLE_SERVER_WEB = True
 
 # Initialize Store
@@ -24,6 +24,9 @@ sql_store = SQLStore()
 frames_store = FramesStore()
 
 app = Flask(__name__)
+
+# Configure maximum request size (must be larger than _MAX_FILE_SIZE_BYTES in api_v1.py)
+app.config['MAX_CONTENT_LENGTH'] = 20 * 1024 * 1024  # 20 MB
 
 # Register API Blueprints
 app.register_blueprint(api_bp)
@@ -174,8 +177,8 @@ def add_cors_headers(response):
     """Allow cross-origin requests from the client web UI.
 
     Echoes back the Origin header so browsers can access Edge API from any origin.
-    In same-machine mode: Origin = http://localhost:8883 (or 127.0.0.1)
-    In distributed mode: Origin = http://<client-ip>:8883
+    In same-machine mode: Origin = http://localhost:8889 (or 127.0.0.1)
+    In distributed mode: Origin = http://<client-ip>:8889
 
     The Edge API itself is still protected by other auth mechanisms (future work).
     """

@@ -189,7 +189,7 @@ def memories_latest():
 
 @api_bp.route("/memories/recent", methods=["GET"])
 def memories_recent():
-    limit_str = (request.args.get("limit") or "200").strip()
+    limit_str = (request.args.get("limit") or "500").strip()
     try:
         limit = int(limit_str)
     except ValueError:

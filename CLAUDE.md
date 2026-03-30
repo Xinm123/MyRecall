@@ -30,7 +30,7 @@ MyRecall v3 is a privacy-first alternative to proprietary digital memory solutio
 ./run_client.sh --debug
 ```
 
-Open browser: http://localhost:8883
+Open browser: http://localhost:8889
 
 **Configuration:**
 - Server: `myrecall_server.env` or environment variables
@@ -71,7 +71,7 @@ pip install -e ".[test]"    # Include test dependencies
 
 ### Host (Client) - `openrecall.client`
 
-**Responsibility:** Capture + Spool + Upload + Web UI Server (port 8883)
+**Responsibility:** Capture + Spool + Upload + Web UI Server (port 8889)
 
 **Components:**
 - **Recorder**: Event-driven screenshot capture
@@ -82,7 +82,7 @@ pip install -e ".[test]"    # Include test dependencies
   - Format: JPEG (`.jpg`/`.jpeg`) + JSON metadata
   - Atomic writes, idempotent retry
 - **Uploader**: Background consumer, posts to Edge `/v1/ingest`
-- **Web Server**: Flask app on port 8883 serving Jinja2 templates; browser JS fetches API from Edge (port 8083) via CORS
+- **Web Server**: Flask app on port 8889 serving Jinja2 templates; browser JS fetches API from Edge (port 8083) via CORS
 
 **Web Routes (served by Client):**
 - `/` (Grid), `/search`, `/timeline` — Jinja2 templates
@@ -182,7 +182,7 @@ openrecall/
 │   │   ├── macos.py    # macOS AX API bindings
 │   │   ├── policy.py   # AX vs OCR decision logic
 │   │   └── types.py    # AccessibilityDecision types
-│   └── web/         # Flask web UI (port 8883)
+│   └── web/         # Flask web UI (port 8889)
 │       ├── app.py
 │       └── templates/
 ├── server/          # Edge process
@@ -208,7 +208,7 @@ Key settings (see `openrecall/shared/config.py`):
 - `OPENRECALL_SERVER_DATA_DIR`: Edge data directory (default: ~/MRS)
 - `OPENRECALL_CLIENT_DATA_DIR`: Host spool directory (default: ~/MRC)
 - `OPENRECALL_PORT`: Edge API server port (default: 8083, API only — web UI disabled)
-- `OPENRECALL_CLIENT_WEB_PORT`: Client web UI port (default: 8883)
+- `OPENRECALL_CLIENT_WEB_PORT`: Client web UI port (default: 8889)
 - `OPENRECALL_DEBUG`: Enable debug logging
 - `OPENRECALL_AI_PROVIDER`: AI provider (local/dashscope/openai)
 - `OPENRECALL_DEVICE`: Inference device (cpu/cuda/mps)
