@@ -57,6 +57,100 @@ from openrecall.shared.utils import (
 
 logger = logging.getLogger(__name__)
 
+
+class HeartbeatThread(threading.Thread):
+    """Independent background thread that sends heartbeat to server.
+
+    Runs its own 5-second timer loop, completely decoupled from the
+    capture loop. Posts /heartbeat and updates recording_enabled /
+    upload_enabled from the server response.
+
+    Thread-safety: All reads from ScreenRecorder use snapshot copies
+    (dict.copy(), set.copy(), TriggerChannel.snapshot()) to avoid
+    holding locks on the main capture loop.
+    """
+
+    HEARTBEAT_INTERVAL_SEC = 5
+
+    def __init__(
+        self,
+        recorder: "ScreenRecorder",
+        stop_event: threading.Event,
+        name: str = "HeartbeatThread",
+    ) -> None:
+        super().__init__(name=name, daemon=True)
+        self.recorder = recorder
+        self._stop_event = stop_event
+
+    def run(self) -> None:
+        """Send heartbeat every 5 seconds until stop event is set."""
+        logger.info("heartbeat: HeartbeatThread started")
+
+        while not self._stop_event.is_set():
+            try:
+                self._send_heartbeat()
+            except Exception:
+                logger.warning("HeartbeatThread: unexpected error: %s", exc_info=True)
+
+            # Wait for next interval or stop signal
+            self._stop_event.wait(timeout=self.HEARTBEAT_INTERVAL_SEC)
+
+        logger.info("heartbeat: HeartbeatThread stopped")
+
+    def _send_heartbeat(self) -> None:
+        """Build payload, POST to /heartbeat, update config from response."""
+        url = f"{settings.api_url.rstrip('/')}/heartbeat"
+
+        # Build snapshot of recorder state (thread-safe reads)
+        payload: dict[str, object] = {}
+
+        # Permission snapshot (frozen dataclass, safe to share)
+        perm = self.recorder._last_permission_snapshot
+        payload["capture_permission_status"] = perm.status.value
+        payload["capture_permission_reason"] = perm.reason
+        payload["last_permission_check_ts"] = perm.last_check_ts
+
+        # Trigger channel snapshot (creates new object)
+        trigger_snapshot = self.recorder.trigger_channel_snapshot()
+        payload["queue_depth"] = trigger_snapshot.queue_depth
+        payload["queue_capacity"] = trigger_snapshot.queue_capacity
+        payload["collapse_trigger_count"] = trigger_snapshot.collapse_trigger_count
+        payload["overflow_drop_count"] = trigger_snapshot.overflow_drop_count
+
+        # Runtime info (copy-on-read for mutable containers)
+        payload["capture_runtime"] = {
+            "topology_epoch": self.recorder._topology_epoch,
+            "primary_monitor_only": settings.primary_monitor_only,
+            "active_monitors": sorted(self.recorder._enabled_monitor_devices.copy()),
+            "last_capture_outcome": self.recorder._last_capture_outcome.copy(),
+        }
+
+        try:
+            response = requests.post(
+                url,
+                json=payload,
+                **_build_request_kwargs(url, timeout=10),
+            )
+            response.raise_for_status()
+
+            data = response.json()
+            config = data.get("config", {})
+            # Write back to recorder (safe: next capture loop iteration sees new value)
+            self.recorder.recording_enabled = config.get("recording_enabled", True)
+            self.recorder.upload_enabled = config.get("upload_enabled", True)
+
+            if settings.debug:
+                logger.debug(
+                    "heartbeat: synced recording=%s upload=%s",
+                    self.recorder.recording_enabled,
+                    self.recorder.upload_enabled,
+                )
+        except requests.RequestException as e:
+            logger.warning("heartbeat: network error: %s", e)
+        except Exception as e:
+            logger.warning("heartbeat: failed: %s", e)
+
+
 ImageArray = NDArray[np.uint8]
 
 
