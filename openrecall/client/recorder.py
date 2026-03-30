@@ -5,7 +5,6 @@ import queue
 import subprocess
 import threading
 import time
-from collections.abc import Callable
 from dataclasses import asdict
 
 import mss
@@ -267,7 +266,7 @@ def compute_similarity(img1: ImageArray, img2: ImageArray) -> float:
 
 def _merge_accessibility_metadata(
     base_metadata: dict[str, str | int | None],
-    decision: "openrecall.client.accessibility.types.AccessibilityDecision",
+    decision: "openrecall.client.accessibility.types.AccessibilityDecision",  # noqa: F821
 ) -> dict[str, str | int | None]:
     """Merge accessibility decision into capture metadata for upload.
 
@@ -290,7 +289,6 @@ def _merge_accessibility_metadata(
         Updated metadata dictionary with accessibility fields if applicable
     """
     from openrecall.client.accessibility.types import (
-        AccessibilityDecision,
         REASON_EMPTY_TEXT,
     )
 
@@ -1315,7 +1313,7 @@ class ScreenRecorder:
                         should_check_simhash = False
 
                     if should_check_simhash:
-                        logger.info(f"DEBUG: Computing phash for capture")
+                        logger.info("DEBUG: Computing phash for capture")
                         try:
                             # Compute PHash
                             phash_value = compute_phash(image)
