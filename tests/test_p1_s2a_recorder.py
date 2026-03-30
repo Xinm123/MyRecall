@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import queue
+import threading
 import time
+from unittest.mock import patch, MagicMock
 
 import pytest
 
@@ -11,7 +13,112 @@ from openrecall.client.events.base import (
     TriggerEvent,
 )
 from openrecall.client.events.permissions import PermissionCheckResult
-from openrecall.client.recorder import ScreenRecorder, take_screenshots
+from openrecall.client.recorder import HeartbeatThread, ScreenRecorder, take_screenshots
+
+
+class TestHeartbeatThread:
+    """Tests for HeartbeatThread independent background heartbeat."""
+
+    def test_thread_posts_heartbeat_and_updates_config(self):
+        """HeartbeatThread should POST /heartbeat and update recording_enabled from response."""
+        recorder = ScreenRecorder()
+        stop_event = threading.Event()
+
+        mock_response = MagicMock()
+        mock_response.json.return_value = {
+            "status": "ok",
+            "config": {"recording_enabled": False, "upload_enabled": False},
+        }
+        mock_response.raise_for_status = MagicMock()
+
+        with patch("requests.post", return_value=mock_response) as mock_post:
+            with patch("time.sleep", return_value=None) as mock_sleep:
+                thread = HeartbeatThread(recorder=recorder, stop_event=stop_event)
+                thread.start()
+                # Wait for one heartbeat cycle
+                time.sleep(0.1)
+                stop_event.set()
+                thread.join(timeout=2.0)
+
+        # Verify POST was called
+        assert mock_post.called
+        # Verify recording_enabled updated from response
+        assert recorder.recording_enabled is False
+        assert recorder.upload_enabled is False
+
+    def test_thread_stops_cleanly_on_stop_event(self):
+        """HeartbeatThread should exit when stop_event is set."""
+        recorder = ScreenRecorder()
+        stop_event = threading.Event()
+
+        mock_response = MagicMock()
+        mock_response.json.return_value = {"status": "ok", "config": {}}
+        mock_response.raise_for_status = MagicMock()
+
+        with patch("requests.post", return_value=mock_response):
+            with patch("time.sleep", return_value=None):
+                thread = HeartbeatThread(recorder=recorder, stop_event=stop_event)
+                thread.start()
+                stop_event.set()
+                thread.join(timeout=2.0)
+
+        assert not thread.is_alive()
+
+    def test_thread_continues_on_network_error(self):
+        """HeartbeatThread should log warning and continue loop on network error."""
+        recorder = ScreenRecorder()
+        stop_event = threading.Event()
+
+        import requests as req
+
+        with patch("requests.post", side_effect=req.RequestException("network error")):
+            with patch("time.sleep", return_value=None) as mock_sleep:
+                with patch("openrecall.client.recorder.logger") as mock_logger:
+                    thread = HeartbeatThread(recorder=recorder, stop_event=stop_event)
+                    thread.start()
+                    time.sleep(0.1)
+                    stop_event.set()
+                    thread.join(timeout=2.0)
+
+        assert mock_logger.warning.called
+
+    def test_payload_contains_required_fields(self):
+        """HeartbeatThread payload should include permission, trigger, and runtime info."""
+        recorder = ScreenRecorder()
+        recorder._last_permission_snapshot = MagicMock()
+        recorder._last_permission_snapshot.status.value = "granted"
+        recorder._last_permission_snapshot.reason = "ok"
+        recorder._last_permission_snapshot.last_check_ts = "2026-03-30T00:00:00Z"
+        recorder._trigger_channel = MagicMock()
+        recorder._trigger_channel.snapshot.return_value = MagicMock(
+            queue_depth=0, queue_capacity=100, collapse_trigger_count=0, overflow_drop_count=0
+        )
+        recorder._topology_epoch = 1
+        recorder._enabled_monitor_devices = {"monitor_1"}
+        recorder._last_capture_outcome = {"outcome": "capture_completed"}
+
+        stop_event = threading.Event()
+
+        captured_payload = {}
+
+        def capture_payload(*args, **kwargs):
+            captured_payload["json"] = kwargs.get("json", {})
+            mock_resp = MagicMock()
+            mock_resp.json.return_value = {"status": "ok", "config": {}}
+            mock_resp.raise_for_status = MagicMock()
+            stop_event.set()
+            return mock_resp
+
+        with patch("requests.post", side_effect=capture_payload):
+            with patch("time.sleep", return_value=None):
+                thread = HeartbeatThread(recorder=recorder, stop_event=stop_event)
+                thread.start()
+                thread.join(timeout=2.0)
+
+        payload = captured_payload.get("json", {})
+        assert "capture_permission_status" in payload
+        assert "capture_runtime" in payload
+        assert payload["capture_runtime"]["topology_epoch"] == 1
 
 
 @pytest.mark.unit
