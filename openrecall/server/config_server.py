@@ -83,6 +83,7 @@ class ServerSettings(TOMLConfig):
 
     @classmethod
     def _default_filename(cls) -> str:
+        """Return default config filename for server."""
         return "server.toml"
 
     @classmethod

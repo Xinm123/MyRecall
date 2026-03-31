@@ -14,6 +14,7 @@ class TOMLConfig:
     """Base class for TOML-based configuration with fallback to defaults."""
 
     def __init__(self, **kwargs: Any) -> None:
+        """Initialize with keyword arguments from flattened TOML data."""
         for key, value in kwargs.items():
             setattr(self, key, value)
 
