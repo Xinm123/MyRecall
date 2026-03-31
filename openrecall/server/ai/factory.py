@@ -5,31 +5,25 @@ from typing import TYPE_CHECKING, Dict, Union
 if TYPE_CHECKING:
     from openrecall.server.description.providers.base import DescriptionProvider
 
-from openrecall.server.ai.base import AIProvider, AIProviderConfigError, EmbeddingProvider, OCRProvider
+from openrecall.server.ai.base import (
+    AIProvider,
+    AIProviderConfigError,
+    EmbeddingProvider,
+    OCRProvider,
+)
 from openrecall.server.ai.providers import (
     DashScopeEmbeddingProvider,
     DashScopeOCRProvider,
-    DashScopeProvider,
     DoctrOCRProvider,
     LocalEmbeddingProvider,
     LocalOCRProvider,
-    LocalProvider,
     OpenAIEmbeddingProvider,
     OpenAIOCRProvider,
-    OpenAIProvider,
     RapidOCRProvider,
 )
 from openrecall.shared.config import settings
 
 _instances: Dict[str, object] = {}
-
-
-def _resolve_vision_config() -> tuple[str, str, str, str]:
-    provider = settings.vision_provider or settings.ai_provider
-    model_name = settings.vision_model_name or settings.ai_model_name
-    api_key = settings.vision_api_key or settings.ai_api_key
-    api_base = settings.vision_api_base or settings.ai_api_base
-    return provider, model_name, api_key, api_base
 
 
 def _resolve_ocr_config() -> tuple[str, str, str, str]:
@@ -40,15 +34,9 @@ def _resolve_ocr_config() -> tuple[str, str, str, str]:
     return provider, model_name, api_key, api_base
 
 
-def _resolve_embedding_config() -> tuple[str, str, str, str]:
-    provider = settings.embedding_provider or settings.ai_provider
-    model_name = settings.embedding_api_model_name
-    api_key = settings.embedding_api_key or settings.ai_api_key
-    api_base = settings.embedding_api_base or settings.ai_api_base
-    return provider, model_name, api_key, api_base
-
-
-def get_ai_provider(capability: str = "vision") -> Union[AIProvider, OCRProvider, EmbeddingProvider]:
+def get_ai_provider(
+    capability: str = "vision",
+) -> Union[AIProvider, OCRProvider, EmbeddingProvider]:
     if capability == "embedding":
         return get_embedding_provider()
     elif capability == "ocr":
@@ -60,15 +48,28 @@ def get_ai_provider(capability: str = "vision") -> Union[AIProvider, OCRProvider
     if isinstance(cached, AIProvider):
         return cached
 
-    provider, model_name, api_key, api_base = _resolve_vision_config()
+    # Vision provider uses global [ai] settings (no separate [vision] section)
+    provider = settings.ai_provider
+    model_name = settings.ai_model_name
+    api_key = settings.ai_api_key
+    api_base = settings.ai_api_base
     provider = (provider or "local").strip().lower()
+
+    # Import here to avoid circular dependency at module level
+    from openrecall.server.ai.providers import (
+        DashScopeProvider,
+        LocalProvider,
+        OpenAIProvider,
+    )
 
     if provider == "local":
         instance: AIProvider = LocalProvider(model_name=model_name)
     elif provider == "dashscope":
         instance = DashScopeProvider(api_key=api_key, model_name=model_name)
     elif provider == "openai":
-        instance = OpenAIProvider(api_key=api_key, model_name=model_name, api_base=api_base)
+        instance = OpenAIProvider(
+            api_key=api_key, model_name=model_name, api_base=api_base
+        )
     else:
         raise AIProviderConfigError(f"Unknown AI provider: {provider}")
 
@@ -94,7 +95,9 @@ def get_ocr_provider() -> OCRProvider:
     elif provider == "dashscope":
         instance = DashScopeOCRProvider(api_key=api_key, model_name=model_name)
     elif provider == "openai":
-        instance = OpenAIOCRProvider(api_key=api_key, model_name=model_name, api_base=api_base)
+        instance = OpenAIOCRProvider(
+            api_key=api_key, model_name=model_name, api_base=api_base
+        )
     else:
         raise AIProviderConfigError(f"Unknown OCR provider: {provider}")
 
@@ -108,7 +111,11 @@ def get_embedding_provider() -> EmbeddingProvider:
     if isinstance(cached, EmbeddingProvider):
         return cached
 
-    provider, model_name, api_key, api_base = _resolve_embedding_config()
+    # Embedding provider uses global [ai] settings (no separate [embedding] section)
+    provider = settings.ai_provider
+    model_name = settings.ai_model_name
+    api_key = settings.ai_api_key
+    api_base = settings.ai_api_base
     provider = (provider or "local").strip().lower()
 
     if provider == "local":
@@ -116,7 +123,9 @@ def get_embedding_provider() -> EmbeddingProvider:
     elif provider == "dashscope":
         instance = DashScopeEmbeddingProvider(api_key=api_key, model_name=model_name)
     elif provider == "openai":
-        instance = OpenAIEmbeddingProvider(api_key=api_key, model_name=model_name, api_base=api_base)
+        instance = OpenAIEmbeddingProvider(
+            api_key=api_key, model_name=model_name, api_base=api_base
+        )
     else:
         raise AIProviderConfigError(f"Unknown embedding provider: {provider}")
 
@@ -125,7 +134,11 @@ def get_embedding_provider() -> EmbeddingProvider:
 
 
 def get_description_provider() -> "DescriptionProvider":
-    """Get or create a cached DescriptionProvider instance."""
+    """Get or create a cached DescriptionProvider instance.
+
+    Description provider uses independent [description] section configuration.
+    No fallback to [ai] section - description must be explicitly configured.
+    """
     capability = "description"
     cached = _instances.get(capability)
     if cached is not None:
@@ -138,18 +151,20 @@ def get_description_provider() -> "DescriptionProvider":
         DashScopeDescriptionProvider,
     )
 
-    provider = settings.description_provider or settings.ai_provider
-    model_name = settings.description_model or settings.ai_model_name
-    api_key = settings.description_api_key or settings.ai_api_key
-    api_base = settings.description_api_base or settings.ai_api_base
-    provider = (provider or "local").strip().lower()
+    # Use [description] section only - no fallback to [ai]
+    provider = settings.description_provider.strip().lower() if settings.description_provider else "local"
+    model_name = settings.description_model
+    api_key = settings.description_api_key
+    api_base = settings.description_api_base
 
     if provider == "local":
         instance: DescriptionProvider = LocalDescriptionProvider(model_name=model_name)
     elif provider == "dashscope":
         instance = DashScopeDescriptionProvider(api_key=api_key, model_name=model_name)
     elif provider == "openai":
-        instance = OpenAIDescriptionProvider(api_key=api_key, model_name=model_name, api_base=api_base)
+        instance = OpenAIDescriptionProvider(
+            api_key=api_key, model_name=model_name, api_base=api_base
+        )
     else:
         raise AIProviderConfigError(f"Unknown description provider: {provider}")
 

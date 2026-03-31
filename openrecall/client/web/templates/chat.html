@@ -773,6 +773,33 @@
     max-height: 400px;
     overflow-y: auto;
   }
+
+  /* === Scroll to Bottom Button === */
+  .scroll-to-bottom-btn {
+    position: sticky;
+    bottom: 16px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 16px;
+    border-radius: 20px;
+    background: var(--accent-color);
+    color: white;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    border: none;
+    transition: background-color 0.2s, opacity 0.2s;
+  }
+
+  .scroll-to-bottom-btn:hover {
+    background-color: #005bb5;
+  }
+
 </style>
 {% endblock %}
 
@@ -821,7 +848,7 @@
 
   <!-- Main Chat Area -->
   <main class="chat-main">
-    <div class="chat-messages" id="chat-messages">
+    <div class="chat-messages" id="chat-messages" @scroll="handleMessagesScroll()">
       <!-- Welcome state (no conversation selected) -->
       <template x-if="messages.length === 0 && !currentConvId">
         <div class="chat-welcome">
@@ -950,6 +977,16 @@
         </div>
       </template>
     </div>
+
+    <!-- Floating scroll-to-bottom button -->
+    <template x-if="isUserScrolledUp && messages.length > 0">
+      <button class="scroll-to-bottom-btn" @click="scrollToBottomAndReset()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="6 9 12 15 18 9"/>
+        </svg>
+        <span>新内容</span>
+      </button>
+    </template>
 
     <!-- Input Area -->
     <div class="chat-input-area">
@@ -1080,6 +1117,7 @@
       inputText: '',
       isStreaming: false,
       sidebarOpen: false,
+      isUserScrolledUp: false,  // Track if user scrolled up to read history
       currentAssistantMsg: null,  // In-progress streaming message
       streamReader: null,         // SSE fetch reader for cancellation
 
@@ -1162,6 +1200,7 @@
         this.currentConvId = id;
         this.messages = [];
         this.currentAssistantMsg = null;
+        this.isUserScrolledUp = false;
         this.sidebarOpen = false;
 
         try {
@@ -1239,6 +1278,7 @@
 
         this.inputText = '';
         this.isStreaming = true;
+        this.isUserScrolledUp = false;  // Reset scroll state for new message
         this.currentAssistantMsg = {
           id: this.nextId(),
           role: 'assistant',
@@ -1323,7 +1363,7 @@
             if (!delta) return;
             this.currentAssistantMsg.rawContent += delta;
             this.currentAssistantMsg.content = marked.parse(this.currentAssistantMsg.rawContent);
-            this.scrollToBottom();
+            this.smartScrollToBottom();
           }
         }
 
@@ -1466,6 +1506,28 @@
           const el = document.getElementById('chat-messages');
           if (el) el.scrollTop = el.scrollHeight;
         });
+      },
+
+      // Smart scroll: only scroll if user is near bottom
+      smartScrollToBottom() {
+        if (!this.isUserScrolledUp) {
+          this.scrollToBottom();
+        }
+      },
+
+      // Handle scroll events to detect if user scrolled up
+      handleMessagesScroll() {
+        const el = document.getElementById('chat-messages');
+        if (!el) return;
+        // Consider "near bottom" if within 150px of the bottom
+        const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 150;
+        this.isUserScrolledUp = !nearBottom;
+      },
+
+      // Scroll to bottom and reset user scroll state
+      scrollToBottomAndReset() {
+        this.isUserScrolledUp = false;
+        this.scrollToBottom();
       },
 
       formatRelativeTime(isoString) {

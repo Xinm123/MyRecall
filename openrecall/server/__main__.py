@@ -1,21 +1,48 @@
 """OpenRecall Server entry point.
 
-Launch with: python -m openrecall.server
+Launch with: python -m openrecall.server [--config=/path/to/server.toml]
 """
 
 import atexit
+import argparse
 import sqlite3
 import signal
 import sys
 from pathlib import Path
 from typing import Optional
 
-from openrecall.shared.config import settings
 from openrecall.shared.logging_config import configure_logging
 
-logger = configure_logging("openrecall.server")
+logger = None  # Set in main() after settings are initialized
 
 _description_worker = None  # module-level reference for shutdown
+
+
+def _parse_args():
+    parser = argparse.ArgumentParser(prog="openrecall-server")
+    parser.add_argument(
+        "--config",
+        type=str,
+        default=None,
+        help="Path to TOML config file (default: ~/.myrecall/server.toml)",
+    )
+    return parser.parse_known_args()[0]
+
+
+def _load_settings(config_path: Optional[str] = None):
+    from openrecall.server.config_server import ServerSettings
+
+    settings_obj = ServerSettings.from_toml(config_path)
+    return settings_obj
+
+
+_args = _parse_args()
+settings = _load_settings(_args.config)
+
+# Make new settings the global singleton for server modules
+import openrecall.shared.config
+
+openrecall.shared.config.settings = settings
 
 from openrecall.server.app import app
 from openrecall.server.database.migrations_runner import run_migrations
@@ -51,7 +78,7 @@ def preload_ai_models():
     try:
         from openrecall.server.ai.factory import get_ai_provider
 
-        provider = (settings.vision_provider or settings.ai_provider).strip().lower()
+        provider = settings.ai_provider.strip().lower()
         if provider == "local":
             get_ai_provider("vision")
             logger.info("✅ VL Model loaded successfully")
@@ -65,9 +92,7 @@ def preload_ai_models():
     try:
         from openrecall.server.ai.factory import get_embedding_provider
 
-        embedding_provider = (
-            (settings.embedding_provider or settings.ai_provider).strip().lower()
-        )
+        embedding_provider = settings.ai_provider.strip().lower()
         if embedding_provider == "local":
             get_embedding_provider()
             logger.info("✅ Embedding model loaded successfully")
@@ -164,6 +189,8 @@ def _start_ocr_mode():
 
 
 def main():
+    global logger
+    logger = configure_logging("openrecall.server")
     logger.info("=" * 50)
     logger.info("OpenRecall Server Starting")
     logger.info("=" * 50)

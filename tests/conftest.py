@@ -15,6 +15,20 @@ _DEFAULT_TEST_DATA_DIR = tempfile.mkdtemp(prefix="openrecall_test_data_")
 os.environ.setdefault("OPENRECALL_DATA_DIR", _DEFAULT_TEST_DATA_DIR)
 
 
+def pytest_configure(config):
+    """Initialize settings BEFORE test collection so all modules get the real settings."""
+    import openrecall.shared.config
+
+    # Reload to ensure clean state
+    importlib.reload(openrecall.shared.config)
+
+    # Initialize settings with test data dir
+    from openrecall.server.config_server import ServerSettings
+
+    test_settings = ServerSettings.from_toml()
+    openrecall.shared.config.settings = test_settings
+
+
 @pytest.fixture
 def flask_app(tmp_path, monkeypatch):
     monkeypatch.setenv("OPENRECALL_DATA_DIR", str(tmp_path))

@@ -87,22 +87,19 @@ class RapidOCRBackend:
             "Det.engine_type": EngineType.ONNXRUNTIME,
             "Det.ocr_version": ocr_version,
             "Det.model_type": model_type,
-
             # Recognition config
             "Rec.engine_type": EngineType.ONNXRUNTIME,
             "Rec.ocr_version": ocr_version,
             "Rec.model_type": model_type,
-
             # Classification config
             "Cls.engine_type": EngineType.ONNXRUNTIME,
-
-            # Quality tuning parameters (from settings)
-            "Det.limit_side_len": settings.ocr_det_limit_side_len,
-            "Det.thresh": settings.ocr_det_db_thresh,
-            "Det.box_thresh": settings.ocr_det_db_box_thresh,
-            "Det.unclip_ratio": settings.ocr_det_db_unclip_ratio,
-            "Det.score_mode": settings.ocr_det_db_score_mode,
-            "Global.text_score": settings.ocr_drop_score,
+            # Quality tuning parameters (hardcoded defaults)
+            "Det.limit_side_len": 960,
+            "Det.thresh": 0.3,
+            "Det.box_thresh": 0.7,
+            "Det.unclip_ratio": 1.6,
+            "Det.score_mode": 0,
+            "Global.text_score": 0.0,
         }
 
         self.engine = RapidOCR(params=params)
@@ -214,7 +211,9 @@ class RapidOCRBackend:
         scores = [float(s) for s in result.scores] if result.scores else []
 
         if settings.debug:
-            logger.debug(f"RapidOCR v3: Extracted {len(text)} chars, {len(boxes)} boxes")
+            logger.debug(
+                f"RapidOCR v3: Extracted {len(text)} chars, {len(boxes)} boxes"
+            )
 
         # Generate visualization image if path provided
         if vis_output_path and result is not None:
@@ -223,7 +222,9 @@ class RapidOCRBackend:
                 Path(vis_output_path).parent.mkdir(parents=True, exist_ok=True)
                 result.vis(vis_output_path)
                 if settings.debug:
-                    logger.debug(f"RapidOCR v3: Saved visualization to {vis_output_path}")
+                    logger.debug(
+                        f"RapidOCR v3: Saved visualization to {vis_output_path}"
+                    )
             except Exception as e:
                 # Non-fatal: log warning but continue
                 logger.warning(f"RapidOCR v3: Failed to save visualization: {e}")
@@ -240,6 +241,7 @@ if __name__ == "__main__":
 
     # Test with sample image if available
     import os
+
     test_img = "tests/fixtures/images/sample_jpeg.jpg"
     if os.path.exists(test_img):
         img = Image.open(test_img)
@@ -250,7 +252,9 @@ if __name__ == "__main__":
 
         # Test extract_text_with_boxes
         result = backend.extract_text_with_boxes(img)
-        print(f"✅ extract_text_with_boxes: {len(result.text)} chars, {len(result.boxes)} boxes")
+        print(
+            f"✅ extract_text_with_boxes: {len(result.text)} chars, {len(result.boxes)} boxes"
+        )
 
         # Test JSON serialization
         json_dict = result.to_json_dict()

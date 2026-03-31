@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import tempfile
 from pathlib import Path
 from typing import Any, Self
 
@@ -49,6 +50,7 @@ class ClientSettings(TOMLConfig):
     # [ui]
     ui_web_enabled: bool = True
     ui_web_port: int = 8889
+    ui_show_ai_description: bool = False
 
     # [stats]
     stats_interval_sec: int = 120
@@ -88,5 +90,144 @@ class ClientSettings(TOMLConfig):
             ),
             ui_web_enabled=data.get("ui.web_enabled", True),
             ui_web_port=data.get("ui.web_port", 8889),
+            ui_show_ai_description=data.get("ui.show_ai_description", False),
             stats_interval_sec=data.get("stats.interval_sec", 120),
         )
+
+    def __init__(self, **kwargs: Any) -> None:
+        super().__init__(**kwargs)
+        self._ensure_dirs()
+
+    def _ensure_dirs(self) -> None:
+        self.paths_data_dir = Path(self.paths_data_dir).expanduser().resolve()
+        self.paths_buffer_dir = Path(self.paths_buffer_dir).expanduser().resolve()
+        try:
+            self.paths_data_dir.mkdir(parents=True, exist_ok=True)
+            self.paths_buffer_dir.mkdir(parents=True, exist_ok=True)
+            (self.paths_data_dir / "screenshots").mkdir(parents=True, exist_ok=True)
+            (self.paths_data_dir / "cache").mkdir(parents=True, exist_ok=True)
+            (self.paths_data_dir / "spool").mkdir(parents=True, exist_ok=True)
+        except PermissionError:
+            self.paths_data_dir = Path(tempfile.gettempdir()) / "MRC"
+            self.paths_buffer_dir = self.paths_data_dir / "buffer"
+            self.paths_data_dir.mkdir(parents=True, exist_ok=True)
+            self.paths_buffer_dir.mkdir(parents=True, exist_ok=True)
+            (self.paths_data_dir / "screenshots").mkdir(parents=True, exist_ok=True)
+            (self.paths_data_dir / "cache").mkdir(parents=True, exist_ok=True)
+            (self.paths_data_dir / "spool").mkdir(parents=True, exist_ok=True)
+
+    @property
+    def debug(self) -> bool:
+        return self.client_debug
+
+    @property
+    def show_ai_description(self) -> bool:
+        return self.ui_show_ai_description
+
+    @property
+    def buffer_path(self) -> Path:
+        return self.paths_buffer_dir
+
+    @property
+    def spool_path(self) -> Path:
+        """Directory for spooling captures before upload (created by SpoolQueue)."""
+        return self.paths_data_dir / "spool"
+
+    @property
+    def client_screenshots_path(self) -> Path:
+        return self.paths_data_dir / "screenshots"
+
+    @property
+    def cache_path(self) -> Path:
+        return self.paths_data_dir / "cache"
+
+    @property
+    def api_url(self) -> str:
+        return self.server_api_url
+
+    @property
+    def edge_base_url(self) -> str:
+        return self.server_edge_base_url
+
+    @property
+    def upload_timeout(self) -> int:
+        return self.server_upload_timeout
+
+    @property
+    def click_debounce_ms(self) -> int:
+        return self.debounce_click_ms
+
+    @property
+    def trigger_debounce_ms(self) -> int:
+        return self.debounce_trigger_ms
+
+    @property
+    def capture_debounce_ms(self) -> int:
+        return self.debounce_capture_ms
+
+    @property
+    def idle_capture_interval_ms(self) -> int:
+        return self.debounce_idle_interval_ms
+
+    @property
+    def primary_monitor_only(self) -> bool:
+        return self.capture_primary_monitor_only
+
+    @property
+    def client_web_enabled(self) -> bool:
+        return self.ui_web_enabled
+
+    @property
+    def client_web_port(self) -> int:
+        return self.ui_web_port
+
+    @property
+    def client_save_local_screenshots(self) -> bool:
+        return self.capture_save_local_copies
+
+    @property
+    def simhash_enabled_for_click(self) -> bool:
+        return self.dedup_for_click
+
+    @property
+    def simhash_enabled_for_app_switch(self) -> bool:
+        return self.dedup_for_app_switch
+
+    @property
+    def simhash_cache_size_per_device(self) -> int:
+        return self.dedup_cache_size_per_device
+
+    @property
+    def trigger_queue_capacity(self) -> int:
+        return 1000
+
+    @property
+    def permission_poll_interval_sec(self) -> int:
+        return self.capture_permission_poll_sec
+
+    @property
+    def min_capture_interval_ms(self) -> int:
+        """Minimum time between any two captures (global debounce)."""
+        return self.capture_debounce_ms
+
+    # --- Legacy simhash aliases used by recorder.py (dedup via PHash, not MSSIM) ---
+
+    @property
+    def simhash_dedup_enabled(self) -> bool:
+        return self.dedup_enabled
+
+    @property
+    def simhash_dedup_threshold(self) -> int:
+        return self.dedup_threshold
+
+    @property
+    def simhash_ttl_seconds(self) -> float:
+        return self.dedup_ttl_seconds
+
+    @property
+    def max_skip_duration_sec(self) -> int:
+        return self.dedup_force_after_skip_seconds
+
+    @property
+    def client_data_dir(self) -> Path:
+        return self.paths_data_dir

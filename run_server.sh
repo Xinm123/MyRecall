@@ -5,7 +5,8 @@ set -euo pipefail
 repo_root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 cd "$repo_root"
 
-env_file="${OPENRECALL_ENV_FILE:-$repo_root/myrecall_server.env}"
+config_file=""
+env_file=""
 enable_debug="false"
 
 for arg in "$@"; do
@@ -13,31 +14,51 @@ for arg in "$@"; do
     --debug)
       enable_debug="true"
       ;;
+    --config=*)
+      config_file="${arg#--config=}"
+      ;;
     --env=*)
       env_file="${arg#--env=}"
       ;;
     *)
-      echo "Usage: $0 [--debug] [--env=/abs/path/to/myrecall_server.env]" >&2
+      echo "Usage: $0 [--debug] [--config=/abs/path/to/server.toml] [--env=/abs/path/to/myrecall_server.env]" >&2
       exit 2
       ;;
   esac
 done
 
-if [[ ! -f "$env_file" ]]; then
-  # Backward compatible fallbacks
-  if [[ -f "$repo_root/openrecall.env" ]]; then
-    env_file="$repo_root/openrecall.env"
+# Determine config source priority:
+# 1. --config flag (TOML)
+# 2. --env flag (legacy .env)
+# 3. Default: server.toml in repo root, then ~/.myrecall/server.toml
+if [[ -z "$config_file" && -z "$env_file" ]]; then
+  if [[ -f "$repo_root/server.toml" ]]; then
+    config_file="$repo_root/server.toml"
+  elif [[ -f "$HOME/.myrecall/server.toml" ]]; then
+    config_file="$HOME/.myrecall/server.toml"
+  elif [[ -f "$repo_root/myrecall_server.env" ]]; then
+    # Legacy fallback
+    env_file="$repo_root/myrecall_server.env"
+  elif [[ -f "$HOME/.myrecall/myrecall_server.env" ]]; then
+    # Legacy fallback
+    env_file="$HOME/.myrecall/myrecall_server.env"
   fi
 fi
 
-if [[ ! -f "$env_file" ]]; then
-  echo "Env file not found: $env_file" >&2
+if [[ -n "$config_file" && ! -f "$config_file" ]]; then
+  echo "Config file not found: $config_file" >&2
   exit 1
 fi
 
-set -a
-source "$env_file"
-set +a
+if [[ -n "$env_file" ]]; then
+  if [[ ! -f "$env_file" ]]; then
+    echo "Env file not found: $env_file" >&2
+    exit 1
+  fi
+  set -a
+  source "$env_file"
+  set +a
+fi
 
 if [[ "$enable_debug" == "true" ]]; then
   export OPENRECALL_DEBUG=true
@@ -52,4 +73,10 @@ if [[ -z "${python_bin:-}" ]]; then
   exit 1
 fi
 
-exec "$python_bin" -m openrecall.server
+# Build command arguments
+cmd_args=("-m" "openrecall.server")
+if [[ -n "$config_file" ]]; then
+  cmd_args+=("--config" "$config_file")
+fi
+
+exec "$python_bin" "${cmd_args[@]}"

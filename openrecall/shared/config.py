@@ -1,7 +1,8 @@
 """Configuration management for OpenRecall using pydantic-settings."""
 
 import os
-from typing import Optional, Union
+import warnings
+from typing import Any, Optional, Union
 from pathlib import Path
 import tempfile
 import logging
@@ -10,6 +11,13 @@ from pydantic import Field, model_validator, field_validator
 from pydantic_settings import BaseSettings
 
 logger = logging.getLogger(__name__)
+
+warnings.warn(
+    "openrecall.shared.config is deprecated. Use TOML-based configuration instead. "
+    "See myrecall_server.toml.example and myrecall_client.toml.example.",
+    DeprecationWarning,
+    stacklevel=2,
+)
 
 
 class Settings(BaseSettings):
@@ -499,12 +507,12 @@ class Settings(BaseSettings):
     @classmethod
     def derive_edge_base_url(cls, values):
         """Auto-derive edge_base_url from api_url if not explicitly set."""
-        edge_base_url = getattr(values, 'edge_base_url', None) or ""
-        api_url = getattr(values, 'api_url', None) or ""
+        edge_base_url = getattr(values, "edge_base_url", None) or ""
+        api_url = getattr(values, "api_url", None) or ""
 
         if not edge_base_url and api_url:
             # Strip /api suffix: http://localhost:8083/api → http://localhost:8083
-            derived = api_url.rstrip('/api').rstrip('/')
+            derived = api_url.rstrip("/api").rstrip("/")
             values.edge_base_url = derived
             logger.info(f"Auto-derived EDGE_BASE_URL={derived} from API_URL={api_url}")
 
@@ -643,5 +651,29 @@ class Settings(BaseSettings):
         return self
 
 
-# Global settings instance - directories are created on import
-settings = Settings()
+# Lazy proxy that prevents eager Settings() instantiation (which creates ~/MRC ~/MRS).
+# Entry points MUST set openrecall.shared.config.settings to the real settings object
+# (ServerSettings.from_toml() or ClientSettings.from_toml()) BEFORE importing modules that
+# use `from openrecall.shared.config import settings`.
+# This proxy raises a helpful error if settings is accessed before initialization.
+class _SettingsProxy:
+    _instance: Optional[Any] = None
+
+    def __getattr__(self, name: str) -> Any:
+        if _SettingsProxy._instance is None:
+            raise AttributeError(
+                "shared.config.settings not initialized. "
+                "Use ServerSettings.from_toml() or ClientSettings.from_toml() "
+                "and assign to openrecall.shared.config.settings BEFORE importing "
+                "modules that use `from openrecall.shared.config import settings`."
+            )
+        return getattr(_SettingsProxy._instance, name)
+
+
+def __getattr__(name: str) -> Any:
+    if name == "settings":
+        return _settings_proxy
+    raise AttributeError(f"module 'openrecall.shared.config' has no attribute '{name}'")
+
+
+_settings_proxy = _SettingsProxy()

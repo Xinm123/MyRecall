@@ -32,10 +32,8 @@ def test_server_settings_ocr_defaults():
     """OCR settings should have correct defaults."""
     settings = ServerSettings._from_dict({})
     assert settings.ocr_provider == "rapidocr"
-    assert settings.ocr_det_db_thresh == 0.3
-    assert settings.ocr_det_db_box_thresh == 0.7
-    assert settings.ocr_det_db_score_mode == 0  # Used in rapid_backend.py
-    assert settings.ocr_drop_score == 0.0  # Used in rapid_backend.py
+    assert settings.ocr_rapid_version == "PP-OCRv4"
+    assert settings.ocr_model_type == "mobile"
 
 
 def test_server_settings_paths():
@@ -51,12 +49,10 @@ def test_server_settings_from_nested_dict():
         "server.host": "192.168.1.1",
         "server.port": 9000,
         "ai.provider": "dashscope",
-        "ocr.det_db_score_mode": 1,
-        "ocr.drop_score": 0.5,
+        "ocr.rapid_version": "PP-OCRv5",
     }
     settings = ServerSettings._from_dict(data)
     assert settings.server_host == "192.168.1.1"
     assert settings.server_port == 9000
     assert settings.ai_provider == "dashscope"
-    assert settings.ocr_det_db_score_mode == 1
-    assert settings.ocr_drop_score == 0.5
+    assert settings.ocr_rapid_version == "PP-OCRv5"

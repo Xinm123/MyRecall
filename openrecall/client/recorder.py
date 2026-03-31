@@ -153,62 +153,6 @@ class HeartbeatThread(threading.Thread):
 ImageArray = NDArray[np.uint8]
 
 
-def mean_structured_similarity_index(
-    img1: ImageArray, img2: ImageArray, L: int = 255
-) -> float:
-    """Calculates the Mean Structural Similarity Index (MSSIM) between two images.
-
-    Args:
-        img1: The first image as a NumPy array (RGB).
-        img2: The second image as a NumPy array (RGB).
-        L: The dynamic range of the pixel values (default is 255).
-
-    Returns:
-        The MSSIM value between the two images (float between -1 and 1).
-    """
-    K1, K2 = 0.01, 0.03
-    C1, C2 = (K1 * L) ** 2, (K2 * L) ** 2
-
-    def rgb2gray(img: ImageArray) -> NDArray[np.float64]:
-        """Converts an RGB image to grayscale."""
-        return 0.2989 * img[..., 0] + 0.5870 * img[..., 1] + 0.1140 * img[..., 2]
-
-    img1_gray: NDArray[np.float64] = rgb2gray(img1)
-    img2_gray: NDArray[np.float64] = rgb2gray(img2)
-    mu1 = float(np.mean(img1_gray))
-    mu2 = float(np.mean(img2_gray))
-    sigma1_sq = float(np.var(img1_gray))
-    sigma2_sq = float(np.var(img2_gray))
-    sigma12 = float(np.mean((img1_gray - mu1) * (img2_gray - mu2)))
-    ssim_index = ((2 * mu1 * mu2 + C1) * (2 * sigma12 + C2)) / (
-        (mu1**2 + mu2**2 + C1) * (sigma1_sq + sigma2_sq + C2)
-    )
-    return float(ssim_index)
-
-
-def is_similar(
-    img1: ImageArray, img2: ImageArray, similarity_threshold: float | None = None
-) -> bool:
-    """Checks if two images are similar based on MSSIM.
-
-    Args:
-        img1: The first image as a NumPy array.
-        img2: The second image as a NumPy array.
-        similarity_threshold: The threshold above which images are considered similar.
-
-    Returns:
-        True if the images are similar, False otherwise.
-    """
-    if settings.disable_similarity_filter:
-        return False
-    similarity: float = compute_similarity(img1, img2)
-    threshold = (
-        similarity_threshold
-        if similarity_threshold is not None
-        else settings.similarity_threshold
-    )
-    return similarity >= threshold
-
 
 def take_screenshots() -> list[ImageArray]:
     """Takes screenshots of all connected monitors or just the primary one.
@@ -242,26 +186,6 @@ def take_screenshots() -> list[ImageArray]:
                 logger.warning("Monitor index %s out of bounds. Skipping.", i)
 
     return screenshots
-
-
-def resize_image(image: ImageArray, max_dim: int = 800) -> ImageArray:
-    """
-    Resizes an image to fit within a maximum dimension while maintaining aspect ratio.
-    Args:
-        image: The input image as a NumPy array (RGB).
-        max_dim: The maximum dimension for resizing.
-    Returns:
-        The resized image as a NumPy array (RGB).
-    """
-    pil_image = Image.fromarray(image)
-    pil_image.thumbnail((max_dim, max_dim), Image.Resampling.LANCZOS)
-    return np.array(pil_image)
-
-
-def compute_similarity(img1: ImageArray, img2: ImageArray) -> float:
-    compress_img1: ImageArray = resize_image(img1)
-    compress_img2: ImageArray = resize_image(img2)
-    return mean_structured_similarity_index(compress_img1, compress_img2)
 
 
 def _merge_accessibility_metadata(
