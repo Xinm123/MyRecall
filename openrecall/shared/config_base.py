@@ -13,6 +13,10 @@ logger = logging.getLogger(__name__)
 class TOMLConfig:
     """Base class for TOML-based configuration with fallback to defaults."""
 
+    def __init__(self, **kwargs: Any) -> None:
+        for key, value in kwargs.items():
+            setattr(self, key, value)
+
     @classmethod
     def from_toml(cls, path: str | Path | None = None) -> Self:
         """Load config from TOML file with fallback to defaults."""
