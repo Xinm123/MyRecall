@@ -1839,14 +1839,28 @@ class FramesStore:
         time_end: str,
         limit: int = 20,
     ) -> list[dict]:
-        """Get recent frame descriptions within a time range."""
+        """Get recent frame descriptions within a time range.
+
+        Returns simplified description entries: frame_id, timestamp, summary, intent, entities.
+        The narrative field is excluded from activity-summary responses — detailed descriptions
+        are available via GET /v1/frames/{id}/context.
+
+        Args:
+            conn: SQLite connection
+            time_start: ISO8601 start timestamp
+            time_end: ISO8601 end timestamp
+            limit: Maximum number of descriptions to return
+
+        Returns:
+            List of dicts with frame_id, timestamp, summary, intent, entities
+        """
         cursor = conn.execute(
             """
-            SELECT fd.frame_id, fd.narrative, fd.entities_json, fd.intent, fd.summary
+            SELECT fd.frame_id, f.timestamp, fd.summary, fd.intent, fd.entities_json
             FROM frame_descriptions fd
             JOIN frames f ON f.id = fd.frame_id
             WHERE f.timestamp BETWEEN ? AND ?
-              AND fd.narrative IS NOT NULL
+              AND fd.summary IS NOT NULL
             ORDER BY f.timestamp DESC
             LIMIT ?
             """,
@@ -1856,14 +1870,14 @@ class FramesStore:
         result = []
         for r in rows:
             try:
-                entities = json.loads(r[2])
+                entities = json.loads(r[4])
             except (json.JSONDecodeError, TypeError):
                 entities = []
             result.append({
                 "frame_id": r[0],
-                "narrative": r[1],
-                "entities": entities,
+                "timestamp": r[1],
+                "summary": r[2],
                 "intent": r[3],
-                "summary": r[4],
+                "entities": entities,
             })
         return result
