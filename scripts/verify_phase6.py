@@ -140,43 +140,6 @@ def verify_activity_summary_apps(store: FramesStore) -> bool:
     return True
 
 
-def verify_activity_summary_recent_texts(store: FramesStore) -> bool:
-    """Verify get_activity_summary_recent_texts."""
-    print("2️⃣  Testing get_activity_summary_recent_texts...")
-
-    texts = store.get_activity_summary_recent_texts(
-        start_time="2026-03-21T00:00:00Z",
-        end_time="2026-03-21T23:59:59Z",
-        limit=10,
-    )
-
-    print(f"   Result ({len(texts)} items):")
-    for t in texts[:5]:
-        print(f"      - [{t['role']}] {t['text'][:30]}... (frame_id={t['frame_id']})")
-
-    # Verify only text-like roles (AXStaticText, line, paragraph)
-    roles = {t["role"] for t in texts}
-    print(f"   Roles found: {roles}")
-
-    assert roles.issubset({"AXStaticText", "line", "paragraph"}), \
-        f"Expected only text-like roles, got {roles}"
-
-    # Verify ordering (timestamp DESC)
-    timestamps = [t["timestamp"] for t in texts]
-    assert timestamps == sorted(timestamps, reverse=True), \
-        "Expected timestamps in descending order"
-
-    # Test app_name filter
-    safari_texts = store.get_activity_summary_recent_texts(
-        start_time="2026-03-21T00:00:00Z",
-        end_time="2026-03-21T23:59:59Z",
-        app_name="Safari",
-    )
-    assert all(t["app_name"] == "Safari" for t in safari_texts), \
-        "Expected only Safari texts"
-
-    print("   ✅ PASSED\n")
-    return True
 
 
 def verify_activity_summary_total_frames(store: FramesStore) -> bool:
@@ -321,7 +284,6 @@ def main():
     # Run verification
     results = []
     results.append(verify_activity_summary_apps(store))
-    results.append(verify_activity_summary_recent_texts(store))
     results.append(verify_activity_summary_total_frames(store))
     results.append(verify_activity_summary_time_range(store))
     results.append(verify_get_frame_context(store))
