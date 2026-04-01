@@ -87,6 +87,7 @@ class PiRpcManager:
             f"Timezone: {tz_name} (UTC{tz_offset})\n"
             f"Local midnight today (UTC): {midnight_utc_str}\n"
             f"Local midnight yesterday (UTC): {yesterday_utc_str}\n"
+            f"Now (UTC): {now.astimezone(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')}\n"
         )
 
     def start(self, provider: str, model: str) -> bool:

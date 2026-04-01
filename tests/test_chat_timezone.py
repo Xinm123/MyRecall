@@ -26,6 +26,7 @@ def test_build_timezone_header_utc_plus_8():
 
     assert "Local midnight today (UTC): 2026-04-01T16:00:00Z" in header
     assert "Local midnight yesterday (UTC): 2026-03-31T16:00:00Z" in header
+    assert "Now (UTC): 2026-04-02T00:30:00Z" in header
     assert "Timezone: CST (UTC+08:00)" in header
     assert "Date: 2026-04-02" in header
 
@@ -52,4 +53,5 @@ def test_build_timezone_header_utc_minus_4():
     # -> UTC = 2026-04-02 04:00 UTC
     assert "Local midnight today (UTC): 2026-04-02T04:00:00Z" in header
     assert "Local midnight yesterday (UTC): 2026-04-01T04:00:00Z" in header
+    assert "Now (UTC): 2026-04-02T14:00:00Z" in header
     assert "Date: 2026-04-02" in header

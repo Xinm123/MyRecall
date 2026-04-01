@@ -18,9 +18,10 @@ Local REST API at `http://localhost:8083`. Base URL for all endpoints below.
 > Timezone: CST (UTC+08:00)
 > Local midnight today (UTC): 2026-04-01T16:00:00Z
 > Local midnight yesterday (UTC): 2026-03-31T16:00:00Z
+> Now (UTC): 2026-04-02T08:30:00Z
 > ```
-> Extract `Local midnight today (UTC)` and `Local midnight yesterday (UTC)` directly from
-> the injected header — do not compute them yourself.
+> Extract `Local midnight today (UTC)`, `Local midnight yesterday (UTC)`, and `Now (UTC)`
+> directly from the injected header — do not compute them yourself.
 
 ---
 
@@ -36,7 +37,7 @@ expressions to UTC before calling the API.
 | `recent` | Last 30 minutes | Current UTC time - 30 minutes |
 | `1h ago` | One hour ago | Current UTC time - 1 hour |
 | `2d ago` | Two days ago | Current UTC time - 2 days |
-| `now` | Current moment | Current UTC time |
+| `now` | Current moment | Use `Now (UTC)` from context above |
 
 **Conversion workflow:**
 1. Parse the user's time expression
@@ -49,9 +50,10 @@ expressions to UTC before calling the API.
 # The injected header contains:
 #   Local midnight today (UTC): 2026-04-01T16:00:00Z
 #   Local midnight yesterday (UTC): 2026-03-31T16:00:00Z
+#   Now (UTC): 2026-04-02T08:30:00Z
 # Extract these values from the injected header above — do not compute.
 START="$LOCAL_MIDNIGHT_TODAY_UTC"   # from injected header
-END=$(date -u +%Y-%m-%dT%H:%M:%SZ)   # current UTC time
+END="$NOW_UTC"                       # from injected header
 curl "http://localhost:8083/v1/activity-summary?start_time=${START}&end_time=${END}"
 ```
 
