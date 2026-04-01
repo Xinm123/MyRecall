@@ -333,7 +333,7 @@ Each node object:
 
 ## GET /v1/activity-summary
 
-**Purpose:** Lightweight compressed activity overview for a time range (~200-500 tokens). Returns app usage, recent accessibility texts, and audio summary.
+**Purpose:** Lightweight compressed activity overview for a time range. Returns app usage (with accurate time-based minutes), AI-generated descriptions, and audio summary.
 
 **Returns:** `application/json`
 
@@ -341,29 +341,25 @@ Each node object:
 
 | Field | Type | Always Present | Description |
 |-------|------|:--------------:|-------------|
-| `apps` | `object[]` | Yes | App usage statistics |
+| `apps` | `object[]` | Yes | App usage statistics, ordered by `minutes` descending |
 | `apps[].name` | `string` | Yes | Application name (`app_name`). Falls back to `"Unknown"` when `app_name` is NULL in DB. |
-| `apps[].frame_count` | `int` | Yes | Number of frames captured for this app in the time range |
-| `apps[].minutes` | `number` | Yes | Approximate usage in minutes. Calculated as `frame_count * 2 / 60`, rounded to 2 decimal places. |
-| `total_frames` | `int` | Yes | Total frames in the time range |
+| `apps[].frame_count` | `int` | Yes | Number of completed frames captured for this app in the time range |
+| `apps[].minutes` | `number` | Yes | Accurate usage in minutes. Calculated from actual timestamp gaps between consecutive frames using SQLite LEAD() window function. Only gaps < 300 seconds (5 min) count, filtering out "away from computer" periods. |
+| `apps[].first_seen` | `string` | Yes | ISO8601 timestamp of the first frame captured for this app in the range |
+| `apps[].last_seen` | `string` | Yes | ISO8601 timestamp of the last frame captured for this app in the range |
+| `total_frames` | `int` | Yes | Total completed frames in the time range |
 | `time_range` | `object` | Yes | Requested time range |
 | `time_range.start` | `string` | Yes | ISO8601 start time |
 | `time_range.end` | `string` | Yes | ISO8601 end time |
-| `recent_texts` | `object[]` | Yes | Recent accessibility texts (up to 10) |
-| `recent_texts[].frame_id` | `int` | Yes | Frame identifier |
-| `recent_texts[].text` | `string` | Yes | Text content from `AXStaticText` role elements |
-| `recent_texts[].role` | `string` | Yes | Element role — currently only `"AXStaticText"` in MVP |
-| `recent_texts[].app_name` | `string` | Yes | App name for the frame |
-| `recent_texts[].timestamp` | `string` | Yes | ISO8601 timestamp |
 | `audio_summary` | `object` | Yes | Audio transcription summary. **Currently empty shell in vision-only MVP.** |
 | `audio_summary.segment_count` | `int` | Yes | Always `0` in MVP |
 | `audio_summary.speakers` | `object[]` | Yes | Always `[]` in MVP |
-| `descriptions` | `object[]` | Yes | AI-generated frame descriptions. Returns up to `max_descriptions` entries, sorted by frame timestamp descending. Returns `[]` when no frames in the time range have completed descriptions. |
+| `descriptions` | `object[]` | Yes | AI-generated frame descriptions. Sorted by frame timestamp descending. Returns `[]` when no frames in range have completed descriptions. |
 | `descriptions[].frame_id` | `int` | Yes | Frame identifier |
-| `descriptions[].narrative` | `string` | Yes | AI-generated narrative |
-| `descriptions[].entities` | `string[]` | Yes | Extracted entities |
+| `descriptions[].timestamp` | `string` | Yes | ISO8601 timestamp of the frame |
+| `descriptions[].summary` | `string` | Yes | Short summary of activity |
 | `descriptions[].intent` | `string` | Yes | Detected intent |
-| `descriptions[].summary` | `string` | Yes | Short summary |
+| `descriptions[].entities` | `string[]` | Yes | Extracted entities |
 
 ### Query Parameters
 
@@ -372,7 +368,7 @@ Each node object:
 | `start_time` | `string` | — | **Required.** ISO8601 start of time range |
 | `end_time` | `string` | — | **Required.** ISO8601 end of time range |
 | `app_name` | `string` | — | Optional app filter — returns only this app's stats |
-| `max_descriptions` | `int` | `20` | Maximum number of `descriptions` entries to return. `recent_texts` is capped at a separate fixed limit (10 entries). Max 100. |
+| `max_descriptions` | `int` | — | Maximum number of `descriptions` entries to return. No default — all available descriptions within time range are returned if unspecified. Max 1000. |
 
 ### Example Response
 
@@ -384,17 +380,16 @@ Each node object:
     {
       "name": "Claude Code",
       "frame_count": 180,
-      "minutes": 6.0
+      "minutes": 42.5,
+      "first_seen": "2026-03-26T10:05:22Z",
+      "last_seen": "2026-03-26T11:32:08Z"
     },
     {
       "name": "Chrome",
       "frame_count": 120,
-      "minutes": 4.0
-    },
-    {
-      "name": "Terminal",
-      "frame_count": 60,
-      "minutes": 2.0
+      "minutes": 28.0,
+      "first_seen": "2026-03-26T09:15:00Z",
+      "last_seen": "2026-03-26T10:03:00Z"
     }
   ],
   "total_frames": 360,
@@ -402,29 +397,6 @@ Each node object:
     "start": "2026-03-26T09:00:00Z",
     "end": "2026-03-26T18:00:00Z"
   },
-  "recent_texts": [
-    {
-      "frame_id": 108,
-      "text": "docs/v3/chat/api-fields-reference.md",
-      "role": "AXStaticText",
-      "app_name": "Claude Code",
-      "timestamp": "2026-03-26T17:58:05Z"
-    },
-    {
-      "frame_id": 107,
-      "text": "API Response Fields Reference",
-      "role": "AXStaticText",
-      "app_name": "Claude Code",
-      "timestamp": "2026-03-26T17:55:22Z"
-    },
-    {
-      "frame_id": 105,
-      "text": "MyRecall openrecall MyRecall v3",
-      "role": "AXStaticText",
-      "app_name": "Chrome",
-      "timestamp": "2026-03-26T17:50:11Z"
-    }
-  ],
   "audio_summary": {
     "segment_count": 0,
     "speakers": []
@@ -432,24 +404,17 @@ Each node object:
   "descriptions": [
     {
       "frame_id": 108,
-      "narrative": "The user is editing the API fields reference document in Claude Code, adding JSON examples for the activity-summary endpoint.",
-      "entities": ["Claude Code", "API", "activity-summary"],
+      "timestamp": "2026-03-26T17:58:05Z",
+      "summary": "Editing API reference docs",
       "intent": "writing documentation",
-      "summary": "Editing API reference docs"
+      "entities": ["Claude Code", "API", "activity-summary"]
     },
     {
       "frame_id": 95,
-      "narrative": "GitHub repository page for openrecall/MyRecall project showing README and recent commits.",
-      "entities": ["GitHub", "openrecall", "MyRecall"],
+      "timestamp": "2026-03-26T16:30:00Z",
+      "summary": "Viewing GitHub repo README",
       "intent": "browsing",
-      "summary": "Viewing GitHub repo README"
-    },
-    {
-      "frame_id": 88,
-      "narrative": "Terminal window running pytest with all tests passing.",
-      "entities": ["pytest", "terminal"],
-      "intent": "running tests",
-      "summary": "Running test suite"
+      "entities": ["GitHub", "openrecall", "MyRecall"]
     }
   ]
 }
@@ -464,7 +429,9 @@ Each node object:
     {
       "name": "Chrome",
       "frame_count": 120,
-      "minutes": 4.0
+      "minutes": 28.0,
+      "first_seen": "2026-03-26T09:15:00Z",
+      "last_seen": "2026-03-26T10:03:00Z"
     }
   ],
   "total_frames": 120,
@@ -472,15 +439,6 @@ Each node object:
     "start": "2026-03-26T09:00:00Z",
     "end": "2026-03-26T18:00:00Z"
   },
-  "recent_texts": [
-    {
-      "frame_id": 105,
-      "text": "MyRecall openrecall MyRecall v3",
-      "role": "AXStaticText",
-      "app_name": "Chrome",
-      "timestamp": "2026-03-26T17:50:11Z"
-    }
-  ],
   "audio_summary": {
     "segment_count": 0,
     "speakers": []
@@ -493,12 +451,8 @@ Each node object:
 
 | Gap | screenpipe | MyRecall | Impact |
 |-----|-----------|----------|--------|
-| `first_seen`/`last_seen` per app | ✅ `AppUsage` includes both | ❌ Missing | AI cannot determine app usage duration |
-| `minutes` calculation | Uses frame-gap time delta | Uses `frame_count * 2 / 60` | Inaccurate for sparse/spammy captures |
-| `window_name` per app | ❌ Not included | ❌ Not included | Same gap |
-| `recent_texts` roles | `'AXStaticText', 'line', 'paragraph', 'block'` | `'AXStaticText'` only | OCR text elements not included |
+| `window_name` per app | ❌ Not included | ❌ Not included | Limited |
 | `focused` flag | ❌ Not included | ❌ Not included | Limited |
-| `description` field in recent_texts | ✅ Includes full text | ❌ Not included | Less context for AI |
 
 ---
 
@@ -530,3 +484,4 @@ This document is the **authoritative reference** for field names. When adding, r
 | 2026-03-26 | Removed `properties` field from `nodes[]` example JSON (it is never included in response, not even as `null`). Clarified `nodes[].properties` description. Added `hybrid` to text_source description. |
 | 2026-03-26 | Fixed three doc/code inconsistencies: (1) corrected `max_descriptions` description — it limits `descriptions` count, not `recent_texts` (which has a separate fixed cap of 10); (2) documented `apps[].name` fallback to `"Unknown"` when DB `app_name` is NULL; (3) documented that `descriptions` returns `[]` when no frames in range have completed descriptions. |
 | 2026-03-26 | Added `timestamp`, `app_name`, `window_name` fields to `GET /v1/frames/{id}/context` response. Fixed bounds description: normalized 0.0–1.0 floats, rounded to 3 decimal places. Removed resolved gaps from Known Gaps table. |
+| 2026-04-01 | Major activity-summary redesign: (1) removed `recent_texts` field entirely; (2) `apps[].minutes` now uses screenpipe LEAD() method with 5-min threshold; (3) added `apps[].first_seen` and `apps[].last_seen`; (4) `apps` ordered by `minutes DESC`; (5) `descriptions[]` now has `frame_id, timestamp, summary, intent, entities` (narrative removed); (6) `max_descriptions` has no default (returns all available); (7) Known Gaps table updated — first_seen/last_seen and minutes calculation gaps are now resolved. |

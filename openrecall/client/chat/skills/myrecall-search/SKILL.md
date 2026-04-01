@@ -71,7 +71,7 @@ head -c 5120 /tmp/myrecall_result.json   # Truncate to ~5KB if too large
 ```
 
 **Rules:**
-- `activity-summary`: ~200-500 tokens. Safe to include directly.
+- `activity-summary`: Compact overview. The `apps` array and a few `descriptions` entries are typically sufficient. Use `max_descriptions` to control size.
 - `search`: Use `limit=5` initially, expand if needed. Each result is ~500-2000 tokens.
 - `frame context`: The `nodes` array is only present when `include_nodes=true`. Use `max_nodes=20` if you only need top-level text.
 - `frame image`: Never include raw image data in context. Describe what you see verbally.
@@ -95,24 +95,21 @@ curl "http://localhost:8083/v1/activity-summary?start_time=${START}&end_time=${E
 | `start_time` | ISO 8601 | **Yes** | Start of time range (e.g. `2026-03-25T00:00:00Z`) |
 | `end_time` | ISO 8601 | **Yes** | End of time range (e.g. `2026-03-25T12:00:00Z`) |
 | `app_name` | string | No | Filter by specific app name |
-| `max_descriptions` | integer | No | Max AI frame descriptions to return (default: 20, max: 100) |
+| `max_descriptions` | integer | No | Max AI frame descriptions to return. No default — all available descriptions returned if unspecified. Max 1000. |
 
 ### Response Format
 
 ```json
 {
   "apps": [
-    {"name": "Safari", "frame_count": 10, "minutes": 0.33},
-    {"name": "VSCode", "frame_count": 5, "minutes": 0.17}
-  ],
-  "recent_texts": [
-    {"frame_id": 1, "text": "Hello world", "role": "AXStaticText", "app_name": "Safari", "timestamp": "2026-03-25T10:00:00Z"}
+    {"name": "Safari", "frame_count": 10, "minutes": 0.33, "first_seen": "2026-03-25T10:00:00Z", "last_seen": "2026-03-25T10:05:00Z"},
+    {"name": "VSCode", "frame_count": 5, "minutes": 0.17, "first_seen": "2026-03-25T09:30:00Z", "last_seen": "2026-03-25T10:02:00Z"}
   ],
   "audio_summary": {"segment_count": 0, "speakers": []},
   "total_frames": 15,
   "time_range": {"start": "2026-03-25T00:00:00Z", "end": "2026-03-25T12:00:00Z"},
   "descriptions": [
-    {"frame_id": 42, "narrative": "User is reviewing a GitHub pull request...", "summary": "GitHub PR review", "entities": ["PR #123", "GitHub"], "intent": "code_review"}
+    {"frame_id": 42, "timestamp": "2026-03-25T10:00:00Z", "summary": "GitHub PR review", "intent": "code_review", "entities": ["PR #123", "GitHub"]}
   ]
 }
 ```
@@ -121,17 +118,15 @@ curl "http://localhost:8083/v1/activity-summary?start_time=${START}&end_time=${E
 
 | Field | Description |
 |-------|-------------|
-| `apps` | List of apps used in the time range, with frame count and estimated active minutes |
-| `recent_texts` | Recent screen texts captured. Each entry has `frame_id`, `text`, `role` (e.g. `AXStaticText`), `app_name`, `timestamp`. Deduplicated by text content. |
-| `descriptions` | AI-generated frame descriptions (`narrative`, `entities`, `intent`, `summary`). Great for "what was I doing?" — check `description_status` first. |
-| `total_frames` | Total screenshot count in the time range |
+| `apps` | List of apps used in the time range, ordered by `minutes` descending. Includes `frame_count`, accurate `minutes` (from timestamp gaps), `first_seen`, and `last_seen`. |
+| `descriptions` | AI-generated frame descriptions (`summary`, `intent`, `entities`, `timestamp`). Use `GET /v1/frames/{id}/context` for full `narrative`. |
+| `total_frames` | Total completed screenshots in the time range |
 | `audio_summary` | Currently empty (`segment_count: 0`). Audio is not yet supported. |
 
 ### When to Use
 
 - **"What was I doing today/yesterday/recently?"** → Step 1 only
 - **"Which apps did I use?"** → Step 1 (`apps` array)
-- **"What text did I see recently?"** → Step 1 (`recent_texts`)
 - **"Give me a summary of my activity"** → Step 1 only
 
 ---
@@ -448,7 +443,6 @@ User asks a question
 
 | Quality Issue | Likely Cause | Fix |
 |---------------|-------------|-----|
-| Empty `recent_texts` | Time range too narrow | Expand `start_time` |
 | No search results | Query too specific | Try broader terms, check spelling |
 | `text_source=ocr` everywhere | App lacks accessibility support (games, remote desktop, etc.) | Normal for some apps — use raw text |
 | `description_status != "completed"` | AI description not yet generated | Use raw `text` and `nodes` instead |

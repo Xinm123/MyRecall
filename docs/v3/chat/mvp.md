@@ -492,7 +492,7 @@ MVP constraints:
 
 - only `source='accessibility'` is written in MVP
 - `/v1/elements` is not exposed in MVP
-- `elements` exists mainly to support `activity-summary.recent_texts`
+- `elements` exists to support accessibility text capture and frame context queries
 - `elements.parent_id` and `elements.sort_order` are reconstructed on the server from node `depth` ordering
 
 ### OCR Text
@@ -580,7 +580,7 @@ For `AXTextField`, `AXTextArea`, `AXComboBox`, and `AXStaticText`, a successful 
 
 Nodes in `light_container_roles` may contribute direct value text to `text_content`, but they do not need to be emitted as persisted text-bearing nodes and should continue recursing into children.
 
-This acquisition-time role set is intentionally wider than the summary-time role set used by `recent_texts`.
+This acquisition-time role set captures all text-bearing elements for accessibility text extraction.
 
 #### Text Extraction Priority
 
@@ -909,7 +909,7 @@ The endpoint returns a typed union.
 - `start_time`
 - `end_time`
 - `app_name` (optional)
-- `max_descriptions` (optional, integer, default 20, max 100) — limits the number of AI-generated frame descriptions returned
+- `max_descriptions` (optional, integer, no default, max 1000) — limits the number of AI-generated frame descriptions returned. If not specified, all available descriptions within the time range are returned.
 
 ### Return Shape
 
@@ -919,25 +919,18 @@ The endpoint returns a typed union.
     {
       "name": "Google Chrome",
       "frame_count": 128,
-      "minutes": 4.3
-    }
-  ],
-  "recent_texts": [
-    {
-      "frame_id": 123,
-      "text": "Chat Capability Alignment",
-      "role": "AXStaticText",
-      "app_name": "Cursor",
-      "timestamp": "2026-03-19T10:21:35Z"
+      "minutes": 3.2,
+      "first_seen": "2026-03-19T09:30:00Z",
+      "last_seen": "2026-03-19T10:30:00Z"
     }
   ],
   "descriptions": [
     {
       "frame_id": 42,
-      "narrative": "User is reviewing a GitHub pull request...",
+      "timestamp": "2026-03-19T10:00:00Z",
       "summary": "GitHub PR review",
-      "entities": ["PR #123", "GitHub"],
-      "intent": "code_review"
+      "intent": "code_review",
+      "entities": ["PR #123", "GitHub"]
     }
   ],
   "audio_summary": {
@@ -954,15 +947,10 @@ The endpoint returns a typed union.
 
 ### Semantics
 
-- `apps` is aggregated from completed frames in the time range
-- `apps.minutes` is an approximate value derived from frame density and is not a precise active-time metric
-- `recent_texts` aligns with current screenpipe behavior
-- `recent_texts` comes from `elements(source='accessibility')`
-- `recent_texts` only includes `AXStaticText` role from accessibility elements
-  - Note: `line` and `paragraph` are OCR hierarchy roles that only exist when `source='ocr'`. Since MVP only writes `source='accessibility'` elements, these roles never appear in MVP queries. They are reserved for future OCR elements support.
-- `recent_texts` returns recent text-like accessibility nodes, sorted by frame timestamp descending
-- `recent_texts` entries include a `role` field (e.g. `AXStaticText`) identifying the accessibility element type
-- `descriptions` contains AI-generated frame descriptions (`narrative`, `entities`, `intent`, `summary`) produced by the `DescriptionWorker`. Available when `description_status == "completed"`. Only includes frames with completed descriptions within the time range.
+- `apps` is aggregated from completed frames in the time range, ordered by `minutes` descending
+- `apps.minutes` is calculated from actual timestamp gaps between consecutive frames using SQLite LEAD() window function. Only gaps < 300 seconds (5 min) count toward usage time, filtering out "away from computer" periods
+- `apps.first_seen` and `apps.last_seen` are the MIN and MAX timestamps of frames for each app
+- `descriptions` contains AI-generated frame descriptions (`summary`, `intent`, `entities`, `timestamp`) produced by the `DescriptionWorker`. Available when `description_status == "completed"`. Only includes frames with completed descriptions within the time range. The `narrative` field is not included in activity-summary — use `GET /v1/frames/{id}/context` for full narrative
 - `audio_summary` is preserved as a shape-compatible empty shell in vision-only MVP
 - `time_range` always returns an object — when no frames exist in the queried range, the query bounds (`start_time`, `end_time`) are echoed back
 
