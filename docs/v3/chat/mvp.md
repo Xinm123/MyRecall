@@ -926,11 +926,11 @@ The endpoint returns a typed union.
   ],
   "descriptions": [
     {
-      "entities": ["PR #123", "GitHub"],
       "frame_id": 42,
-      "intent": "code_review",
+      "timestamp": "2026-03-19T10:00:00Z",
       "summary": "GitHub PR review",
-      "timestamp": "2026-03-19T10:00:00Z"
+      "intent": "code_review",
+      "entities": ["PR #123", "GitHub"]
     }
   ],
   "audio_summary": {

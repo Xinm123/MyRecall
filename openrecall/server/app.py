@@ -28,6 +28,10 @@ app = Flask(__name__)
 # Configure maximum request size (must be larger than _MAX_FILE_SIZE_BYTES in api_v1.py)
 app.config['MAX_CONTENT_LENGTH'] = 20 * 1024 * 1024  # 20 MB
 
+# Preserve dict key insertion order in JSON responses (spec-defined field order matters)
+# Flask 3.x deprecated app.config['JSON_SORT_KEYS'] — must set on provider directly
+app.json.sort_keys = False
+
 # Register API Blueprints
 app.register_blueprint(api_bp)
 app.register_blueprint(v1_bp)
