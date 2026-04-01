@@ -30,7 +30,6 @@ def send_prompt(self, content: str, images: Optional[list[str]] = None) -> str:
 ```python
 def _build_timezone_header(self) -> str:
     """Build timezone context header (mirrors screenpipe's render_prompt_with_port)."""
-    import time
     now = datetime.now()
     tz_name = now.strftime("%Z")           # e.g. "CST"
     tz_offset = now.strftime("%:z")         # e.g. "+08:00"
@@ -46,7 +45,7 @@ def _build_timezone_header(self) -> str:
     yesterday_utc = yesterday_midnight.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
     return (
-        f"Time range: {midnight_utc} to {date_str} 23:59:59 local\n"
+        f"Time range: {midnight_utc} to {date_str}T23:59:59Z\n"
         f"Date: {date_str}\n"
         f"Timezone: {tz_name} (UTC{tz_offset})\n"
         f"Local midnight today (UTC): {midnight_utc}\n"
@@ -62,7 +61,7 @@ def send_prompt(self, content: str, images: Optional[list[str]] = None) -> str:
 
 **Example injected header (for UTC+8, 2026-04-02 08:30:00 local):**
 ```
-Time range: 2026-04-01T16:00:00Z to 2026-04-02 23:59:59 local
+Time range: 2026-04-01T16:00:00Z to 2026-04-02T15:59:59Z
 Date: 2026-04-02
 Timezone: CST (UTC+08:00)
 Local midnight today (UTC): 2026-04-01T16:00:00Z
