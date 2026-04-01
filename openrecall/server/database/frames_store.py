@@ -1223,16 +1223,6 @@ class FramesStore:
     # Chat MVP Query Helpers (Phase 6)
     # ------------------------------------------------------------------
 
-    # Text-like roles for recent_texts query.
-    # Note: In MVP, only AXStaticText exists in accessibility elements.
-    # 'line' and 'paragraph' are OCR hierarchy roles (source='ocr') that don't exist
-    # in MVP accessibility data. They are kept for screenpipe query compatibility
-    # and future OCR elements support.
-    # MVP: Only AXStaticText exists in accessibility elements.
-    # 'line' and 'paragraph' are OCR hierarchy roles that don't exist
-    # when source='accessibility'. Kept minimal for clarity.
-    TEXT_LIKE_ROLES = ("AXStaticText",)
-
     def get_activity_summary_apps(
         self,
         start_time: str,
