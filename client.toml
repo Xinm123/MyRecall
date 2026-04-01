@@ -12,8 +12,9 @@ debug = true
 # Server Connection Settings
 # ==============================================================================
 [server]
-api_url = "http://10.77.3.162:8083/api"   # Server API URL
-edge_base_url = "http://10.77.3.162:8083"  # Edge base URL (auto-derived from api_url)
+# api_url = "http://10.77.3.162:8083/api"   # Server API URL
+api_url = "http://127.0.0.1:8083/api"
+# edge_base_url = "http://127.0.0.1:8083"  # Edge base URL (auto-derived from api_url)
 upload_timeout = 180                     # Upload timeout in seconds
 
 # ==============================================================================
