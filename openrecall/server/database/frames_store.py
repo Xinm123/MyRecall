@@ -1258,17 +1258,25 @@ class FramesStore:
         apps = []
         try:
             with self._connect() as conn:
-                # Use LEAD() to get next frame's timestamp per app, then compute gap
-                sql = """
-                    SELECT
-                        app_name,
-                        COUNT(*) AS frame_count,
-                        ROUND(SUM(
-                            CASE WHEN gap_sec < 300 THEN gap_sec ELSE 0 END
-                        ) / 60.0, 1) AS minutes,
-                        MIN(ts) AS first_seen,
-                        MAX(ts) AS last_seen
-                    FROM (
+                if app_name:
+                    inner_sql = """
+                        SELECT
+                            app_name,
+                            timestamp AS ts,
+                            (JULIANDAY(LEAD(timestamp) OVER (
+                                PARTITION BY app_name ORDER BY timestamp
+                            )) - JULIANDAY(timestamp)) * 86400.0 AS gap_sec
+                        FROM frames
+                        WHERE status = 'completed'
+                          AND app_name = ?
+                          AND timestamp >= ?
+                          AND timestamp <= ?
+                          AND app_name IS NOT NULL
+                          AND app_name != ''
+                    """
+                    params = [app_name, start_time, end_time]
+                else:
+                    inner_sql = """
                         SELECT
                             app_name,
                             timestamp AS ts,
@@ -1281,19 +1289,24 @@ class FramesStore:
                           AND timestamp <= ?
                           AND app_name IS NOT NULL
                           AND app_name != ''
+                    """
+                    params = [start_time, end_time]
+
+                sql = f"""
+                    SELECT
+                        app_name,
+                        COUNT(*) AS frame_count,
+                        ROUND(SUM(
+                            CASE WHEN gap_sec < 300 THEN gap_sec ELSE 0 END
+                        ) / 60.0, 1) AS minutes,
+                        MIN(ts) AS first_seen,
+                        MAX(ts) AS last_seen
+                    FROM (
+                        {inner_sql}
                     )
                     GROUP BY app_name
                     ORDER BY minutes DESC
                 """
-                params: list = [start_time, end_time]
-
-                if app_name:
-                    # Prepend app_name filter to inner subquery params
-                    sql = sql.replace(
-                        "WHERE status = 'completed'\n                      AND timestamp >= ?",
-                        "WHERE status = 'completed'\n                      AND app_name = ?\n                      AND timestamp >= ?"
-                    )
-                    params = [app_name, start_time, end_time]
 
                 rows = conn.execute(sql, params).fetchall()
 

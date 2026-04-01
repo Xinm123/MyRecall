@@ -3,7 +3,6 @@
 Tests that minutes are calculated from actual timestamp gaps
 (LEAD() window function) with a 5-minute threshold, plus first_seen/last_seen.
 """
-import json
 import sqlite3
 from pathlib import Path
 import pytest
