@@ -83,7 +83,6 @@ class PiRpcManager:
         yesterday_utc_str = yesterday_midnight.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
         return (
-            f"Time range: {midnight_utc_str} to {date_str}T23:59:59Z\n"
             f"Date: {date_str}\n"
             f"Timezone: {tz_name} (UTC{tz_offset})\n"
             f"Local midnight today (UTC): {midnight_utc_str}\n"

@@ -14,7 +14,6 @@ Local REST API at `http://localhost:8083`. Base URL for all endpoints below.
 >
 > **Injected context format** (appears at the top of every message):
 > ```
-> Time range: 2026-04-01T16:00:00Z to 2026-04-02T15:59:59Z
 > Date: 2026-04-02
 > Timezone: CST (UTC+08:00)
 > Local midnight today (UTC): 2026-04-01T16:00:00Z
@@ -47,11 +46,11 @@ expressions to UTC before calling the API.
 
 **Example — user asks "what was I doing today?":**
 ```bash
-# The injected header (at top of message) contains:
+# The injected header contains:
 #   Local midnight today (UTC): 2026-04-01T16:00:00Z
 #   Local midnight yesterday (UTC): 2026-03-31T16:00:00Z
-# Extract from the injected header above — do not compute.
-START="2026-04-01T16:00:00Z"   # from injected header
+# Extract these values from the injected header above — do not compute.
+START="$LOCAL_MIDNIGHT_TODAY_UTC"   # from injected header
 END=$(date -u +%Y-%m-%dT%H:%M:%SZ)   # current UTC time
 curl "http://localhost:8083/v1/activity-summary?start_time=${START}&end_time=${END}"
 ```
