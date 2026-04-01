@@ -1193,9 +1193,14 @@ def activity_summary():
         start_time (str): Required. ISO8601 start timestamp.
         end_time (str): Required. ISO8601 end timestamp.
         app_name (str): Optional. Filter by app name.
+        max_descriptions (int): Optional. Maximum descriptions to return.
+            No default — all available descriptions within the time range
+            are returned if not specified.
 
     Returns:
-        JSON with apps, recent_texts, audio_summary, total_frames, time_range.
+        JSON with apps, total_frames, time_range, audio_summary, descriptions.
+        The recent_texts field has been removed — descriptions provide sufficient
+        semantic context for activity overview.
     """
     request_id = str(uuid.uuid4())
 
@@ -1218,16 +1223,16 @@ def activity_summary():
         if not app_name:
             app_name = None
 
+    # Parse optional max_descriptions (no default — return all available)
+    max_descriptions = request.args.get("max_descriptions", type=int)
+    if max_descriptions is not None:
+        max_descriptions = max(1, min(max_descriptions, 1000))
+
     # Get store instance
     store = _get_frames_store()
 
     # Call store methods
     apps = store.get_activity_summary_apps(
-        start_time=start_time,
-        end_time=end_time,
-        app_name=app_name,
-    )
-    recent_texts = store.get_activity_summary_recent_texts(
         start_time=start_time,
         end_time=end_time,
         app_name=app_name,
@@ -1243,20 +1248,18 @@ def activity_summary():
         app_name=app_name,
     )
 
-    # Get recent descriptions within the time range
-    max_descriptions = request.args.get("max_descriptions", 20, type=int)
-    max_descriptions = min(max_descriptions, 100)
+    # Get descriptions within the time range
     with store._connect() as conn:
         descriptions = store.get_recent_descriptions(
-            conn, start_time, end_time, max_descriptions
+            conn, start_time, end_time,
+            limit=max_descriptions if max_descriptions is not None else 1000,
         )
 
     return jsonify({
         "apps": apps,
-        "recent_texts": recent_texts,
-        "audio_summary": {"segment_count": 0, "speakers": []},
         "total_frames": total_frames,
         "time_range": time_range or {"start": start_time, "end": end_time},
+        "audio_summary": {"segment_count": 0, "speakers": []},
         "descriptions": descriptions,
     })
 

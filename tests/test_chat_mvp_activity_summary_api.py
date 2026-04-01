@@ -31,9 +31,6 @@ def mock_store():
         {"name": "Safari", "frame_count": 10, "minutes": 0.33, "first_seen": "2026-03-19T10:00:00Z", "last_seen": "2026-03-19T10:05:00Z"},
         {"name": "VSCode", "frame_count": 5, "minutes": 0.17, "first_seen": "2026-03-19T09:30:00Z", "last_seen": "2026-03-19T09:35:00Z"},
     ]
-    mock.get_activity_summary_recent_texts.return_value = [
-        {"frame_id": 1, "text": "Hello world", "role": "AXStaticText", "app_name": "Safari", "timestamp": "2026-03-19T10:00:00Z"},
-    ]
     mock.get_activity_summary_total_frames.return_value = 15
     mock.get_activity_summary_time_range.return_value = {
         "start": "2026-03-19T09:00:00Z",
@@ -61,7 +58,6 @@ class TestActivitySummaryAPI:
             data = json.loads(response.data)
 
             assert "apps" in data
-            assert "recent_texts" in data
             assert "audio_summary" in data
             assert "total_frames" in data
             assert "time_range" in data
@@ -96,7 +92,6 @@ class TestActivitySummaryAPI:
         """time_range is never null — falls back to query params when store returns None."""
         mock = MagicMock(spec=FramesStore)
         mock.get_activity_summary_apps.return_value = []
-        mock.get_activity_summary_recent_texts.return_value = []
         mock.get_activity_summary_total_frames.return_value = 0
         mock.get_activity_summary_time_range.return_value = None  # no frames
         mock.get_recent_descriptions.return_value = []
@@ -123,3 +118,68 @@ class TestActivitySummaryAPI:
             mock_store.get_activity_summary_apps.assert_called_once()
             call_kwargs = mock_store.get_activity_summary_apps.call_args[1]
             assert call_kwargs["app_name"] == "Safari"
+
+    def test_activity_summary_api_no_recent_texts_field(self, app_with_activity_summary_route):
+        """API response must NOT contain the recent_texts field."""
+        mock = MagicMock()
+        mock.get_activity_summary_apps.return_value = [
+            {"name": "Safari", "frame_count": 5, "minutes": 0.2, "first_seen": "2026-03-20T10:00:00Z", "last_seen": "2026-03-20T10:05:00Z"}
+        ]
+        mock.get_activity_summary_total_frames.return_value = 5
+        mock.get_activity_summary_time_range.return_value = {
+            "start": "2026-03-20T09:00:00Z",
+            "end": "2026-03-20T11:00:00Z",
+        }
+        mock._connect.return_value.__enter__.return_value = MagicMock()
+        mock.get_recent_descriptions.return_value = [
+            {"frame_id": 1, "timestamp": "2026-03-20T10:00:00Z", "summary": "Test", "intent": "testing", "entities": []}
+        ]
+
+        with patch("openrecall.server.api_v1._get_frames_store", return_value=mock):
+            client = app_with_activity_summary_route.test_client()
+            response = client.get(
+                "/v1/activity-summary",
+                query_string={
+                    "start_time": "2026-03-20T09:00:00Z",
+                    "end_time": "2026-03-20T11:00:00Z",
+                },
+            )
+        data = json.loads(response.data)
+        assert response.status_code == 200
+        assert "recent_texts" not in data, "API must not return recent_texts field"
+        assert "descriptions" in data
+        # Verify description fields match new schema (no narrative)
+        desc = data["descriptions"][0]
+        assert set(desc.keys()) == {"frame_id", "timestamp", "summary", "intent", "entities"}
+        assert "narrative" not in desc
+
+    def test_activity_summary_api_max_descriptions_none_default(self, app_with_activity_summary_route):
+        """When max_descriptions is not specified, all available descriptions are returned (limit=1000)."""
+        mock = MagicMock()
+        mock.get_activity_summary_apps.return_value = []
+        mock.get_activity_summary_total_frames.return_value = 0
+        mock.get_activity_summary_time_range.return_value = None
+        mock._connect.return_value.__enter__.return_value = MagicMock()
+        # Return 25 descriptions (no cap — caller's limit applies)
+        mock.get_recent_descriptions.return_value = [
+            {"frame_id": i, "timestamp": f"2026-03-20T10:{i%24:02d}:00Z", "summary": f"Summary {i}", "intent": f"intent-{i}", "entities": []}
+            for i in range(25)
+        ]
+
+        with patch("openrecall.server.api_v1._get_frames_store", return_value=mock):
+            client = app_with_activity_summary_route.test_client()
+            response = client.get(
+                "/v1/activity-summary",
+                query_string={
+                    "start_time": "2026-03-20T09:00:00Z",
+                    "end_time": "2026-03-20T11:00:00Z",
+                },
+            )
+        data = json.loads(response.data)
+        assert response.status_code == 200
+        # No default cap — limit=1000 when param is None, all 25 returned
+        assert len(data["descriptions"]) == 25
+        # Verify the store was called with limit=1000 (the default when param is None)
+        mock.get_recent_descriptions.assert_called_once()
+        call_args = mock.get_recent_descriptions.call_args
+        assert call_args[1]["limit"] == 1000, "limit should default to 1000 when max_descriptions not specified"
