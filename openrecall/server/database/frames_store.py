@@ -1239,7 +1239,13 @@ class FramesStore:
         end_time: str,
         app_name: Optional[str] = None,
     ) -> list[dict]:
-        """Return apps with frame counts and approximate minutes.
+        """Return apps with accurate usage minutes from timestamp gaps.
+
+        Uses SQLite LEAD() window function to calculate the actual time gap
+        between consecutive frames per app. Only gaps < 300 seconds (5 min)
+        count toward usage time, filtering out "away from computer" periods.
+
+        Also returns first_seen and last_seen timestamps.
 
         Args:
             start_time: ISO8601 start timestamp
@@ -1247,36 +1253,57 @@ class FramesStore:
             app_name: Optional filter by app name
 
         Returns:
-            List of dicts with name, frame_count, minutes (approximate)
+            List of dicts with name, frame_count, minutes, first_seen, last_seen
         """
         apps = []
         try:
             with self._connect() as conn:
+                # Use LEAD() to get next frame's timestamp per app, then compute gap
                 sql = """
-                    SELECT app_name AS name, COUNT(*) AS frame_count
-                    FROM frames
-                    WHERE status = 'completed'
-                      AND timestamp >= ?
-                      AND timestamp <= ?
+                    SELECT
+                        app_name,
+                        COUNT(*) AS frame_count,
+                        ROUND(SUM(
+                            CASE WHEN gap_sec < 300 THEN gap_sec ELSE 0 END
+                        ) / 60.0, 1) AS minutes,
+                        MIN(ts) AS first_seen,
+                        MAX(ts) AS last_seen
+                    FROM (
+                        SELECT
+                            app_name,
+                            timestamp AS ts,
+                            (JULIANDAY(LEAD(timestamp) OVER (
+                                PARTITION BY app_name ORDER BY timestamp
+                            )) - JULIANDAY(timestamp)) * 86400.0 AS gap_sec
+                        FROM frames
+                        WHERE status = 'completed'
+                          AND timestamp >= ?
+                          AND timestamp <= ?
+                          AND app_name IS NOT NULL
+                          AND app_name != ''
+                    )
+                    GROUP BY app_name
+                    ORDER BY minutes DESC
                 """
                 params: list = [start_time, end_time]
 
                 if app_name:
-                    sql += " AND app_name = ?"
-                    params.append(app_name)
-
-                sql += " GROUP BY app_name ORDER BY frame_count DESC"
+                    # Prepend app_name filter to inner subquery params
+                    sql = sql.replace(
+                        "WHERE status = 'completed'\n                      AND timestamp >= ?",
+                        "WHERE status = 'completed'\n                      AND app_name = ?\n                      AND timestamp >= ?"
+                    )
+                    params = [app_name, start_time, end_time]
 
                 rows = conn.execute(sql, params).fetchall()
 
                 for row in rows:
-                    # minutes = frame_count * 2 / 60 (approximate)
-                    frame_count = row["frame_count"]
-                    minutes = frame_count * 2.0 / 60.0
                     apps.append({
-                        "name": row["name"] or "Unknown",
-                        "frame_count": frame_count,
-                        "minutes": round(minutes, 2),
+                        "name": row["app_name"] or "Unknown",
+                        "frame_count": row["frame_count"],
+                        "minutes": row["minutes"] or 0.0,
+                        "first_seen": row["first_seen"],
+                        "last_seen": row["last_seen"],
                     })
         except sqlite3.Error as e:
             logger.error("get_activity_summary_apps failed: %s", e)
