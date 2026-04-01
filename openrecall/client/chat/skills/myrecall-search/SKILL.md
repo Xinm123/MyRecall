@@ -9,23 +9,35 @@ Local REST API at `http://localhost:8083`. Base URL for all endpoints below.
 
 > **IMPORTANT — Port**: MyRecall runs on port **8083**, not 3030 (screenpipe uses 3030).
 
-> **IMPORTANT — Time Format**: All timestamps use **ISO 8601 UTC**. Do NOT use natural language
-> time like `"1h ago"`. Always convert to ISO 8601 before making API calls.
+> **Timezone**: The user's local timezone context is injected at the start of every message.
+> Use the values from that header to convert local time expressions to UTC.
+>
+> **Injected context format** (appears at the top of every message):
+> ```
+> Time range: 2026-04-01T16:00:00Z to 2026-04-02T15:59:59Z
+> Date: 2026-04-02
+> Timezone: CST (UTC+08:00)
+> Local midnight today (UTC): 2026-04-01T16:00:00Z
+> Local midnight yesterday (UTC): 2026-03-31T16:00:00Z
+> ```
+> Extract `Local midnight today (UTC)` and `Local midnight yesterday (UTC)` directly from
+> the injected header — do not compute them yourself.
 
 ---
 
 ## Time Formatting Strategy
 
-Always convert relative time expressions to ISO 8601 UTC before calling the API.
+Use the timezone context injected at the start of each message to convert local time
+expressions to UTC before calling the API.
 
-| Expression | Meaning | ISO 8601 Format |
-|------------|---------|-----------------|
-| `recent` | Last 30 minutes | `date -u +%Y-%m-%dT%H:%M:%SZ -d "30 minutes ago"` |
-| `today` | Since midnight UTC | `date -u +%Y-%m-%dT00:00:00Z` |
-| `yesterday` | Yesterday's full day | 00:00 to 23:59:59 UTC |
-| `1h ago` | One hour ago | `date -u +%Y-%m-%dT%H:%M:%SZ -d "1 hour ago"` |
-| `2d ago` | Two days ago | `date -u +%Y-%m-%dT%H:%M:%SZ -d "2 days ago"` |
-| `now` | Current moment | `date -u +%Y-%m-%dT%H:%M:%SZ` |
+| Expression | Meaning | How to compute |
+|------------|---------|----------------|
+| `today` | Since midnight LOCAL time | Use `Local midnight today (UTC)` from context above |
+| `yesterday` | Yesterday's LOCAL full day | `Local midnight yesterday (UTC)` to `Local midnight today (UTC) - 1s` |
+| `recent` | Last 30 minutes | Current UTC time - 30 minutes |
+| `1h ago` | One hour ago | Current UTC time - 1 hour |
+| `2d ago` | Two days ago | Current UTC time - 2 days |
+| `now` | Current moment | Current UTC time |
 
 **Conversion workflow:**
 1. Parse the user's time expression
@@ -35,10 +47,12 @@ Always convert relative time expressions to ISO 8601 UTC before calling the API.
 
 **Example — user asks "what was I doing today?":**
 ```bash
-# Get today's midnight UTC
-START=$(date -u +%Y-%m-%dT00:00:00Z)
-# Get current time
-END=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+# The injected header (at top of message) contains:
+#   Local midnight today (UTC): 2026-04-01T16:00:00Z
+#   Local midnight yesterday (UTC): 2026-03-31T16:00:00Z
+# Extract from the injected header above — do not compute.
+START="2026-04-01T16:00:00Z"   # from injected header
+END=$(date -u +%Y-%m-%dT%H:%M:%SZ)   # current UTC time
 curl "http://localhost:8083/v1/activity-summary?start_time=${START}&end_time=${END}"
 ```
 
