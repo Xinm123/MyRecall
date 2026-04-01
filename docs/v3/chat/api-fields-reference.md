@@ -337,6 +337,8 @@ Each node object:
 
 **Returns:** `application/json`
 
+> **Note on field ordering:** JSON responses use Flask's default JSON serialization. Fields within objects are returned in alphabetical order (e.g., `entities` before `frame_id`, `intent` before `summary`). Consumers should not rely on field order — always reference fields by name.
+
 ### Response Fields
 
 | Field | Type | Always Present | Description |
@@ -403,18 +405,18 @@ Each node object:
   },
   "descriptions": [
     {
+      "entities": ["Claude Code", "API", "activity-summary"],
       "frame_id": 108,
-      "timestamp": "2026-03-26T17:58:05Z",
-      "summary": "Editing API reference docs",
       "intent": "writing documentation",
-      "entities": ["Claude Code", "API", "activity-summary"]
+      "summary": "Editing API reference docs",
+      "timestamp": "2026-03-26T17:58:05Z"
     },
     {
+      "entities": ["GitHub", "openrecall", "MyRecall"],
       "frame_id": 95,
-      "timestamp": "2026-03-26T16:30:00Z",
-      "summary": "Viewing GitHub repo README",
       "intent": "browsing",
-      "entities": ["GitHub", "openrecall", "MyRecall"]
+      "summary": "Viewing GitHub repo README",
+      "timestamp": "2026-03-26T16:30:00Z"
     }
   ]
 }
@@ -484,4 +486,4 @@ This document is the **authoritative reference** for field names. When adding, r
 | 2026-03-26 | Removed `properties` field from `nodes[]` example JSON (it is never included in response, not even as `null`). Clarified `nodes[].properties` description. Added `hybrid` to text_source description. |
 | 2026-03-26 | Fixed three doc/code inconsistencies: (1) corrected `max_descriptions` description — it limits `descriptions` count, not `recent_texts` (which has a separate fixed cap of 10); (2) documented `apps[].name` fallback to `"Unknown"` when DB `app_name` is NULL; (3) documented that `descriptions` returns `[]` when no frames in range have completed descriptions. |
 | 2026-03-26 | Added `timestamp`, `app_name`, `window_name` fields to `GET /v1/frames/{id}/context` response. Fixed bounds description: normalized 0.0–1.0 floats, rounded to 3 decimal places. Removed resolved gaps from Known Gaps table. |
-| 2026-04-01 | Major activity-summary redesign: (1) removed `recent_texts` field entirely; (2) `apps[].minutes` now uses screenpipe LEAD() method with 5-min threshold; (3) added `apps[].first_seen` and `apps[].last_seen`; (4) `apps` ordered by `minutes DESC`; (5) `descriptions[]` now has `frame_id, timestamp, summary, intent, entities` (narrative removed); (6) `max_descriptions` has no default (returns all available); (7) Known Gaps table updated — first_seen/last_seen and minutes calculation gaps are now resolved. |
+| 2026-04-01 | Major activity-summary redesign: (1) removed `recent_texts` field entirely; (2) `apps[].minutes` now uses screenpipe LEAD() method with 5-min threshold; (3) added `apps[].first_seen` and `apps[].last_seen`; (4) `apps` ordered by `minutes DESC`; (5) `descriptions[]` now has `frame_id, timestamp, summary, intent, entities` (narrative removed); (6) `max_descriptions` has no default (returns all available); (7) Known Gaps table updated — first_seen/last_seen and minutes calculation gaps are now resolved. (8) Added note that JSON responses use alphabetical field ordering. |

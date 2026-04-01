@@ -109,7 +109,7 @@ curl "http://localhost:8083/v1/activity-summary?start_time=${START}&end_time=${E
   "total_frames": 15,
   "time_range": {"start": "2026-03-25T00:00:00Z", "end": "2026-03-25T12:00:00Z"},
   "descriptions": [
-    {"frame_id": 42, "timestamp": "2026-03-25T10:00:00Z", "summary": "GitHub PR review", "intent": "code_review", "entities": ["PR #123", "GitHub"]}
+    {"entities": ["PR #123", "GitHub"], "frame_id": 42, "intent": "code_review", "summary": "GitHub PR review", "timestamp": "2026-03-25T10:00:00Z"}
   ]
 }
 ```
