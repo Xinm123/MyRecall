@@ -1,0 +1,78 @@
+# OpenRecall Server Configuration Template
+# Copy this file to ~/.myrecall/server.toml or ./server.toml and fill in your values
+# Or use: openrecall-server --config /path/to/server.toml
+
+# ==============================================================================
+# Server Settings
+# ==============================================================================
+[server]
+host = "127.0.0.1"
+port = 8083
+debug = true
+
+# ==============================================================================
+# Path Settings
+# ==============================================================================
+[paths]
+data_dir = "~/.myrecall/server"
+cache_dir = "~/.myrecall/cache"
+
+# ==============================================================================
+# AI Provider (Global fallback for vision, embedding, description)
+# ==============================================================================
+[ai]
+provider = "openai"           # Options: local, openai, dashscope
+device = "cpu"               # Options: cpu, cuda, mps
+model_name = ""              # Model name (e.g., Qwen3-VL-8B-Instruct)
+api_key = ""                 # API key if required
+api_base = ""                # Base URL for API (e.g., http://localhost:8080/v1)
+request_timeout = 120        # Timeout for AI provider requests (seconds)
+
+# ==============================================================================
+# OCR Settings
+# ==============================================================================
+[ocr]
+provider = "rapidocr"        # Options: rapidocr
+model_name = ""              # OCR model name (empty = bundled default)
+rapid_version = "PP-OCRv4"   # Options: PP-OCRv4, PP-OCRv5
+model_type = "mobile"        # Options: mobile, server
+
+# ==============================================================================
+# Description Generation (Frame AI Analysis)
+# ==============================================================================
+[description]
+enabled = true                      # Enable description generation
+provider = "openai"                       # Options: local, openai, dashscope (empty = use [ai])
+model = "Qwen/Qwen3-VL-8B-Instruct"                          # Model name (e.g., Qwen3-VL-8B-Instruct)
+api_key = "sk-usltbpnjvkrjklolnzinkqctvbcdhqkarjtrlqbyckrubiwn"                        # API key if required
+api_base = "https://api.siliconflow.cn/v1/"                       # Base URL (e.g., http://127.0.0.1:8090/v1)
+
+# ==============================================================================
+# Reranker Settings
+# ==============================================================================
+[reranker]
+enabled = false                     # Enable reranking
+mode = "api"                         # Options: api, local
+url = "http://localhost:8083/rerank" # Reranker API URL
+model = "Qwen/Qwen3-Reranker-0.6B"   # Model name
+api_key = ""                         # API key if required
+
+# ==============================================================================
+# Processing Settings
+# ==============================================================================
+[processing]
+mode = "ocr"                  # Processing mode: ocr
+queue_capacity = 500          # Queue capacity
+preload_models = true         # Preload models at startup
+
+# ==============================================================================
+# UI Settings
+# ==============================================================================
+[ui]
+show_ai_description = true   # Show AI description in UI
+
+# ==============================================================================
+# Advanced Settings
+# ==============================================================================
+[advanced]
+fusion_log_enabled = false    # Enable fusion debug logging

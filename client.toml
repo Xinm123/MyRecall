@@ -1,0 +1,66 @@
+# OpenRecall Client Configuration Template
+# Copy this file to ~/.myrecall/client.toml or ./client.toml and fill in your values
+# Or use: openrecall-client --config /path/to/client.toml
+
+# ==============================================================================
+# Client Settings
+# ==============================================================================
+[client]
+debug = true
+
+# ==============================================================================
+# Server Connection Settings
+# ==============================================================================
+[server]
+api_url = "http://10.77.3.162:8083/api"   # Server API URL
+edge_base_url = "http://10.77.3.162:8083"  # Edge base URL (auto-derived from api_url)
+upload_timeout = 180                     # Upload timeout in seconds
+
+# ==============================================================================
+# Path Settings
+# ==============================================================================
+[paths]
+data_dir = "~/.myrecall/client"    # Client data directory
+buffer_dir = "~/.myrecall/buffer"  # Buffer directory for screenshots
+
+# ==============================================================================
+# Capture Settings
+# ==============================================================================
+[capture]
+primary_monitor_only = true      # Only capture primary monitor
+save_local_copies = false         # Save local copies of screenshots
+permission_poll_sec = 10          # Permission check interval (seconds)
+
+# ==============================================================================
+# Debounce Settings (in milliseconds)
+# ==============================================================================
+[debounce]
+click_ms = 3000          # Click debounce
+trigger_ms = 3000        # Trigger debounce (app_switch, idle, manual)
+capture_ms = 3000        # Capture debounce
+idle_interval_ms = 60000 # Idle fallback interval
+
+# ==============================================================================
+# Deduplication Settings
+# ==============================================================================
+[dedup]
+enabled = true                    # Enable deduplication
+threshold = 10                    # Similarity threshold
+ttl_seconds = 60.0                # TTL for dedup cache
+cache_size_per_device = 1         # Cache size per device
+for_click = true                  # Enable dedup for click triggers
+for_app_switch = false            # Enable dedup for app_switch triggers
+force_after_skip_seconds = 30    # Force capture after skipped frames
+
+# ==============================================================================
+# UI Settings
+# ==============================================================================
+[ui]
+web_enabled = true   # Enable web UI
+web_port = 8889      # Web UI port
+
+# ==============================================================================
+# Stats Settings
+# ==============================================================================
+[stats]
+interval_sec = 120   # Stats logging interval (seconds)

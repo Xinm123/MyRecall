@@ -57,6 +57,12 @@ class LocalDescriptionProvider(DescriptionProvider):
 
     def __init__(self, model_name: str = "") -> None:
         self.model_id = model_name or AIEngine.MODEL_ID
+        if not self.model_id:
+            raise ValueError(
+                "LocalDescriptionProvider requires model_name to be configured. "
+                "Set [description] model = '/path/to/local/model' in server.toml, "
+                "or use provider = 'openai' with api_base pointing to a vLLM server."
+            )
         if settings.device == "cpu":
             torch_dtype = torch.float32
         else:

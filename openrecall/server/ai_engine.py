@@ -20,7 +20,10 @@ class AIEngine:
     of screenshots, including UI understanding and activity detection.
     """
     
-    MODEL_ID = "/Users/tiiny/models/Qwen3-VL-2B-Instruct"
+    # NOTE: Default MODEL_ID should be configured via [description] section in server.toml.
+    # This default is intentionally left empty to force explicit configuration.
+    # Use: description.model = "/path/to/local/model" for local provider.
+    MODEL_ID = ""
     MAX_IMAGE_SIZE = 1024  # Max dimension for CPU optimization
     
     def __init__(self) -> None:
