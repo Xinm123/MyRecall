@@ -1271,8 +1271,6 @@ class FramesStore:
                           AND app_name = ?
                           AND timestamp >= ?
                           AND timestamp <= ?
-                          AND app_name IS NOT NULL
-                          AND app_name != ''
                     """
                     params = [app_name, start_time, end_time]
                 else:

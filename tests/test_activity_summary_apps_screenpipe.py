@@ -134,3 +134,32 @@ class TestAppsScreenpipeMinutes:
 
         assert len(apps) == 1
         assert apps[0]["frame_count"] == 1
+
+    def test_apps_filters_by_app_name(self, store: FramesStore):
+        """Apps should filter correctly when app_name is specified."""
+        _claim_and_complete(store, "cap-1", "2026-03-20T10:00:00Z", "Safari", "SafariPage")
+        _claim_and_complete(store, "cap-2", "2026-03-20T10:00:01Z", "Safari", "SafariPage2")
+        _claim_and_complete(store, "cap-3", "2026-03-20T10:15:00Z", "Mail", "MailApp")
+
+        apps = store.get_activity_summary_apps(
+            start_time="2026-03-20T09:00:00Z",
+            end_time="2026-03-20T11:00:00Z",
+            app_name="Safari",
+        )
+
+        assert len(apps) == 1
+        assert apps[0]["name"] == "Safari"
+        assert apps[0]["frame_count"] == 2
+
+    def test_apps_single_frame_zero_minutes(self, store: FramesStore):
+        """A single frame has no gaps, so minutes should be 0.0."""
+        _claim_and_complete(store, "cap-1", "2026-03-20T10:00:00Z", "Safari", "Solo")
+
+        apps = store.get_activity_summary_apps(
+            start_time="2026-03-20T09:00:00Z",
+            end_time="2026-03-20T11:00:00Z",
+        )
+
+        assert apps[0]["minutes"] == 0.0
+        assert apps[0]["frame_count"] == 1
+        assert apps[0]["first_seen"] == apps[0]["last_seen"]

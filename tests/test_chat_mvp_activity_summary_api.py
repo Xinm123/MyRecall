@@ -28,8 +28,8 @@ def mock_store():
     mock = MagicMock(spec=FramesStore)
 
     mock.get_activity_summary_apps.return_value = [
-        {"name": "Safari", "frame_count": 10, "minutes": 0.33},
-        {"name": "VSCode", "frame_count": 5, "minutes": 0.17},
+        {"name": "Safari", "frame_count": 10, "minutes": 0.33, "first_seen": "2026-03-19T10:00:00Z", "last_seen": "2026-03-19T10:05:00Z"},
+        {"name": "VSCode", "frame_count": 5, "minutes": 0.17, "first_seen": "2026-03-19T09:30:00Z", "last_seen": "2026-03-19T09:35:00Z"},
     ]
     mock.get_activity_summary_recent_texts.return_value = [
         {"frame_id": 1, "text": "Hello world", "role": "AXStaticText", "app_name": "Safari", "timestamp": "2026-03-19T10:00:00Z"},
