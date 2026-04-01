@@ -17,6 +17,7 @@ import stat
 import subprocess
 import threading
 import uuid
+from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from typing import Callable, Optional
 
@@ -58,6 +59,36 @@ class PiRpcManager:
 
         # Create workspace
         self.workspace_dir.mkdir(parents=True, exist_ok=True)
+
+    def _build_timezone_header(self) -> str:
+        """Build timezone context header (mirrors screenpipe's render_prompt_with_port).
+
+        Injects the user's local timezone and midnight anchors so that AI can
+        correctly convert local time expressions ("today", "yesterday") to UTC.
+        """
+        # Naive datetime is intentional: astimezone(timezone.utc) below interprets
+        # it as local wall-clock time, which is exactly what we need here.
+        now = datetime.now()
+        tz_name = now.strftime("%Z")            # e.g. "CST", "JST"
+        tz_offset = now.strftime("%:z")          # e.g. "+08:00", "-05:00"
+        date_str = now.strftime("%Y-%m-%d")     # e.g. "2026-04-02"
+
+        # Today's local midnight -> UTC
+        local_midnight = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        midnight_utc = local_midnight.astimezone(timezone.utc)
+        midnight_utc_str = midnight_utc.strftime("%Y-%m-%dT%H:%M:%SZ")
+
+        # Yesterday's local midnight -> UTC
+        yesterday_midnight = local_midnight - timedelta(days=1)
+        yesterday_utc_str = yesterday_midnight.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+        return (
+            f"Time range: {midnight_utc_str} to {date_str}T23:59:59Z\n"
+            f"Date: {date_str}\n"
+            f"Timezone: {tz_name} (UTC{tz_offset})\n"
+            f"Local midnight today (UTC): {midnight_utc_str}\n"
+            f"Local midnight yesterday (UTC): {yesterday_utc_str}\n"
+        )
 
     def start(self, provider: str, model: str) -> bool:
         """
@@ -172,7 +203,9 @@ class PiRpcManager:
         if not self.stdin:
             raise RuntimeError("Pi not running")
         request_id = f"req-{uuid.uuid4().hex[:8]}"
-        cmd: dict[str, object] = {"type": "prompt", "id": request_id, "message": content}
+        header = self._build_timezone_header()
+        full_message = f"{header}\n{content}"
+        cmd: dict[str, object] = {"type": "prompt", "id": request_id, "message": full_message}
         if images:
             cmd["images"] = images
         with self._lock:
