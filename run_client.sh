@@ -7,6 +7,7 @@ cd "$repo_root"
 
 config_file=""
 env_file=""
+mode=""
 enable_debug="false"
 
 for arg in "$@"; do
@@ -16,6 +17,13 @@ for arg in "$@"; do
       ;;
     --no-web)
       ;;
+    --mode=*)
+      mode="${arg#--mode=}"
+      ;;
+    --mode)
+      shift
+      mode="${1:-}"
+      ;;
     --config=*)
       config_file="${arg#--config=}"
       ;;
@@ -23,11 +31,29 @@ for arg in "$@"; do
       env_file="${arg#--env=}"
       ;;
     *)
-      echo "Usage: $0 [--debug] [--no-web] [--config=/abs/path/to/client.toml] [--env=/abs/path/to/myrecall_client.env]" >&2
+      echo "Usage: $0 [--debug] [--no-web] [--mode local|remote] [--config=/abs/path/to/client.toml] [--env=/abs/path/to/myrecall_client.env]" >&2
       exit 2
       ;;
   esac
 done
+
+# Mode-based config selection (overrides auto-discovery but not --config)
+if [[ -n "$mode" ]]; then
+  case "$mode" in
+    local)
+      config_file="$repo_root/client-local.toml"
+      ;;
+    remote)
+      config_file="$repo_root/client-remote.toml"
+      ;;
+    *)
+      echo "Error: unknown --mode value '$mode'. Use 'local' or 'remote'." >&2
+      echo "Usage: $0 [--debug] [--mode local|remote] [--config=/abs/path] [--env=/abs/path]" >&2
+      exit 2
+      ;;
+  esac
+  echo "[Mode] Loading config: $config_file"
+fi
 
 # Config source priority: --config (TOML) > --env (legacy) > default paths
 if [[ -z "$config_file" && -z "$env_file" ]]; then
