@@ -1,0 +1,77 @@
+# OpenRecall Server Configuration — Local Mode
+# Server listens on localhost only (127.0.0.1)
+
+# ==============================================================================
+# Server Settings
+# ==============================================================================
+[server]
+host = "127.0.0.1"   # Localhost only — not accessible from other machines
+port = 8083
+debug = true
+
+# ==============================================================================
+# Path Settings
+# ==============================================================================
+[paths]
+data_dir = "~/.myrecall/server"
+cache_dir = "~/.myrecall/cache"
+
+# ==============================================================================
+# AI Provider (Global fallback for vision, embedding, description)
+# ==============================================================================
+[ai]
+provider = "openai"
+device = "cpu"
+model_name = ""
+api_key = ""
+api_base = ""
+request_timeout = 120
+
+# ==============================================================================
+# OCR Settings
+# ==============================================================================
+[ocr]
+provider = "rapidocr"
+model_name = ""
+rapid_version = "PP-OCRv4"
+model_type = "mobile"
+
+# ==============================================================================
+# Description Generation (Frame AI Analysis)
+# ==============================================================================
+[description]
+enabled = true
+provider = "openai"
+model = "Qwen/Qwen3-VL-8B-Instruct"
+api_key = ""
+api_base = "http://127.0.0.1:8090/v1"
+
+# ==============================================================================
+# Reranker Settings
+# ==============================================================================
+[reranker]
+enabled = false
+mode = "api"
+url = "http://localhost:8083/rerank"
+model = "Qwen/Qwen3-Reranker-0.6B"
+api_key = ""
+
+# ==============================================================================
+# Processing Settings
+# ==============================================================================
+[processing]
+mode = "ocr"
+queue_capacity = 500
+preload_models = true
+
+# ==============================================================================
+# UI Settings
+# ==============================================================================
+[ui]
+show_ai_description = true
+
+# ==============================================================================
+# Advanced Settings
+# ==============================================================================
+[advanced]
+fusion_log_enabled = false
