@@ -1,0 +1,408 @@
+{% extends "layout.html" %}
+
+{% block title %}Settings - MyRecall{% endblock %}
+
+{% block extra_head %}
+<style>
+  /* Settings page specific styles */
+  .settings-container {
+    max-width: 600px;
+    margin: 40px auto;
+    padding: 0 20px;
+  }
+
+  .settings-header {
+    margin-bottom: 32px;
+  }
+
+  .settings-header h1 {
+    font-size: 28px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin: 0 0 8px 0;
+  }
+
+  .settings-header p {
+    color: var(--text-secondary);
+    margin: 0;
+  }
+
+  .settings-section {
+    background: var(--bg-card);
+    border-radius: 12px;
+    padding: 24px;
+    margin-bottom: 20px;
+    border: 1px solid var(--border-color);
+  }
+
+  .settings-section h2 {
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin: 0 0 20px 0;
+  }
+
+  .form-group {
+    margin-bottom: 20px;
+  }
+
+  .form-group:last-child {
+    margin-bottom: 0;
+  }
+
+  .form-label {
+    display: block;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text-primary);
+    margin-bottom: 8px;
+  }
+
+  .form-label-description {
+    display: block;
+    font-size: 12px;
+    color: var(--text-secondary);
+    margin-bottom: 8px;
+  }
+
+  .form-input {
+    width: 100%;
+    padding: 10px 14px;
+    font-size: 14px;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    background: var(--bg-body);
+    color: var(--text-primary);
+    font-family: var(--font-stack);
+    box-sizing: border-box;
+  }
+
+  .form-input:focus {
+    outline: none;
+    border-color: var(--accent-color);
+  }
+
+  .form-input-group {
+    display: flex;
+    gap: 8px;
+  }
+
+  .form-input-group .form-input {
+    flex: 1;
+  }
+
+  .btn {
+    padding: 10px 16px;
+    font-size: 14px;
+    font-weight: 500;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-family: var(--font-stack);
+  }
+
+  .btn-primary {
+    background: var(--accent-color);
+    color: white;
+  }
+
+  .btn-primary:hover {
+    background: #0056CC;
+  }
+
+  .btn-secondary {
+    background: var(--bg-body);
+    color: var(--text-primary);
+    border: 1px solid var(--border-color);
+  }
+
+  .btn-secondary:hover {
+    background: rgba(0, 0, 0, 0.05);
+  }
+
+  .btn-group {
+    display: flex;
+    gap: 12px;
+    margin-top: 24px;
+  }
+
+  .status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 500;
+  }
+
+  .status-success {
+    background: rgba(52, 199, 89, 0.15);
+    color: #28a745;
+  }
+
+  .status-error {
+    background: rgba(255, 59, 48, 0.12);
+    color: #FF3B30;
+  }
+
+  .status-testing {
+    background: rgba(0, 122, 255, 0.12);
+    color: #007AFF;
+  }
+
+  .toast {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    padding: 14px 20px;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 500;
+    color: white;
+    z-index: 10000;
+    animation: toastIn 0.3s ease-out;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  }
+
+  .toast-success {
+    background: #34C759;
+  }
+
+  .toast-error {
+    background: #FF3B30;
+  }
+
+  @keyframes toastIn {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .current-value {
+    font-size: 12px;
+    color: var(--text-secondary);
+    margin-top: 6px;
+  }
+
+  .current-value code {
+    background: rgba(0, 0, 0, 0.05);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-family: 'SF Mono', Monaco, Consolas, monospace;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="settings-container" x-data="settingsPage()" x-init="init()">
+  <div class="settings-header">
+    <h1>Settings</h1>
+    <p>Configure MyRecall client settings. Changes are applied immediately.</p>
+  </div>
+
+  <div class="settings-section">
+    <h2>Connection</h2>
+
+    <div class="form-group">
+      <label class="form-label" for="edge_base_url">Edge Server URL</label>
+      <span class="form-label-description">
+        The base URL of the Edge API server. Default is http://localhost:8083 for local mode.
+      </span>
+      <div class="form-input-group">
+        <input
+          type="url"
+          id="edge_base_url"
+          class="form-input"
+          x-model="settings.edge_base_url"
+          placeholder="http://localhost:8083"
+          @keydown.enter="saveSettings()"
+        >
+        <button class="btn btn-secondary" @click="testConnection()" :disabled="testStatus === 'testing'">
+          <span x-show="testStatus !== 'testing'">Test</span>
+          <span x-show="testStatus === 'testing'">Testing...</span>
+        </button>
+      </div>
+      <div class="current-value">
+        Current: <code x-text="originalSettings.edge_base_url || '(not set)'"></code>
+      </div>
+      <div x-show="testStatus === 'success'" class="status-badge status-success" style="margin-top: 12px;">
+        <span>✓</span>
+        <span>Connected successfully</span>
+      </div>
+      <div x-show="testStatus === 'error'" class="status-badge status-error" style="margin-top: 12px;">
+        <span>✗</span>
+        <span x-text="testError || 'Connection failed'"></span>
+      </div>
+    </div>
+  </div>
+
+  <div class="btn-group">
+    <button class="btn btn-primary" @click="saveSettings()" :disabled="!hasChanges() || saving">
+      <span x-show="!saving">Save Changes</span>
+      <span x-show="saving">Saving...</span>
+    </button>
+    <button class="btn btn-secondary" @click="resetSettings()" :disabled="saving">
+      Reset to Default
+    </button>
+  </div>
+
+  <!-- Toast notification -->
+  <template x-if="toast">
+    <div class="toast" :class="toast.type" x-text="toast.message"></div>
+  </template>
+</div>
+
+<script>
+  function settingsPage() {
+    return {
+      settings: { edge_base_url: '' },
+      originalSettings: { edge_base_url: '' },
+      testStatus: null, // null | 'testing' | 'success' | 'error'
+      testError: '',
+      toast: null,
+      saving: false,
+
+      init() {
+        // Load current settings from server
+        this.loadSettings();
+
+        // Set current view for toolbar highlighting
+        document.documentElement.setAttribute('data-current-view', 'settings');
+      },
+
+      async loadSettings() {
+        try {
+          const response = await fetch('/api/client/settings');
+          if (response.ok) {
+            const data = await response.json();
+            this.settings.edge_base_url = data.edge_base_url || '';
+            this.originalSettings.edge_base_url = data.edge_base_url || '';
+          } else {
+            this.showToast('Failed to load settings', 'error');
+          }
+        } catch (error) {
+          console.error('Failed to load settings:', error);
+          this.showToast('Failed to load settings', 'error');
+        }
+      },
+
+      hasChanges() {
+        return this.settings.edge_base_url !== this.originalSettings.edge_base_url;
+      },
+
+      async testConnection() {
+        this.testStatus = 'testing';
+        this.testError = '';
+
+        try {
+          const url = this.settings.edge_base_url;
+          const testUrl = url ? `/api/client/settings/edge/health?url=${encodeURIComponent(url)}` : '/api/client/settings/edge/health';
+          const response = await fetch(testUrl);
+          const data = await response.json();
+
+          if (response.ok && data.reachable) {
+            this.testStatus = 'success';
+          } else {
+            this.testStatus = 'error';
+            this.testError = data.error || 'Connection failed';
+          }
+        } catch (error) {
+          this.testStatus = 'error';
+          this.testError = error.message || 'Connection failed';
+        }
+
+        // Clear test status after 3 seconds
+        setTimeout(() => {
+          this.testStatus = null;
+        }, 3000);
+      },
+
+      async saveSettings() {
+        this.saving = true;
+
+        try {
+          const response = await fetch('/api/client/settings', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(this.settings)
+          });
+
+          if (response.ok) {
+            const data = await response.json();
+            this.originalSettings.edge_base_url = data.edge_base_url || '';
+
+            // Update global EDGE_BASE_URL for hot reload
+            window.EDGE_BASE_URL = this.settings.edge_base_url || window.EDGE_BASE_URL;
+
+            // Broadcast event for hot reload
+            window.dispatchEvent(new CustomEvent('openrecall-config-changed', {
+              detail: { edge_base_url: this.settings.edge_base_url }
+            }));
+
+            this.showToast('Settings saved successfully', 'success');
+          } else {
+            const error = await response.json();
+            this.showToast(error.error || 'Failed to save settings', 'error');
+          }
+        } catch (error) {
+          console.error('Failed to save settings:', error);
+          this.showToast('Failed to save settings', 'error');
+        } finally {
+          this.saving = false;
+        }
+      },
+
+      async resetSettings() {
+        if (!confirm('Reset all settings to default values?')) {
+          return;
+        }
+
+        this.saving = true;
+
+        try {
+          const response = await fetch('/api/client/settings/reset', {
+            method: 'POST'
+          });
+
+          if (response.ok) {
+            const data = await response.json();
+            this.settings.edge_base_url = data.edge_base_url || '';
+            this.originalSettings.edge_base_url = data.edge_base_url || '';
+
+            // Update global EDGE_BASE_URL
+            window.EDGE_BASE_URL = data.edge_base_url || window.EDGE_BASE_URL;
+
+            // Broadcast event
+            window.dispatchEvent(new CustomEvent('openrecall-config-changed', {
+              detail: { edge_base_url: data.edge_base_url }
+            }));
+
+            this.showToast('Settings reset to defaults', 'success');
+          } else {
+            this.showToast('Failed to reset settings', 'error');
+          }
+        } catch (error) {
+          console.error('Failed to reset settings:', error);
+          this.showToast('Failed to reset settings', 'error');
+        } finally {
+          this.saving = false;
+        }
+      },
+
+      showToast(message, type) {
+        this.toast = { message, type };
+        setTimeout(() => {
+          this.toast = null;
+        }, 3000);
+      }
+    };
+  }
+</script>
+{% endblock %}
