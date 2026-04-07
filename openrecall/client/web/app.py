@@ -4,18 +4,39 @@ import logging
 import threading
 from flask import Flask, render_template, send_from_directory
 from openrecall.client.chat.routes import chat_bp
+from openrecall.client.web.routes import settings_bp
 from openrecall.shared.config import settings
 
 logger = logging.getLogger(__name__)
 
 client_app = Flask(__name__, template_folder="templates")
 client_app.register_blueprint(chat_bp)
+client_app.register_blueprint(settings_bp)
+
+
+from pathlib import Path
+from openrecall.client.database import ClientSettingsStore
+
+# Initialize settings store for template context
+_settings_store = None
+
+
+def _get_settings_store():
+    global _settings_store
+    if _settings_store is None:
+        db_path = Path(settings.client_data_dir) / "client.db"
+        _settings_store = ClientSettingsStore(db_path)
+    return _settings_store
 
 
 @client_app.context_processor
 def inject_template_vars():
     """Make EDGE_BASE_URL and settings available to all templates."""
-    return {"EDGE_BASE_URL": settings.edge_base_url, "settings": settings}
+    store = _get_settings_store()
+    # Get from DB first, fallback to config
+    db_edge_url = store.get("edge_base_url")
+    edge_base_url = db_edge_url if db_edge_url else settings.edge_base_url
+    return {"EDGE_BASE_URL": edge_base_url, "settings": settings}
 
 
 @client_app.route("/")
@@ -38,6 +59,12 @@ def timeline():
 @client_app.route("/chat")
 def chat():
     return render_template("chat.html")
+
+
+@client_app.route("/settings")
+def settings_page():
+    """Render the settings page."""
+    return render_template("settings.html")
 
 
 @client_app.route("/vendor/<path:filename>")
