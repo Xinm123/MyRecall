@@ -8,6 +8,7 @@ cd "$repo_root"
 config_file=""
 env_file=""
 mode=""
+config_explicit=""
 enable_debug="false"
 
 for arg in "$@"; do
@@ -25,7 +26,11 @@ for arg in "$@"; do
       mode="${1:-}"
       ;;
     --config=*)
+      if [[ -n "$mode" ]]; then
+        echo "[Mode] --config takes precedence over --mode" >&2
+      fi
       config_file="${arg#--config=}"
+      config_explicit="true"
       ;;
     --env=*)
       env_file="${arg#--env=}"
@@ -37,8 +42,9 @@ for arg in "$@"; do
   esac
 done
 
-# Mode-based config selection (overrides auto-discovery but not --config)
-if [[ -n "$mode" ]]; then
+# Mode-based config selection (only if --config was not explicitly provided)
+# Spec: --config takes precedence over --mode (explicit override wins)
+if [[ -n "$mode" && -z "$config_file" ]]; then
   case "$mode" in
     local)
       config_file="$repo_root/client-local.toml"
