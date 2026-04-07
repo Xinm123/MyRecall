@@ -208,6 +208,11 @@
       background-color: rgba(0, 0, 0, 0.12);
       color: #1D1D1F;
     }
+
+    html[data-current-view="settings"] a[href="/settings"] {
+      background-color: rgba(0, 0, 0, 0.12);
+      color: #1D1D1F;
+    }
     
     /* Right Group: Icons */
     .toolbar-right-group {
@@ -432,7 +437,12 @@
       <a href="/search" class="toolbar-icon-link" title="Search">
         {{ icons.icon_search() }}
       </a>
-      
+
+      <!-- Settings Link -->
+      <a href="/settings" class="toolbar-icon-link" title="Settings">
+        {{ icons.icon_settings() }}
+      </a>
+
       <!-- Control Center Button & Popover -->
       <div x-data="controlCenter()" class="control-center-btn">
         <button 
@@ -616,6 +626,8 @@
       currentView = 'search';
     } else if (currentPath === '/chat') {
       currentView = 'chat';
+    } else if (currentPath === '/settings') {
+      currentView = 'settings';
     }
     document.documentElement.setAttribute('data-current-view', currentView);
     
