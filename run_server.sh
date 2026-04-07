@@ -7,6 +7,7 @@ cd "$repo_root"
 
 config_file=""
 env_file=""
+mode=""
 enable_debug="false"
 
 for arg in "$@"; do
@@ -20,14 +21,39 @@ for arg in "$@"; do
     --env=*)
       env_file="${arg#--env=}"
       ;;
+    --mode=*)
+      mode="${arg#--mode=}"
+      ;;
+    --mode)
+      shift
+      mode="${1:-}"
+      ;;
     *)
-      echo "Usage: $0 [--debug] [--config=/abs/path/to/server.toml] [--env=/abs/path/to/myrecall_server.env]" >&2
+      echo "Usage: $0 [--debug] [--mode local|remote] [--config=/abs/path/to/server.toml] [--env=/abs/path/to/myrecall_server.env]" >&2
       exit 2
       ;;
   esac
 done
 
-# Determine config source priority:
+# Mode-based config selection (overrides auto-discovery but not --config)
+if [[ -n "$mode" ]]; then
+  case "$mode" in
+    local)
+      config_file="$repo_root/server-local.toml"
+      ;;
+    remote)
+      config_file="$repo_root/server-remote.toml"
+      ;;
+    *)
+      echo "Error: unknown --mode value '$mode'. Use 'local' or 'remote'." >&2
+      echo "Usage: $0 [--debug] [--mode local|remote] [--config=/abs/path] [--env=/abs/path]" >&2
+      exit 2
+      ;;
+  esac
+  echo "[Mode] Loading config: $config_file"
+fi
+
+# Config source priority...
 # 1. --config flag (TOML)
 # 2. --env flag (legacy .env)
 # 3. Default: server.toml in repo root, then ~/.myrecall/server.toml
