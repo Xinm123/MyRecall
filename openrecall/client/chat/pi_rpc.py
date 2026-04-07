@@ -69,9 +69,18 @@ class PiRpcManager:
         # Naive datetime is intentional: astimezone(timezone.utc) below interprets
         # it as local wall-clock time, which is exactly what we need here.
         now = datetime.now()
-        tz_name = now.strftime("%Z")            # e.g. "CST", "JST"
-        tz_offset = now.strftime("%:z")          # e.g. "+08:00", "-05:00"
         date_str = now.strftime("%Y-%m-%d")     # e.g. "2026-04-02"
+
+        # Use `time` module instead of strftime %Z/%:z — macOS C library returns empty
+        import time as _time
+        local_tz = _time.localtime()
+        tz_name = _time.tzname[0]                # e.g. "CST"
+        # offset in seconds (negative = east of UTC)
+        offset = _time.timezone if local_tz.tm_isdst == 0 else _time.altzone
+        offset_h = -offset // 3600
+        offset_m = (-offset % 3600) // 60
+        sign = "+" if offset_h >= 0 else "-"
+        tz_offset = f"UTC{sign}{abs(offset_h):02d}:{offset_m:02d}"  # e.g. "UTC+08:00"
 
         # Today's local midnight -> UTC
         local_midnight = now.replace(hour=0, minute=0, second=0, microsecond=0)
@@ -84,7 +93,7 @@ class PiRpcManager:
 
         return (
             f"Date: {date_str}\n"
-            f"Timezone: {tz_name} (UTC{tz_offset})\n"
+            f"Timezone: {tz_name} ({tz_offset})\n"
             f"Local midnight today (UTC): {midnight_utc_str}\n"
             f"Local midnight yesterday (UTC): {yesterday_utc_str}\n"
             f"Now (UTC): {now.astimezone(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')}\n"

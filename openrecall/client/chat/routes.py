@@ -14,9 +14,7 @@ Endpoints:
 """
 
 import json
-import os
 from flask import Blueprint, Response, request, jsonify
-from pathlib import Path
 from typing import Optional
 
 from .service import ChatService
@@ -32,7 +30,9 @@ def get_chat_service() -> ChatService:
     """Get or create ChatService instance (process-level singleton)."""
     global _chat_service
     if _chat_service is None:
-        data_dir = Path(os.environ.get("OPENRECALL_CLIENT_DATA_DIR", Path.home() / "MRC"))
+        # Use the global ClientSettings from client.toml (set by __main__.py)
+        import openrecall.shared.config
+        data_dir = openrecall.shared.config.settings.paths_data_dir
         _chat_service = ChatService(data_dir)
     return _chat_service
 
