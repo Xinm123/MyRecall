@@ -11,29 +11,49 @@ mode=""
 config_explicit=""
 enable_debug="false"
 
-for arg in "$@"; do
-  case "$arg" in
+while [[ $# -gt 0 ]]; do
+  case "$1" in
     --debug)
       enable_debug="true"
+      shift
       ;;
     --no-web)
+      shift
       ;;
     --mode=*)
-      mode="${arg#--mode=}"
+      mode="${1#--mode=}"
+      shift
       ;;
     --mode)
       shift
       mode="${1:-}"
+      shift
       ;;
     --config=*)
       if [[ -n "$mode" ]]; then
         echo "[Mode] --config takes precedence over --mode" >&2
       fi
-      config_file="${arg#--config=}"
+      config_file="${1#--config=}"
       config_explicit="true"
+      shift
+      ;;
+    --config)
+      shift
+      if [[ -n "$mode" ]]; then
+        echo "[Mode] --config takes precedence over --mode" >&2
+      fi
+      config_file="${1:-}"
+      config_explicit="true"
+      shift
       ;;
     --env=*)
-      env_file="${arg#--env=}"
+      env_file="${1#--env=}"
+      shift
+      ;;
+    --env)
+      shift
+      env_file="${1:-}"
+      shift
       ;;
     *)
       echo "Usage: $0 [--debug] [--no-web] [--mode local|remote] [--config=/abs/path/to/client.toml] [--env=/abs/path/to/myrecall_client.env]" >&2
