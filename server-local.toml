@@ -43,8 +43,8 @@ model_type = "mobile"
 enabled = true
 provider = "openai"
 model = "Qwen/Qwen3-VL-8B-Instruct"
-api_key = ""
-api_base = "http://127.0.0.1:8090/v1"
+api_key = "sk-usltbpnjvkrjklolnzinkqctvbcdhqkarjtrlqbyckrubiwn"
+api_base = "https://api.siliconflow.cn/v1/"
 
 # ==============================================================================
 # Reranker Settings
