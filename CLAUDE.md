@@ -24,18 +24,28 @@ MyRecall v3 is a privacy-first alternative to proprietary digital memory solutio
 
 ```bash
 # Server (Edge) - Terminal 1
-./run_server.sh --debug
+./run_server.sh --mode local --debug
 
 # Client (Host) - Terminal 2
-./run_client.sh --debug
+./run_client.sh --mode local --debug
+
+# For deployed mode (client local, server on edge 10.77.3.162):
+./run_client.sh --mode remote --debug
 ```
 
 Open browser: http://localhost:8889
 
 **Configuration:**
-- Server: `myrecall_server.env` or environment variables
-- Client: `myrecall_client.env` or environment variables
-- Key settings: `OPENRECALL_SERVER_DATA_DIR` (~/MRS), `OPENRECALL_CLIENT_DATA_DIR` (~/MRC)
+
+Use `--mode local` (client + server on same machine) or `--mode remote` (client connects to remote edge):
+
+| Mode | Script | Config File | Client Connects To |
+|------|--------|-------------|-------------------|
+| `local` | `--mode local` | `client-local.toml` / `server-local.toml` | `localhost:8083` |
+| `remote` | `--mode remote` | `client-remote.toml` | `10.77.3.162:8083` |
+
+All config files are TOML-based (`*.toml`). Legacy `.env` files still work via `--env=` flag.
+Explicit `--config=/path/to/config.toml` takes precedence over `--mode`.
 
 ### Testing
 
@@ -58,7 +68,7 @@ pytest tests/test_p1_s1_ingest.py -v
 pytest --cov=openrecall --cov-report=term-missing
 ```
 
-**Note:** Integration tests require a running Edge server: `./run_server.sh --debug`
+**Note:** Integration tests require a running Edge server: `./run_server.sh --mode local --debug`
 
 ### Installation
 
@@ -236,7 +246,7 @@ Key settings (see `openrecall/shared/config.py`):
 
 **Running Tests:**
 - Default: `pytest` runs unit + integration, excludes heavy tests
-- Integration tests need: `./run_server.sh --debug` in separate terminal
+- Integration tests need: `./run_server.sh --mode local --debug` in separate terminal
 - See `tests/README.md` for detailed guide
 
 ## Image Format Contract
