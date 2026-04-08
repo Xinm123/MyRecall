@@ -16,6 +16,24 @@ from openrecall.server.description.providers.base import (
 logger = logging.getLogger(__name__)
 
 
+def _build_prompt(ctx_str: str) -> str:
+    """Build prompt with new format."""
+    return (
+        f"Analyze this screenshot. App context: {ctx_str}.\n"
+        f"Output a strictly valid JSON object:\n"
+        f'{{"narrative": "detailed description (max 1024 chars)", '
+        f'"summary": "one sentence (max 256 chars)", '
+        f'"tags": ["keyword1", "keyword2", ...]}}  // 3-8 lowercase keywords\n\n'
+        f'Example output:\n'
+        f'{{\n'
+        f'  "narrative": "User is browsing GitHub repository page showing README content.",\n'
+        f'  "summary": "Browsing GitHub repository README",\n'
+        f'  "tags": ["github", "repository", "readme", "browsing", "documentation"]\n'
+        f'}}\n\n'
+        f'IMPORTANT: Output only valid JSON. No markdown, no explanation.'
+    )
+
+
 class DashScopeDescriptionProvider(DescriptionProvider):
     def __init__(self, api_key: str, model_name: str) -> None:
         if not api_key:
@@ -46,19 +64,14 @@ class DashScopeDescriptionProvider(DescriptionProvider):
             ctx_parts.append(f"URL: {context.browser_url}")
         ctx_str = " | ".join(ctx_parts) if ctx_parts else "unknown"
 
+        prompt_text = _build_prompt(ctx_str)
+
         messages: list[dict[str, Any]] = [
             {
                 "role": "user",
                 "content": [
                     {"image": f"file://{path.as_posix()}"},
-                    {
-                        "text": (
-                            f"Analyze this screenshot. App context: {ctx_str}.\n"
-                            'Output a strictly valid JSON: '
-                            '{"narrative": "detailed description (max 512 chars)", "entities": ["..."], '
-                            '"intent": "user intent phrase", "summary": "one sentence (max 200 chars)"}'
-                        ),
-                    },
+                    {"text": prompt_text},
                 ],
             }
         ]
@@ -105,35 +118,41 @@ class DashScopeDescriptionProvider(DescriptionProvider):
             if isinstance(parsed, dict):
                 original_narrative = parsed.get("narrative", "")
                 original_summary = parsed.get("summary", "")
-                narrative = original_narrative[:512]  # Truncate to max length
-                summary = original_summary[:200]  # Truncate to max length
+                tags = parsed.get("tags", [])
 
-                # Log truncation warnings
-                if len(original_narrative) > 512:
-                    logger.warning(f"Narrative truncated from {len(original_narrative)} to 512 chars")
-                if len(original_summary) > 200:
-                    logger.warning(f"Summary truncated from {len(original_summary)} to 200 chars")
+                narrative = original_narrative[:1024]
+                summary = original_summary[:256]
 
-                logger.info(f"Description generated in {elapsed:.2f}s: {len(narrative)} chars, {len(parsed.get('entities', []))} entities")
+                if len(original_narrative) > 1024:
+                    logger.warning(f"Narrative truncated from {len(original_narrative)} to 1024 chars")
+                if len(original_summary) > 256:
+                    logger.warning(f"Summary truncated from {len(original_summary)} to 256 chars")
+
+                # Normalize tags
+                if isinstance(tags, list):
+                    tags = [str(t).lower().strip() for t in tags if t]
+                    tags = [t for t in tags if t]  # Filter empty strings
+                    tags = tags[:10]
+                else:
+                    tags = []
+
+                logger.info(f"Description generated in {elapsed:.2f}s: {len(narrative)} chars, {len(tags)} tags")
                 return FrameDescription(
                     narrative=narrative,
-                    entities=parsed.get("entities", []),
-                    intent=parsed.get("intent", ""),
                     summary=summary,
+                    tags=tags,
                 )
         except Exception:
             pass
 
         logger.warning(f"Failed to parse JSON from DashScope. Raw: {raw_text[:100]}...")
-        # Truncate raw text for fallback
-        fallback_narrative = raw_text[:512]
-        fallback_summary = raw_text[:200]
-        if len(raw_text) > 512:
-            logger.warning(f"Fallback narrative truncated from {len(raw_text)} to 512 chars")
+        fallback_narrative = raw_text[:1024]
+        fallback_summary = raw_text[:256]
+        if len(raw_text) > 1024:
+            logger.warning(f"Fallback narrative truncated from {len(raw_text)} to 1024 chars")
         logger.info(f"Description generated (fallback) in {elapsed:.2f}s: {len(fallback_narrative)} chars")
         return FrameDescription(
             narrative=fallback_narrative,
-            entities=[],
-            intent="",
             summary=fallback_summary,
+            tags=[],
         )
