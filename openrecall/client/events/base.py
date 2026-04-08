@@ -171,6 +171,9 @@ class RoutedCaptureTask:
     routing_hints: EventPayload
 
 
+from openrecall.client.events.atomic import AtomicInt
+
+
 class TriggerDebouncer:
     """Per-device debounce gate for capture triggers.
 
@@ -178,7 +181,7 @@ class TriggerDebouncer:
     """
 
     def __init__(self, min_interval_ms: int) -> None:
-        self._min_interval_ms: int = min_interval_ms
+        self._min_interval_ms: AtomicInt = AtomicInt(min_interval_ms)
         self._lock: threading.Lock = threading.Lock()  # Simple Lock
         self._last_fire_ms: dict[str, int] = {}
         self._debounced_count: int = 0
@@ -186,11 +189,16 @@ class TriggerDebouncer:
     def should_fire(self, device_name: str, now_ms: int) -> bool:
         with self._lock:
             last_fire_ms = self._last_fire_ms.get(device_name)
-            if last_fire_ms is None or now_ms - last_fire_ms >= self._min_interval_ms:
+            min_interval = self._min_interval_ms.get()
+            if last_fire_ms is None or now_ms - last_fire_ms >= min_interval:
                 self._last_fire_ms[device_name] = now_ms
                 return True
             self._debounced_count += 1
             return False
+
+    def update_interval_ms(self, new_ms: int) -> None:
+        """Update the debounce interval at runtime (hot-reload)."""
+        self._min_interval_ms.set(new_ms)
 
     def reset_device(self, device_name: str) -> None:
         with self._lock:
@@ -219,7 +227,7 @@ class LockFreeDebouncer:
     """
 
     def __init__(self, min_interval_ms: int) -> None:
-        self._min_interval_ms: int = min_interval_ms
+        self._min_interval_ms: AtomicInt = AtomicInt(min_interval_ms)
         # No lock for should_fire - relies on GIL atomicity for dict operations
         self._last_fire_ms: dict[str, int] = {}
         self._lock: threading.Lock = threading.Lock()  # Only for reset/get operations
@@ -231,8 +239,9 @@ class LockFreeDebouncer:
         - Two threads might both pass the check simultaneously (rare)
         - This is acceptable for debouncing (just means an extra event)
         """
+        min_interval = self._min_interval_ms.get()
         last_fire_ms = self._last_fire_ms.get(device_name, 0)
-        if now_ms - last_fire_ms >= self._min_interval_ms:
+        if now_ms - last_fire_ms >= min_interval:
             # Atomic dict assignment under GIL
             self._last_fire_ms[device_name] = now_ms
             return True
@@ -248,9 +257,9 @@ class LockFreeDebouncer:
         with self._lock:
             self._last_fire_ms.clear()
 
-    def update_interval(self, min_interval_ms: int) -> None:
-        """Update the minimum interval."""
-        self._min_interval_ms = min_interval_ms
+    def update_interval_ms(self, new_ms: int) -> None:
+        """Update the debounce interval at runtime (hot-reload)."""
+        self._min_interval_ms.set(new_ms)
 
 
 @dataclass(frozen=True)
