@@ -351,16 +351,28 @@ _config_change_event = threading.Event()
 
 
 def notify_config_changed() -> None:
-    """Call after saving settings to SQLite. Wakes the config listener."""
+    """Call after saving settings to SQLite. Wakes the config listener.
+
+    Sets the event; listener clears it after processing.
+    This prevents race conditions where notify fires while listener is
+    between wait() and processing.
+    """
     _config_change_event.set()
-    _config_change_event.clear()
 
 
-def wait_for_config_change(timeout: float | None = None) -> None:
-    """Block until config changed event is set, then clear and return."""
-    _config_change_event.wait(timeout=timeout)
-    if _config_change_event.is_set():
+def wait_for_config_change(timeout: float | None = None) -> bool:
+    """Block until config changed event is set, then clear and return.
+
+    Returns:
+        True if event was set (config changed), False if timeout expired
+
+    Caller must call notify_config_changed() to set the event again
+    for subsequent notifications.
+    """
+    triggered = _config_change_event.wait(timeout=timeout)
+    if triggered:
         _config_change_event.clear()
+    return triggered
 ```
 
 **Update `settings.py`** to call `notify_config_changed()` after saving.

@@ -420,22 +420,26 @@ _config_change_event = threading.Event()
 def notify_config_changed() -> None:
     """Call after saving settings to SQLite. Wakes the config listener.
 
-    Leaves the event in SET state — the listener clears it after processing.
+    Sets the event; listener clears it after processing.
     This prevents race conditions where notify fires while listener is
-    between wait() and the set() call.
+    between wait() and processing.
     """
     _config_change_event.set()
 
 
-def wait_for_config_change(timeout: float | None = None) -> None:
+def wait_for_config_change(timeout: float | None = None) -> bool:
     """Block until config changed event is set, then clear and return.
+
+    Returns:
+        True if event was set (config changed), False if timeout expired
 
     Caller must call notify_config_changed() to set the event again
     for subsequent notifications.
     """
-    _config_change_event.wait(timeout=timeout)
-    if _config_change_event.is_set():
+    triggered = _config_change_event.wait(timeout=timeout)
+    if triggered:
         _config_change_event.clear()
+    return triggered
 ```
 
 - [ ] **Step 4: Run tests**
@@ -718,12 +722,14 @@ def _config_change_listener(self) -> None:
     from openrecall.client.events.base import LockFreeDebouncer, TriggerDebouncer
 
     while not self._config_listener_stop.is_set():
-        # Block until notify_config_changed() sets the event
-        # (wait returns immediately if already set, then clears it)
-        runtime_config.wait_for_config_change(timeout=1.0)
-
+        # Wait for config change (with 1s timeout to check stop signal)
+        changed = runtime_config.wait_for_config_change(timeout=1.0)
         if self._config_listener_stop.is_set():
             break
+
+        # Only reload if config actually changed (not timeout)
+        if not changed:
+            continue
 
         try:
             store = runtime_config._get_store()
