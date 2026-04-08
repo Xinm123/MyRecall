@@ -52,7 +52,7 @@ class DescriptionService:
             desc = self.provider.generate(image_path, context)
             logger.debug(
                 f"Generated description: {len(desc.narrative)} chars, "
-                f"{len(desc.entities)} entities, intent={desc.intent}"
+                f"{len(desc.tags)} tags"
             )
             return desc
         except Exception as e:
