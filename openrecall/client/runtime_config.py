@@ -93,3 +93,93 @@ def get_save_local_copies() -> bool:
     from openrecall.shared.config import settings
 
     return settings.client_save_local_screenshots
+
+
+def get_debounce_click_ms() -> int:
+    """Get click debounce interval in milliseconds.
+
+    Priority: SQLite runtime settings > TOML config (click_debounce_ms) > 3000
+    """
+    store = _get_store()
+    if store is not None:
+        try:
+            value = store.get("debounce.click_ms", "")
+            if value:
+                return int(value)
+        except (ValueError, TypeError) as e:
+            logger.warning(f"Invalid debounce.click_ms in runtime settings: {e}")
+
+    from openrecall.shared.config import settings
+    return settings.click_debounce_ms
+
+
+def get_debounce_trigger_ms() -> int:
+    """Get trigger debounce interval in milliseconds.
+
+    Priority: SQLite runtime settings > TOML config (trigger_debounce_ms) > 3000
+    """
+    store = _get_store()
+    if store is not None:
+        try:
+            value = store.get("debounce.trigger_ms", "")
+            if value:
+                return int(value)
+        except (ValueError, TypeError) as e:
+            logger.warning(f"Invalid debounce.trigger_ms in runtime settings: {e}")
+
+    from openrecall.shared.config import settings
+    return settings.trigger_debounce_ms
+
+
+def get_debounce_capture_ms() -> int:
+    """Get global capture debounce interval in milliseconds.
+
+    Priority: SQLite runtime settings > TOML config (capture_debounce_ms) > 3000
+    """
+    store = _get_store()
+    if store is not None:
+        try:
+            value = store.get("debounce.capture_ms", "")
+            if value:
+                return int(value)
+        except (ValueError, TypeError) as e:
+            logger.warning(f"Invalid debounce.capture_ms in runtime settings: {e}")
+
+    from openrecall.shared.config import settings
+    return settings.capture_debounce_ms
+
+
+def get_debounce_idle_interval_ms() -> int:
+    """Get idle capture fallback interval in milliseconds.
+
+    Priority: SQLite runtime settings > TOML config (idle_capture_interval_ms) > 60000
+    """
+    store = _get_store()
+    if store is not None:
+        try:
+            value = store.get("debounce.idle_interval_ms", "")
+            if value:
+                return int(value)
+        except (ValueError, TypeError) as e:
+            logger.warning(f"Invalid debounce.idle_interval_ms in runtime settings: {e}")
+
+    from openrecall.shared.config import settings
+    return settings.idle_capture_interval_ms
+
+
+def get_stats_interval_sec() -> int:
+    """Get stats reporting interval in seconds.
+
+    Priority: SQLite runtime settings > TOML config (stats.interval_sec) > 120
+    """
+    store = _get_store()
+    if store is not None:
+        try:
+            value = store.get("stats.interval_sec", "")
+            if value:
+                return int(value)
+        except (ValueError, TypeError) as e:
+            logger.warning(f"Invalid stats.interval_sec in runtime settings: {e}")
+
+    from openrecall.shared.config import settings
+    return settings.stats_interval_sec
