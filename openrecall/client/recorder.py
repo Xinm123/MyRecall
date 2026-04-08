@@ -47,6 +47,7 @@ from openrecall.client.hash_utils import (
 )
 from openrecall.client.spool import SpoolQueue, get_spool
 from openrecall.client.v3_uploader import SpoolUploader
+from openrecall.client.runtime_config import get_stats_interval_sec
 from openrecall.client import runtime_config
 from openrecall.shared.config import settings
 from openrecall.shared.utils import (
@@ -1139,6 +1140,8 @@ class ScreenRecorder:
 
             # Periodic stats logging
             current_time = time.time()
+            # Refresh stats interval each tick to support hot-reload
+            self._stats_report_interval_sec = get_stats_interval_sec()
             if (
                 current_time - self._last_stats_report_time
                 >= self._stats_report_interval_sec
