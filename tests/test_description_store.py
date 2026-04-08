@@ -1,4 +1,5 @@
 """Tests for FramesStore description CRUD methods."""
+import json
 import sqlite3
 from pathlib import Path
 
@@ -44,18 +45,16 @@ class TestDescriptionCRUD:
                 conn,
                 frame_id=frame_id,
                 narrative="Test narrative",
-                entities_json='["entity1", "entity2"]',
-                intent="testing",
                 summary="Test summary",
+                tags_json=json.dumps(["github", "coding", "browsing"]),
             )
 
             # Get
             desc = store.get_frame_description(conn, frame_id)
             assert desc is not None
             assert desc["narrative"] == "Test narrative"
-            assert desc["intent"] == "testing"
-            assert desc["entities"] == ["entity1", "entity2"]
             assert desc["summary"] == "Test summary"
+            assert desc["tags"] == ["github", "coding", "browsing"]
 
     def test_queue_status(self, store):
         conn = store._connect()
@@ -120,9 +119,8 @@ class TestDescriptionCRUD:
                 conn,
                 frame_id=frame_id,
                 narrative="Recent narrative",
-                entities_json='["test"]',
-                intent="recent test",
                 summary="Recent summary",
+                tags_json=json.dumps(["github", "coding"]),
             )
 
         conn2 = store._connect()
@@ -137,7 +135,7 @@ class TestDescriptionCRUD:
             desc = descriptions[0]
             assert desc["frame_id"] == frame_id
             assert desc["summary"] == "Recent summary"
-            assert desc["intent"] == "recent test"
+            assert desc["tags"] == ["github", "coding"]
 
     def test_frame_description_task_enqueues_pending_status(self, store):
         conn = store._connect()

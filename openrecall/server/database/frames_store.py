@@ -1608,19 +1608,18 @@ class FramesStore:
         conn: sqlite3.Connection,
         frame_id: int,
         narrative: str,
-        entities_json: str,
-        intent: str,
         summary: str,
+        tags_json: str,
         description_model: Optional[str] = None,
     ) -> None:
         """Insert completed description. Idempotent via UNIQUE(frame_id)."""
         conn.execute(
             """
             INSERT OR REPLACE INTO frame_descriptions
-              (frame_id, narrative, entities_json, intent, summary, description_model, generated_at)
-            VALUES (?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+              (frame_id, narrative, summary, tags_json, description_model, generated_at)
+            VALUES (?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
             """,
-            (frame_id, narrative, entities_json, intent, summary, description_model),
+            (frame_id, narrative, summary, tags_json, description_model),
         )
 
     def complete_description_task(
@@ -1727,7 +1726,7 @@ class FramesStore:
         import json
         cursor = conn.execute(
             """
-            SELECT narrative, entities_json, intent, summary, description_model, generated_at
+            SELECT narrative, summary, tags_json, description_model, generated_at
             FROM frame_descriptions WHERE frame_id = ?
             """,
             (frame_id,),
@@ -1737,11 +1736,10 @@ class FramesStore:
             return None
         return {
             "narrative": row[0],
-            "entities": json.loads(row[1]),
-            "intent": row[2],
-            "summary": row[3],
-            "model": row[4],
-            "generated_at": row[5],
+            "summary": row[1],
+            "tags": json.loads(row[2]),
+            "model": row[3],
+            "generated_at": row[4],
         }
 
     def get_recent_descriptions(
@@ -1753,7 +1751,7 @@ class FramesStore:
     ) -> list[dict]:
         """Get recent frame descriptions within a time range.
 
-        Returns simplified description entries: frame_id, timestamp, summary, intent, entities.
+        Returns simplified description entries: frame_id, timestamp, summary, tags.
         The narrative field is excluded from activity-summary responses — detailed descriptions
         are available via GET /v1/frames/{id}/context.
 
@@ -1764,11 +1762,11 @@ class FramesStore:
             limit: Maximum number of descriptions to return
 
         Returns:
-            List of dicts with frame_id, timestamp, summary, intent, entities
+            List of dicts with frame_id, timestamp, summary, tags
         """
         cursor = conn.execute(
             """
-            SELECT fd.frame_id, f.timestamp, fd.summary, fd.intent, fd.entities_json
+            SELECT fd.frame_id, f.timestamp, fd.summary, fd.tags_json
             FROM frame_descriptions fd
             JOIN frames f ON f.id = fd.frame_id
             WHERE f.timestamp BETWEEN ? AND ?
@@ -1782,14 +1780,13 @@ class FramesStore:
         result = []
         for r in rows:
             try:
-                entities = json.loads(r[4])
+                tags = json.loads(r[3])
             except (json.JSONDecodeError, TypeError):
-                entities = []
+                tags = []
             result.append({
                 "frame_id": r[0],
                 "timestamp": r[1],
                 "summary": r[2],
-                "intent": r[3],
-                "entities": entities,
+                "tags": tags,
             })
         return result
