@@ -159,6 +159,60 @@ descriptions: [{"frame_id": 123, "summary": "...", "intent": "..."}]
 descriptions: [{"frame_id": 123, "summary": "...", "tags": ["..."]}]
 ```
 
+## WebUI 变更
+
+文件：`openrecall/client/web/templates/index.html`
+
+需要更新 Description Tab 的展示逻辑：
+
+### 当前代码（需要修改）
+
+```html
+<!-- Intent Section -->
+<div class="metadata-section" x-show="selectedEntry?.description?.intent">
+  <h3>Intent</h3>
+  <div class="metadata-value" style="font-style: italic;" x-text="selectedEntry.description.intent"></div>
+</div>
+
+<!-- Entities Section -->
+<div class="metadata-section" x-show="selectedEntry?.description?.entities?.length">
+  <h3>Entities</h3>
+  <div style="display: flex; flex-wrap: wrap; gap: 8px;">
+    <template x-for="entity in selectedEntry.description.entities" :key="entity">
+      <span style="..." x-text="entity"></span>
+    </template>
+  </div>
+</div>
+```
+
+### 新代码
+
+```html
+<!-- Tags Section -->
+<div class="metadata-section" x-show="selectedEntry?.description?.tags?.length">
+  <h3>Tags</h3>
+  <div style="display: flex; flex-wrap: wrap; gap: 8px;">
+    <template x-for="tag in selectedEntry.description.tags" :key="tag">
+      <span style="
+        display: inline-flex;
+        align-items: center;
+        padding: 4px 12px;
+        background: rgba(0, 122, 255, 0.12);
+        color: #007AFF;
+        border-radius: 12px;
+        font-size: 12px;
+        font-weight: 500;
+      " x-text="tag"></span>
+    </template>
+  </div>
+</div>
+```
+
+**变更点：**
+- 删除 Intent Section
+- 删除 Entities Section
+- 添加 Tags Section（复用 Entities 的样式）
+
 ## 实施步骤
 
 1. **更新 FrameDescription model** — `openrecall/server/description/models.py`
@@ -166,7 +220,8 @@ descriptions: [{"frame_id": 123, "summary": "...", "tags": ["..."]}]
 3. **数据库迁移** — 删除/重命名字段，添加 tags_json
 4. **更新 FramesStore** — 插入/查询逻辑调整
 5. **更新 API** — response 结构调整
-6. **更新 tests** — 测试用例适配新结构
+6. **更新 WebUI** — `index.html` 替换 entities/intent 为 tags
+7. **更新 tests** — 测试用例适配新结构
 
 ## 兼容性
 
