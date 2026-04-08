@@ -2,7 +2,7 @@
 
 **Date:** 2026-04-08
 **Author:** Claude
-**Status:** Approved
+**Status:** ✅ Implemented
 
 ## Overview
 
@@ -235,3 +235,49 @@ descriptions: [{"frame_id": 123, "summary": "...", "tags": ["..."]}]
 - 不保留 `entities` 字段作为兼容字段
 - 不迁移旧数据的 entities/intent 到新结构
 - 不添加 fallback 机制（直接替换）
+
+---
+
+## 实施总结
+
+**实施日期：** 2026-04-08
+**实施状态：** ✅ 已完成
+
+### 变更文件清单
+
+| 文件 | 变更类型 | 说明 |
+|------|----------|------|
+| `openrecall/server/description/models.py` | 修改 | FrameDescription 模型更新 |
+| `openrecall/server/description/providers/openai.py` | 修改 | Prompt 和解析逻辑更新 |
+| `openrecall/server/description/providers/local.py` | 修改 | Prompt 和解析逻辑更新 |
+| `openrecall/server/description/providers/dashscope.py` | 修改 | Prompt 和解析逻辑更新 |
+| `openrecall/server/description/providers/base.py` | 修改 | Docstring 更新 |
+| `openrecall/server/description/service.py` | 修改 | 使用新 to_db_dict() 字段 |
+| `openrecall/server/database/frames_store.py` | 修改 | CRUD 更新为 tags_json |
+| `openrecall/server/api_v1.py` | 修改 | API response 结构调整 |
+| `openrecall/client/web/templates/index.html` | 修改 | WebUI 显示 Tags |
+| `openrecall/server/database/migrations/20260408120000_description_fields_redesign.sql` | 新增 | 数据库迁移 |
+| `tests/test_description_*.py` | 修改 | 测试更新 |
+
+### 测试结果
+
+```
+46 passed, 12 warnings in 3.56s
+```
+
+### 运行时验证
+
+API 返回示例：
+```json
+{
+  "frame_id": 19,
+  "summary": "Developer editing a PyTorch model file...",
+  "tags": ["python", "pytorch", "machine-learning", "code-editor", "terminal", "macos"]
+}
+```
+
+### Breaking Changes 确认
+
+- ✅ API response 不再包含 `entities` 和 `intent`
+- ✅ 数据库表结构已迁移到 `tags_json`
+- ✅ WebUI 显示 Tags 而非 Intent/Entities

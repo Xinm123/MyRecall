@@ -1,8 +1,12 @@
 # Frame Description Design
 
+> ⚠️ **DEPRECATED:** This document describes the original design with `entities` and `intent` fields.
+> The fields have been redesigned in [2026-04-08-description-fields-redesign.md](./2026-04-08-description-fields-redesign.md).
+> Current structure: `narrative` (1024 chars), `summary` (256 chars), `tags` (3-8 keywords).
+
 **Date:** 2026-03-24
 **Author:** Claude
-**Status:** Approved
+**Status:** Superseded by 2026-04-08-description-fields-redesign.md
 
 ## Overview
 
