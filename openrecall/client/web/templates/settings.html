@@ -392,10 +392,18 @@
   <div class="settings-section">
     <h2>Debounce</h2>
 
-    <div class="inline-fields-3" style="margin-bottom: 16px;">
-      <div class="form-group">
-        <label class="form-label" for="debounce_click_sec">Click</label>
-        <span class="form-label-description">Suppress rapid clicks (sec)</span>
+    <div class="form-group">
+      <label class="form-label" for="debounce_click_sec">Click Debounce</label>
+      <span class="form-label-description">Suppress rapid consecutive clicks (seconds)</span>
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <input
+          type="range"
+          min="0"
+          max="60"
+          step="0.1"
+          x-model="settings.debounce_click_sec"
+          style="flex: 1;"
+        >
         <input
           type="number"
           id="debounce_click_sec"
@@ -404,13 +412,23 @@
           min="0"
           max="60"
           step="0.1"
-          style="width: 100%;"
+          style="width: 80px;"
         >
       </div>
+    </div>
 
-      <div class="form-group">
-        <label class="form-label" for="debounce_trigger_sec">Trigger</label>
-        <span class="form-label-description">Suppress rapid app switches (sec)</span>
+    <div class="form-group">
+      <label class="form-label" for="debounce_trigger_sec">Trigger Debounce</label>
+      <span class="form-label-description">Suppress rapid app switches (seconds)</span>
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <input
+          type="range"
+          min="0"
+          max="60"
+          step="0.1"
+          x-model="settings.debounce_trigger_sec"
+          style="flex: 1;"
+        >
         <input
           type="number"
           id="debounce_trigger_sec"
@@ -419,13 +437,23 @@
           min="0"
           max="60"
           step="0.1"
-          style="width: 100%;"
+          style="width: 80px;"
         >
       </div>
+    </div>
 
-      <div class="form-group">
-        <label class="form-label" for="debounce_capture_sec">Capture</label>
-        <span class="form-label-description">Global min interval (sec)</span>
+    <div class="form-group">
+      <label class="form-label" for="debounce_capture_sec">Capture Debounce</label>
+      <span class="form-label-description">Global minimum interval between captures (seconds)</span>
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <input
+          type="range"
+          min="0"
+          max="60"
+          step="0.1"
+          x-model="settings.debounce_capture_sec"
+          style="flex: 1;"
+        >
         <input
           type="number"
           id="debounce_capture_sec"
@@ -434,26 +462,34 @@
           min="0"
           max="60"
           step="0.1"
-          style="width: 100%;"
+          style="width: 80px;"
         >
       </div>
     </div>
 
-    <div class="form-group" style="max-width: 200px;">
-      <label class="form-label" for="debounce_idle_sec">Idle Interval</label>
-      <span class="form-label-description">Background capture fallback (sec)</span>
-      <input
-        type="number"
-        id="debounce_idle_sec"
-        class="form-input"
-        x-model="settings.debounce_idle_sec"
-        min="10"
-        max="600"
-        step="1"
-        style="width: 100%;"
-      >
-      <div class="current-value">
-        Capture when idle for <code x-text="settings.debounce_idle_sec">60</code> seconds
+    <div class="form-group">
+      <label class="form-label" for="debounce_idle_sec">Idle Capture Interval</label>
+      <span class="form-label-description">Background capture when idle for N seconds</span>
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <input
+          type="range"
+          min="10"
+          max="600"
+          step="1"
+          x-model="settings.debounce_idle_sec"
+          style="flex: 1;"
+        >
+        <input
+          type="number"
+          id="debounce_idle_sec"
+          class="form-input"
+          x-model="settings.debounce_idle_sec"
+          min="10"
+          max="600"
+          step="1"
+          style="width: 80px;"
+        >
+        <span style="color: var(--text-secondary); font-size: 13px;">sec</span>
       </div>
     </div>
   </div>
@@ -552,7 +588,7 @@
             this.originalSettings.debounce_trigger_sec = this.settings.debounce_trigger_sec;
             this.settings.debounce_capture_sec = (parseInt(data['debounce.capture_ms'] || '3000') / 1000).toFixed(1);
             this.originalSettings.debounce_capture_sec = this.settings.debounce_capture_sec;
-            this.settings.debounce_idle_sec = (parseInt(data['debounce.idle_interval_ms'] || '60000') / 1000).toFixed(0);
+            this.settings.debounce_idle_sec = (parseInt(data['debounce.idle_interval_ms'] || '60000') / 1000).toFixed(1);
             this.originalSettings.debounce_idle_sec = this.settings.debounce_idle_sec;
             // Stats
             this.settings.stats_interval_sec = data['stats.interval_sec'] || '120';
@@ -692,7 +728,7 @@
             this.originalSettings.debounce_trigger_sec = this.settings.debounce_trigger_sec;
             this.settings.debounce_capture_sec = (parseInt(data['debounce.capture_ms'] || '3000') / 1000).toFixed(1);
             this.originalSettings.debounce_capture_sec = this.settings.debounce_capture_sec;
-            this.settings.debounce_idle_sec = (parseInt(data['debounce.idle_interval_ms'] || '60000') / 1000).toFixed(0);
+            this.settings.debounce_idle_sec = (parseInt(data['debounce.idle_interval_ms'] || '60000') / 1000).toFixed(1);
             this.originalSettings.debounce_idle_sec = this.settings.debounce_idle_sec;
             this.settings.stats_interval_sec = data['stats.interval_sec'] || '120';
             this.originalSettings.stats_interval_sec = this.settings.stats_interval_sec;
