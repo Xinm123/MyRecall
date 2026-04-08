@@ -63,6 +63,11 @@ def update_settings():
         "edge_base_url": lambda v: v is None or v == "" or v.startswith(("http://", "https://")),
         "capture_save_local_copies": lambda v: str(v).lower() in ("true", "false"),
         "capture_permission_poll_sec": lambda v: str(v).isdigit() and 1 <= int(v) <= 300,
+        "debounce.click_ms": lambda v: str(v).isdigit() and 0 <= int(v) <= 60000,
+        "debounce.trigger_ms": lambda v: str(v).isdigit() and 0 <= int(v) <= 60000,
+        "debounce.capture_ms": lambda v: str(v).isdigit() and 0 <= int(v) <= 60000,
+        "debounce.idle_interval_ms": lambda v: str(v).isdigit() and 10000 <= int(v) <= 600000,
+        "stats.interval_sec": lambda v: str(v).isdigit() and 10 <= int(v) <= 3600,
     }
 
     for key, value in data.items():
