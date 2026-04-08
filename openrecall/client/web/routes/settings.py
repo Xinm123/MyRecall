@@ -68,6 +68,15 @@ def update_settings():
         "debounce.capture_ms": lambda v: str(v).isdigit() and 0 <= int(v) <= 60000,
         "debounce.idle_interval_ms": lambda v: str(v).isdigit() and 10000 <= int(v) <= 600000,
         "stats.interval_sec": lambda v: str(v).isdigit() and 10 <= int(v) <= 3600,
+        "dedup.enabled": lambda v: str(v).lower() in ("true", "false"),
+        "dedup.threshold": lambda v: str(v).isdigit() and 0 <= int(v) <= 64,
+        "dedup.ttl_seconds": lambda v: (
+            str(v).replace(".", "", 1).isdigit() and 1 <= float(v) <= 600
+        ),
+        "dedup.cache_size_per_device": lambda v: str(v).isdigit() and 1 <= int(v) <= 100,
+        "dedup.for_click": lambda v: str(v).lower() in ("true", "false"),
+        "dedup.for_app_switch": lambda v: str(v).lower() in ("true", "false"),
+        "dedup.force_after_skip_seconds": lambda v: str(v).isdigit() and 1 <= int(v) <= 3600,
     }
 
     for key, value in data.items():
@@ -78,6 +87,10 @@ def update_settings():
     for key, value in data.items():
         store.set(key, str(value))
         logger.info(f"Setting updated via API: {key}")
+
+    # Notify runtime config so hot-reload consumers pick up the changes
+    from openrecall.client import runtime_config
+    runtime_config.notify_config_changed()
 
     return jsonify(store.get_all())
 
