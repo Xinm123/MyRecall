@@ -225,7 +225,7 @@ def get_dedup_ttl_seconds() -> float:
         except (ValueError, TypeError) as e:
             logger.warning(f"Invalid dedup.ttl_seconds in runtime settings: {e}")
     from openrecall.shared.config import settings
-    return settings.simhash_ttl_seconds
+    return getattr(settings, "simhash_ttl_seconds", 60.0)
 
 
 def get_dedup_cache_size() -> int:
@@ -239,7 +239,7 @@ def get_dedup_cache_size() -> int:
         except (ValueError, TypeError) as e:
             logger.warning(f"Invalid dedup.cache_size_per_device in runtime settings: {e}")
     from openrecall.shared.config import settings
-    return settings.simhash_cache_size_per_device
+    return getattr(settings, "simhash_cache_size_per_device", 1)
 
 
 def get_dedup_for_click() -> bool:
@@ -253,7 +253,7 @@ def get_dedup_for_click() -> bool:
         except (ValueError, TypeError) as e:
             logger.warning(f"Invalid dedup.for_click in runtime settings: {e}")
     from openrecall.shared.config import settings
-    return settings.simhash_enabled_for_click
+    return getattr(settings, "simhash_enabled_for_click", True)
 
 
 def get_dedup_for_app_switch() -> bool:
@@ -267,7 +267,7 @@ def get_dedup_for_app_switch() -> bool:
         except (ValueError, TypeError) as e:
             logger.warning(f"Invalid dedup.for_app_switch in runtime settings: {e}")
     from openrecall.shared.config import settings
-    return settings.simhash_enabled_for_app_switch
+    return getattr(settings, "simhash_enabled_for_app_switch", False)
 
 
 def get_dedup_force_after_skip_sec() -> int:
@@ -281,7 +281,7 @@ def get_dedup_force_after_skip_sec() -> int:
         except (ValueError, TypeError) as e:
             logger.warning(f"Invalid dedup.force_after_skip_seconds in runtime settings: {e}")
     from openrecall.shared.config import settings
-    return settings.max_skip_duration_sec
+    return getattr(settings, "max_skip_duration_sec", 30)
 
 
 _config_change_event = threading.Event()

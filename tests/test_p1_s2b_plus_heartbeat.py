@@ -7,6 +7,7 @@ PHash-based similarity detection and heartbeat fallback logic.
 
 import pytest
 from PIL import Image
+from unittest.mock import MagicMock
 
 from openrecall.client.hash_utils import SimhashCache, compute_phash, hamming_distance
 
@@ -134,8 +135,12 @@ class TestSimhashHeartbeatIntegration:
 
         assert is_similar is False  # Should NOT be similar
 
-    def test_simhash_cache_size_eviction(self):
+    def test_simhash_cache_size_eviction(self, monkeypatch):
         """Cache should evict oldest entries when at capacity."""
+        mock_rc = MagicMock()
+        mock_rc.get_dedup_cache_size.return_value = 2
+        mock_rc.get_dedup_ttl_seconds.return_value = float("inf")
+        monkeypatch.setattr("openrecall.client.hash_utils.runtime_config", mock_rc)
         cache = SimhashCache(cache_size_per_device=2)
 
         # Add 3 frames

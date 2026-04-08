@@ -181,3 +181,27 @@ class TestHeartbeatConfigRemoved:
         settings = Settings()
         # Should not have this attribute
         assert not hasattr(settings, "simhash_heartbeat_interval_sec")
+
+
+class TestSimhashCacheHotReload:
+    """Tests for SimhashCache hot-reload of cache_size and ttl_seconds."""
+
+    def test_simhash_cache_respects_runtime_cache_size(self, monkeypatch):
+        """SimhashCache should use current cache_size from runtime_config."""
+        from unittest.mock import MagicMock
+        from openrecall.client.hash_utils import SimhashCache
+
+        # Create cache with init values (1, infinity)
+        cache = SimhashCache(cache_size_per_device=1, ttl_seconds=1000.0)
+
+        # Mock runtime_config to return larger cache size
+        mock_rc = MagicMock()
+        mock_rc.get_dedup_cache_size.return_value = 3
+        mock_rc.get_dedup_ttl_seconds.return_value = 500.0
+        monkeypatch.setattr("openrecall.client.hash_utils.runtime_config", mock_rc)
+
+        # Add 3 entries — with runtime size=3, all 3 should be present
+        for i in range(3):
+            cache.add("device1", i, timestamp=float(i))
+
+        assert len(cache._caches["device1"]) == 3

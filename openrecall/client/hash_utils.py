@@ -11,6 +11,8 @@ from typing import Optional
 import imagehash
 from PIL import Image
 
+from openrecall.client import runtime_config
+
 
 def compute_phash(image: Image.Image) -> int:
     """
@@ -157,18 +159,22 @@ class SimhashCache:
             >>> cache.add("monitor_0", 0xABC, 100.0)
             >>> cache.add("monitor_0", 0xDEF, 200.0)
         """
+        # Hot-reload: read current cache size and TTL on each add
+        cache_size = runtime_config.get_dedup_cache_size()
+        ttl_seconds = runtime_config.get_dedup_ttl_seconds()
+
         if device_name not in self._caches:
             self._caches[device_name] = OrderedDict()
 
         cache = self._caches[device_name]
 
-        if self.cache_size_per_device <= 0:
+        if cache_size <= 0:
             self._last_enqueue_time[device_name] = timestamp
             return
 
         if phash in cache:
             cache.move_to_end(phash)
-        elif len(cache) >= self.cache_size_per_device:
+        elif len(cache) >= cache_size:
             cache.popitem(last=False)
 
         # Add new entry
@@ -234,6 +240,9 @@ class SimhashCache:
         """
         self._total_checks += 1
 
+        # Hot-reload: read TTL from runtime_config
+        ttl_seconds = runtime_config.get_dedup_ttl_seconds()
+
         if device_name not in self._caches:
             return False
 
@@ -251,7 +260,7 @@ class SimhashCache:
         if phash in cache:
             entry_time = cache[phash]
             # TTL is relative to newest entry in cache
-            if max_timestamp - entry_time < self.ttl_seconds:
+            if max_timestamp - entry_time < ttl_seconds:
                 self._hash_hits += 1
                 return True
             # Expired exact match - don't count as hit, continue to fuzzy check
@@ -259,7 +268,7 @@ class SimhashCache:
         # No exact match or expired: check Hamming distance against non-expired hashes
         for cached_hash, entry_time in cache.items():
             # TTL check: skip entries older than TTL from newest
-            if max_timestamp - entry_time >= self.ttl_seconds:
+            if max_timestamp - entry_time >= ttl_seconds:
                 continue
             if is_similar(phash, cached_hash, threshold):
                 return True

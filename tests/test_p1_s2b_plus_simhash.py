@@ -8,6 +8,8 @@ This test module validates:
 - SimhashCache insertion, eviction, and query operations
 """
 
+from unittest.mock import MagicMock
+
 from PIL import Image
 
 from openrecall.client.hash_utils import (
@@ -138,8 +140,12 @@ class TestSimhashCache:
 
         assert cache.get_last_enqueue_time("monitor_0") == 100.0
 
-    def test_cache_size_enforcement(self):
+    def test_cache_size_enforcement(self, monkeypatch):
         """Cache should evict oldest entries when at capacity."""
+        mock_rc = MagicMock()
+        mock_rc.get_dedup_cache_size.return_value = 2
+        mock_rc.get_dedup_ttl_seconds.return_value = float("inf")
+        monkeypatch.setattr("openrecall.client.hash_utils.runtime_config", mock_rc)
         cache = SimhashCache(cache_size_per_device=2)
 
         cache.add("monitor_0", 0xABC, timestamp=100.0)
@@ -223,8 +229,12 @@ class TestSimhashCache:
         cache = SimhashCache(cache_size_per_device=5)
         assert not cache.is_similar_to_cache("monitor_0", 0xABC, threshold=8)
 
-    def test_multiple_similar_hashes_in_cache(self):
+    def test_multiple_similar_hashes_in_cache(self, monkeypatch):
         """Cache should detect similarity if any cached hash is similar."""
+        mock_rc = MagicMock()
+        mock_rc.get_dedup_cache_size.return_value = 3
+        mock_rc.get_dedup_ttl_seconds.return_value = float("inf")
+        monkeypatch.setattr("openrecall.client.hash_utils.runtime_config", mock_rc)
         cache = SimhashCache(cache_size_per_device=3)
         cache.add("monitor_0", 0xABC, timestamp=100.0)
         cache.add("monitor_0", 0xDEF, timestamp=200.0)
@@ -238,8 +248,12 @@ class TestSimhashCache:
         # Similar to 0xABC (distance 1)
         assert cache.is_similar_to_cache("monitor_0", 0xABD, threshold=8)
 
-    def test_fifo_eviction_order(self):
+    def test_fifo_eviction_order(self, monkeypatch):
         """Cache should evict entries in FIFO order."""
+        mock_rc = MagicMock()
+        mock_rc.get_dedup_cache_size.return_value = 2
+        mock_rc.get_dedup_ttl_seconds.return_value = float("inf")
+        monkeypatch.setattr("openrecall.client.hash_utils.runtime_config", mock_rc)
         cache = SimhashCache(cache_size_per_device=2)
 
         cache.add("monitor_0", 0xABC, timestamp=100.0)  # Oldest
