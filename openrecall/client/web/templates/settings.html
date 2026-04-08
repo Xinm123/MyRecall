@@ -519,6 +519,106 @@
     </div>
   </div>
 
+  <div class="settings-section">
+    <h2>Deduplication</h2>
+
+    <div class="form-group">
+      <div class="toggle-wrapper">
+        <div class="toggle-label">
+          <span class="label-title">Enable Deduplication</span>
+          <span class="label-description">Drop visually similar consecutive frames</span>
+        </div>
+        <label class="toggle-switch">
+          <input type="checkbox" id="dedup_enabled"
+            x-model="settings.dedup_enabled"
+            :checked="settings.dedup_enabled === 'true'"
+            @change="settings.dedup_enabled = $event.target.checked ? 'true' : 'false'">
+          <span class="toggle-slider"></span>
+        </label>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label" for="dedup_threshold">Similarity Threshold</label>
+      <span class="form-label-description">Hamming distance threshold (lower = more strict)</span>
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <input type="range" min="0" max="64" step="1"
+          x-model="settings.dedup_threshold" style="flex: 1;">
+        <input type="number" id="dedup_threshold" class="form-input"
+          x-model="settings.dedup_threshold" min="0" max="64" step="1"
+          style="width: 60px;">
+        <span style="color: var(--text-secondary); font-size: 13px;">bits</span>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label" for="dedup_ttl_seconds">Cache TTL</label>
+      <span class="form-label-description">Duration before similar content can be recaptured</span>
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <input type="range" min="1" max="600" step="1"
+          x-model="settings.dedup_ttl_seconds" style="flex: 1;">
+        <input type="number" id="dedup_ttl_seconds" class="form-input"
+          x-model="settings.dedup_ttl_seconds" min="1" max="600" step="1"
+          style="width: 80px;">
+        <span style="color: var(--text-secondary); font-size: 13px;">sec</span>
+      </div>
+    </div>
+
+    <div class="form-group" style="max-width: 200px;">
+      <label class="form-label" for="dedup_cache_size_per_device">Cache Size</label>
+      <span class="form-label-description">Recent hashes to keep per device</span>
+      <input type="number" id="dedup_cache_size_per_device" class="form-input"
+        x-model="settings.dedup_cache_size_per_device" min="1" max="100" step="1">
+    </div>
+
+    <div class="inline-fields" style="margin-top: 16px;">
+      <div class="form-group" style="margin-bottom: 0;">
+        <div class="toggle-wrapper">
+          <div class="toggle-label">
+            <span class="label-title">For Click</span>
+            <span class="label-description">Dedup on click triggers</span>
+          </div>
+          <label class="toggle-switch">
+            <input type="checkbox" id="dedup_for_click"
+              x-model="settings.dedup_for_click"
+              :checked="settings.dedup_for_click === 'true'"
+              @change="settings.dedup_for_click = $event.target.checked ? 'true' : 'false'">
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+      </div>
+
+      <div class="form-group" style="margin-bottom: 0;">
+        <div class="toggle-wrapper">
+          <div class="toggle-label">
+            <span class="label-title">For App Switch</span>
+            <span class="label-description">Dedup on app_switch triggers</span>
+          </div>
+          <label class="toggle-switch">
+            <input type="checkbox" id="dedup_for_app_switch"
+              x-model="settings.dedup_for_app_switch"
+              :checked="settings.dedup_for_app_switch === 'true'"
+              @change="settings.dedup_for_app_switch = $event.target.checked ? 'true' : 'false'">
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+      </div>
+    </div>
+
+    <div class="form-group" style="max-width: 300px; margin-top: 16px;">
+      <label class="form-label" for="dedup_force_after_skip_seconds">Force After Skip</label>
+      <span class="form-label-description">Force capture after N seconds even if similar</span>
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <input type="range" min="1" max="3600" step="1"
+          x-model="settings.dedup_force_after_skip_seconds" style="flex: 1;">
+        <input type="number" id="dedup_force_after_skip_seconds" class="form-input"
+          x-model="settings.dedup_force_after_skip_seconds" min="1" max="3600" step="1"
+          style="width: 80px;">
+        <span style="color: var(--text-secondary); font-size: 13px;">sec</span>
+      </div>
+    </div>
+  </div>
+
   <div class="btn-group">
     <button class="btn btn-primary" @click="saveSettings()" :disabled="!hasChanges() || saving">
       <span x-show="!saving">Save Changes</span>
@@ -548,7 +648,15 @@
         debounce_capture_sec: '3.0',
         debounce_idle_sec: '60',
         // Stats
-        stats_interval_sec: '120'
+        stats_interval_sec: '120',
+        // Dedup
+        dedup_enabled: 'true',
+        dedup_threshold: '10',
+        dedup_ttl_seconds: '60',
+        dedup_cache_size_per_device: '1',
+        dedup_for_click: 'true',
+        dedup_for_app_switch: 'false',
+        dedup_force_after_skip_seconds: '30'
       },
       originalSettings: {
         edge_base_url: '',
@@ -558,7 +666,15 @@
         debounce_trigger_sec: '3.0',
         debounce_capture_sec: '3.0',
         debounce_idle_sec: '60',
-        stats_interval_sec: '120'
+        stats_interval_sec: '120',
+        // Dedup
+        dedup_enabled: 'true',
+        dedup_threshold: '10',
+        dedup_ttl_seconds: '60',
+        dedup_cache_size_per_device: '1',
+        dedup_for_click: 'true',
+        dedup_for_app_switch: 'false',
+        dedup_force_after_skip_seconds: '30'
       },
       testStatus: null, // null | 'testing' | 'success' | 'error'
       testError: '',
@@ -596,6 +712,21 @@
             // Stats
             this.settings.stats_interval_sec = data['stats.interval_sec'] || '120';
             this.originalSettings.stats_interval_sec = this.settings.stats_interval_sec;
+            // Dedup fields
+            this.settings.dedup_enabled = data['dedup.enabled'] || 'true';
+            this.originalSettings.dedup_enabled = this.settings.dedup_enabled;
+            this.settings.dedup_threshold = data['dedup.threshold'] || '10';
+            this.originalSettings.dedup_threshold = this.settings.dedup_threshold;
+            this.settings.dedup_ttl_seconds = data['dedup.ttl_seconds'] || '60';
+            this.originalSettings.dedup_ttl_seconds = this.settings.dedup_ttl_seconds;
+            this.settings.dedup_cache_size_per_device = data['dedup.cache_size_per_device'] || '1';
+            this.originalSettings.dedup_cache_size_per_device = this.settings.dedup_cache_size_per_device;
+            this.settings.dedup_for_click = data['dedup.for_click'] || 'true';
+            this.originalSettings.dedup_for_click = this.settings.dedup_for_click;
+            this.settings.dedup_for_app_switch = data['dedup.for_app_switch'] || 'false';
+            this.originalSettings.dedup_for_app_switch = this.settings.dedup_for_app_switch;
+            this.settings.dedup_force_after_skip_seconds = data['dedup.force_after_skip_seconds'] || '30';
+            this.originalSettings.dedup_force_after_skip_seconds = this.settings.dedup_force_after_skip_seconds;
           } else {
             this.showToast('Failed to load settings', 'error');
           }
@@ -613,7 +744,14 @@
                this.settings.debounce_trigger_sec !== this.originalSettings.debounce_trigger_sec ||
                this.settings.debounce_capture_sec !== this.originalSettings.debounce_capture_sec ||
                this.settings.debounce_idle_sec !== this.originalSettings.debounce_idle_sec ||
-               this.settings.stats_interval_sec !== this.originalSettings.stats_interval_sec;
+               this.settings.stats_interval_sec !== this.originalSettings.stats_interval_sec ||
+               this.settings.dedup_enabled !== this.originalSettings.dedup_enabled ||
+               this.settings.dedup_threshold !== this.originalSettings.dedup_threshold ||
+               this.settings.dedup_ttl_seconds !== this.originalSettings.dedup_ttl_seconds ||
+               this.settings.dedup_cache_size_per_device !== this.originalSettings.dedup_cache_size_per_device ||
+               this.settings.dedup_for_click !== this.originalSettings.dedup_for_click ||
+               this.settings.dedup_for_app_switch !== this.originalSettings.dedup_for_app_switch ||
+               this.settings.dedup_force_after_skip_seconds !== this.originalSettings.dedup_force_after_skip_seconds;
       },
 
       async testConnection() {
@@ -656,6 +794,13 @@
             'debounce.capture_ms': String(Math.round(parseFloat(this.settings.debounce_capture_sec) * 1000)),
             'debounce.idle_interval_ms': String(Math.round(parseFloat(this.settings.debounce_idle_sec) * 1000)),
             'stats.interval_sec': String(parseInt(this.settings.stats_interval_sec)),
+            'dedup.enabled': this.settings.dedup_enabled,
+            'dedup.threshold': this.settings.dedup_threshold,
+            'dedup.ttl_seconds': this.settings.dedup_ttl_seconds,
+            'dedup.cache_size_per_device': this.settings.dedup_cache_size_per_device,
+            'dedup.for_click': this.settings.dedup_for_click,
+            'dedup.for_app_switch': this.settings.dedup_for_app_switch,
+            'dedup.force_after_skip_seconds': this.settings.dedup_force_after_skip_seconds,
           };
           const response = await fetch('/api/client/settings', {
             method: 'POST',
@@ -674,6 +819,13 @@
             this.originalSettings.debounce_capture_sec = this.settings.debounce_capture_sec;
             this.originalSettings.debounce_idle_sec = this.settings.debounce_idle_sec;
             this.originalSettings.stats_interval_sec = this.settings.stats_interval_sec;
+            this.originalSettings.dedup_enabled = this.settings.dedup_enabled;
+            this.originalSettings.dedup_threshold = this.settings.dedup_threshold;
+            this.originalSettings.dedup_ttl_seconds = this.settings.dedup_ttl_seconds;
+            this.originalSettings.dedup_cache_size_per_device = this.settings.dedup_cache_size_per_device;
+            this.originalSettings.dedup_for_click = this.settings.dedup_for_click;
+            this.originalSettings.dedup_for_app_switch = this.settings.dedup_for_app_switch;
+            this.originalSettings.dedup_force_after_skip_seconds = this.settings.dedup_force_after_skip_seconds;
 
             // Update global EDGE_BASE_URL for hot reload
             window.EDGE_BASE_URL = this.settings.edge_base_url || window.EDGE_BASE_URL;
@@ -689,6 +841,13 @@
                 'debounce.capture_ms': String(Math.round(parseFloat(this.settings.debounce_capture_sec) * 1000)),
                 'debounce.idle_interval_ms': String(Math.round(parseFloat(this.settings.debounce_idle_sec) * 1000)),
                 'stats.interval_sec': String(parseInt(this.settings.stats_interval_sec)),
+                'dedup.enabled': this.settings.dedup_enabled,
+                'dedup.threshold': this.settings.dedup_threshold,
+                'dedup.ttl_seconds': this.settings.dedup_ttl_seconds,
+                'dedup.cache_size_per_device': this.settings.dedup_cache_size_per_device,
+                'dedup.for_click': this.settings.dedup_for_click,
+                'dedup.for_app_switch': this.settings.dedup_for_app_switch,
+                'dedup.force_after_skip_seconds': this.settings.dedup_force_after_skip_seconds,
               }
             }));
 
@@ -735,6 +894,21 @@
             this.originalSettings.debounce_idle_sec = this.settings.debounce_idle_sec;
             this.settings.stats_interval_sec = data['stats.interval_sec'] || '120';
             this.originalSettings.stats_interval_sec = this.settings.stats_interval_sec;
+            // Dedup fields
+            this.settings.dedup_enabled = data['dedup.enabled'] || 'true';
+            this.originalSettings.dedup_enabled = this.settings.dedup_enabled;
+            this.settings.dedup_threshold = data['dedup.threshold'] || '10';
+            this.originalSettings.dedup_threshold = this.settings.dedup_threshold;
+            this.settings.dedup_ttl_seconds = data['dedup.ttl_seconds'] || '60';
+            this.originalSettings.dedup_ttl_seconds = this.settings.dedup_ttl_seconds;
+            this.settings.dedup_cache_size_per_device = data['dedup.cache_size_per_device'] || '1';
+            this.originalSettings.dedup_cache_size_per_device = this.settings.dedup_cache_size_per_device;
+            this.settings.dedup_for_click = data['dedup.for_click'] || 'true';
+            this.originalSettings.dedup_for_click = this.settings.dedup_for_click;
+            this.settings.dedup_for_app_switch = data['dedup.for_app_switch'] || 'false';
+            this.originalSettings.dedup_for_app_switch = this.settings.dedup_for_app_switch;
+            this.settings.dedup_force_after_skip_seconds = data['dedup.force_after_skip_seconds'] || '30';
+            this.originalSettings.dedup_force_after_skip_seconds = this.settings.dedup_force_after_skip_seconds;
 
             // Update global EDGE_BASE_URL
             window.EDGE_BASE_URL = data.edge_base_url || window.EDGE_BASE_URL;
@@ -750,6 +924,13 @@
                 'debounce.capture_ms': data['debounce.capture_ms'],
                 'debounce.idle_interval_ms': data['debounce.idle_interval_ms'],
                 'stats.interval_sec': data['stats.interval_sec'],
+                'dedup.enabled': data['dedup.enabled'],
+                'dedup.threshold': data['dedup.threshold'],
+                'dedup.ttl_seconds': data['dedup.ttl_seconds'],
+                'dedup.cache_size_per_device': data['dedup.cache_size_per_device'],
+                'dedup.for_click': data['dedup.for_click'],
+                'dedup.for_app_switch': data['dedup.for_app_switch'],
+                'dedup.force_after_skip_seconds': data['dedup.force_after_skip_seconds'],
               }
             }));
 
