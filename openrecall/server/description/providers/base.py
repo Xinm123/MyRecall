@@ -45,7 +45,7 @@ class DescriptionProvider(ABC):
             context: Frame metadata for prompt injection.
 
         Returns:
-            FrameDescription with narrative, entities, intent, summary.
+            FrameDescription with narrative, summary, tags.
 
         Raises:
             DescriptionProviderRequestError: On API/SDK error.
