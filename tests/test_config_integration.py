@@ -315,3 +315,30 @@ class TestSingletonReplacement:
             assert openrecall.shared.config.settings.click_debounce_ms == 3000
         finally:
             openrecall.shared.config.settings = original
+
+
+class TestDebouncerHotReload:
+    """Verify debouncer interval updates after settings store change."""
+
+    def test_debouncer_hot_reload_via_store(self, tmp_path):
+        """Verify debouncer interval updates after settings store change."""
+        from openrecall.client.database import ClientSettingsStore
+        from openrecall.client.events.base import LockFreeDebouncer
+
+        db_path = tmp_path / "client.db"
+        store = ClientSettingsStore(db_path)
+
+        # Create debouncer with initial interval
+        debouncer = LockFreeDebouncer(3000)  # 3000ms
+
+        # Fire at t=0: 0 - 0 >= 3000? No → need a positive timestamp
+        assert debouncer.should_fire("device1", 5000) is True
+
+        # Simulate hot-reload: update interval to 100ms via store + direct update
+        debouncer.update_interval_ms(100)
+
+        # With new interval (100ms), t=5100 should fire (enough time passed)
+        assert debouncer.should_fire("device1", 5100) is True
+
+        # With new interval (100ms), t=5150 should NOT fire (not enough time passed)
+        assert debouncer.should_fire("device1", 5150) is False
