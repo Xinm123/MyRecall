@@ -47,6 +47,7 @@ from openrecall.client.hash_utils import (
 )
 from openrecall.client.spool import SpoolQueue, get_spool
 from openrecall.client.v3_uploader import SpoolUploader
+from openrecall.client import runtime_config
 from openrecall.shared.config import settings
 from openrecall.shared.utils import (
     _build_request_kwargs,
@@ -287,6 +288,10 @@ class ScreenRecorder:
         self.upload_enabled: bool = True
         self._warned_capture_issue: bool = False
         self.consumer: UploaderConsumer | None = consumer
+
+        # Initialize runtime config for hot-reload support
+        runtime_config.init_runtime_config(settings.client_data_dir)
+
         self._spool: SpoolQueue = get_spool()
         self._spool_uploader: SpoolUploader = SpoolUploader()
         self._trigger_channel: TriggerEventChannel = TriggerEventChannel(
@@ -582,7 +587,7 @@ class ScreenRecorder:
     def _poll_permissions(self, *, now_epoch: float) -> None:
         if (
             now_epoch - self._last_permission_poll_time
-            < settings.permission_poll_interval_sec
+            < runtime_config.get_permission_poll_interval_sec()
         ):
             return
         self._last_permission_snapshot = self._permission_state_machine.record_check(
@@ -1210,7 +1215,7 @@ class ScreenRecorder:
                 capture_start_time = time.time()
                 screenshot = self._capture_single_monitor(monitor)
                 image = Image.fromarray(screenshot)
-                if settings.client_save_local_screenshots:
+                if runtime_config.get_save_local_copies():
                     file_tag = int(time.time())
                     filepath = settings.client_screenshots_path / f"{file_tag}.webp"
                     image.save(str(filepath), format="webp", lossless=True)

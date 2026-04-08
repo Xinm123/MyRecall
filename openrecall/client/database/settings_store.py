@@ -11,13 +11,16 @@ logger = logging.getLogger(__name__)
 class ClientSettingsStore:
     """SQLite-backed store for client-side settings.
 
-    Stores configuration in MRC/client.db for persistence across restarts.
+    Stores configuration in client.db within the client data directory
+    (e.g., ~/.myrecall/client/client.db) for persistence across restarts.
     Supports hot-reload by allowing runtime updates.
     """
 
     # Default settings applied on first run or reset
     DEFAULTS: dict[str, str] = {
         "edge_base_url": "",
+        "capture_save_local_copies": "false",
+        "capture_permission_poll_sec": "10",
     }
 
     def __init__(self, db_path: Path):

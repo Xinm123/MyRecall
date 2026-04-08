@@ -197,6 +197,89 @@
     border-radius: 4px;
     font-family: 'SF Mono', Monaco, Consolas, monospace;
   }
+
+  /* Toggle Switch */
+  .toggle-wrapper {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+  }
+
+  .toggle-label {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .toggle-label .label-title {
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text-primary);
+  }
+
+  .toggle-label .label-description {
+    font-size: 12px;
+    color: var(--text-secondary);
+  }
+
+  .toggle-switch {
+    position: relative;
+    width: 44px;
+    height: 24px;
+    flex-shrink: 0;
+  }
+
+  .toggle-switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+  }
+
+  .toggle-slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: var(--border-color);
+    transition: 0.2s;
+    border-radius: 24px;
+    border: 1px solid var(--border-color);
+  }
+
+  .toggle-slider:before {
+    position: absolute;
+    content: "";
+    height: 18px;
+    width: 18px;
+    left: 2px;
+    bottom: 2px;
+    background-color: white;
+    transition: 0.2s;
+    border-radius: 50%;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+  }
+
+  .toggle-switch input:checked + .toggle-slider {
+    background-color: var(--accent-color);
+    border-color: var(--accent-color);
+  }
+
+  .toggle-switch input:checked + .toggle-slider:before {
+    transform: translateX(20px);
+  }
+
+  .toggle-switch input:focus + .toggle-slider {
+    box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.15);
+  }
+
+  .toggle-status {
+    font-size: 12px;
+    color: var(--text-secondary);
+    font-weight: 500;
+  }
 </style>
 {% endblock %}
 
@@ -244,6 +327,48 @@
     </div>
   </div>
 
+  <div class="settings-section">
+    <h2>Capture</h2>
+
+    <div class="form-group">
+      <div class="toggle-wrapper">
+        <div class="toggle-label">
+          <span class="label-title">Save Local Copies</span>
+          <span class="label-description">Save screenshot copies locally in addition to uploading to Edge server</span>
+        </div>
+        <label class="toggle-switch">
+          <input
+            type="checkbox"
+            id="capture_save_local_copies"
+            x-model="settings.capture_save_local_copies"
+            :checked="settings.capture_save_local_copies === 'true'"
+            @change="settings.capture_save_local_copies = $event.target.checked ? 'true' : 'false'"
+          >
+          <span class="toggle-slider"></span>
+        </label>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label" for="capture_permission_poll_sec">Permission Poll Interval</label>
+      <span class="form-label-description">
+        How often to check for screen recording permission (in seconds).
+      </span>
+      <input
+        type="number"
+        id="capture_permission_poll_sec"
+        class="form-input"
+        x-model="settings.capture_permission_poll_sec"
+        min="1"
+        max="300"
+        style="width: 120px;"
+      >
+      <div class="current-value">
+        Current: <code x-text="originalSettings.capture_permission_poll_sec + ' seconds'">10 seconds</code>
+      </div>
+    </div>
+  </div>
+
   <div class="btn-group">
     <button class="btn btn-primary" @click="saveSettings()" :disabled="!hasChanges() || saving">
       <span x-show="!saving">Save Changes</span>
@@ -263,8 +388,16 @@
 <script>
   function settingsPage() {
     return {
-      settings: { edge_base_url: '' },
-      originalSettings: { edge_base_url: '' },
+      settings: {
+        edge_base_url: '',
+        capture_save_local_copies: 'false',
+        capture_permission_poll_sec: '10'
+      },
+      originalSettings: {
+        edge_base_url: '',
+        capture_save_local_copies: 'false',
+        capture_permission_poll_sec: '10'
+      },
       testStatus: null, // null | 'testing' | 'success' | 'error'
       testError: '',
       toast: null,
@@ -285,6 +418,10 @@
             const data = await response.json();
             this.settings.edge_base_url = data.edge_base_url || '';
             this.originalSettings.edge_base_url = data.edge_base_url || '';
+            this.settings.capture_save_local_copies = data.capture_save_local_copies || 'false';
+            this.originalSettings.capture_save_local_copies = data.capture_save_local_copies || 'false';
+            this.settings.capture_permission_poll_sec = data.capture_permission_poll_sec || '10';
+            this.originalSettings.capture_permission_poll_sec = data.capture_permission_poll_sec || '10';
           } else {
             this.showToast('Failed to load settings', 'error');
           }
@@ -295,7 +432,9 @@
       },
 
       hasChanges() {
-        return this.settings.edge_base_url !== this.originalSettings.edge_base_url;
+        return this.settings.edge_base_url !== this.originalSettings.edge_base_url ||
+               this.settings.capture_save_local_copies !== this.originalSettings.capture_save_local_copies ||
+               this.settings.capture_permission_poll_sec !== this.originalSettings.capture_permission_poll_sec;
       },
 
       async testConnection() {
@@ -338,13 +477,19 @@
           if (response.ok) {
             const data = await response.json();
             this.originalSettings.edge_base_url = data.edge_base_url || '';
+            this.originalSettings.capture_save_local_copies = data.capture_save_local_copies || 'false';
+            this.originalSettings.capture_permission_poll_sec = data.capture_permission_poll_sec || '10';
 
             // Update global EDGE_BASE_URL for hot reload
             window.EDGE_BASE_URL = this.settings.edge_base_url || window.EDGE_BASE_URL;
 
             // Broadcast event for hot reload
             window.dispatchEvent(new CustomEvent('openrecall-config-changed', {
-              detail: { edge_base_url: this.settings.edge_base_url }
+              detail: {
+                edge_base_url: this.settings.edge_base_url,
+                capture_save_local_copies: this.settings.capture_save_local_copies,
+                capture_permission_poll_sec: this.settings.capture_permission_poll_sec
+              }
             }));
 
             this.showToast('Settings saved successfully', 'success');
@@ -376,13 +521,21 @@
             const data = await response.json();
             this.settings.edge_base_url = data.edge_base_url || '';
             this.originalSettings.edge_base_url = data.edge_base_url || '';
+            this.settings.capture_save_local_copies = data.capture_save_local_copies || 'false';
+            this.originalSettings.capture_save_local_copies = data.capture_save_local_copies || 'false';
+            this.settings.capture_permission_poll_sec = data.capture_permission_poll_sec || '10';
+            this.originalSettings.capture_permission_poll_sec = data.capture_permission_poll_sec || '10';
 
             // Update global EDGE_BASE_URL
             window.EDGE_BASE_URL = data.edge_base_url || window.EDGE_BASE_URL;
 
             // Broadcast event
             window.dispatchEvent(new CustomEvent('openrecall-config-changed', {
-              detail: { edge_base_url: data.edge_base_url }
+              detail: {
+                edge_base_url: data.edge_base_url,
+                capture_save_local_copies: data.capture_save_local_copies,
+                capture_permission_poll_sec: data.capture_permission_poll_sec
+              }
             }));
 
             this.showToast('Settings reset to defaults', 'success');

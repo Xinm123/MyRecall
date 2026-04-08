@@ -210,4 +210,10 @@ def detect_permissions() -> PermissionCheckResult:
 
 
 def permission_poll_interval_sec() -> int:
-    return settings.permission_poll_interval_sec
+    """Get permission poll interval, preferring runtime settings over TOML config.
+
+    This function supports hot-reload: if the value is changed via WebUI,
+    it will be picked up immediately without requiring a process restart.
+    """
+    from openrecall.client import runtime_config
+    return runtime_config.get_permission_poll_interval_sec()

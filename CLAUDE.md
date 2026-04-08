@@ -88,7 +88,7 @@ pip install -e ".[test]"    # Include test dependencies
   - Triggers: `idle`, `app_switch`, `manual`, `click`
   - Debounce: Three-layer debouncing (click: 3000ms, trigger: 3000ms, capture: 3000ms)
   - Idle fallback: `idle_capture_interval_ms=60000ms`
-- **Spool**: Disk queue for reliability (`~/MRC/spool/`)
+- **Spool**: Disk queue for reliability (`~/.myrecall/client/spool/`)
   - Format: JPEG (`.jpg`/`.jpeg`) + JSON metadata
   - Atomic writes, idempotent retry
 - **Uploader**: Background consumer, posts to Edge `/v1/ingest`
@@ -111,9 +111,9 @@ pip install -e ".[test]"    # Include test dependencies
 - **Ingest API**: `POST /v1/ingest` (idempotent)
 - **Worker**: Processing worker (`V3ProcessingWorker` for OCR mode, `DescriptionWorker` for frame descriptions)
 - **Database**:
-  - `~/MRS/db/edge.db`: Frames metadata + FTS5 tables (frames_fts, ocr_text_fts, accessibility_fts)
-  - `~/MRS/fts.db`: Legacy schema (used by old API layer)
-  - `~/MRS/frames/`: JPEG snapshots
+  - `~/.myrecall/server/db/edge.db`: Frames metadata + FTS5 tables (frames_fts, ocr_text_fts, accessibility_fts)
+  - `~/.myrecall/server/fts.db`: Legacy schema (used by old API layer)
+  - `~/.myrecall/server/frames/`: JPEG snapshots
 - **Search Engine**: FTS5 + metadata filtering (P1)
   - Filters: time range, app_name, window_name, browser_url, focused
   - `content_type` parameter: `ocr`, `accessibility`, or `all` (default)
@@ -215,8 +215,8 @@ openrecall/
 ### Environment Variables
 
 Key settings (see `openrecall/shared/config.py`):
-- `OPENRECALL_SERVER_DATA_DIR`: Edge data directory (default: ~/MRS)
-- `OPENRECALL_CLIENT_DATA_DIR`: Host spool directory (default: ~/MRC)
+- `OPENRECALL_SERVER_DATA_DIR`: Edge data directory (default: ~/.myrecall/server)
+- `OPENRECALL_CLIENT_DATA_DIR`: Host spool directory (default: ~/.myrecall/client)
 - `OPENRECALL_PORT`: Edge API server port (default: 8083, API only — web UI disabled)
 - `OPENRECALL_CLIENT_WEB_PORT`: Client web UI port (default: 8889)
 - `OPENRECALL_DEBUG`: Enable debug logging
@@ -254,7 +254,7 @@ Key settings (see `openrecall/shared/config.py`):
 **P1 Contract (v3):**
 - **Capture**: JPEG format (`.jpg`/`.jpeg`)
 - **Ingest API**: Accepts `image/jpeg`
-- **Frame Storage**: JPEG in `~/MRS/frames/`
+- **Frame Storage**: JPEG in `~/.myrecall/server/frames/`
 - **Frame API**: Returns `image/jpeg`
 - **Legacy Support**: Reads `.webp` only for draining old spool
 
@@ -311,7 +311,7 @@ See `docs/archive/v3/http_contract_ledger.md` for complete API documentation (ar
 
 ### Debugging Upload Issues
 
-1. Check spool directory: `ls ~/MRC/spool/`
+1. Check spool directory: `ls ~/.myrecall/client/spool/`
 2. Check uploader logs: Look for `[Uploader]` entries
 3. Verify Edge server running: `curl http://localhost:8083/v1/health`
 4. Check queue status: `curl http://localhost:8083/v1/ingest/queue/status`

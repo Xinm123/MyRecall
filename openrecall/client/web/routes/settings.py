@@ -2,6 +2,7 @@
 
 import logging
 from pathlib import Path
+from typing import Optional
 
 import requests
 from flask import Blueprint, jsonify, request
@@ -13,13 +14,19 @@ logger = logging.getLogger(__name__)
 
 settings_bp = Blueprint("settings", __name__, url_prefix="/api/client")
 
-# Initialize settings store with MRC path
-_db_path = Path(app_settings.client_data_dir) / "client.db"
-_settings_store = ClientSettingsStore(_db_path)
+# Lazy initialization of settings store (to ensure TOML config is loaded first)
+_settings_store: Optional[ClientSettingsStore] = None
 
 
 def get_settings_store() -> ClientSettingsStore:
-    """Get the settings store instance."""
+    """Get the settings store instance.
+
+    Lazily initialized to ensure TOML config is loaded before accessing paths.
+    """
+    global _settings_store
+    if _settings_store is None:
+        db_path = Path(app_settings.client_data_dir) / "client.db"
+        _settings_store = ClientSettingsStore(db_path)
     return _settings_store
 
 
@@ -51,11 +58,16 @@ def update_settings():
     if not isinstance(data, dict):
         return jsonify({"error": "Request body must be a JSON object"}), 400
 
-    # Validate edge_base_url if present
-    if "edge_base_url" in data:
-        url = data["edge_base_url"]
-        if url and not (url.startswith("http://") or url.startswith("https://")):
-            return jsonify({"error": "edge_base_url must be a valid HTTP/HTTPS URL"}), 400
+    # Validate settings
+    validators = {
+        "edge_base_url": lambda v: v is None or v == "" or v.startswith(("http://", "https://")),
+        "capture_save_local_copies": lambda v: str(v).lower() in ("true", "false"),
+        "capture_permission_poll_sec": lambda v: str(v).isdigit() and 1 <= int(v) <= 300,
+    }
+
+    for key, value in data.items():
+        if key in validators and not validators[key](value):
+            return jsonify({"error": f"Invalid value for {key}"}), 400
 
     # Update settings
     for key, value in data.items():
