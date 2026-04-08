@@ -318,6 +318,8 @@ class ScreenRecorder:
         self._event_tap: MacOSEventTap | None = None
         self._app_switch_monitor: MacOSAppSwitchMonitor | None = None
         self._heartbeat_thread: HeartbeatThread | None = None
+        self._config_listener_stop: threading.Event = threading.Event()
+        self._config_listener_thread: threading.Thread | None = None
 
         # PHash-based visual similarity detection (Layer 2)
         # Note: Named _phash_cache (stores image perceptual hashes, not text simhash)
@@ -348,7 +350,6 @@ class ScreenRecorder:
         self._enabled_monitor_devices: set[str] = set()
         self._idle_deadlines: dict[str, float] = {}
         self._idle_deadlines_lock: threading.Lock = threading.Lock()
-        self._idle_interval_seconds: float = settings.idle_capture_interval_ms / 1000.0
         self._monitor_last_context: dict[str, tuple[str, str, float]] = {}
         self._monitor_last_context_max_size: int = 100  # Bound memory growth
         self._last_capture_outcome: dict[str, object] = {
@@ -381,6 +382,14 @@ class ScreenRecorder:
         if self._heartbeat_thread is None:
             self._heartbeat_thread = HeartbeatThread(recorder=self, stop_event=self._stop_event)
             self._heartbeat_thread.start()
+        # Hot-reload config listener thread
+        self._config_listener_stop.clear()
+        self._config_listener_thread = threading.Thread(
+            target=self._config_change_listener,
+            daemon=True,
+            name="config-change-listener",
+        )
+        self._config_listener_thread.start()
 
     def _emit_trigger(self, event: TriggerEvent, *, now_ms: int | None = None) -> bool:
         event_time_ms = now_ms if now_ms is not None else int(time.time() * 1000)
@@ -466,6 +475,7 @@ class ScreenRecorder:
         """
         # Signal stop to all threads
         self._stop_event.set()
+        self._config_listener_stop.set()
 
         # Stop event sources first (they produce events)
         if self._event_tap is not None:
@@ -495,6 +505,10 @@ class ScreenRecorder:
         if self._heartbeat_thread is not None and self._heartbeat_thread.is_alive():
             self._heartbeat_thread.join(timeout=2.0)
 
+        # Stop config listener thread
+        if self._config_listener_thread is not None and self._config_listener_thread.is_alive():
+            self._config_listener_thread.join(timeout=2.0)
+
         # Clean up MSS instance
         if self._mss_instance is not None:
             try:
@@ -503,6 +517,37 @@ class ScreenRecorder:
                 pass
             self._mss_instance = None
             self._mss_monitors_signature = None
+
+    def _config_change_listener(self) -> None:
+        """Listen for config changes and update debouncers dynamically."""
+        from openrecall.client import runtime_config
+
+        while not self._config_listener_stop.is_set():
+            runtime_config.wait_for_config_change(timeout=1.0)
+            if self._config_listener_stop.is_set():
+                break
+
+            try:
+                store = runtime_config._get_store()
+                if store is None:
+                    continue
+
+                # Update click debouncer
+                click_ms = store.get("debounce.click_ms", "")
+                if click_ms:
+                    self._click_debouncer.update_interval_ms(int(click_ms))
+
+                # Update trigger debouncer
+                trigger_ms = store.get("debounce.trigger_ms", "")
+                if trigger_ms:
+                    self._trigger_debouncer.update_interval_ms(int(trigger_ms))
+
+                logger.info(
+                    "[Recorder] Hot-reloaded: click=%sms trigger=%sms",
+                    click_ms, trigger_ms,
+                )
+            except Exception as e:
+                logger.warning("[Recorder] Config listener error: %s", e)
 
     def _refresh_monitors(self) -> list[MonitorDescriptor]:
         monitors = list_monitors(settings.primary_monitor_only)
@@ -535,11 +580,11 @@ class ScreenRecorder:
             self._idle_deadlines.pop(device_name, None)
 
         for device_name in added:
-            self._idle_deadlines[device_name] = now + self._idle_interval_seconds
+            self._idle_deadlines[device_name] = now + self._get_idle_interval_seconds()
 
         for device_name in current_devices & previous_devices:
             self._idle_deadlines.setdefault(
-                device_name, now + self._idle_interval_seconds
+                device_name, now + self._get_idle_interval_seconds()
             )
 
         self._enabled_monitor_devices = current_devices
@@ -639,7 +684,7 @@ class ScreenRecorder:
                 deadline = self._idle_deadlines.get(device_name)
                 if deadline is None:
                     self._idle_deadlines[device_name] = (
-                        now_epoch + self._idle_interval_seconds
+                        now_epoch + self._get_idle_interval_seconds()
                     )
                     continue
                 if deadline <= now_epoch:
@@ -658,9 +703,14 @@ class ScreenRecorder:
                     if min_deadline is None or deadline < min_deadline:
                         min_deadline = deadline
         if min_deadline is None:
-            return self._idle_interval_seconds
+            return self._get_idle_interval_seconds()
         timeout = min_deadline - now_epoch
-        return max(0.1, min(timeout, self._idle_interval_seconds))
+        return max(0.1, min(timeout, self._get_idle_interval_seconds()))
+
+    def _get_idle_interval_seconds(self) -> float:
+        """Get idle capture interval, hot-reloadable via runtime_config."""
+        from openrecall.client import runtime_config
+        return runtime_config.get_debounce_idle_interval_ms() / 1000.0
 
     def _snapshot_active_context(self) -> tuple[str, str, str | None]:
         active_app = get_active_app_name() or get_frontmost_app_name()
@@ -893,7 +943,7 @@ class ScreenRecorder:
         with self._idle_deadlines_lock:
             if target_device_name in self._enabled_monitor_devices:
                 self._idle_deadlines[target_device_name] = (
-                    now_epoch + self._idle_interval_seconds
+                    now_epoch + self._get_idle_interval_seconds()
                 )
 
     def _update_monitor_context(
@@ -1185,7 +1235,7 @@ class ScreenRecorder:
             last_capture_end = self._last_successful_capture_time.get(
                 routed_task.target_device_name, 0.0
             )
-            min_interval_sec = settings.capture_debounce_ms / 1000.0
+            min_interval_sec = runtime_config.get_debounce_capture_ms() / 1000.0
             if last_capture_end > 0 and time.time() - last_capture_end < min_interval_sec:
                 logger.debug(
                     "Debounced trigger: device=%s trigger=%s (last_capture=%.2fs ago < %.2fs)",
@@ -1238,7 +1288,7 @@ class ScreenRecorder:
                     and (current_time - last_capture) >= settings.max_skip_duration_sec
                 )
 
-                if settings.simhash_dedup_enabled:
+                if runtime_config.get_dedup_enabled():
                     # Determine if simhash should be checked based on trigger type
                     # IDLE and MANUAL always skip simhash (ensures periodic/user-requested capture)
                     if routed_task.capture_trigger in (
@@ -1260,9 +1310,9 @@ class ScreenRecorder:
                             settings.max_skip_duration_sec,
                         )
                     elif routed_task.capture_trigger == CaptureTrigger.CLICK:
-                        should_check_simhash = settings.simhash_enabled_for_click
+                        should_check_simhash = runtime_config.get_dedup_for_click()
                     elif routed_task.capture_trigger == CaptureTrigger.APP_SWITCH:
-                        should_check_simhash = settings.simhash_enabled_for_app_switch
+                        should_check_simhash = runtime_config.get_dedup_for_app_switch()
                     else:
                         should_check_simhash = False
 
@@ -1277,7 +1327,7 @@ class ScreenRecorder:
                             is_similar_frame = self._phash_cache.is_similar_to_cache(
                                 routed_task.target_device_name,
                                 phash_value,
-                                threshold=settings.simhash_dedup_threshold,
+                                threshold=runtime_config.get_dedup_threshold(),
                             )
 
                             if is_similar_frame:
@@ -1286,7 +1336,7 @@ class ScreenRecorder:
                                 logger.info(
                                     "MRV3 phash_dropped device=%s threshold=%d trigger=%s phash=%s",
                                     routed_task.target_device_name,
-                                    settings.simhash_dedup_threshold,
+                                    runtime_config.get_dedup_threshold(),
                                     routed_task.capture_trigger.value,
                                     phash_value,
                                 )
