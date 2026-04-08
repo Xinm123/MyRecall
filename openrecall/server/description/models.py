@@ -10,38 +10,40 @@ class FrameDescription(BaseModel):
 
     narrative: str = Field(
         ...,
-        max_length=512,
-        description="Detailed natural language description of the screen content and user intent",
-    )
-    entities: List[str] = Field(
-        default_factory=list,
-        description="Key entities extracted from the frame (max 10 items)",
-    )
-    intent: str = Field(
-        ...,
-        description="User intent in natural language phrase (e.g., 'authenticating to GitHub')",
+        max_length=1024,
+        description="Detailed natural language description of screen content and user activity",
     )
     summary: str = Field(
         ...,
-        max_length=200,
-        description="One-sentence summary (max 200 chars / ~50 words)",
+        max_length=256,
+        description="One-sentence summary capturing the key activity",
+    )
+    tags: List[str] = Field(
+        default_factory=list,
+        min_length=0,
+        max_length=10,
+        description="3-8 lowercase keywords describing the activity (max 10 items)",
     )
 
-    @field_validator("entities")
+    @field_validator("tags")
     @classmethod
-    def entities_max_length(cls, v: List[str]) -> List[str]:
+    def tags_max_length(cls, v: List[str]) -> List[str]:
         if len(v) > 10:
             return v[:10]
         return v
+
+    @field_validator("tags")
+    @classmethod
+    def tags_lowercase(cls, v: List[str]) -> List[str]:
+        return [tag.lower().strip() for tag in v if tag.strip()]
 
     def to_db_dict(self) -> dict:
         """Convert to dict for database insertion."""
         import json
         return {
             "narrative": self.narrative,
-            "entities_json": json.dumps(self.entities),
-            "intent": self.intent,
             "summary": self.summary,
+            "tags_json": json.dumps(self.tags),
         }
 
 
