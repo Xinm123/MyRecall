@@ -1260,17 +1260,11 @@
                     <div style="font-size: 13px; line-height: 1.7; color: var(--text-primary);" x-text="selectedEntry.description.narrative"></div>
                   </div>
 
-                  <!-- Intent Section -->
-                  <div class="metadata-section" x-show="selectedEntry?.description?.intent">
-                    <h3>Intent</h3>
-                    <div class="metadata-value" style="font-style: italic;" x-text="selectedEntry.description.intent"></div>
-                  </div>
-
-                  <!-- Entities Section -->
-                  <div class="metadata-section" x-show="selectedEntry?.description?.entities?.length">
-                    <h3>Entities</h3>
+                  <!-- Tags Section -->
+                  <div class="metadata-section" x-show="selectedEntry?.description?.tags?.length">
+                    <h3>Tags</h3>
                     <div style="display: flex; flex-wrap: wrap; gap: 8px;">
-                      <template x-for="entity in selectedEntry.description.entities" :key="entity">
+                      <template x-for="tag in selectedEntry.description.tags" :key="tag">
                         <span style="
                           display: inline-flex;
                           align-items: center;
@@ -1280,7 +1274,7 @@
                           border-radius: 12px;
                           font-size: 12px;
                           font-weight: 500;
-                        " x-text="entity"></span>
+                        " x-text="tag"></span>
                       </template>
                     </div>
                   </div>
