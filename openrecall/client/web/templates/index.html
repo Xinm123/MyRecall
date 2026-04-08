@@ -1117,7 +1117,7 @@
                   <div class="meta-row" x-show="entry.browser_url">
                     <span class="meta-icon">🔗</span>
                     <a class="browser-url" :href="entry.browser_url" target="_blank" rel="noopener"
-                       x-text="entry.browser_url.length > 40 ? entry.browser_url.substring(0, 40) + '...' : entry.browser_url"
+                       x-text="(entry.browser_url || '').length > 40 ? entry.browser_url.substring(0, 40) + '...' : entry.browser_url"
                        :title="entry.browser_url"
                     ></a>
                   </div>
