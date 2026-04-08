@@ -76,7 +76,11 @@ def vendor(filename):
 def screenshots(filename):
     """Proxy screenshots requests to Edge server (served at /v1/frames/)."""
     import requests
-    edge_url = f"{settings.edge_base_url}/v1/frames/{filename}"
+    # Use database setting first (hot-reload), fallback to TOML config
+    store = _get_settings_store()
+    db_edge_url = store.get("edge_base_url")
+    edge_base = db_edge_url if db_edge_url else settings.edge_base_url
+    edge_url = f"{edge_base}/v1/frames/{filename}"
     try:
         resp = requests.get(edge_url, timeout=5)
         from flask import Response

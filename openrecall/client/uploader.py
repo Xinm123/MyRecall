@@ -4,6 +4,8 @@ import logging
 import io
 import json
 import time
+from pathlib import Path
+from typing import Optional, Any
 
 import numpy as np
 import requests
@@ -17,12 +19,44 @@ logger = logging.getLogger(__name__)
 
 ImageArray = NDArray[np.uint8]
 
+# Settings store for hot-reload support
+_settings_store: Optional[Any] = None
+
+
+def _get_settings_store():
+    """Get or create the settings store singleton."""
+    global _settings_store
+    if _settings_store is None:
+        from openrecall.client.database import ClientSettingsStore
+
+        db_path = Path(settings.client_data_dir) / "client.db"
+        _settings_store = ClientSettingsStore(db_path)
+    return _settings_store
+
+
+def _get_api_url() -> str:
+    """Get the API URL, preferring runtime settings over TOML config.
+
+    Checks ClientSettingsStore first (for hot-reload), falls back to TOML settings.
+    """
+    store = _get_settings_store()
+
+    # Try to get edge_base_url from database first (user may have updated it)
+    db_url = store.get("edge_base_url", "").strip()
+    if db_url:
+        # edge_base_url is base URL like http://localhost:8083
+        # Return the /api endpoint
+        return f"{db_url.rstrip('/')}/api"
+
+    # Fall back to TOML config
+    return settings.api_url
+
 
 class HTTPUploader:
     """HTTP client for uploading screenshots to the OpenRecall server.
 
     Attributes:
-        api_url: Base URL for the API endpoints.
+        _api_url_override: Optional override for the API URL.
         timeout: Request timeout in seconds.
     """
 
@@ -33,8 +67,15 @@ class HTTPUploader:
             api_url: Override the default API URL from settings.
             timeout: Request timeout in seconds. Defaults to settings.upload_timeout.
         """
-        self.api_url: str = api_url or settings.api_url
+        self._api_url_override: str | None = api_url
         self.timeout: int = timeout or settings.upload_timeout
+
+    @property
+    def api_url(self) -> str:
+        """Get the current API URL, checking for runtime updates."""
+        if self._api_url_override:
+            return self._api_url_override
+        return _get_api_url()
 
     def health_check(self) -> bool:
         """Check if the server is healthy.

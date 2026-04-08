@@ -6,10 +6,12 @@ import threading
 import time
 import urllib.parse
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Optional
 
 import requests
 
+from openrecall.client.database import ClientSettingsStore
 from openrecall.client.spool import SpoolItem, SpoolQueue, get_spool
 from openrecall.shared.config import settings
 from openrecall.shared.utils import _build_request_kwargs
@@ -20,6 +22,18 @@ _INGEST_TIMEOUT = 30
 _BACKOFF_BASE = 1
 _BACKOFF_MAX = 60
 
+# Settings store for hot-reload support
+_settings_store: Optional[ClientSettingsStore] = None
+
+
+def _get_settings_store() -> ClientSettingsStore:
+    """Get or create the settings store singleton."""
+    global _settings_store
+    if _settings_store is None:
+        db_path = Path(settings.client_data_dir) / "client.db"
+        _settings_store = ClientSettingsStore(db_path)
+    return _settings_store
+
 
 @dataclass
 class UploadResult:
@@ -29,6 +43,20 @@ class UploadResult:
 
 
 def _ingest_url() -> str:
+    """Get the ingest URL, preferring runtime settings over TOML config.
+
+    Checks ClientSettingsStore first (for hot-reload), falls back to TOML settings.
+    """
+    store = _get_settings_store()
+
+    # Try to get edge_base_url from database first (user may have updated it)
+    db_url = store.get("edge_base_url", "").strip()
+    if db_url:
+        # edge_base_url is base URL like http://localhost:8083
+        base = db_url.rstrip("/")
+        return f"{base}/v1/ingest"
+
+    # Fall back to TOML config
     base = settings.api_url.rstrip("/")
     if base.endswith("/api"):
         base = base[: -len("/api")]

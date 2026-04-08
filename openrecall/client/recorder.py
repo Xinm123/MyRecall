@@ -57,6 +57,28 @@ from openrecall.shared.utils import (
 logger = logging.getLogger(__name__)
 
 
+def _get_api_url() -> str:
+    """Get the API URL, preferring runtime settings over TOML config.
+
+    Checks ClientSettingsStore first (for hot-reload), falls back to TOML settings.
+    """
+    from pathlib import Path
+    from openrecall.client.database import ClientSettingsStore
+
+    db_path = Path(settings.client_data_dir) / "client.db"
+    store = ClientSettingsStore(db_path)
+
+    # Try to get edge_base_url from database first (user may have updated it)
+    db_url = store.get("edge_base_url", "").strip()
+    if db_url:
+        # edge_base_url is base URL like http://localhost:8083
+        # Return the /api endpoint
+        return f"{db_url.rstrip('/')}/api"
+
+    # Fall back to TOML config
+    return settings.api_url
+
+
 class HeartbeatThread(threading.Thread):
     """Independent background thread that sends heartbeat to server.
 
@@ -98,7 +120,7 @@ class HeartbeatThread(threading.Thread):
 
     def _send_heartbeat(self) -> None:
         """Build payload, POST to /heartbeat, update config from response."""
-        url = f"{settings.api_url.rstrip('/')}/heartbeat"
+        url = f"{_get_api_url().rstrip('/')}/heartbeat"
 
         # Build snapshot of recorder state (thread-safe reads)
         payload: dict[str, object] = {}
