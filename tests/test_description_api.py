@@ -46,3 +46,38 @@ class TestDescriptionAPI:
         data = response.get_json()
         assert "descriptions" in data
         assert isinstance(data["descriptions"], list)
+
+    def test_frame_context_returns_new_description_format(self, flask_client, flask_app):
+        """Test that /v1/frames/<id>/context returns tags instead of entities/intent."""
+        flask_app.config["TESTING"] = True
+        response = flask_client.get("/v1/frames/1/context")
+        # Skip if frame doesn't exist (404) - we just verify the format when description exists
+        if response.status_code == 404:
+            pytest.skip("Frame 1 not found in test database")
+        assert response.status_code == 200
+        data = response.get_json()
+
+        if data.get("description"):
+            desc = data["description"]
+            assert "narrative" in desc
+            assert "summary" in desc
+            assert "tags" in desc
+            assert isinstance(desc["tags"], list)
+            assert "entities" not in desc
+            assert "intent" not in desc
+
+    def test_activity_summary_returns_new_format(self, flask_client, flask_app):
+        """Test that /v1/activity-summary returns tags instead of intent."""
+        flask_app.config["TESTING"] = True
+        response = flask_client.get(
+            "/v1/activity-summary?start_time=2026-01-01T00:00:00Z&end_time=2027-01-01T00:00:00Z"
+        )
+        assert response.status_code == 200
+        data = response.get_json()
+
+        if data.get("descriptions"):
+            for desc in data["descriptions"]:
+                assert "summary" in desc
+                assert "tags" in desc
+                assert isinstance(desc["tags"], list)
+                assert "intent" not in desc

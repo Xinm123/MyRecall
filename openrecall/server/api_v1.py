@@ -707,9 +707,8 @@ def get_frame_context(frame_id: int):
                 if desc_row:
                     description = {
                         "narrative": desc_row["narrative"],
-                        "entities": desc_row["entities"],
-                        "intent": desc_row["intent"],
                         "summary": desc_row["summary"],
+                        "tags": desc_row["tags"],
                     }
     except Exception as e:
         logger.warning(f"Failed to get description for frame {frame_id}: {e}")
