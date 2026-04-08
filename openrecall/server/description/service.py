@@ -72,9 +72,8 @@ class DescriptionService:
             conn,
             frame_id=frame_id,
             narrative=db_dict["narrative"],
-            entities_json=db_dict["entities_json"],
-            intent=db_dict["intent"],
             summary=db_dict["summary"],
+            tags_json=db_dict["tags_json"],
             description_model=model_name,
         )
 
