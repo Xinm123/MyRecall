@@ -520,15 +520,25 @@ git commit -m "feat(settings): add debounce and stats sections with sec/ms conve
 
 ## Spec Coverage Check
 
-- [ ] `settings_store.py` DEFAULTS — Task 1 ✓
-- [ ] `runtime_config.py` getters — Task 2 ✓
-- [ ] `settings.py` validation — Task 3 ✓
-- [ ] `recorder.py` hot-reload — Task 4 ✓
-- [ ] `settings.html` UI + unit conversion — Task 5 ✓
+- [x] `settings_store.py` DEFAULTS — Task 1 ✅ (commit `b7468c3`)
+- [x] `runtime_config.py` getters — Task 2 ✅ (commit `b1c3534`)
+- [x] `settings.py` validation — Task 3 ✅ (commit `ae0d0ea`)
+- [x] `recorder.py` hot-reload — Task 4 ✅ (commit `79478fa`)
+- [x] `settings.html` UI + unit conversion — Task 5 ✅ (commit `0a87596`)
+- [x] UI improvements (exceeded plan) — commits `dbae168`, `eccc308`
 
-## Self-Review
+## Implementation Notes (Exceed Plan)
 
-- No placeholders or TBDs
-- Function names in later tasks match earlier task definitions (`get_stats_interval_sec`, `get_debounce_*_ms`)
-- No contradictions with the spec
-- All 5 spec requirements mapped to tasks
+The following improvements were made beyond the original plan and are intentional:
+
+1. **UI Layout**: Changed from horizontal 3-column grid to **vertical stacked rows** with range+number dual-input for each field, per user feedback.
+2. **Range sliders**: Added `<input type="range">` synced with the number input for better UX.
+3. **Unit labels**: Added `"sec"` suffix to all number inputs (not just idle interval) for clarity.
+4. **toFixed(1)**: `debounce_idle_sec` uses `toFixed(1)` for consistency with other debounce fields (plan had `toFixed(0)`).
+
+## Hot-Reload Scope
+
+| Setting | Hot-Reload Support | Notes |
+|---------|-------------------|-------|
+| `stats.interval_sec` | ✅ Yes | Refreshed every timer tick in recorder |
+| `debounce.*` params | ❌ No | Set at recorder `__init__`; requires client restart to take effect |
