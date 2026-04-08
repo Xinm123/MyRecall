@@ -11,6 +11,7 @@ Settings are stored in client.db within the client data directory
 from __future__ import annotations
 
 import logging
+import threading
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -183,3 +184,104 @@ def get_stats_interval_sec() -> int:
 
     from openrecall.shared.config import settings
     return settings.stats_interval_sec
+
+
+def get_dedup_enabled() -> bool:
+    """Priority: SQLite runtime > TOML (dedup.enabled) > True"""
+    store = _get_store()
+    if store is not None:
+        value = store.get("dedup.enabled", "")
+        if value:
+            return value.lower() == "true"
+    from openrecall.shared.config import settings
+    return settings.simhash_dedup_enabled
+
+
+def get_dedup_threshold() -> int:
+    """Priority: SQLite runtime > TOML (dedup.threshold) > 10"""
+    store = _get_store()
+    if store is not None:
+        value = store.get("dedup.threshold", "")
+        if value:
+            return int(value)
+    from openrecall.shared.config import settings
+    return settings.simhash_dedup_threshold
+
+
+def get_dedup_ttl_seconds() -> float:
+    """Priority: SQLite runtime > TOML (dedup.ttl_seconds) > 60.0"""
+    store = _get_store()
+    if store is not None:
+        value = store.get("dedup.ttl_seconds", "")
+        if value:
+            return float(value)
+    from openrecall.shared.config import settings
+    return settings.simhash_ttl_seconds
+
+
+def get_dedup_cache_size() -> int:
+    """Priority: SQLite runtime > TOML (dedup.cache_size_per_device) > 1"""
+    store = _get_store()
+    if store is not None:
+        value = store.get("dedup.cache_size_per_device", "")
+        if value:
+            return int(value)
+    from openrecall.shared.config import settings
+    return settings.simhash_cache_size_per_device
+
+
+def get_dedup_for_click() -> bool:
+    """Priority: SQLite runtime > TOML (dedup.for_click) > True"""
+    store = _get_store()
+    if store is not None:
+        value = store.get("dedup.for_click", "")
+        if value:
+            return value.lower() == "true"
+    from openrecall.shared.config import settings
+    return settings.simhash_enabled_for_click
+
+
+def get_dedup_for_app_switch() -> bool:
+    """Priority: SQLite runtime > TOML (dedup.for_app_switch) > False"""
+    store = _get_store()
+    if store is not None:
+        value = store.get("dedup.for_app_switch", "")
+        if value:
+            return value.lower() == "true"
+    from openrecall.shared.config import settings
+    return settings.simhash_enabled_for_app_switch
+
+
+def get_dedup_force_after_skip_sec() -> int:
+    """Priority: SQLite runtime > TOML (dedup.force_after_skip_seconds) > 30"""
+    store = _get_store()
+    if store is not None:
+        value = store.get("dedup.force_after_skip_seconds", "")
+        if value:
+            return int(value)
+    from openrecall.shared.config import settings
+    return settings.max_skip_duration_sec
+
+
+_config_change_event = threading.Event()
+
+
+def notify_config_changed() -> None:
+    """Call after saving settings to SQLite. Wakes the config listener.
+
+    Leaves the event in SET state — the listener clears it after processing.
+    This prevents race conditions where notify fires while listener is
+    between wait() and the set() call.
+    """
+    _config_change_event.set()
+
+
+def wait_for_config_change(timeout: float | None = None) -> None:
+    """Block until config changed event is set, then clear and return.
+
+    Caller must call notify_config_changed() to set the event again
+    for subsequent notifications.
+    """
+    _config_change_event.wait(timeout=timeout)
+    if _config_change_event.is_set():
+        _config_change_event.clear()

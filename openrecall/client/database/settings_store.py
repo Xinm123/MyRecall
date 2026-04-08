@@ -3,7 +3,6 @@
 import logging
 import sqlite3
 from pathlib import Path
-from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -26,6 +25,13 @@ class ClientSettingsStore:
         "debounce.capture_ms": "3000",
         "debounce.idle_interval_ms": "60000",
         "stats.interval_sec": "120",
+        "dedup.enabled": "true",
+        "dedup.threshold": "10",
+        "dedup.ttl_seconds": "60.0",
+        "dedup.cache_size_per_device": "1",
+        "dedup.for_click": "true",
+        "dedup.for_app_switch": "false",
+        "dedup.force_after_skip_seconds": "30",
     }
 
     def __init__(self, db_path: Path):
