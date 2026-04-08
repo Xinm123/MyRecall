@@ -280,6 +280,26 @@
     color: var(--text-secondary);
     font-weight: 500;
   }
+
+  .settings-section .inline-fields {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+
+  .settings-section .inline-fields .form-group {
+    margin-bottom: 0;
+  }
+
+  .settings-section .inline-fields-3 {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 16px;
+  }
+
+  .settings-section .inline-fields-3 .form-group {
+    margin-bottom: 0;
+  }
 </style>
 {% endblock %}
 
@@ -369,6 +389,97 @@
     </div>
   </div>
 
+  <div class="settings-section">
+    <h2>Debounce</h2>
+
+    <div class="inline-fields-3" style="margin-bottom: 16px;">
+      <div class="form-group">
+        <label class="form-label" for="debounce_click_sec">Click</label>
+        <span class="form-label-description">Suppress rapid clicks (sec)</span>
+        <input
+          type="number"
+          id="debounce_click_sec"
+          class="form-input"
+          x-model="settings.debounce_click_sec"
+          min="0"
+          max="60"
+          step="0.1"
+          style="width: 100%;"
+        >
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="debounce_trigger_sec">Trigger</label>
+        <span class="form-label-description">Suppress rapid app switches (sec)</span>
+        <input
+          type="number"
+          id="debounce_trigger_sec"
+          class="form-input"
+          x-model="settings.debounce_trigger_sec"
+          min="0"
+          max="60"
+          step="0.1"
+          style="width: 100%;"
+        >
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="debounce_capture_sec">Capture</label>
+        <span class="form-label-description">Global min interval (sec)</span>
+        <input
+          type="number"
+          id="debounce_capture_sec"
+          class="form-input"
+          x-model="settings.debounce_capture_sec"
+          min="0"
+          max="60"
+          step="0.1"
+          style="width: 100%;"
+        >
+      </div>
+    </div>
+
+    <div class="form-group" style="max-width: 200px;">
+      <label class="form-label" for="debounce_idle_sec">Idle Interval</label>
+      <span class="form-label-description">Background capture fallback (sec)</span>
+      <input
+        type="number"
+        id="debounce_idle_sec"
+        class="form-input"
+        x-model="settings.debounce_idle_sec"
+        min="10"
+        max="600"
+        step="1"
+        style="width: 100%;"
+      >
+      <div class="current-value">
+        Capture when idle for <code x-text="settings.debounce_idle_sec">60</code> seconds
+      </div>
+    </div>
+  </div>
+
+  <div class="settings-section">
+    <h2>Stats</h2>
+
+    <div class="form-group" style="max-width: 200px;">
+      <label class="form-label" for="stats_interval_sec">Reporting Interval</label>
+      <span class="form-label-description">How often to log capture statistics (sec)</span>
+      <input
+        type="number"
+        id="stats_interval_sec"
+        class="form-input"
+        x-model="settings.stats_interval_sec"
+        min="10"
+        max="3600"
+        step="1"
+        style="width: 100%;"
+      >
+      <div class="current-value">
+        Current: <code x-text="originalSettings.stats_interval_sec + ' seconds'">120 seconds</code>
+      </div>
+    </div>
+  </div>
+
   <div class="btn-group">
     <button class="btn btn-primary" @click="saveSettings()" :disabled="!hasChanges() || saving">
       <span x-show="!saving">Save Changes</span>
@@ -391,12 +502,24 @@
       settings: {
         edge_base_url: '',
         capture_save_local_copies: 'false',
-        capture_permission_poll_sec: '10'
+        capture_permission_poll_sec: '10',
+        // Debounce — displayed as seconds, stored as ms
+        debounce_click_sec: '3.0',
+        debounce_trigger_sec: '3.0',
+        debounce_capture_sec: '3.0',
+        debounce_idle_sec: '60',
+        // Stats
+        stats_interval_sec: '120'
       },
       originalSettings: {
         edge_base_url: '',
         capture_save_local_copies: 'false',
-        capture_permission_poll_sec: '10'
+        capture_permission_poll_sec: '10',
+        debounce_click_sec: '3.0',
+        debounce_trigger_sec: '3.0',
+        debounce_capture_sec: '3.0',
+        debounce_idle_sec: '60',
+        stats_interval_sec: '120'
       },
       testStatus: null, // null | 'testing' | 'success' | 'error'
       testError: '',
@@ -422,6 +545,18 @@
             this.originalSettings.capture_save_local_copies = data.capture_save_local_copies || 'false';
             this.settings.capture_permission_poll_sec = data.capture_permission_poll_sec || '10';
             this.originalSettings.capture_permission_poll_sec = data.capture_permission_poll_sec || '10';
+            // Debounce: convert ms to seconds for display
+            this.settings.debounce_click_sec = (parseInt(data['debounce.click_ms'] || '3000') / 1000).toFixed(1);
+            this.originalSettings.debounce_click_sec = this.settings.debounce_click_sec;
+            this.settings.debounce_trigger_sec = (parseInt(data['debounce.trigger_ms'] || '3000') / 1000).toFixed(1);
+            this.originalSettings.debounce_trigger_sec = this.settings.debounce_trigger_sec;
+            this.settings.debounce_capture_sec = (parseInt(data['debounce.capture_ms'] || '3000') / 1000).toFixed(1);
+            this.originalSettings.debounce_capture_sec = this.settings.debounce_capture_sec;
+            this.settings.debounce_idle_sec = (parseInt(data['debounce.idle_interval_ms'] || '60000') / 1000).toFixed(0);
+            this.originalSettings.debounce_idle_sec = this.settings.debounce_idle_sec;
+            // Stats
+            this.settings.stats_interval_sec = data['stats.interval_sec'] || '120';
+            this.originalSettings.stats_interval_sec = this.settings.stats_interval_sec;
           } else {
             this.showToast('Failed to load settings', 'error');
           }
@@ -434,7 +569,12 @@
       hasChanges() {
         return this.settings.edge_base_url !== this.originalSettings.edge_base_url ||
                this.settings.capture_save_local_copies !== this.originalSettings.capture_save_local_copies ||
-               this.settings.capture_permission_poll_sec !== this.originalSettings.capture_permission_poll_sec;
+               this.settings.capture_permission_poll_sec !== this.originalSettings.capture_permission_poll_sec ||
+               this.settings.debounce_click_sec !== this.originalSettings.debounce_click_sec ||
+               this.settings.debounce_trigger_sec !== this.originalSettings.debounce_trigger_sec ||
+               this.settings.debounce_capture_sec !== this.originalSettings.debounce_capture_sec ||
+               this.settings.debounce_idle_sec !== this.originalSettings.debounce_idle_sec ||
+               this.settings.stats_interval_sec !== this.originalSettings.stats_interval_sec;
       },
 
       async testConnection() {
@@ -468,10 +608,20 @@
         this.saving = true;
 
         try {
+          const payload = {
+            edge_base_url: this.settings.edge_base_url,
+            capture_save_local_copies: this.settings.capture_save_local_copies,
+            capture_permission_poll_sec: this.settings.capture_permission_poll_sec,
+            'debounce.click_ms': String(Math.round(parseFloat(this.settings.debounce_click_sec) * 1000)),
+            'debounce.trigger_ms': String(Math.round(parseFloat(this.settings.debounce_trigger_sec) * 1000)),
+            'debounce.capture_ms': String(Math.round(parseFloat(this.settings.debounce_capture_sec) * 1000)),
+            'debounce.idle_interval_ms': String(Math.round(parseFloat(this.settings.debounce_idle_sec) * 1000)),
+            'stats.interval_sec': String(parseInt(this.settings.stats_interval_sec)),
+          };
           const response = await fetch('/api/client/settings', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(this.settings)
+            body: JSON.stringify(payload)
           });
 
           if (response.ok) {
@@ -479,6 +629,12 @@
             this.originalSettings.edge_base_url = data.edge_base_url || '';
             this.originalSettings.capture_save_local_copies = data.capture_save_local_copies || 'false';
             this.originalSettings.capture_permission_poll_sec = data.capture_permission_poll_sec || '10';
+            // Sync originalSettings
+            this.originalSettings.debounce_click_sec = this.settings.debounce_click_sec;
+            this.originalSettings.debounce_trigger_sec = this.settings.debounce_trigger_sec;
+            this.originalSettings.debounce_capture_sec = this.settings.debounce_capture_sec;
+            this.originalSettings.debounce_idle_sec = this.settings.debounce_idle_sec;
+            this.originalSettings.stats_interval_sec = this.settings.stats_interval_sec;
 
             // Update global EDGE_BASE_URL for hot reload
             window.EDGE_BASE_URL = this.settings.edge_base_url || window.EDGE_BASE_URL;
@@ -488,7 +644,12 @@
               detail: {
                 edge_base_url: this.settings.edge_base_url,
                 capture_save_local_copies: this.settings.capture_save_local_copies,
-                capture_permission_poll_sec: this.settings.capture_permission_poll_sec
+                capture_permission_poll_sec: this.settings.capture_permission_poll_sec,
+                'debounce.click_ms': String(Math.round(parseFloat(this.settings.debounce_click_sec) * 1000)),
+                'debounce.trigger_ms': String(Math.round(parseFloat(this.settings.debounce_trigger_sec) * 1000)),
+                'debounce.capture_ms': String(Math.round(parseFloat(this.settings.debounce_capture_sec) * 1000)),
+                'debounce.idle_interval_ms': String(Math.round(parseFloat(this.settings.debounce_idle_sec) * 1000)),
+                'stats.interval_sec': String(parseInt(this.settings.stats_interval_sec)),
               }
             }));
 
@@ -525,6 +686,16 @@
             this.originalSettings.capture_save_local_copies = data.capture_save_local_copies || 'false';
             this.settings.capture_permission_poll_sec = data.capture_permission_poll_sec || '10';
             this.originalSettings.capture_permission_poll_sec = data.capture_permission_poll_sec || '10';
+            this.settings.debounce_click_sec = (parseInt(data['debounce.click_ms'] || '3000') / 1000).toFixed(1);
+            this.originalSettings.debounce_click_sec = this.settings.debounce_click_sec;
+            this.settings.debounce_trigger_sec = (parseInt(data['debounce.trigger_ms'] || '3000') / 1000).toFixed(1);
+            this.originalSettings.debounce_trigger_sec = this.settings.debounce_trigger_sec;
+            this.settings.debounce_capture_sec = (parseInt(data['debounce.capture_ms'] || '3000') / 1000).toFixed(1);
+            this.originalSettings.debounce_capture_sec = this.settings.debounce_capture_sec;
+            this.settings.debounce_idle_sec = (parseInt(data['debounce.idle_interval_ms'] || '60000') / 1000).toFixed(0);
+            this.originalSettings.debounce_idle_sec = this.settings.debounce_idle_sec;
+            this.settings.stats_interval_sec = data['stats.interval_sec'] || '120';
+            this.originalSettings.stats_interval_sec = this.settings.stats_interval_sec;
 
             // Update global EDGE_BASE_URL
             window.EDGE_BASE_URL = data.edge_base_url || window.EDGE_BASE_URL;
@@ -534,7 +705,12 @@
               detail: {
                 edge_base_url: data.edge_base_url,
                 capture_save_local_copies: data.capture_save_local_copies,
-                capture_permission_poll_sec: data.capture_permission_poll_sec
+                capture_permission_poll_sec: data.capture_permission_poll_sec,
+                'debounce.click_ms': data['debounce.click_ms'],
+                'debounce.trigger_ms': data['debounce.trigger_ms'],
+                'debounce.capture_ms': data['debounce.capture_ms'],
+                'debounce.idle_interval_ms': data['debounce.idle_interval_ms'],
+                'stats.interval_sec': data['stats.interval_sec'],
               }
             }));
 
