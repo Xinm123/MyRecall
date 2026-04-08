@@ -21,6 +21,11 @@ class ClientSettingsStore:
         "edge_base_url": "",
         "capture_save_local_copies": "false",
         "capture_permission_poll_sec": "10",
+        "debounce.click_ms": "3000",
+        "debounce.trigger_ms": "3000",
+        "debounce.capture_ms": "3000",
+        "debounce.idle_interval_ms": "60000",
+        "stats.interval_sec": "120",
     }
 
     def __init__(self, db_path: Path):
