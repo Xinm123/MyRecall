@@ -18,12 +18,22 @@ from openrecall.shared.config import settings
 
 logger = logging.getLogger(__name__)
 
-
 _PROMPT_TEXT = (
-    "Analyze this screenshot. Output a strictly valid JSON object:\n"
-    '{"narrative": "detailed description (max 512 chars)", "entities": ["entity1"], '
-    '"intent": "user intent phrase", "summary": "one sentence (max 200 chars)"}'
+    'Output a strictly valid JSON object:\n'
+    '{"narrative": "detailed description (max 1024 chars)", '
+    '"summary": "one sentence (max 256 chars)", '
+    '"tags": ["keyword1", "keyword2", ...]}  // 3-8 lowercase keywords'
 )
+
+# Add example output
+_EXAMPLE_OUTPUT = '''
+Example output:
+{
+  "narrative": "User is browsing GitHub repository page showing README content with project description and installation instructions.",
+  "summary": "Browsing GitHub repository README",
+  "tags": ["github", "repository", "readme", "browsing", "documentation"]
+}
+'''
 
 
 class OpenAIDescriptionProvider(DescriptionProvider):
@@ -35,7 +45,6 @@ class OpenAIDescriptionProvider(DescriptionProvider):
     ) -> None:
         if not model_name:
             raise DescriptionProviderConfigError("model_name is required")
-        # api_key can be empty for local vLLM without auth
         self.api_key = api_key.strip() if api_key else ""
         self.model_name = model_name.strip()
         self.api_base = _normalize_api_base(api_base or "https://api.openai.com/v1")
@@ -58,21 +67,24 @@ class OpenAIDescriptionProvider(DescriptionProvider):
         ctx_str = " | ".join(ctx_parts) if ctx_parts else "unknown"
 
         url = f"{self.api_base}/chat/completions"
-        headers = {
-            "Content-Type": "application/json",
-        }
+        headers = {"Content-Type": "application/json"}
         if self.api_key:
             headers["Authorization"] = f"Bearer {self.api_key}"
+
+        prompt_content = (
+            f"Analyze this screenshot. App context: {ctx_str}.\n"
+            f"{_PROMPT_TEXT}\n"
+            f"{_EXAMPLE_OUTPUT}\n"
+            "IMPORTANT: Output only valid JSON. No markdown, no explanation."
+        )
+
         payload = {
             "model": self.model_name,
             "messages": [
                 {
                     "role": "user",
                     "content": [
-                        {
-                            "type": "text",
-                            "text": f"Analyze this screenshot. App context: {ctx_str}.\n{_PROMPT_TEXT}",
-                        },
+                        {"type": "text", "text": prompt_content},
                         {
                             "type": "image_url",
                             "image_url": {"url": f"data:image/png;base64,{encoded}"},
@@ -111,35 +123,40 @@ class OpenAIDescriptionProvider(DescriptionProvider):
             if isinstance(parsed, dict):
                 original_narrative = parsed.get("narrative", "")
                 original_summary = parsed.get("summary", "")
-                narrative = original_narrative[:512]  # Truncate to max length
-                summary = original_summary[:200]  # Truncate to max length
+                tags = parsed.get("tags", [])
 
-                # Log truncation warnings
-                if len(original_narrative) > 512:
-                    logger.warning(f"Narrative truncated from {len(original_narrative)} to 512 chars")
-                if len(original_summary) > 200:
-                    logger.warning(f"Summary truncated from {len(original_summary)} to 200 chars")
+                narrative = original_narrative[:1024]
+                summary = original_summary[:256]
 
-                logger.info(f"Description generated in {elapsed:.2f}s: {len(narrative)} chars, {len(parsed.get('entities', []))} entities")
+                if len(original_narrative) > 1024:
+                    logger.warning(f"Narrative truncated from {len(original_narrative)} to 1024 chars")
+                if len(original_summary) > 256:
+                    logger.warning(f"Summary truncated from {len(original_summary)} to 256 chars")
+
+                # Normalize tags
+                if isinstance(tags, list):
+                    tags = [str(t).lower().strip() for t in tags if t]
+                    tags = tags[:10]  # Max 10 tags
+                else:
+                    tags = []
+
+                logger.info(f"Description generated in {elapsed:.2f}s: {len(narrative)} chars, {len(tags)} tags")
                 return FrameDescription(
                     narrative=narrative,
-                    entities=parsed.get("entities", []),
-                    intent=parsed.get("intent", ""),
                     summary=summary,
+                    tags=tags,
                 )
         except Exception:
             pass
 
         logger.warning(f"Failed to parse JSON from OpenAIDescriptionProvider. Raw: {raw[:100]}...")
-        # Truncate raw text for fallback
-        fallback_narrative = raw[:512]
-        fallback_summary = raw[:200]
-        if len(raw) > 512:
-            logger.warning(f"Fallback narrative truncated from {len(raw)} to 512 chars")
+        fallback_narrative = raw[:1024]
+        fallback_summary = raw[:256]
+        if len(raw) > 1024:
+            logger.warning(f"Fallback narrative truncated from {len(raw)} to 1024 chars")
         logger.info(f"Description generated (fallback) in {elapsed:.2f}s: {len(fallback_narrative)} chars")
         return FrameDescription(
             narrative=fallback_narrative,
-            entities=[],
-            intent="",
             summary=fallback_summary,
+            tags=[],
         )
