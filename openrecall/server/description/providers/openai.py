@@ -136,6 +136,7 @@ class OpenAIDescriptionProvider(DescriptionProvider):
                 # Normalize tags
                 if isinstance(tags, list):
                     tags = [str(t).lower().strip() for t in tags if t]
+                    tags = [t for t in tags if t]  # Filter out empty strings after strip
                     tags = tags[:10]  # Max 10 tags
                 else:
                     tags = []
