@@ -297,12 +297,16 @@ def notify_config_changed() -> None:
     _config_change_event.set()
 
 
-def wait_for_config_change(timeout: float | None = None) -> None:
+def wait_for_config_change(timeout: float | None = None) -> bool:
     """Block until config changed event is set, then clear and return.
 
     Caller must call notify_config_changed() to set the event again
     for subsequent notifications.
+
+    Returns:
+        True if event was set (config changed), False if timeout expired
     """
-    _config_change_event.wait(timeout=timeout)
-    if _config_change_event.is_set():
+    triggered = _config_change_event.wait(timeout=timeout)
+    if triggered:
         _config_change_event.clear()
+    return triggered

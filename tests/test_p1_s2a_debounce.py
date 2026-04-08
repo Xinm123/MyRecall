@@ -8,7 +8,6 @@ from pathlib import Path
 import pytest
 
 from openrecall.client.events.base import CaptureTrigger, TriggerEvent
-from openrecall.client.recorder import ScreenRecorder
 from openrecall.server import __main__ as server_main
 
 
@@ -147,30 +146,47 @@ def test_debounce_violation_count_detects_sub_interval_same_device_samples(
 
 @pytest.mark.unit
 def test_manual_and_idle_share_the_same_debounce_gate() -> None:
-    recorder = ScreenRecorder()
+    # Must set ClientSettings BEFORE importing ScreenRecorder
+    # (recorder imports settings at module level)
+    import openrecall.shared.config
+    from openrecall.client.config_client import ClientSettings
 
-    accepted_manual = recorder.emit_manual_trigger(
-        device_name="monitor_1",
-        now_ms=1000,
-        event_ts="2026-03-10T00:00:00Z",
-    )
-    accepted_idle = recorder._emit_trigger(
-        TriggerEvent(
-            capture_trigger=CaptureTrigger.IDLE,
-            device_name="monitor_1",
-            event_ts="2026-03-10T00:00:00.500Z",
-        ),
-        now_ms=1500,
-    )
-    accepted_idle_after_window = recorder._emit_trigger(
-        TriggerEvent(
-            capture_trigger=CaptureTrigger.IDLE,
-            device_name="monitor_1",
-            event_ts="2026-03-10T00:00:03.100Z",
-        ),
-        now_ms=3100,
-    )
+    # Save original and set ClientSettings
+    original_settings = openrecall.shared.config.settings
+    openrecall.shared.config.settings = ClientSettings._from_dict({})
 
-    assert accepted_manual is True
-    assert accepted_idle is False
-    assert accepted_idle_after_window is True
+    try:
+        # Import after settings is set
+        from openrecall.client.recorder import ScreenRecorder
+
+        recorder = ScreenRecorder()
+
+        accepted_manual = recorder.emit_manual_trigger(
+            device_name="monitor_1",
+            now_ms=1000,
+            event_ts="2026-03-10T00:00:00Z",
+        )
+        accepted_idle = recorder._emit_trigger(
+            TriggerEvent(
+                capture_trigger=CaptureTrigger.IDLE,
+                device_name="monitor_1",
+                event_ts="2026-03-10T00:00:00.500Z",
+            ),
+            now_ms=1500,
+        )
+        # Wait until debounce window passes (need >3000ms after first trigger)
+        accepted_idle_after_window = recorder._emit_trigger(
+            TriggerEvent(
+                capture_trigger=CaptureTrigger.IDLE,
+                device_name="monitor_1",
+                event_ts="2026-03-10T00:00:04.100Z",
+            ),
+            now_ms=4100,  # 3100ms after first trigger, > 3000ms debounce
+        )
+
+        assert accepted_manual is True
+        assert accepted_idle is False
+        assert accepted_idle_after_window is True
+    finally:
+        # Restore original settings
+        openrecall.shared.config.settings = original_settings

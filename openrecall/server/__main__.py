@@ -58,11 +58,12 @@ def ensure_v3_schema(
     )
     with sqlite3.connect(str(target_db_path)) as conn:
         run_migrations(conn, target_migrations_dir)
-    logger.info(
-        "v3 schema migrations ensured: db=%s migrations=%s",
-        target_db_path,
-        target_migrations_dir,
-    )
+    if logger is not None:
+        logger.info(
+            "v3 schema migrations ensured: db=%s migrations=%s",
+            target_db_path,
+            target_migrations_dir,
+        )
 
 
 def preload_ai_models():

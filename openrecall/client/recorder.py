@@ -523,9 +523,14 @@ class ScreenRecorder:
         from openrecall.client import runtime_config
 
         while not self._config_listener_stop.is_set():
-            runtime_config.wait_for_config_change(timeout=1.0)
+            # Wait for config change (with 1s timeout to check stop signal)
+            changed = runtime_config.wait_for_config_change(timeout=1.0)
             if self._config_listener_stop.is_set():
                 break
+
+            # Only reload if config actually changed (not timeout)
+            if not changed:
+                continue
 
             try:
                 store = runtime_config._get_store()

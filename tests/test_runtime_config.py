@@ -103,11 +103,12 @@ def test_notify_and_wait_config_changed(fresh_runtime_config):
 
 
 def test_wait_for_config_change_timeout(fresh_runtime_config):
-    """wait_for_config_change should return after timeout even without notify."""
+    """wait_for_config_change should return False after timeout without notify."""
     start = time.time()
-    fresh_runtime_config.wait_for_config_change(timeout=0.1)
+    result = fresh_runtime_config.wait_for_config_change(timeout=0.1)
     elapsed = time.time() - start
     assert elapsed < 0.5, f"Timeout should be immediate, took {elapsed}s"
+    assert result is False, "wait_for_config_change should return False on timeout"
 
 
 # ---------------------------------------------------------------------------
