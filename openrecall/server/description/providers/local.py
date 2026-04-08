@@ -33,18 +33,27 @@ def _build_messages(context: FrameContext) -> list[dict[str, Any]]:
     if context.browser_url:
         app_context += f" | URL: {context.browser_url}"
 
+    prompt_text = (
+        f"Analyze this screenshot. App context: {app_context or 'unknown'}. "
+        f"Output a strictly valid JSON object:\n"
+        f'{{"narrative": "detailed description (max 1024 chars)", '
+        f'"summary": "one sentence (max 256 chars)", '
+        f'"tags": ["keyword1", "keyword2", ...]}}  // 3-8 lowercase keywords\n\n'
+        f'Example output:\n'
+        f'{{\n'
+        f'  "narrative": "User is browsing GitHub repository page showing README content.",\n'
+        f'  "summary": "Browsing GitHub repository README",\n'
+        f'  "tags": ["github", "repository", "readme", "browsing", "documentation"]\n'
+        f'}}\n\n'
+        f'IMPORTANT: Output only valid JSON. No markdown, no explanation.'
+    )
+
     return [
         {
             "role": "user",
             "content": [
                 {"type": "image", "image": None},
-                {
-                    "type": "text",
-                    "text": f"Analyze this screenshot. App context: {app_context or 'unknown'}. "
-                    f"Output a strictly valid JSON object:\n"
-                    f'{{"narrative": "detailed description (max 512 chars)", "entities": ["..."], '
-                    f'"intent": "user intent phrase", "summary": "one sentence (max 200 chars)"}}',
-                },
+                {"type": "text", "text": prompt_text},
             ],
         }
     ]
@@ -143,33 +152,41 @@ class LocalDescriptionProvider(DescriptionProvider):
             if isinstance(data, dict):
                 original_narrative = data.get("narrative", "")
                 original_summary = data.get("summary", "")
-                narrative = original_narrative[:512]
-                summary = original_summary[:200]
+                tags = data.get("tags", [])
 
-                if len(original_narrative) > 512:
-                    logger.warning(f"Narrative truncated from {len(original_narrative)} to 512 chars")
-                if len(original_summary) > 200:
-                    logger.warning(f"Summary truncated from {len(original_summary)} to 200 chars")
+                narrative = original_narrative[:1024]
+                summary = original_summary[:256]
 
-                logger.info(f"Description generated in {elapsed:.2f}s: {len(narrative)} chars, {len(data.get('entities', []))} entities")
+                if len(original_narrative) > 1024:
+                    logger.warning(f"Narrative truncated from {len(original_narrative)} to 1024 chars")
+                if len(original_summary) > 256:
+                    logger.warning(f"Summary truncated from {len(original_summary)} to 256 chars")
+
+                # Normalize tags
+                if isinstance(tags, list):
+                    tags = [str(t).lower().strip() for t in tags if t]
+                    tags = [t for t in tags if t]  # Filter empty strings
+                    tags = tags[:10]
+                else:
+                    tags = []
+
+                logger.info(f"Description generated in {elapsed:.2f}s: {len(narrative)} chars, {len(tags)} tags")
                 return FrameDescription(
                     narrative=narrative,
-                    entities=data.get("entities", []),
-                    intent=data.get("intent", ""),
                     summary=summary,
+                    tags=tags,
                 )
         except Exception:
             pass
 
         logger.warning(f"Failed to parse JSON from LocalDescriptionProvider. Raw: {raw[:100]}...")
-        fallback_narrative = raw[:512]
-        fallback_summary = raw[:200]
-        if len(raw) > 512:
-            logger.warning(f"Fallback narrative truncated from {len(raw)} to 512 chars")
+        fallback_narrative = raw[:1024]
+        fallback_summary = raw[:256]
+        if len(raw) > 1024:
+            logger.warning(f"Fallback narrative truncated from {len(raw)} to 1024 chars")
         logger.info(f"Description generated (fallback) in {elapsed:.2f}s: {len(fallback_narrative)} chars")
         return FrameDescription(
             narrative=fallback_narrative,
-            entities=[],
-            intent="",
             summary=fallback_summary,
+            tags=[],
         )

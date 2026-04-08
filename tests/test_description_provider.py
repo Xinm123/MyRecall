@@ -134,3 +134,26 @@ class TestDashScopeDescriptionProvider:
 
         with pytest.raises(Exception):  # ConfigError
             DashScopeDescriptionProvider(api_key="sk-test", model_name="")
+
+
+class TestLocalDescriptionProvider:
+    @pytest.mark.unit
+    def test_local_provider_builds_messages_with_new_prompt(self):
+        """Test Local provider builds messages with new prompt format."""
+        from openrecall.server.description.providers.local import _build_messages
+        from openrecall.server.description.models import FrameContext
+
+        context = FrameContext(
+            app_name="Chrome",
+            window_name="GitHub",
+            browser_url="https://github.com"
+        )
+        messages = _build_messages(context)
+
+        # Check prompt contains new format keywords
+        prompt_text = messages[0]["content"][1]["text"]
+        assert "tags" in prompt_text
+        assert "entities" not in prompt_text
+        assert "intent" not in prompt_text
+        assert "1024" in prompt_text
+        assert "256" in prompt_text
