@@ -1,6 +1,7 @@
 """Description models for frame description generation."""
 from __future__ import annotations
 
+import json
 from typing import List, Optional
 from pydantic import BaseModel, Field, field_validator
 
@@ -27,19 +28,11 @@ class FrameDescription(BaseModel):
 
     @field_validator("tags")
     @classmethod
-    def tags_max_length(cls, v: List[str]) -> List[str]:
-        if len(v) > 10:
-            return v[:10]
-        return v
-
-    @field_validator("tags")
-    @classmethod
     def tags_lowercase(cls, v: List[str]) -> List[str]:
         return [tag.lower().strip() for tag in v if tag.strip()]
 
     def to_db_dict(self) -> dict:
         """Convert to dict for database insertion."""
-        import json
         return {
             "narrative": self.narrative,
             "summary": self.summary,

@@ -3,6 +3,7 @@ from pydantic import ValidationError
 from openrecall.server.description.models import FrameDescription, FrameContext
 
 
+@pytest.mark.unit
 def test_frame_description_new_fields():
     """Test FrameDescription accepts narrative, summary, tags."""
     # Create a narrative that is within 1024 characters (54 chars * 18 = 972)
@@ -15,9 +16,21 @@ def test_frame_description_new_fields():
     )
     assert len(desc.narrative) <= 1024
     assert len(desc.summary) <= 256
-    assert 3 <= len(desc.tags) <= 8
+    assert 0 <= len(desc.tags) <= 10
 
 
+@pytest.mark.unit
+def test_frame_description_empty_tags():
+    """Test empty tags list is valid."""
+    desc = FrameDescription(
+        narrative="test",
+        summary="test",
+        tags=[]
+    )
+    assert desc.tags == []
+
+
+@pytest.mark.unit
 def test_frame_description_ignores_old_fields():
     """Test FrameDescription ignores entities and intent (extra='ignore' behavior)."""
     # Pydantic BaseModel by default ignores extra fields
@@ -36,6 +49,7 @@ def test_frame_description_ignores_old_fields():
     assert not hasattr(desc, 'intent')
 
 
+@pytest.mark.unit
 def test_frame_description_tags_validation():
     """Test tags length validation - too many tags raises error."""
     # Too many tags should raise validation error (max_length=10)
@@ -47,6 +61,7 @@ def test_frame_description_tags_validation():
         )
 
 
+@pytest.mark.unit
 def test_frame_description_tags_at_max():
     """Test tags at exactly max length (10)."""
     desc = FrameDescription(
@@ -57,6 +72,7 @@ def test_frame_description_tags_at_max():
     assert len(desc.tags) == 10
 
 
+@pytest.mark.unit
 def test_frame_description_tags_lowercase():
     """Test tags are converted to lowercase."""
     desc = FrameDescription(
@@ -67,6 +83,7 @@ def test_frame_description_tags_lowercase():
     assert desc.tags == ["github", "coding", "browsing"]
 
 
+@pytest.mark.unit
 def test_frame_description_tags_strips_whitespace():
     """Test tags have whitespace stripped."""
     desc = FrameDescription(
@@ -77,6 +94,7 @@ def test_frame_description_tags_strips_whitespace():
     assert desc.tags == ["github", "coding", "browsing"]
 
 
+@pytest.mark.unit
 def test_frame_description_tags_filters_empty():
     """Test empty tags are filtered out."""
     desc = FrameDescription(
@@ -87,6 +105,7 @@ def test_frame_description_tags_filters_empty():
     assert desc.tags == ["github", "coding"]
 
 
+@pytest.mark.unit
 def test_frame_description_to_db_dict():
     """Test to_db_dict returns correct fields."""
     desc = FrameDescription(
@@ -104,6 +123,7 @@ def test_frame_description_to_db_dict():
     assert json.loads(db_dict["tags_json"]) == ["tag1", "tag2"]
 
 
+@pytest.mark.unit
 def test_frame_description_narrative_max_length():
     """Test narrative max length is 1024."""
     long_narrative = "x" * 1025
@@ -115,6 +135,7 @@ def test_frame_description_narrative_max_length():
         )
 
 
+@pytest.mark.unit
 def test_frame_description_summary_max_length():
     """Test summary max length is 256."""
     long_summary = "x" * 257
