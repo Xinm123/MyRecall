@@ -178,6 +178,8 @@ def _start_ocr_mode():
     worker = V3ProcessingWorker()
     worker.start()
 
+    store = None  # Shared store for workers
+
     if settings.description_enabled:
         from openrecall.server.database.frames_store import FramesStore
         from openrecall.server.description.worker import DescriptionWorker
@@ -191,8 +193,9 @@ def _start_ocr_mode():
         from openrecall.server.database.frames_store import FramesStore
         from openrecall.server.embedding.worker import EmbeddingWorker
 
-        # Reuse store if already created, otherwise create new one
-        store = FramesStore() if _description_worker is None else FramesStore()
+        # Reuse store if already created by DescriptionWorker
+        if store is None:
+            store = FramesStore()
         _embedding_worker = EmbeddingWorker(store)
         _embedding_worker.start()
         logger.info("EmbeddingWorker started (ocr mode)")
