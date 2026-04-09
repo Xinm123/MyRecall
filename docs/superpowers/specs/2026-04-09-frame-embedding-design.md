@@ -158,7 +158,7 @@ Use `frames.full_text` as the text input:
 ### Protocol
 
 ```python
-# openrecall/server/ai/base.py
+# openrecall/server/embedding/providers/base.py
 
 class MultimodalEmbeddingProvider(ABC):
     """Multimodal embedding provider protocol"""
@@ -227,18 +227,34 @@ class OpenAIMultimodalEmbeddingProvider(MultimodalEmbeddingProvider):
 
 [embedding]
 enabled = true
-provider = "openai"  # openai / dashscope
-dim = 1024
+provider = "openai"           # openai (supports DashScope and vLLM)
+model = "qwen3-vl-embedding"  # Embedding model name
+api_key = ""                  # API key (optional for local vLLM)
+api_base = ""                 # API base URL (e.g., http://localhost:8000/v1)
+dim = 1024                    # Embedding dimension
 
-[embedding.openai]
+# Worker settings (optional, defaults shown)
+poll_interval_ms = 2000       # Polling interval for task queue
+max_retries = 3               # Max retry attempts before marking failed
+```
+
+**Examples:**
+
+```toml
+# Local vLLM service (no auth required)
+[embedding]
+enabled = true
+provider = "openai"
 model = "qwen3-vl-embedding"
-api_key = "${EMBEDDING_API_KEY}"
-api_base = "http://localhost:8000/v1"  # Local vLLM service
-# api_base = "https://dashscope.aliyuncs.com/compatible-mode/v1"  # DashScope
+api_base = "http://localhost:8000/v1"
 
-[embedding.worker]
-poll_interval_ms = 1000
-max_retries = 3
+# DashScope cloud API
+[embedding]
+enabled = true
+provider = "openai"
+model = "text-embedding-v3"
+api_key = "sk-xxx"
+api_base = "https://dashscope.aliyuncs.com/compatible-mode/v1"
 ```
 
 ---

@@ -2377,16 +2377,140 @@ if mode != "fts":
     # ... continue with existing response format
 ```
 
-- [ ] **Step 5: Run API tests**
+- [ ] **Step 5: Add POST /v1/frames/<frame_id>/embedding endpoint**
+
+Manually trigger embedding generation for a specific frame:
+
+```python
+@v1_bp.route("/frames/<int:frame_id>/embedding", methods=["POST"])
+def trigger_frame_embedding(frame_id: int):
+    """Manually trigger embedding generation for a frame."""
+    from openrecall.server.database.frames_store import FramesStore
+
+    store = FramesStore()
+
+    with store._connect() as conn:
+        # Check if frame exists
+        frame = store.get_frame_by_id(frame_id, conn)
+        if frame is None:
+            return jsonify({"error": "Frame not found"}), 404
+
+        # Check existing status
+        existing_status = frame.get("embedding_status")
+        if existing_status == "completed":
+            return jsonify({
+                "error": "Embedding already exists",
+                "code": "ALREADY_EXISTS",
+            }), 409
+        if existing_status in ("pending", "processing"):
+            return jsonify({
+                "error": "Embedding task already queued",
+                "code": "ALREADY_QUEUED",
+            }), 409
+
+        # Insert new task or reset failed task
+        conn.execute(
+            """
+            INSERT INTO embedding_tasks (frame_id, status)
+            VALUES (?, 'pending')
+            ON CONFLICT(frame_id) DO UPDATE SET
+                status = 'pending',
+                error_message = NULL,
+                retry_count = 0,
+                next_retry_at = NULL,
+                started_at = NULL,
+                completed_at = NULL
+            """,
+            (frame_id,),
+        )
+        conn.execute(
+            "UPDATE frames SET embedding_status = 'pending' WHERE id = ?",
+            (frame_id,),
+        )
+        conn.commit()
+
+        row = conn.execute(
+            "SELECT id FROM embedding_tasks WHERE frame_id = ?",
+            (frame_id,),
+        ).fetchone()
+        task_id = row[0] if row else 0
+
+    return jsonify({
+        "task_id": task_id,
+        "frame_id": frame_id,
+        "status": "pending",
+        "message": "Embedding generation queued",
+    }), 202
+```
+
+- [ ] **Step 6: Add POST /v1/admin/embedding/backfill endpoint**
+
+Trigger backfill for historical frames:
+
+```python
+@v1_bp.route("/admin/embedding/backfill", methods=["POST"])
+def embedding_backfill():
+    """Trigger backfill for frames without embeddings."""
+    from openrecall.server.database.frames_store import FramesStore
+
+    store = FramesStore()
+
+    with store._connect() as conn:
+        # Count frames without embedding_status
+        count_row = conn.execute(
+            "SELECT COUNT(*) FROM frames WHERE embedding_status IS NULL"
+        ).fetchone()
+        estimated_count = count_row[0] if count_row else 0
+
+        if estimated_count == 0:
+            return jsonify({
+                "message": "No frames to backfill",
+                "estimated_count": 0,
+            })
+
+        # Insert tasks for frames without embeddings
+        cursor = conn.execute(
+            """
+            INSERT INTO embedding_tasks (frame_id, status)
+            SELECT id, 'pending' FROM frames
+            WHERE embedding_status IS NULL
+              AND id NOT IN (SELECT frame_id FROM embedding_tasks)
+            """
+        )
+        actual_count = cursor.rowcount
+
+        # Update frames.embedding_status
+        conn.execute(
+            """
+            UPDATE frames SET embedding_status = 'pending'
+            WHERE embedding_status IS NULL
+            """
+        )
+        conn.commit()
+
+    return jsonify({
+        "message": "Backfill started",
+        "estimated_count": estimated_count,
+        "actual_count": actual_count,
+    }), 202
+```
+
+- [ ] **Step 7: Run API tests**
 
 Run: `pytest tests/test_embedding_api.py -v`
 Expected: PASS (create basic API tests if needed)
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 8: Commit**
 
 ```bash
 git add openrecall/server/api_v1.py
-git commit -m "feat(api): add embedding endpoints and hybrid search support"
+git commit -m "feat(api): add embedding endpoints
+
+- /embedding/tasks/status: queue statistics
+- /frames/{id}/similar: similar frames with similarity score
+- /frames/{id}/embedding: manual trigger endpoint
+- /admin/embedding/backfill: backfill historical frames
+- Extend /v1/search with mode parameter for hybrid search"
 ```
 
 ---
@@ -2527,11 +2651,15 @@ Expected: No errors (or fix any issues)
 git add -A
 git commit -m "feat(embedding): complete multimodal embedding implementation
 
-- Add FrameEmbedding model and LanceDB store
+- Add FrameEmbedding model and LanceDB store with similarity search
 - Add OpenAI-compatible multimodal embedding provider
-- Add EmbeddingWorker for background processing
+- Add EmbeddingWorker for background processing with retry logic
 - Add hybrid search with RRF fusion
-- Add API endpoints: /embedding/tasks/status, /frames/{id}/similar
+- Add API endpoints:
+  - GET /embedding/tasks/status: queue statistics
+  - GET /frames/{id}/similar: similar frames with similarity score
+  - POST /frames/{id}/embedding: manual trigger
+  - POST /admin/embedding/backfill: historical frame backfill
 - Extend /v1/search with mode parameter for hybrid search"
 ```
 
