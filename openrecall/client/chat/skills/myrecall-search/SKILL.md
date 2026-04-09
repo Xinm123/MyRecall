@@ -248,8 +248,8 @@ Do not use `/search` as the first step for broad questions. Use `/activity-summa
 
 ## 3. Frame Context — `GET /v1/frames/{id}/context`
 
-**Purpose**: Detailed information about a specific frame. Returns text, UI structure,
-browser URLs, and AI-generated description.
+**Purpose**: Detailed information about a specific frame. Returns text, browser URLs,
+and AI-generated description.
 
 ```bash
 curl "http://localhost:8083/v1/frames/42/context"
@@ -328,8 +328,6 @@ curl -o /tmp/frame.jpg "http://localhost:8083/v1/frames/42"
 
 - **"What did the screenshot actually look like?"** → Rarely needed. Usually `description.narrative`
   from Step 3 is sufficient.
-- **"What UI elements were at what positions?"** → Rarely needed. The `nodes` array with
-  `bounds` information provides spatial context.
 
 ---
 
