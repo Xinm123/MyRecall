@@ -73,7 +73,7 @@ head -c 5120 /tmp/myrecall_result.json   # Truncate to ~5KB if too large
 **Rules:**
 - `activity-summary`: Compact overview. The `apps` array and a few `descriptions` entries are typically sufficient. Use `max_descriptions` to control size.
 - `search`: Use `limit=5` initially, expand if needed. Each result is ~500-2000 tokens.
-- `frame context`: The `nodes` array is only present when `include_nodes=true`. Use `max_nodes=20` if you only need top-level text.
+- `frame context`: Text is capped at 5000 characters. Use for specific frame details.
 - `frame image`: Never include raw image data in context. Describe what you see verbally.
 
 ---
@@ -253,10 +253,6 @@ browser URLs, and AI-generated description.
 
 ```bash
 curl "http://localhost:8083/v1/frames/42/context"
-# With nodes included (UI element tree):
-curl "http://localhost:8083/v1/frames/42/context?include_nodes=true"
-# With limits:
-curl "http://localhost:8083/v1/frames/42/context?include_nodes=true&max_nodes=20&max_text_length=1000"
 ```
 
 ### Parameters
@@ -264,60 +260,31 @@ curl "http://localhost:8083/v1/frames/42/context?include_nodes=true&max_nodes=20
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
 | `frame_id` | integer | **Yes** (path) | The frame ID from search results |
-| `include_nodes` | boolean | No | Include parsed UI nodes from accessibility tree (default: **false** — omit for efficiency) |
-| `max_text_length` | integer | No | Truncate `text` field to this length |
-| `max_nodes` | integer | No | Limit number of nodes in the `nodes` array (only applies when `include_nodes=true`) |
+
+> **Note**: This endpoint accepts no query parameters. Text is always truncated at 5000 characters.
 
 ### Response Format
 
-**When `include_nodes=false` (default):**
 ```json
 {
   "frame_id": 42,
   "timestamp": "2026-03-25T10:30:00Z",
   "app_name": "Claude Code",
   "window_name": "Claude Code — ~/chat/MyRecall",
+  "description": {
+    "narrative": "The user is reviewing pull request #123 on GitHub...",
+    "summary": "GitHub PR review",
+    "tags": ["code_review", "github"]
+  },
   "text": "Reviewing pull request #123 in the GitHub web interface...",
   "text_source": "accessibility",
   "urls": ["https://github.com/pulls/123"],
   "browser_url": "https://github.com/",
-  "status": "completed",
-  "description_status": "completed",
-  "description": {
-    "narrative": "The user is reviewing pull request #123 on GitHub...",
-    "entities": ["PR #123", "GitHub"],
-    "intent": "code_review",
-    "summary": "GitHub PR review"
-  }
+  "status": "completed"
 }
 ```
 
-**When `include_nodes=true`:**
-```json
-{
-  "frame_id": 42,
-  "timestamp": "2026-03-25T10:30:00Z",
-  "app_name": "Claude Code",
-  "window_name": "Claude Code — ~/chat/MyRecall",
-  "text": "Reviewing pull request #123 in the GitHub web interface...",
-  "text_source": "accessibility",
-  "urls": ["https://github.com/pulls/123"],
-  "browser_url": "https://github.com/",
-  "status": "completed",
-  "nodes": [
-    {"role": "AXStaticText", "text": "Reviewing pull request", "depth": 0},
-    {"role": "AXButton", "text": "Approve", "depth": 1},
-    {"role": "AXLink", "text": "View on GitHub", "url": "https://github.com/..."}
-  ],
-  "description_status": "completed",
-  "description": {
-    "narrative": "The user is reviewing pull request #123 on GitHub...",
-    "entities": ["PR #123", "GitHub"],
-    "intent": "code_review",
-    "summary": "GitHub PR review"
-  }
-}
-```
+> **Note**: The response always includes `description` (null if not generated), `text` (capped at 5000 chars with "..." suffix if truncated), and `urls` extracted via regex. No query parameters are accepted.
 
 ### Key Fields
 
@@ -326,40 +293,22 @@ curl "http://localhost:8083/v1/frames/42/context?include_nodes=true&max_nodes=20
 | `timestamp` | ISO8601 UTC capture time of the frame |
 | `app_name` | Application name at capture time (e.g. "Claude Code", "Chrome") |
 | `window_name` | Window title at capture time |
-| `text` | Full text captured from the frame |
+| `description` | **MyRecall unique feature**. AI-generated description with `narrative`, `summary`, and `tags`. Returns `null` if not yet generated. |
+| `text` | Full text captured from the frame (capped at 5000 chars) |
 | `text_source` | `accessibility` (preferred) or `ocr` (fallback) |
-| `nodes` | **Only present when `include_nodes=true`**. UI element tree with `role`, `text`, `depth`, and optional `url`. Nodes with empty text are filtered out. |
-| `urls` | Extracted URLs from link-like nodes (via `AXLink` roles) and plain text regex |
+| `urls` | Extracted URLs from text via regex |
 | `browser_url` | Browser URL at capture time |
-| `description_status` | `"completed"`, `"pending"`, `"processing"`, or `null` |
-| `description` | **MyRecall unique feature**. AI-generated narrative, entities, intent, and summary. Available when `description_status == "completed"`. |
-| `nodes_truncated` | Present only when `include_nodes=true` and `max_nodes` truncation was applied. Indicates how many nodes were omitted. |
+| `status` | Frame processing status (`completed`, `pending`, etc.) |
 
 > **Tip**: The `description.narrative` field is the most useful for answering
-> "what was I doing in this frame?" questions. Check `description_status` first —
-> if `"completed"`, the narrative is available.
-
-### Common AX Roles (macOS)
-
-| Concept | macOS Role |
-|---------|------------|
-| Button | `AXButton` |
-| Static text | `AXStaticText` |
-| Link | `AXLink` |
-| Text field | `AXTextField` |
-| Menu item | `AXMenuItem` |
-| Checkbox | `AXCheckBox` |
-| Web area | `AXWebArea` |
-| Heading | `AXHeading` |
-
-OCR-only roles (when `text_source=ocr`): `line`, `word`, `block`, `paragraph`, `page`
+> "what was I doing in this frame?" questions. If `description` is `null`, the AI
+> description has not been generated yet — use the raw `text` field instead.
 
 ### When to Use
 
 - **"What was I doing in this specific frame?"** → Step 3 (check `description.narrative`)
-- **"What buttons/links were visible?"** → Step 3 with `include_nodes=true`, examine `nodes` array
 - **"What URLs were open?"** → Step 3 (check `urls` array)
-- **"Show me the full text of frame 42"** → Step 3
+- **"Show me the full text of frame 42"** → Step 3 (note: text is capped at 5000 chars)
 
 ---
 
@@ -400,10 +349,9 @@ User asks a question
 │    → Step 2: /search
 │    → If results found → Step 3 for frame details
 │
-├─► "What was I doing in this specific frame?" / "What buttons/links were there?"
-│    → Step 3: /frames/{id}/context (use include_nodes=true for UI structure)
-│    → Check description.narrative first
-│    → Check nodes array for UI elements (only with include_nodes=true)
+├─► "What was I doing in this specific frame?"
+│    → Step 3: /frames/{id}/context
+│    → Check description.narrative first, fall back to text if null
 │
 ├─► "Show me the screenshot"
 │    → Step 4: /frames/{id} (JPEG) — describe verbally only
@@ -420,7 +368,7 @@ User asks a question
 | "Which apps did I use?" | `/activity-summary` | Check `apps` array |
 | "Did I open GitHub today?" | `/activity-summary` + `/search` | Step 1 first, then Step 2 with `app_name` |
 | "Find all frames with my password" | `/search` with `q=password` | Be careful about logging/securing password-related frames |
-| "What was that button text?" | `/search` → `/frames/{id}/context?include_nodes=true` | Get frame_id from search, check `nodes` array |
+| "What did the screenshot show?" | `/frames/{id}/context` | Check `description.narrative` or `text` |
 | "Show me a screenshot" | `/frames/{id}` | Describe verbally, don't include image data |
 | "How long on Safari?" | `/activity-summary` | Check `apps` for Safari's `minutes` field |
 | "What did I code in VSCode?" | `/search` with `app_name` | Use `window_name` for specific files |
@@ -432,10 +380,10 @@ User asks a question
 3. **Use `app_name` filter** when the user mentions a specific app
 4. **Keep `limit` low** (5-10) initially — expand if needed
 5. **`text_source` tells you quality**: `accessibility` > `ocr`. If results seem poor, they may be from OCR fallback
-6. **`description.narrative` is the gold standard** for understanding activity — check if `description_status == "completed"` before relying on raw text
+6. **`description.narrative` is the gold standard** for understanding activity — use it first, fall back to `text` if `description` is null
 7. **Do NOT use `content_type` parameter** — it is deprecated and ignored
 8. **Max 2-3 frames per response** — don't overwhelm the context with many frame details
-9. **Use `include_nodes=true` only when you need UI structure** — the default (false) is more efficient
+9. **Frame context text is capped at 5000 chars** — long content will be truncated with "..." suffix
 
 ---
 
@@ -445,7 +393,7 @@ User asks a question
 |---------------|-------------|-----|
 | No search results | Query too specific | Try broader terms, check spelling |
 | `text_source=ocr` everywhere | App lacks accessibility support (games, remote desktop, etc.) | Normal for some apps — use raw text |
-| `description_status != "completed"` | AI description not yet generated | Use raw `text` and `nodes` instead |
+| `description` is null | AI description not yet generated | Use raw `text` instead |
 | `audio_summary` is always empty | Audio not yet supported | Do not query or mention audio features |
 
 ---
@@ -456,10 +404,11 @@ These screenpipe endpoints do **not exist** in MyRecall:
 
 | Screenpipe Endpoint | MyRecall Equivalent | Notes |
 |---------------------|---------------------|-------|
-| `GET /elements` | None | Not implemented. Use `/frames/{id}/context?include_nodes=true` instead |
+| `GET /elements` | None | Not implemented |
 | `POST /audio/retranscribe` | None | Audio not supported |
 | `GET /meetings` | None | Not implemented |
 | `POST /frames/export` | None | Not implemented |
 | `POST /raw_sql` | None | Not exposed to agents |
 | `screenpipe://` deeplinks | None | Not supported |
 | `content_type=memory\|audio\|input` | `content_type` is deprecated | Ignored — always returns merged results |
+| `/frames/{id}/context?include_nodes=true` | `/frames/{id}/context` | Query parameters not supported — simplified API always returns the same structure |
