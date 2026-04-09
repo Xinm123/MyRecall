@@ -38,22 +38,6 @@ def mock_store():
     return mock
 
 
-def _seed_accessibility_context():
-    """Return sample frame context for accessibility frame."""
-    return {
-        "frame_id": 1,
-        "timestamp": "2026-03-26T10:00:00Z",
-        "app_name": "Claude Code",
-        "window_name": "Claude Code — ~/chat",
-        "description": None,
-        "text": "Hello World",
-        "text_source": "accessibility",
-        "urls": [],
-        "browser_url": "https://example.com",
-        "status": "completed",
-    }
-
-
 class TestFrameContextAPI:
     """Tests for GET /v1/frames/{id}/context."""
 

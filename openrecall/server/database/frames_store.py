@@ -1462,19 +1462,6 @@ class FramesStore:
             logger.exception(f"Error getting frame context for frame_id={frame_id}")
             return None
 
-    def _extract_urls_from_link_text(self, text: str) -> list[str]:
-        """Extract URLs from link node text (screenpipe-aligned).
-
-        screenpipe behavior: extract URL only if the trimmed text starts with http/https.
-        Takes just the URL part (stops at whitespace).
-        """
-        trimmed = text.strip()
-        if trimmed.startswith("http://") or trimmed.startswith("https://"):
-            # Take just the URL part (stop at whitespace)
-            url = trimmed.split()[0] if trimmed.split() else trimmed
-            return [url]
-        return []
-
     def _extract_urls_from_text(self, text: str) -> list[str]:
         """Extract URLs from text using regex (screenpipe-aligned).
 
