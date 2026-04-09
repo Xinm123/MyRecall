@@ -963,41 +963,34 @@ The endpoint returns a typed union.
 ### Return Shape
 
 - `frame_id`
+- `timestamp`
+- `app_name`
+- `window_name`
+- `description`
 - `text`
-- `urls`
 - `text_source`
-- `nodes` — only present when `include_nodes=true`
-- `nodes_truncated` — only present when `include_nodes=true` and `max_nodes` truncation was applied
+- `urls`
+- `browser_url`
+- `status`
+
+### Query Parameters
+
+None. The endpoint accepts no query parameters.
 
 ### Semantics
 
 - `text` comes from `frames.accessibility_text` (accessibility frames) or `frames.ocr_text` (OCR frames)
 - if accessibility data is available:
   - `text_source='accessibility'`
-  - `nodes` are derived from `accessibility_tree_json` (only when `include_nodes=true`)
-  - `urls` are extracted from link-like nodes first (only when `include_nodes=true`), then from text
+  - `urls` are extracted from text via regex
 - otherwise:
   - fallback to OCR-derived frame text and URLs
   - `text_source='ocr'`
-
-### Node Filtering (aligns with screenpipe)
-
-Nodes with empty `text` are filtered out. This matches screenpipe behavior:
-
-```rust
-// screenpipe: if !text.is_empty() { nodes.push(...) }
-```
-
-Only nodes with non-empty text content are included in the response.
+- `description` contains AI-generated frame description with `narrative`, `summary`, and `tags` when available; otherwise `null`
 
 ### URL Extraction (aligns with screenpipe)
 
-**Link-like node extraction** (only when `include_nodes=true`):
-
-- Matches roles containing "link" or "hyperlink" (case-insensitive)
-- Extracts URL only if node text starts with `http://` or `https://`
-
-**Full text extraction** (always active):
+**Full text extraction:**
 
 - Word-based scan for `http://` or `https://` prefixes
 - Length check: URL must be > 10 characters
@@ -1006,47 +999,6 @@ Only nodes with non-empty text content are included in the response.
 **Deduplication:**
 
 - URLs are deduplicated while preserving order
-- Link node URLs are added first, then text URLs
-
-### Node Shape
-
-MVP node entries should include:
-
-- `role`
-- `text`
-- `depth`
-- `bounds` when available
-
-### Truncation Policy (aligns with screenpipe)
-
-The API returns complete data by default. Truncation is applied at the Chat/MCP layer, not the API layer.
-
-**Default limits for Chat/MCP consumption:**
-
-| Field | Default Limit | Behavior |
-|-------|---------------|----------|
-| `text` | 2000 chars | Truncate with `...` suffix |
-| `nodes` | 50 items | Include `nodes_truncated` count if exceeded |
-| `depth` indentation | 5 levels | Deeper nodes use max indent |
-
-**API query parameters (optional):**
-
-```
-GET /v1/frames/{id}/context?include_nodes=false&max_text_length=2000&max_nodes=50
-```
-
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `include_nodes` | boolean | `false` | When `false` (default), omits `nodes` and `nodes_truncated` from response and skips accessibility tree parsing. When `true`, includes parsed accessibility nodes. |
-| `max_text_length` | integer | — | Truncates text with `...` suffix |
-| `max_nodes` | integer | — | Limits node count. Only applies when `include_nodes=true`. |
-
-**Rationale:**
-
-- `include_nodes` defaults to `false` to reduce token overhead for default consumers. Consumers needing structural node data must explicitly pass `include_nodes=true`.
-- When `include_nodes=false`, the accessibility tree JSON is not parsed, reducing compute and memory overhead.
-- URL extraction from text (via regex) remains active regardless of `include_nodes` value.
-- Chat/MCP layer applies truncation to protect LLM context window
 
 ## Image Fetch
 

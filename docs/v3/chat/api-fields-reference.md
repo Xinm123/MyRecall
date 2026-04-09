@@ -51,131 +51,62 @@
 | `timestamp` | `string \| null` | Yes | ISO8601 UTC capture timestamp, from `frames.timestamp` |
 | `app_name` | `string \| null` | Yes | Application name at capture time, from `frames.app_name` |
 | `window_name` | `string \| null` | Yes | Window title at capture time, from `frames.window_name` |
-| `text` | `string \| null` | Yes | `accessibility_text` if AX-first succeeded, else `ocr_text`, truncated by `max_text_length` if specified |
+| `description` | `object \| null` | Yes | AI-generated frame description (object with `narrative`, `summary`, `tags`). Returns `null` when no description has been generated. |
+| `text` | `string \| null` | Yes | `accessibility_text` if AX-first succeeded, else `ocr_text` |
 | `text_source` | `string` | Yes | `"accessibility"` \| `"ocr"` \| `"hybrid"` (lowercase) |
-| `urls` | `string[]` | Yes | Extracted URLs from AX link nodes + regex fallback on text. Deduplicated. |
+| `urls` | `string[]` | Yes | Extracted URLs from text via regex. Deduplicated. |
 | `browser_url` | `string \| null` | Yes | `browser_url` field from frames table |
 | `status` | `string` | Yes | `processing_status` from frames table: `"pending"` \| `"processing"` \| `"completed"` \| `"failed"` |
-| `nodes` | `object[]` | No | Parsed accessibility tree nodes. **Only included when `include_nodes=true`** |
-| `nodes_truncated` | `int \| null` | No | Number of nodes skipped due to `max_nodes` limit. Only present when limit was exceeded. |
-| `description_status` | `string \| null` | Yes | Status of AI description task: `"pending"` \| `"processing"` \| `"completed"` \| `"failed"` \| `null` (no description requested) |
-| `description` | `object \| null` | No | AI-generated frame description. **Only present when `description_status == "completed"`** |
 
-### Nodes Array (when `include_nodes=true`)
-
-Each node object:
+### Description Object (when description is not null)
 
 | Field | Type | Always Present | Description |
 |-------|------|:--------------:|-------------|
-| `role` | `string` | Yes | AX role (e.g., `"AXStaticText"`, `"AXButton"`, `"AXLink"`) |
-| `text` | `string` | Yes | Text content of the node |
-| `depth` | `int` | Yes | Depth in accessibility tree (0 = root) |
-| `bounds` | `object \| null` | No | Bounding box relative to focused window (normalized 0.0–1.0), rounded to 3 decimal places |
-| `bounds.left` | `number` | — | Left coordinate (0.0–1.0) |
-| `bounds.top` | `number` | — | Top coordinate (0.0–1.0) |
-| `bounds.width` | `number` | — | Width (0.0–1.0) |
-| `bounds.height` | `number` | — | Height (0.0–1.0) |
-| `properties` | `object \| null` | **No** | AX properties (automation_id, class_name, value, help_text, url, placeholder, role_description, subrole, is_enabled, is_focused, is_selected, is_expanded, is_password, is_keyboard_focusable, accelerator_key, access_key). **Currently not populated in MyRecall** — reserved for future. This field is **never included** in the response (not even as `null`). |
-
-### Description Object (when `description_status == "completed"`)
-
-| Field | Type | Always Present | Description |
-|-------|------|:--------------:|-------------|
-| `narrative` | `string` | Yes | AI-generated description of what the frame shows |
-| `entities` | `string[]` | Yes | Extracted named entities (empty array if none) |
-| `intent` | `string` | Yes | Detected user intent |
-| `summary` | `string` | Yes | Short one-line summary |
-
-### Query Parameters
-
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `include_nodes` | `boolean` | `false` | Whether to include parsed accessibility tree nodes |
-| `max_text_length` | `int` | — | Truncate `text` field to this max length |
-| `max_nodes` | `int` | — | Limit number of nodes returned (when `include_nodes=true`) |
+| `narrative` | `string` | Yes | Human-readable description of what's happening in the frame |
+| `summary` | `string` | Yes | Brief one-line summary |
+| `tags` | `string[]` | Yes | Array of descriptive tags |
 
 ### Example Response
 
 ```json
 // GET /v1/frames/42/context
-// (include_nodes=false, description_status="completed")
+// (description available)
 
 {
   "frame_id": 42,
   "timestamp": "2026-03-26T14:32:05Z",
   "app_name": "Claude Code",
   "window_name": "Claude Code — ~/chat/MyRecall",
+  "description": {
+    "narrative": "The user is working on MyRecall v3 chat functionality in Claude Code, reviewing the API fields reference documentation.",
+    "summary": "Working on API documentation in Claude Code",
+    "tags": ["claude-code", "documentation", "api"]
+  },
   "text": "MyRecall v3 Chat API MyRecall Search Claude Code Today 14:32",
   "text_source": "accessibility",
   "urls": [
     "https://github.com/anthropics/claude-code"
   ],
   "browser_url": null,
-  "status": "completed",
-  "description_status": "completed",
-  "description": {
-    "narrative": "The user is working on MyRecall v3 chat functionality in Claude Code, reviewing the API fields reference documentation.",
-    "entities": ["MyRecall v3", "Claude Code", "API"],
-    "intent": "coding",
-    "summary": "Working on API documentation in Claude Code"
-  }
+  "status": "completed"
 }
 ```
 
 ```json
-// GET /v1/frames/42/context?include_nodes=true&max_nodes=5
-// (with accessibility tree nodes, truncated)
+// GET /v1/frames/43/context
+// (no description generated yet)
 
 {
-  "frame_id": 42,
-  "timestamp": "2026-03-26T14:32:05Z",
-  "app_name": "Claude Code",
-  "window_name": "Claude Code — ~/chat/MyRecall",
-  "text": "MyRecall v3 Chat API MyRecall Search Claude Code Today 14:32",
-  "text_source": "accessibility",
+  "frame_id": 43,
+  "timestamp": "2026-03-26T14:33:05Z",
+  "app_name": "Terminal",
+  "window_name": "zsh — 120×40",
+  "description": null,
+  "text": "ls -la\nopenrecall\nmyrecall\nscreenshots",
+  "text_source": "ocr",
   "urls": [],
-  "browser_url": "https://github.com/pyw/myrecall",
-  "status": "completed",
-  "nodes_truncated": 23,
-  "description_status": "completed",
-  "description": {
-    "narrative": "...",
-    "entities": ["MyRecall v3"],
-    "intent": "coding",
-    "summary": "..."
-  },
-  "nodes": [
-    {
-      "role": "AXWindow",
-      "text": "Claude Code — ~/chat/MyRecall",
-      "depth": 0,
-      "bounds": { "left": 0.0, "top": 0.012, "width": 1.0, "height": 0.988 }
-    },
-    {
-      "role": "AXStaticText",
-      "text": "MyRecall v3 Chat API",
-      "depth": 1,
-      "bounds": { "left": 0.008, "top": 0.038, "width": 0.066, "height": 0.011 }
-    },
-    {
-      "role": "AXButton",
-      "text": "Search",
-      "depth": 2,
-      "bounds": { "left": 280, "top": 80, "width": 60, "height": 28 }
-    },
-    {
-      "role": "AXLink",
-      "text": "https://github.com/pyw/myrecall",
-      "depth": 2,
-      "bounds": { "left": 24, "top": 120, "width": 180, "height": 16 }
-    },
-    {
-      "role": "AXStaticText",
-      "text": "Claude Code — ~/chat/MyRecall",
-      "depth": 1,
-      "bounds": null
-    }
-  ]
+  "browser_url": null,
+  "status": "completed"
 }
 ```
 
@@ -183,7 +114,6 @@ Each node object:
 
 - ❌ `device_name` / `monitor_index` — not returned
 - ❌ `capture_trigger` — not returned
-- ❌ `nodes[].properties` — schema defined but not populated; field is **never present** in response (not even as `null`)
 
 ---
 
