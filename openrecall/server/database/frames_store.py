@@ -1389,44 +1389,29 @@ class FramesStore:
             logger.error("get_activity_summary_time_range failed: %s", e)
             return None
 
+    MAX_TEXT_LENGTH = 5000
+
     def get_frame_context(
         self,
         frame_id: int,
-        include_nodes: bool = False,
-        max_text_length: Optional[int] = None,
-        max_nodes: Optional[int] = None,
     ) -> Optional[dict]:
         """Return frame context for chat grounding.
 
-        Returns frame data including:
-        - frame_id, text, text_source
-        - nodes: parsed from accessibility_tree_json (text nodes only, aligns with screenpipe)
-          — only included when include_nodes=True
-        - urls: extracted from link-like nodes and text
+        Returns:
+            - frame_id, timestamp, app_name, window_name: frame metadata
+            - text: accessibility_text or ocr_text, truncated at MAX_TEXT_LENGTH chars
+            - text_source: 'accessibility' | 'ocr' | 'hybrid' | None
+            - urls: extracted from text via regex
+            - browser_url, status: frame metadata
 
-        Truncation (aligns with screenpipe MCP layer):
-        - By default, returns complete data (no truncation)
-        - When max_text_length is set, truncates text with "..." suffix
-        - When max_nodes is set, limits nodes and adds nodes_truncated count
-          — only has effect when include_nodes=True
-
-        Args:
-            frame_id: The frame ID
-            include_nodes: Whether to include parsed nodes (default: False).
-                When False, skips accessibility_tree_json parsing for efficiency.
-            max_text_length: Optional max text length (default: None = no limit)
-            max_nodes: Optional max nodes count (default: None = no limit).
-                Only applies when include_nodes=True.
+        Text is always truncated at MAX_TEXT_LENGTH (5000) chars with "..." suffix.
         """
         try:
             with self._connect() as conn:
-                # Join with ocr_text table for OCR frames
-                # accessibility frames: read frames.accessibility_text
-                # ocr frames: read frames.ocr_text
                 row = conn.execute(
                     """
                     SELECT f.id, f.accessibility_text, f.ocr_text, f.text_source,
-                           f.accessibility_tree_json, f.browser_url, f.status,
+                           f.browser_url, f.status,
                            f.timestamp, f.app_name, f.window_name
                     FROM frames f
                     WHERE f.id = ?
@@ -1444,63 +1429,25 @@ class FramesStore:
                 else:
                     text = row["accessibility_text"] or ""
                 text_source = row["text_source"]
-                tree_json = row["accessibility_tree_json"]
                 browser_url = row["browser_url"]
                 status = row["status"]
                 timestamp = row["timestamp"]
                 app_name = row["app_name"]
                 window_name = row["window_name"]
 
-                raw_nodes: list[dict] = []
                 urls: list[str] = []
-                nodes_truncated: Optional[int] = None
-                result_nodes: list[dict] = []
 
-                # Parse accessibility tree only when include_nodes=True
-                if include_nodes and tree_json:
-                    try:
-                        raw_nodes = json.loads(tree_json)
-                    except (json.JSONDecodeError, TypeError):
-                        raw_nodes = []
-
-                    # Filter nodes: only include nodes with non-empty text (aligns with screenpipe)
-                    # screenpipe: `if !text.is_empty() { nodes.push(...) }`
-                    filtered = []
-                    for node in raw_nodes:
-                        node_text = node.get("text", "")
-                        if node_text:  # Skip empty-text nodes
-                            filtered.append(node)
-
-                    # Extract URLs from link-like nodes (aligns with screenpipe)
-                    # screenpipe: `role_lower.contains("link") || role_lower.contains("hyperlink")`
-                    for node in filtered:
-                        role = (node.get("role") or "").lower()
-                        if "link" in role or "hyperlink" in role:
-                            node_text = node.get("text", "")
-                            # screenpipe: extract URL if text starts with http/https
-                            for url in self._extract_urls_from_link_text(node_text):
-                                if url not in urls:
-                                    urls.append(url)
-
-                    # Apply nodes truncation (only when include_nodes=True)
-                    if max_nodes is not None and len(filtered) > max_nodes:
-                        nodes_truncated = len(filtered) - max_nodes
-                        result_nodes = filtered[:max_nodes]
-                    else:
-                        result_nodes = filtered
-
-                # Extract URLs from full text using regex (aligns with screenpipe)
-                # screenpipe: word-based scan with length > 10 check and punctuation trimming
+                # Extract URLs from text using regex (screenpipe-aligned)
                 for url in self._extract_urls_from_text(text):
                     if url not in urls:
                         urls.append(url)
 
-                # Apply text truncation
+                # Apply fixed text truncation at MAX_TEXT_LENGTH
                 result_text = text
-                if max_text_length is not None and len(result_text) > max_text_length:
-                    result_text = result_text[:max_text_length] + "..."
+                if len(result_text) > self.MAX_TEXT_LENGTH:
+                    result_text = result_text[:self.MAX_TEXT_LENGTH] + "..."
 
-                result = {
+                return {
                     "frame_id": frame_id_val,
                     "timestamp": timestamp,
                     "app_name": app_name,
@@ -1511,17 +1458,8 @@ class FramesStore:
                     "browser_url": browser_url,
                     "status": status,
                 }
-
-                # Only include nodes when include_nodes=True
-                if include_nodes:
-                    result["nodes"] = result_nodes
-                    if nodes_truncated is not None:
-                        result["nodes_truncated"] = nodes_truncated
-
-                return result
-
-        except sqlite3.Error as e:
-            logger.error("get_frame_context failed frame_id=%d: %s", frame_id, e)
+        except Exception:
+            logger.exception(f"Error getting frame context for frame_id={frame_id}")
             return None
 
     def _extract_urls_from_link_text(self, text: str) -> list[str]:
