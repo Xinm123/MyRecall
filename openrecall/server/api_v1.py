@@ -5,7 +5,12 @@ This module defines the v1_bp Blueprint and implements:
   - GET  /v1/ingest/queue/status — live queue counters
   - GET  /v1/frames/<frame_id>   — serve frame JPEG
   - GET  /v1/frames/<frame_id>/context — frame context for chat grounding
+  - GET  /v1/frames/<frame_id>/similar — find similar frames using vector search
+  - POST /v1/frames/<frame_id>/embedding — manually trigger embedding generation
   - GET  /v1/health              — health check
+  - GET  /v1/search              — FTS5/hybrid/vector search
+  - GET  /v1/embedding/tasks/status — embedding task queue statistics
+  - POST /v1/admin/embedding/backfill — trigger embedding backfill
 
 SSOT: docs/v3/spec.md §4.7, §4.8.1, §4.9; docs/v3/http_contract_ledger.md
 """
@@ -378,7 +383,28 @@ def ingest():
             )
 
     # ------------------------------------------------------------------
-    # Step 7: Build success response (2xx — no "code" field)
+    # Step 7: Enqueue embedding task if enabled (PARALLEL)
+    # ------------------------------------------------------------------
+    if settings.embedding_enabled:
+        try:
+            with store._connect() as conn:
+                store.insert_embedding_task(conn, frame_id)
+                conn.commit()
+                logger.debug(
+                    "ingest: embedding task enqueued capture_id=%s frame_id=%d",
+                    capture_id_raw,
+                    frame_id,
+                )
+        except Exception as e:
+            logger.warning(
+                "ingest: failed to enqueue embedding task capture_id=%s frame_id=%d: %s",
+                capture_id_raw,
+                frame_id,
+                e,
+            )
+
+    # ------------------------------------------------------------------
+    # Step 8: Build success response (2xx — no "code" field)
     # ------------------------------------------------------------------
     logger.info(
         "ingest: 201 Created capture_id=%s frame_id=%d request_id=%s",
@@ -500,6 +526,25 @@ def _handle_accessibility_canonical_ingest(
         except Exception as e:
             logger.warning(
                 "ingest: failed to enqueue description task capture_id=%s frame_id=%d: %s",
+                capture_id,
+                frame_id,
+                e,
+            )
+
+    # Enqueue embedding task if enabled
+    if settings.embedding_enabled:
+        try:
+            with store._connect() as conn:
+                store.insert_embedding_task(conn, frame_id)
+                conn.commit()
+                logger.debug(
+                    "ingest: embedding task enqueued capture_id=%s frame_id=%d",
+                    capture_id,
+                    frame_id,
+                )
+        except Exception as e:
+            logger.warning(
+                "ingest: failed to enqueue embedding task capture_id=%s frame_id=%d: %s",
                 capture_id,
                 frame_id,
                 e,
@@ -871,6 +916,7 @@ def search():
 
     Query Parameters:
         q: Text query (sanitized via sanitize_fts5_query)
+        mode: "fts", "vector", or "hybrid" (default: "fts")
         content_type: "ocr", "accessibility", or "all" (default: "all")
         limit: Max results (default 20, max 100)
         offset: Pagination offset (default 0)
@@ -889,6 +935,11 @@ def search():
     """
     # Parse query parameters
     q = request.args.get("q", "").strip()
+
+    # Parse mode (default: "fts")
+    mode = request.args.get("mode", "fts").strip().lower()
+    if mode not in ("fts", "vector", "hybrid"):
+        mode = "fts"
 
     # Parse content_type (default: "all")
     content_type = request.args.get("content_type", "all").strip().lower()
@@ -962,21 +1013,42 @@ def search():
         pass
 
     # Execute search
-    engine = _get_search_engine()
-    results, total = engine.search(
-        q=q,
-        limit=limit,
-        offset=offset,
-        start_time=start_time,
-        end_time=end_time,
-        app_name=app_name,
-        window_name=window_name,
-        browser_url=browser_url,
-        focused=focused,
-        min_length=min_length,
-        max_length=max_length,
-        content_type=content_type,
-    )
+    if mode == "fts":
+        # Use existing FTS engine
+        engine = _get_search_engine()
+        results, total = engine.search(
+            q=q,
+            limit=limit,
+            offset=offset,
+            start_time=start_time,
+            end_time=end_time,
+            app_name=app_name,
+            window_name=window_name,
+            browser_url=browser_url,
+            focused=focused,
+            min_length=min_length,
+            max_length=max_length,
+            content_type=content_type,
+        )
+    else:
+        # Use hybrid search engine for vector/hybrid modes
+        from openrecall.server.search.hybrid_engine import HybridSearchEngine
+
+        hybrid_engine = HybridSearchEngine()
+        results, total = hybrid_engine.search(
+            q=q,
+            mode=mode,
+            limit=limit,
+            offset=offset,
+            start_time=start_time,
+            end_time=end_time,
+            app_name=app_name,
+            window_name=window_name,
+            browser_url=browser_url,
+            focused=focused,
+            min_length=min_length,
+            max_length=max_length,
+        )
 
     # Build response per mvp.md Search Contract
     # Returns typed union entries based on text_source
@@ -1008,6 +1080,11 @@ def search():
                 "fts_rank": r.get("fts_rank"),  # BM25 rank (null when no text query)
             },
         }
+
+        # Add hybrid_score for hybrid/vector mode results
+        if "hybrid_score" in r:
+            item["content"]["hybrid_score"] = r["hybrid_score"]
+
         data_items.append(item)
 
     return jsonify(
@@ -1326,3 +1403,133 @@ def description_backfill():
             "estimated_count": count,
             "request_id": request_id,
         }), 202
+
+
+# ---------------------------------------------------------------------------
+# Embedding API Endpoints
+# ---------------------------------------------------------------------------
+
+
+@v1_bp.route("/embedding/tasks/status", methods=["GET"])
+def embedding_tasks_status():
+    """Return embedding task queue statistics."""
+    from openrecall.server.embedding.service import EmbeddingService
+
+    store = _get_frames_store()
+    service = EmbeddingService(store=store)
+
+    with store._connect() as conn:
+        status = service.get_queue_status(conn)
+
+    return jsonify(status)
+
+
+@v1_bp.route("/frames/<int:frame_id>/similar", methods=["GET"])
+def similar_frames(frame_id: int):
+    """Find similar frames using vector similarity."""
+    from openrecall.server.database.embedding_store import EmbeddingStore
+
+    store = EmbeddingStore()
+    frames_store = _get_frames_store()
+
+    # Get the frame's embedding
+    embedding = store.get_by_frame_id(frame_id)
+    if embedding is None:
+        return jsonify({"error": "Embedding not found for frame"}), 404
+
+    limit = request.args.get("limit", 10, type=int)
+    limit = max(1, min(limit, 100))
+
+    # Search for similar frames
+    results_with_distance = store.search_with_distance(
+        embedding.embedding_vector, limit=limit + 1
+    )
+
+    # Filter out the query frame itself
+    similar = []
+    for r, distance in results_with_distance:
+        if r.frame_id != frame_id:
+            similarity = max(0.0, 1.0 - float(distance))
+            similar.append({
+                "frame_id": r.frame_id,
+                "similarity": round(similarity, 4),
+                "timestamp": r.timestamp,
+                "app_name": r.app_name,
+                "window_name": r.window_name,
+                "frame_url": f"/v1/frames/{r.frame_id}",
+            })
+        if len(similar) >= limit:
+            break
+
+    return jsonify({
+        "frame_id": frame_id,
+        "similar_frames": similar,
+    })
+
+
+@v1_bp.route("/frames/<int:frame_id>/embedding", methods=["POST"])
+def create_frame_embedding(frame_id: int):
+    """Manually trigger embedding generation for a specific frame."""
+    request_id = str(uuid.uuid4())
+    store = _get_frames_store()
+
+    # Check if frame exists
+    frame = store.get_frame_by_id(frame_id)
+    if frame is None:
+        return jsonify({
+            "error": "Frame not found",
+            "code": "NOT_FOUND",
+            "request_id": request_id,
+        }), 404
+
+    with store._connect() as conn:
+        # Check if embedding task already exists
+        existing = conn.execute(
+            "SELECT id, status FROM embedding_tasks WHERE frame_id = ? ORDER BY id DESC LIMIT 1",
+            (frame_id,),
+        ).fetchone()
+
+        if existing and existing[1] in ("pending", "processing"):
+            return jsonify({
+                "error": "Embedding task already queued",
+                "code": "ALREADY_QUEUED",
+                "request_id": request_id,
+                "task_id": existing[0],
+            }), 409
+
+        # Enqueue embedding task
+        store.insert_embedding_task(conn, frame_id)
+        conn.commit()
+
+        row = conn.execute(
+            "SELECT id, status FROM embedding_tasks WHERE frame_id = ? ORDER BY id DESC LIMIT 1",
+            (frame_id,),
+        ).fetchone()
+        task_id = row[0] if row else 0
+
+    return jsonify({
+        "task_id": task_id,
+        "frame_id": frame_id,
+        "status": "queued",
+        "request_id": request_id,
+    }), 202
+
+
+@v1_bp.route("/admin/embedding/backfill", methods=["POST"])
+def embedding_backfill():
+    """Trigger backfill of embeddings for all historical frames."""
+    request_id = str(uuid.uuid4())
+    store = _get_frames_store()
+
+    with store._connect() as conn:
+        from openrecall.server.embedding.service import EmbeddingService
+
+        service = EmbeddingService(store=store)
+        count = service.backfill(conn)
+
+        return jsonify({
+            "message": "Backfill started",
+            "estimated_count": count,
+            "request_id": request_id,
+        }), 202
+

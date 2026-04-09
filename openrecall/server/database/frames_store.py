@@ -1536,6 +1536,24 @@ class FramesStore:
             (frame_id,),
         )
 
+    def insert_embedding_task(self, conn: sqlite3.Connection, frame_id: int) -> None:
+        """Insert a pending embedding task. Idempotent via UNIQUE constraint."""
+        conn.execute(
+            """
+            INSERT OR IGNORE INTO embedding_tasks (frame_id, status)
+            VALUES (?, 'pending')
+            """,
+            (frame_id,),
+        )
+        conn.execute(
+            """
+            UPDATE frames
+            SET embedding_status = 'pending'
+            WHERE id = ? AND embedding_status IS NULL
+            """,
+            (frame_id,),
+        )
+
     def claim_description_task(
         self,
         conn: sqlite3.Connection,
