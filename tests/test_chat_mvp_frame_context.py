@@ -92,60 +92,6 @@ class TestGetFrameContext:
         assert context["text"] == "Hello World"
         assert context["text_source"] == "accessibility"
 
-    def test_get_frame_context_parses_accessibility_tree_json(
-        self, store: FramesStore
-    ):
-        """Frame context should parse nodes from accessibility_tree_json."""
-        elements = [
-            {"role": "AXGroup", "text": "", "depth": 0, "bounds": None},  # Empty text - filtered
-            {"role": "AXStaticText", "text": "Title", "depth": 1, "bounds": {"left": 0.1, "top": 0.2, "width": 0.5, "height": 0.1}},
-            {"role": "AXButton", "text": "Click Me", "depth": 1, "bounds": {"left": 0.1, "top": 0.4, "width": 0.2, "height": 0.1}},
-        ]
-        frame_id = _create_completed_frame_with_accessibility(
-            store, "cap-1", "2026-03-20T10:00:00Z", "Safari", "Title Click Me", elements
-        )
-
-        context = store.get_frame_context(frame_id, include_nodes=True)
-
-        assert context is not None
-        assert "nodes" in context
-        # Only 2 nodes with non-empty text (AXGroup with empty text is filtered - screenpipe-aligned)
-        assert len(context["nodes"]) == 2
-
-        # Check node structure
-        nodes = context["nodes"]
-        assert nodes[0]["role"] == "AXStaticText"
-        assert nodes[0]["text"] == "Title"
-        assert nodes[0]["depth"] == 1
-        assert nodes[0]["bounds"]["left"] == 0.1
-
-        assert nodes[1]["role"] == "AXButton"
-        assert nodes[1]["text"] == "Click Me"
-
-    def test_get_frame_context_extracts_urls_from_link_nodes(
-        self, store: FramesStore
-    ):
-        """Frame context should extract URLs from link-like role nodes (screenpipe-aligned)."""
-        elements = [
-            {"role": "AXStaticText", "text": "Visit ", "depth": 0},
-            {"role": "AXLink", "text": "https://example.com", "depth": 0},
-            {"role": "AXHyperlink", "text": "https://hyperlink.org", "depth": 0},  # Also matched
-            {"role": "link", "text": "https://link.net", "depth": 0},  # Also matched
-            {"role": "AXButton", "text": "Click here", "depth": 0},  # Not link-like, no URL
-        ]
-        frame_id = _create_completed_frame_with_accessibility(
-            store, "cap-1", "2026-03-20T10:00:00Z", "Safari", "Visit https://example.com Click here", elements
-        )
-
-        context = store.get_frame_context(frame_id, include_nodes=True)
-
-        assert context is not None
-        assert "urls" in context
-        # Should extract URLs from AXLink, AXHyperlink, and "link" roles
-        assert "https://example.com" in context["urls"]
-        assert "https://hyperlink.org" in context["urls"]
-        assert "https://link.net" in context["urls"]
-
     def test_get_frame_context_extracts_urls_from_text(
         self, store: FramesStore
     ):
@@ -191,13 +137,11 @@ class TestGetFrameContext:
             )
             conn.commit()
 
-        context = store.get_frame_context(frame_id, include_nodes=True)
+        context = store.get_frame_context(frame_id)
 
         assert context is not None
         assert context["text_source"] == "ocr"
         assert context["text"] == "OCR extracted text with https://ocr-url.com link"
-        # nodes should be empty for OCR frames
-        assert context["nodes"] == []
         # URLs should still be extracted from text
         assert "https://ocr-url.com" in context["urls"]
 
@@ -221,14 +165,13 @@ class TestGetFrameContext:
             },
         )
 
-        context = store.get_frame_context(frame_id, include_nodes=True)
+        context = store.get_frame_context(frame_id)
 
         # Should return basic context with no text
         assert context is not None
         assert context["frame_id"] == frame_id
         assert context["text"] is None or context["text"] == ""
         assert context["text_source"] is None
-        assert context["nodes"] == []
         assert context["urls"] == []
 
     def test_get_frame_context_includes_browser_url(
@@ -256,10 +199,9 @@ class TestGetFrameContext:
             store, "cap-1", "2026-03-20T10:00:00Z", "Safari", "", []
         )
 
-        context = store.get_frame_context(frame_id, include_nodes=True)
+        context = store.get_frame_context(frame_id)
 
         assert context is not None
-        assert context["nodes"] == []
         assert context["urls"] == []
 
     def test_get_frame_context_deduplicates_urls(
@@ -274,7 +216,7 @@ class TestGetFrameContext:
             store, "cap-1", "2026-03-20T10:00:00Z", "Safari", "Visit https://example.com again", elements
         )
 
-        context = store.get_frame_context(frame_id, include_nodes=True)
+        context = store.get_frame_context(frame_id)
 
         assert context is not None
         # URL should appear only once despite being in both AXLink and text
@@ -283,43 +225,37 @@ class TestGetFrameContext:
     def test_get_frame_context_extracts_multiple_urls(
         self, store: FramesStore
     ):
-        """Frame context should extract multiple distinct URLs."""
+        """Frame context should extract multiple distinct URLs from text."""
         elements = [
             {"role": "AXStaticText", "text": "Check https://foo.com and https://bar.org", "depth": 0},
-            {"role": "AXLink", "text": "https://baz.net", "depth": 0},
         ]
         frame_id = _create_completed_frame_with_accessibility(
             store, "cap-1", "2026-03-20T10:00:00Z", "Safari", "Check https://foo.com and https://bar.org", elements
         )
 
-        context = store.get_frame_context(frame_id, include_nodes=True)
+        context = store.get_frame_context(frame_id)
 
         assert context is not None
-        assert len(context["urls"]) == 3
+        assert len(context["urls"]) == 2
         assert "https://foo.com" in context["urls"]
         assert "https://bar.org" in context["urls"]
-        assert "https://baz.net" in context["urls"]
 
-    def test_get_frame_context_filters_empty_text_nodes(
-        self, store: FramesStore
-    ):
-        """Frame context should skip nodes with empty text (screenpipe-aligned)."""
+    def test_get_frame_context_text_captures_node_content(self, store: FramesStore):
+        """Frame context text should include content from non-empty AX nodes."""
         elements = [
             {"role": "AXStaticText", "text": "Visible text", "depth": 0},
-            {"role": "AXGroup", "text": "", "depth": 0},  # Empty text - should be filtered
-            {"role": "AXButton", "text": None, "depth": 0},  # None text - should be filtered
+            {"role": "AXGroup", "text": "", "depth": 0},  # Empty text - filtered from tree
+            {"role": "AXButton", "text": None, "depth": 0},  # None text - filtered from tree
             {"role": "AXStaticText", "text": "More text", "depth": 0},
         ]
         frame_id = _create_completed_frame_with_accessibility(
             store, "cap-1", "2026-03-20T10:00:00Z", "Safari", "Visible text More text", elements
         )
-
-        context = store.get_frame_context(frame_id, include_nodes=True)
-
+        context = store.get_frame_context(frame_id)
         assert context is not None
-        # Only 2 nodes with non-empty text should be included
-        assert len(context["nodes"]) == 2
-        assert all(n.get("text") for n in context["nodes"])
+        # Text should contain both non-empty texts (concatenated by the recorder)
+        assert "Visible text" in context["text"]
+        assert "More text" in context["text"]
 
     def test_get_frame_context_url_length_check(
         self, store: FramesStore
@@ -368,24 +304,42 @@ class TestGetFrameContext:
         assert "https://foo.com," not in context["urls"]
         assert "https://bar.org)" not in context["urls"]
 
-    def test_get_frame_context_link_text_url_extraction(
-        self, store: FramesStore
-    ):
-        """Link node URL extraction: only if text starts with http/https (screenpipe-aligned)."""
+    def test_get_frame_context_url_extraction_from_text(self, store: FramesStore):
+        """URLs are extracted from text via regex (link-node extraction removed)."""
         elements = [
-            {"role": "AXLink", "text": "https://direct-url.com", "depth": 0},  # Starts with http - extract
-            {"role": "AXLink", "text": "Click here", "depth": 0},  # Doesn't start with http - no extract
+            {"role": "AXStaticText", "text": "Check https://direct-url.com for details", "depth": 0},
         ]
         frame_id = _create_completed_frame_with_accessibility(
-            store, "cap-1", "2026-03-20T10:00:00Z", "Safari", "https://direct-url.com Click here", elements
+            store, "cap-1", "2026-03-20T10:00:00Z", "Safari",
+            "Check https://direct-url.com for details", elements
         )
-
-        context = store.get_frame_context(frame_id, include_nodes=True)
-
+        context = store.get_frame_context(frame_id)
         assert context is not None
         assert "https://direct-url.com" in context["urls"]
-        # "Click here" doesn't start with http, so no URL extracted from it
-        assert len(context["urls"]) == 1
+
+    def test_get_frame_context_truncates_text_at_5000_chars(self, store: FramesStore):
+        """Text should be truncated at 5000 chars with '...' suffix."""
+        # Exactly 5000 chars — no truncation
+        text_5000 = "X" * 5000
+        elements = [{"role": "AXStaticText", "text": text_5000, "depth": 0}]
+        frame_id = _create_completed_frame_with_accessibility(
+            store, "cap-t5000", "2026-03-20T10:00:00Z", "Safari", text_5000, elements
+        )
+        context = store.get_frame_context(frame_id)
+        assert context is not None
+        assert len(context["text"]) == 5000
+        assert not context["text"].endswith("...")
+
+        # 5001 chars — truncated to 5000 + "..."
+        text_5001 = "Y" * 5001
+        elements2 = [{"role": "AXStaticText", "text": text_5001, "depth": 0}]
+        frame_id2 = _create_completed_frame_with_accessibility(
+            store, "cap-t5001", "2026-03-20T10:00:00Z", "Safari", text_5001, elements2
+        )
+        context2 = store.get_frame_context(frame_id2)
+        assert context2 is not None
+        assert len(context2["text"]) == 5003  # 5000 + "..."
+        assert context2["text"].endswith("...")
 
 
 class TestGetFrameContextMetadataFields:
@@ -456,283 +410,3 @@ class TestGetFrameContextBoundsPrecision:
         assert bounds.height == round(bounds.height, 3)
 
 
-class TestGetFrameContextTruncation:
-    """Tests for get_frame_context truncation parameters (screenpipe-aligned)."""
-
-    def test_get_frame_context_truncates_text(
-        self, store: FramesStore
-    ):
-        """Frame context should truncate text when max_text_length is set."""
-        long_text = "A" * 5000
-        elements = [
-            {"role": "AXStaticText", "text": long_text, "depth": 0},
-        ]
-        frame_id = _create_completed_frame_with_accessibility(
-            store, "cap-1", "2026-03-20T10:00:00Z", "Safari", long_text, elements
-        )
-
-        # Without truncation
-        context_full = store.get_frame_context(frame_id)
-        assert len(context_full["text"]) == 5000
-
-        # With truncation
-        context_truncated = store.get_frame_context(frame_id, max_text_length=100)
-        assert len(context_truncated["text"]) == 103  # 100 + "..."
-        assert context_truncated["text"].endswith("...")
-
-    def test_get_frame_context_truncates_nodes(
-        self, store: FramesStore
-    ):
-        """Frame context should truncate nodes when max_nodes is set."""
-        # Create 100 nodes
-        elements = [
-            {"role": "AXStaticText", "text": f"Node {i}", "depth": 0}
-            for i in range(100)
-        ]
-        frame_id = _create_completed_frame_with_accessibility(
-            store, "cap-1", "2026-03-20T10:00:00Z", "Safari", "Many nodes", elements
-        )
-
-        # Without truncation
-        context_full = store.get_frame_context(frame_id, include_nodes=True)
-        assert len(context_full["nodes"]) == 100
-        assert "nodes_truncated" not in context_full
-
-        # With truncation
-        context_truncated = store.get_frame_context(frame_id, include_nodes=True, max_nodes=50)
-        assert len(context_truncated["nodes"]) == 50
-        assert context_truncated["nodes_truncated"] == 50
-
-    def test_get_frame_context_truncation_defaults_none(
-        self, store: FramesStore
-    ):
-        """Frame context should return complete data when no truncation params."""
-        long_text = "B" * 3000
-        elements = [
-            {"role": "AXStaticText", "text": f"Node {i}", "depth": 0}
-            for i in range(100)
-        ]
-        frame_id = _create_completed_frame_with_accessibility(
-            store, "cap-1", "2026-03-20T10:00:00Z", "Safari", long_text, elements
-        )
-
-        context = store.get_frame_context(frame_id, include_nodes=True)
-
-        assert len(context["text"]) == 3000
-        assert len(context["nodes"]) == 100
-        assert "nodes_truncated" not in context
-
-    def test_get_frame_context_combined_truncation(
-        self, store: FramesStore
-    ):
-        """Frame context should apply both text and nodes truncation."""
-        long_text = "C" * 5000
-        elements = [
-            {"role": "AXStaticText", "text": f"Node {i}", "depth": 0}
-            for i in range(200)
-        ]
-        frame_id = _create_completed_frame_with_accessibility(
-            store, "cap-1", "2026-03-20T10:00:00Z", "Safari", long_text, elements
-        )
-
-        # screenpipe defaults: text=2000, nodes=50
-        context = store.get_frame_context(
-            frame_id, include_nodes=True, max_text_length=2000, max_nodes=50
-        )
-
-        assert len(context["text"]) == 2003  # 2000 + "..."
-        assert len(context["nodes"]) == 50
-        assert context["nodes_truncated"] == 150
-
-
-class TestGetFrameContextIncludeNodes:
-    """Tests for get_frame_context include_nodes parameter."""
-
-    def test_include_nodes_false_omits_nodes_and_nodes_truncated(
-        self, store: FramesStore
-    ):
-        """When include_nodes=False, nodes and nodes_truncated are absent from response."""
-        elements = [
-            {"role": "AXStaticText", "text": f"Node {i}", "depth": 0}
-            for i in range(100)
-        ]
-        frame_id = _create_completed_frame_with_accessibility(
-            store, "cap-1", "2026-03-20T10:00:00Z", "Safari", "Many nodes", elements
-        )
-
-        context = store.get_frame_context(frame_id, include_nodes=False)
-
-        assert context is not None
-        assert "nodes" not in context
-        assert "nodes_truncated" not in context
-        # Core fields should still be present
-        assert context["frame_id"] == frame_id
-        assert context["text_source"] == "accessibility"
-
-    def test_include_nodes_false_still_extracts_urls_from_text(
-        self, store: FramesStore
-    ):
-        """When include_nodes=False, URLs are still extracted from text."""
-        elements = [
-            {"role": "AXStaticText", "text": "Check https://foo.bar and https://baz.org", "depth": 0},
-        ]
-        frame_id = _create_completed_frame_with_accessibility(
-            store, "cap-1", "2026-03-20T10:00:00Z", "Safari",
-            "Check https://foo.bar and https://baz.org", elements
-        )
-
-        context = store.get_frame_context(frame_id, include_nodes=False)
-
-        assert context is not None
-        assert "nodes" not in context
-        assert "https://foo.bar" in context["urls"]
-        assert "https://baz.org" in context["urls"]
-
-    def test_include_nodes_false_accessibility_frame_returns_text_urls_text_source(
-        self, store: FramesStore
-    ):
-        """When include_nodes=False with accessibility frame, returns text, urls, text_source."""
-        elements = [
-            {"role": "AXStaticText", "text": "Hello from Safari", "depth": 0},
-        ]
-        frame_id = _create_completed_frame_with_accessibility(
-            store, "cap-1", "2026-03-20T10:00:00Z", "Safari",
-            "Hello from Safari", elements, browser_url="https://example.com"
-        )
-
-        context = store.get_frame_context(frame_id, include_nodes=False)
-
-        assert context is not None
-        assert context["text"] == "Hello from Safari"
-        assert context["text_source"] == "accessibility"
-        assert context["urls"] == []
-        assert context["browser_url"] == "https://example.com"
-        assert "nodes" not in context
-
-    def test_include_nodes_false_ocr_frame_returns_text_urls_text_source(
-        self, store: FramesStore
-    ):
-        """When include_nodes=False with OCR frame, returns text, urls, text_source."""
-        frame_id, _ = store.claim_frame(
-            capture_id="cap-ocr-incl",
-            metadata={
-                "timestamp": "2026-03-20T10:00:00Z",
-                "app_name": "Safari",
-            },
-        )
-
-        with sqlite3.connect(str(store.db_path)) as conn:
-            conn.execute(
-                """
-                UPDATE frames SET
-                    ocr_text = ?,
-                    text_source = 'ocr',
-                    status = 'completed'
-                WHERE id = ?
-                """,
-                ("OCR text with https://ocr.example.com", frame_id),
-            )
-            conn.commit()
-
-        context = store.get_frame_context(frame_id, include_nodes=False)
-
-        assert context is not None
-        assert context["text"] == "OCR text with https://ocr.example.com"
-        assert context["text_source"] == "ocr"
-        assert "https://ocr.example.com" in context["urls"]
-        assert "nodes" not in context
-
-    def test_include_nodes_true_includes_nodes(self, store: FramesStore):
-        """When include_nodes=True, nodes are included in response."""
-        elements = [
-            {"role": "AXStaticText", "text": "Title", "depth": 0},
-            {"role": "AXButton", "text": "Click Me", "depth": 0},
-        ]
-        frame_id = _create_completed_frame_with_accessibility(
-            store, "cap-1", "2026-03-20T10:00:00Z", "Safari",
-            "Title Click Me", elements
-        )
-
-        context = store.get_frame_context(frame_id, include_nodes=True)
-
-        assert context is not None
-        assert "nodes" in context
-        assert len(context["nodes"]) == 2
-
-    def test_include_nodes_false_skips_accessibility_tree_json_parsing(
-        self, store: FramesStore
-    ):
-        """When include_nodes=False, accessibility_tree_json is not parsed."""
-        elements = [
-            {"role": "AXStaticText", "text": "Test", "depth": 0},
-        ]
-        frame_id = _create_completed_frame_with_accessibility(
-            store, "cap-1", "2026-03-20T10:00:00Z", "Safari", "Test", elements
-        )
-
-        # With include_nodes=False, nodes should not be in response
-        context = store.get_frame_context(frame_id, include_nodes=False)
-
-        assert "nodes" not in context
-
-    def test_include_nodes_false_skips_link_node_url_extraction(
-        self, store: FramesStore
-    ):
-        """When include_nodes=False, link-node URL extraction is skipped but text URLs still extracted."""
-        elements = [
-            {"role": "AXLink", "text": "https://link-only.example", "depth": 0},
-            {"role": "AXStaticText", "text": "Visit https://text-url.example", "depth": 0},
-        ]
-        frame_id = _create_completed_frame_with_accessibility(
-            store, "cap-1", "2026-03-20T10:00:00Z", "Safari",
-            "Visit https://text-url.example", elements
-        )
-
-        # With include_nodes=False, only text URLs should be extracted
-        # (link-node URL extraction is skipped)
-        context = store.get_frame_context(frame_id, include_nodes=False)
-
-        assert "https://text-url.example" in context["urls"]
-        # Note: https://link-only.example is NOT in text, so it won't be extracted
-        # when include_nodes=False (link extraction skipped)
-        assert "https://link-only.example" not in context["urls"]
-        assert "nodes" not in context
-
-    def test_include_nodes_false_max_nodes_has_no_effect(
-        self, store: FramesStore
-    ):
-        """When include_nodes=False, max_nodes has no effect (nodes absent)."""
-        elements = [
-            {"role": "AXStaticText", "text": f"Node {i}", "depth": 0}
-            for i in range(100)
-        ]
-        frame_id = _create_completed_frame_with_accessibility(
-            store, "cap-1", "2026-03-20T10:00:00Z", "Safari", "Many nodes", elements
-        )
-
-        context = store.get_frame_context(
-            frame_id, include_nodes=False, max_nodes=10
-        )
-
-        assert "nodes" not in context
-        assert "nodes_truncated" not in context
-
-    def test_include_nodes_true_with_max_nodes_respects_limit(
-        self, store: FramesStore
-    ):
-        """When include_nodes=True with max_nodes, limits node count."""
-        elements = [
-            {"role": "AXStaticText", "text": f"Node {i}", "depth": 0}
-            for i in range(100)
-        ]
-        frame_id = _create_completed_frame_with_accessibility(
-            store, "cap-1", "2026-03-20T10:00:00Z", "Safari", "Many nodes", elements
-        )
-
-        context = store.get_frame_context(
-            frame_id, include_nodes=True, max_nodes=10
-        )
-
-        assert "nodes" in context
-        assert len(context["nodes"]) == 10
-        assert context["nodes_truncated"] == 90
