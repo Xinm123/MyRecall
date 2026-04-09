@@ -36,7 +36,7 @@ def _build_messages(context: FrameContext) -> list[dict[str, Any]]:
     prompt_text = (
         f"Analyze this screenshot. App context: {app_context or 'unknown'}. "
         f"Output a strictly valid JSON object:\n"
-        f'{{"narrative": "detailed description (max 1024 chars)", '
+        f'{{"narrative": "detailed description (max 2048 chars)", '
         f'"summary": "one sentence (max 256 chars)", '
         f'"tags": ["keyword1", "keyword2", ...]}}  // 3-8 lowercase keywords\n\n'
         f'Example output:\n'

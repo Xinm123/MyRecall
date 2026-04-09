@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 
 _PROMPT_TEXT = (
     'Output a strictly valid JSON object:\n'
-    '{"narrative": "detailed description (max 1024 chars)", '
+    '{"narrative": "detailed description (max 2048 chars)", '
     '"summary": "one sentence (max 256 chars)", '
     '"tags": ["keyword1", "keyword2", ...]}  // 3-8 lowercase keywords'
 )
