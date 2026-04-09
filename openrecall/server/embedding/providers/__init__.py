@@ -1,6 +1,5 @@
-"""Frame embedding module for multimodal vector search."""
-from openrecall.server.embedding.models import FrameEmbedding
-from openrecall.server.embedding.providers import (
+"""Embedding providers for multimodal vector generation."""
+from openrecall.server.embedding.providers.base import (
     MultimodalEmbeddingProvider,
     EmbeddingProviderError,
     EmbeddingProviderConfigError,
@@ -9,7 +8,6 @@ from openrecall.server.embedding.providers import (
 )
 
 __all__ = [
-    "FrameEmbedding",
     "MultimodalEmbeddingProvider",
     "EmbeddingProviderError",
     "EmbeddingProviderConfigError",
