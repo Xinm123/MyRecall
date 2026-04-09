@@ -5,7 +5,7 @@ import logging
 import sqlite3
 import threading
 import time
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from openrecall.server.database.frames_store import FramesStore

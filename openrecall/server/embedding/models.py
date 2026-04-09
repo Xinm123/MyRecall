@@ -1,7 +1,6 @@
 """Embedding models for frame vector storage."""
 from __future__ import annotations
 
-from typing import Optional
 from lancedb.pydantic import LanceModel, Vector
 from pydantic import Field
 

@@ -7,7 +7,6 @@ from pathlib import Path
 from typing import List, Optional, Tuple
 
 import lancedb
-import numpy as np
 from lancedb.pydantic import LanceModel, Vector
 from pydantic import Field
 

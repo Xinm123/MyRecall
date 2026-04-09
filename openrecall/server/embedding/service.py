@@ -9,7 +9,6 @@ from typing import TYPE_CHECKING, Optional
 from openrecall.server.embedding.models import FrameEmbedding
 from openrecall.server.embedding.providers import (
     MultimodalEmbeddingProvider,
-    EmbeddingProviderError,
 )
 
 if TYPE_CHECKING:
