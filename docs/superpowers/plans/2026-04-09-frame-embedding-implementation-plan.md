@@ -548,7 +548,14 @@ class OpenAIMultimodalEmbeddingProvider(MultimodalEmbeddingProvider):
             headers["Authorization"] = f"Bearer {self.api_key}"
 
         # Build multimodal input
-        # Format depends on API provider - using OpenAI-style for now
+        # NOTE: API format varies by provider. This implementation supports:
+        # 1. OpenAI-style text-only: {"input": "text", ...}
+        # 2. Multimodal with image+text (provider-specific):
+        #    - Some providers use: {"input": {"image": "...", "text": "..."}}
+        #    - Others use: {"input": [...], "modalities": ["image", "text"]}
+        #
+        # For qwen3-vl-embedding via vLLM/DashScope, verify the exact format.
+        # Current implementation uses a generic format that may need adjustment.
         input_data = {
             "image": f"data:image/jpeg;base64,{encoded}",
         }
@@ -814,7 +821,7 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import List, Optional
+from typing import List, Optional, Tuple
 
 import lancedb
 import numpy as np
@@ -997,6 +1004,52 @@ class EmbeddingStore:
         """Return total number of embeddings."""
         table = self.db.open_table(self.table_name)
         return len(table)
+
+    def search_with_distance(
+        self,
+        query_vector: List[float],
+        limit: int = 20,
+    ) -> List[Tuple[FrameEmbedding, float]]:
+        """Search for similar embeddings and return with distance scores.
+
+        Args:
+            query_vector: Query embedding vector
+            limit: Maximum number of results
+
+        Returns:
+            List of (FrameEmbedding, distance) tuples sorted by distance (ascending)
+        """
+        table = self.db.open_table(self.table_name)
+
+        query = table.search(query_vector)
+
+        # Try to use cosine metric if available
+        metric_fn = getattr(query, "metric", None)
+        if callable(metric_fn):
+            try:
+                query = query.metric("cosine")
+            except Exception:
+                pass
+
+        # Get results with distance column
+        results = query.limit(limit).to_list()
+
+        # Convert to (FrameEmbedding, distance) tuples
+        embeddings_with_distance = []
+        for r in results:
+            emb = FrameEmbedding(
+                frame_id=r["frame_id"],
+                embedding_vector=r["embedding_vector"],
+                embedding_model=r.get("embedding_model", "qwen3-vl-embedding"),
+                timestamp=r["timestamp"],
+                app_name=r.get("app_name", ""),
+                window_name=r.get("window_name", ""),
+            )
+            # LanceDB returns distance in _distance column
+            distance = r.get("_distance", 0.0)
+            embeddings_with_distance.append((emb, distance))
+
+        return embeddings_with_distance
 ```
 
 - [ ] **Step 4: Run test to verify it passes**
@@ -1664,6 +1717,42 @@ def claim_embedding_task(
         "frame_id": row[1],
         "retry_count": row[2],
     }
+
+def get_frames_by_ids(
+    self,
+    frame_ids: List[int],
+) -> Dict[int, dict]:
+    """Fetch multiple frames by ID. Returns dict mapping frame_id to frame data."""
+    if not frame_ids:
+        return {}
+
+    placeholders = ",".join("?" * len(frame_ids))
+    with self._connect() as conn:
+        rows = conn.execute(
+            f"""
+            SELECT id, timestamp, full_text, app_name, window_name,
+                   browser_url, focused, device_name, snapshot_path
+            FROM frames
+            WHERE id IN ({placeholders})
+            """,
+            frame_ids,
+        ).fetchall()
+
+    result = {}
+    for row in rows:
+        frame_id = row[0]
+        result[frame_id] = {
+            "frame_id": frame_id,
+            "timestamp": row[1],
+            "full_text": row[2],
+            "app_name": row[3] or "",
+            "window_name": row[4] or "",
+            "browser_url": row[5],
+            "focused": row[6],
+            "device_name": row[7] or "monitor_0",
+            "snapshot_path": row[8],
+        }
+    return result
 ```
 
 - [ ] **Step 5: Run test to verify it passes**
@@ -1678,6 +1767,41 @@ git add openrecall/server/embedding/worker.py
 git add openrecall/server/database/frames_store.py
 git add tests/test_embedding_worker.py
 git commit -m "feat(embedding): add EmbeddingWorker for background processing"
+```
+
+---
+
+## Task 7b: Worker Startup Integration
+
+**Files:**
+- Modify: `openrecall/server/__main__.py`
+
+- [ ] **Step 1: Add EmbeddingWorker startup in OCR mode**
+
+Find the `_start_ocr_mode()` function in `openrecall/server/__main__.py`. After the DescriptionWorker startup block, add similar code for EmbeddingWorker:
+
+```python
+# In _start_ocr_mode(), after DescriptionWorker startup:
+if settings.embedding_enabled:
+    from openrecall.server.embedding.worker import EmbeddingWorker
+    _embedding_worker = EmbeddingWorker(store)
+    _embedding_worker.start()
+    logger.info("EmbeddingWorker started (ocr mode)")
+```
+
+- [ ] **Step 2: Verify worker startup order**
+
+The startup order should be:
+1. DescriptionWorker (if description_enabled)
+2. EmbeddingWorker (if embedding_enabled)
+
+Both run parallel - no dependency between them.
+
+- [ ] **Step 3: Commit**
+
+```bash
+git add openrecall/server/__main__.py
+git commit -m "feat(server): add EmbeddingWorker startup in OCR mode"
 ```
 
 ---
@@ -1934,14 +2058,31 @@ class HybridSearchEngine:
         total = len(merged)
         merged = merged[offset : offset + limit]
 
-        # Build final results
-        # For now, return frame_ids with scores
+        # Build final results - fetch full frame data from database
+        frame_ids = [frame_id for frame_id, score in merged]
+        scores = {frame_id: score for frame_id, score in merged}
+
+        # Fetch full frame data from frames table
+        from openrecall.server.database.frames_store import FramesStore
+        frames_store = FramesStore()
+        frame_data_map = frames_store.get_frames_by_ids(frame_ids)
+
         results = []
-        for frame_id, score in merged:
+        for frame_id in frame_ids:
+            frame = frame_data_map.get(frame_id, {})
             results.append({
                 "frame_id": frame_id,
-                "hybrid_score": score,
+                "hybrid_score": scores.get(frame_id, 0.0),
+                "timestamp": frame.get("timestamp", ""),
+                "text": frame.get("full_text", "")[:200] if frame.get("full_text") else "",
+                "app_name": frame.get("app_name", ""),
+                "window_name": frame.get("window_name", ""),
+                "browser_url": frame.get("browser_url"),
+                "focused": frame.get("focused"),
+                "device_name": frame.get("device_name", "monitor_0"),
+                "file_path": frame.get("file_path", f"{frame.get('timestamp', '')}.jpg"),
                 "frame_url": f"/v1/frames/{frame_id}",
+                "tags": [],
             })
 
         return results, total
@@ -2061,18 +2202,74 @@ git commit -m "feat(config): add embedding provider configuration"
 **Files:**
 - Modify: `openrecall/server/api_v1.py`
 
-- [ ] **Step 1: Add embedding task creation to ingest flow**
+- [ ] **Step 1: Add embedding task creation to ingest flow (parallel to description_task)**
 
-In the ingest endpoint, after frame is created, add:
+In `openrecall/server/api_v1.py`, find where `insert_description_task` is called after frame creation. Add embedding task creation in parallel:
 
 ```python
-# After frame is successfully created and OCR processing completes
-# Create embedding task if embedding is enabled
+# In ingest endpoint, after frame is successfully created:
+# Step 6: Enqueue description task if enabled (EXISTING CODE)
+if settings.description_enabled:
+    try:
+        with store._connect() as conn:
+            store.insert_description_task(conn, frame_id)
+            conn.commit()
+            logger.debug(
+                "ingest: description task enqueued capture_id=%s frame_id=%d",
+                capture_id_raw,
+                frame_id,
+            )
+    except Exception as e:
+        logger.warning(
+            "ingest: failed to enqueue description task capture_id=%s frame_id=%d: %s",
+            capture_id_raw,
+            frame_id,
+            e,
+        )
+
+# Step 7: Enqueue embedding task if enabled (NEW CODE - PARALLEL)
 if settings.embedding_enabled:
     try:
-        service.enqueue_embedding_task(conn, frame_id)
+        with store._connect() as conn:
+            store.insert_embedding_task(conn, frame_id)
+            conn.commit()
+            logger.debug(
+                "ingest: embedding task enqueued capture_id=%s frame_id=%d",
+                capture_id_raw,
+                frame_id,
+            )
     except Exception as e:
-        logger.warning(f"Failed to enqueue embedding task: {e}")
+        logger.warning(
+            "ingest: failed to enqueue embedding task capture_id=%s frame_id=%d: %s",
+            capture_id_raw,
+            frame_id,
+            e,
+        )
+```
+
+Add `insert_embedding_task` method to FramesStore:
+
+```python
+def insert_embedding_task(self, conn: sqlite3.Connection, frame_id: int) -> None:
+    """Insert a pending embedding task for a frame. Idempotent."""
+    try:
+        conn.execute(
+            """
+            INSERT INTO embedding_tasks (frame_id, status)
+            VALUES (?, 'pending')
+            """,
+            (frame_id,),
+        )
+        conn.execute(
+            """
+            UPDATE frames SET embedding_status = 'pending'
+            WHERE id = ? AND embedding_status IS NULL
+            """,
+            (frame_id,),
+        )
+    except sqlite3.IntegrityError:
+        # Task already exists - ignore
+        pass
 ```
 
 - [ ] **Step 2: Add GET /v1/embedding/tasks/status endpoint**
@@ -2101,6 +2298,7 @@ def similar_frames(frame_id: int):
     """Find similar frames using vector similarity."""
     from openrecall.server.database.embedding_store import EmbeddingStore
     from openrecall.server.database.frames_store import FramesStore
+    import numpy as np
 
     limit = request.args.get("limit", 10, type=int)
     limit = max(1, min(limit, 100))
@@ -2114,14 +2312,20 @@ def similar_frames(frame_id: int):
         return jsonify({"error": "Embedding not found for frame"}), 404
 
     # Search for similar frames
-    results = store.search(embedding.embedding_vector, limit=limit + 1)
+    # Returns (frame_id, distance) tuples from LanceDB
+    results_with_distance = store.search_with_distance(
+        embedding.embedding_vector, limit=limit + 1
+    )
 
-    # Filter out the query frame itself
+    # Filter out the query frame itself and calculate similarity
+    # LanceDB returns cosine distance, similarity = 1 - distance
     similar = []
-    for r in results:
+    for r, distance in results_with_distance:
         if r.frame_id != frame_id:
+            similarity = max(0.0, 1.0 - float(distance))
             similar.append({
                 "frame_id": r.frame_id,
+                "similarity": round(similarity, 4),
                 "timestamp": r.timestamp,
                 "app_name": r.app_name,
                 "window_name": r.window_name,
@@ -2135,6 +2339,8 @@ def similar_frames(frame_id: int):
         "similar_frames": similar,
     })
 ```
+
+**Note:** Requires adding `search_with_distance()` method to EmbeddingStore that returns distance along with results.
 
 - [ ] **Step 4: Extend /v1/search to support mode parameter**
 
@@ -2339,12 +2545,13 @@ git commit -m "feat(embedding): complete multimodal embedding implementation
 | 2 | Embedding models | 2 new, 1 test |
 | 3 | Provider protocol | 2 new, 1 test |
 | 4 | OpenAI provider | 1 new, 1 modify, 1 test |
-| 5 | Embedding store | 1 new, 1 test |
+| 5 | Embedding store (with search_with_distance) | 1 new, 1 test |
 | 6 | Embedding service | 1 new, 1 test |
-| 7 | Embedding worker | 1 new, 1 modify, 1 test |
-| 8 | Hybrid search engine | 1 new, 1 test |
+| 7 | Embedding worker | 1 new, 1 test |
+| 7b | Worker startup integration | 1 modify |
+| 8 | Hybrid search engine (with full frame data) | 1 new, 1 test |
 | 9 | Factory integration | 2 modify |
-| 10 | API endpoints | 1 modify |
+| 10 | API endpoints (ingest trigger + similar with score) | 1 modify |
 | 11 | Module exports | 1 modify |
 | 12 | Config documentation | 1 modify |
 | 13 | Integration tests | 1 new |
