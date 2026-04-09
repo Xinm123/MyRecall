@@ -16,6 +16,7 @@ from openrecall.shared.logging_config import configure_logging
 logger = None  # Set in main() after settings are initialized
 
 _description_worker = None  # module-level reference for shutdown
+_embedding_worker = None  # module-level reference for shutdown
 
 
 def _parse_args():
@@ -171,7 +172,7 @@ def _preload_ocr_model():
 
 def _start_ocr_mode():
     """Start the V3ProcessingWorker for OCR processing."""
-    global _description_worker
+    global _description_worker, _embedding_worker
     from openrecall.server.processing.v3_worker import V3ProcessingWorker
 
     worker = V3ProcessingWorker()
@@ -185,6 +186,16 @@ def _start_ocr_mode():
         _description_worker = DescriptionWorker(store)
         _description_worker.start()
         logger.info("DescriptionWorker started (ocr mode)")
+
+    if settings.embedding_enabled:
+        from openrecall.server.database.frames_store import FramesStore
+        from openrecall.server.embedding.worker import EmbeddingWorker
+
+        # Reuse store if already created, otherwise create new one
+        store = FramesStore() if _description_worker is None else FramesStore()
+        _embedding_worker = EmbeddingWorker(store)
+        _embedding_worker.start()
+        logger.info("EmbeddingWorker started (ocr mode)")
 
     return worker
 
@@ -266,6 +277,13 @@ def main():
                 app_desc_worker.join(timeout=5)
                 logger.info("DescriptionWorker stopped")
 
+        # Stop EmbeddingWorker
+        if _embedding_worker is not None:
+            logger.info("Stopping EmbeddingWorker...")
+            _embedding_worker.stop()
+            _embedding_worker.join(timeout=5)
+            logger.info("EmbeddingWorker stopped")
+
         logger.info("Server shutdown complete")
         sys.exit(0)
 
@@ -285,6 +303,8 @@ def main():
             app_desc_worker = getattr(app, "description_worker", None)
             if app_desc_worker is not None:
                 app_desc_worker.stop()
+        if _embedding_worker is not None:
+            _embedding_worker.stop()
 
     atexit.register(_cleanup_worker)
 

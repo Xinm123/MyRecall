@@ -53,6 +53,14 @@ class ServerSettings(TOMLConfig):
     reranker_model: str = "Qwen/Qwen3-Reranker-0.6B"
     reranker_api_key: str = ""
 
+    # [embedding]
+    embedding_enabled: bool = True
+    embedding_provider: str = "openai"
+    embedding_model: str = "qwen3-vl-embedding"
+    embedding_api_key: str = ""
+    embedding_api_base: str = ""
+    embedding_dim: int = 1024
+
     # [processing]
     processing_mode: str = "ocr"
     processing_queue_capacity: int = 200
@@ -99,6 +107,12 @@ class ServerSettings(TOMLConfig):
             reranker_url=data.get("reranker.url", "http://localhost:8083/rerank"),
             reranker_model=data.get("reranker.model", "Qwen/Qwen3-Reranker-0.6B"),
             reranker_api_key=data.get("reranker.api_key", ""),
+            embedding_enabled=data.get("embedding.enabled", True),
+            embedding_provider=data.get("embedding.provider", "openai"),
+            embedding_model=data.get("embedding.model", "qwen3-vl-embedding"),
+            embedding_api_key=data.get("embedding.api_key", ""),
+            embedding_api_base=data.get("embedding.api_base", ""),
+            embedding_dim=data.get("embedding.dim", 1024),
             processing_mode=data.get("processing.mode", "ocr"),
             processing_queue_capacity=data.get("processing.queue_capacity", 200),
             processing_lifo_threshold=data.get("processing.lifo_threshold", 10),
