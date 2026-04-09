@@ -87,3 +87,33 @@ class TestOpenAIMultimodalEmbeddingProvider:
         # Check L2 normalization
         norm = np.linalg.norm(result)
         assert abs(norm - 1.0) < 0.001
+
+    def test_embed_image_returns_normalized_vector(self, tmp_path):
+        """embed_image should return normalized vector for image input."""
+        from openrecall.server.embedding.providers.openai import (
+            OpenAIMultimodalEmbeddingProvider,
+        )
+
+        # Create a test image file
+        test_image = tmp_path / "test.jpg"
+        test_image.write_bytes(b"\xff\xd8\xff\xe0" + b"\x00" * 100)
+
+        provider = OpenAIMultimodalEmbeddingProvider(
+            api_key="test", model_name="test-model"
+        )
+
+        # Mock the API response
+        mock_response = Mock()
+        mock_response.ok = True
+        mock_response.json.return_value = {
+            "data": [{"embedding": [0.5] * 1024}]
+        }
+
+        with patch("requests.post", return_value=mock_response):
+            result = provider.embed_image(str(test_image), text="test context")
+
+        assert isinstance(result, np.ndarray)
+        assert result.shape == (1024,)
+        # Check L2 normalization
+        norm = np.linalg.norm(result)
+        assert abs(norm - 1.0) < 0.001
