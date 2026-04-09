@@ -6,6 +6,9 @@ from openrecall.server.embedding.providers.base import (
     EmbeddingProviderRequestError,
     EmbeddingProviderUnavailableError,
 )
+from openrecall.server.embedding.providers.openai import (
+    OpenAIMultimodalEmbeddingProvider,
+)
 
 __all__ = [
     "MultimodalEmbeddingProvider",
@@ -13,4 +16,5 @@ __all__ = [
     "EmbeddingProviderConfigError",
     "EmbeddingProviderRequestError",
     "EmbeddingProviderUnavailableError",
+    "OpenAIMultimodalEmbeddingProvider",
 ]
