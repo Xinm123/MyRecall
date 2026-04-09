@@ -8,7 +8,7 @@ import uuid
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Optional
+from typing import List, Optional
 
 from openrecall.shared.config import settings
 
@@ -1218,6 +1218,41 @@ class FramesStore:
         except sqlite3.Error as e:
             logger.error("get_frame_by_id failed frame_id=%d: %s", frame_id, e)
             return None
+
+    def get_frames_by_ids(
+        self,
+        frame_ids: List[int],
+        conn: Optional[sqlite3.Connection] = None,
+    ) -> dict[int, dict]:
+        """Get multiple frames by IDs as dicts.
+
+        Args:
+            frame_ids: List of frame IDs to retrieve
+            conn: Optional existing connection. If None, creates a new one.
+
+        Returns:
+            Dict mapping frame_id to frame dict (only found frames)
+        """
+        if not frame_ids:
+            return {}
+
+        def _query(c: sqlite3.Connection) -> dict[int, dict]:
+            placeholders = ",".join("?" * len(frame_ids))
+            rows = c.execute(
+                f"SELECT * FROM frames WHERE id IN ({placeholders})",
+                frame_ids,
+            ).fetchall()
+            return {row["id"]: dict(row) for row in rows}
+
+        if conn is not None:
+            return _query(conn)
+
+        try:
+            with self._connect() as conn:
+                return _query(conn)
+        except sqlite3.Error as e:
+            logger.error("get_frames_by_ids failed: %s", e)
+            return {}
 
     # ------------------------------------------------------------------
     # Chat MVP Query Helpers (Phase 6)
