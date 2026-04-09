@@ -1563,6 +1563,32 @@ class FramesStore:
         conn.commit()
         return {"id": row[0], "frame_id": row[1], "retry_count": row[2]}
 
+    def claim_embedding_task(
+        self,
+        conn: sqlite3.Connection,
+    ) -> Optional[dict]:
+        """Atomically claim the next pending embedding task. Returns dict or None."""
+        cursor = conn.execute(
+            """
+            WITH next_task AS (
+                SELECT id FROM embedding_tasks
+                WHERE status = 'pending'
+                  AND (next_retry_at IS NULL OR next_retry_at <= strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+                ORDER BY created_at ASC
+                LIMIT 1
+            )
+            UPDATE embedding_tasks
+            SET status = 'processing', started_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+            WHERE id = (SELECT id FROM next_task)
+            RETURNING id, frame_id, retry_count
+            """
+        )
+        row = cursor.fetchone()
+        if row is None:
+            return None
+        conn.commit()
+        return {"id": row[0], "frame_id": row[1], "retry_count": row[2]}
+
     def insert_frame_description(
         self,
         conn: sqlite3.Connection,
