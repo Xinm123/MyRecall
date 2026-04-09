@@ -86,8 +86,12 @@ pip install -e ".[test]"    # Include test dependencies
 **Components:**
 - **Recorder**: Event-driven screenshot capture
   - Triggers: `idle`, `app_switch`, `manual`, `click`
-  - Debounce: Three-layer debouncing (click: 3000ms, trigger: 3000ms, capture: 3000ms)
-  - Idle fallback: `idle_capture_interval_ms=60000ms`
+  - Debounce: Three-layer hot-reloadable debouncing (click/trigger/capture — AtomicInt ctypes, update_interval_ms())
+  - Idle fallback: `idle_capture_interval_ms=60000ms` (chunked 5s sleep for hot-reload)
+  - Config listener thread: watches SQLite runtime config → calls debouncer update_interval_ms()
+  - Dedup: runtime_config.get_dedup_*() getters for all dedup settings (SQLite > TOML priority)
+- **runtime_config**: Hot-reload config layer — SQLite-backed getters + threading.Event wait/notify
+- **events/atomic.py**: AtomicInt (ctypes.c_int64) — lock-free interval reads for CGEventTap threads
 - **Spool**: Disk queue for reliability (`~/.myrecall/client/spool/`)
   - Format: JPEG (`.jpg`/`.jpeg`) + JSON metadata
   - Atomic writes, idempotent retry
@@ -183,7 +187,9 @@ openrecall/
 ├── client/           # Host process
 │   ├── __main__.py  # Entry point
 │   ├── events/      # Event capture (macOS CGEventTap)
+│   │   ├── atomic.py  # AtomicInt (ctypes.c_int64) for lock-free hot-reload
 │   ├── recorder.py  # Screenshot capture + AX collection
+│   ├── runtime_config.py  # Hot-reload SQLite getters + wait/notify
 │   ├── spool.py     # Disk queue
 │   ├── uploader.py  # Edge upload consumer
 │   ├── hash_utils.py  # Frame deduplication (hash)
@@ -300,6 +306,15 @@ See `docs/archive/v3/http_contract_ledger.md` for complete API documentation (ar
 3. Update API contracts in `openrecall/server/api_v1.py`
 4. Update tests in `tests/test_p1_s1_frames.py`
 5. Run migrations test: `pytest tests/test_v3_migrations_bootstrap.py`
+
+### Adding a New Hot-Reloadable Setting
+
+1. Add default to `ClientSettingsStore.DEFAULTS` in `openrecall/client/database/settings_store.py`
+2. Add validator in `openrecall/client/web/routes/settings.py` validators dict
+3. Add getter in `openrecall/client/runtime_config.py` (SQLite > TOML priority)
+4. Add `notify_config_changed()` call in `openrecall/client/web/routes/settings.py` after save
+5. Consumer (recorder/hash_utils) calls getter on each use cycle
+6. Add unit test in `tests/test_runtime_config.py`
 
 ### Adding a New Capture Trigger
 

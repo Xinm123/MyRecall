@@ -1,7 +1,7 @@
 # Settings Hot-Reload Design
 
 **Date:** 2026-04-08
-**Status:** Approved
+**Status:** Implemented (2026-04-09)
 **Scope:** Enable hot-reload for all settings exposed in the WebUI Settings page, including Debounce, Deduplication, and Idle Interval configurations.
 
 ---

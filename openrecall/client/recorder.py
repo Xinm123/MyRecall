@@ -294,7 +294,9 @@ class ScreenRecorder:
         runtime_config.init_runtime_config(settings.client_data_dir)
 
         self._spool: SpoolQueue = get_spool()
-        self._spool_uploader: SpoolUploader = SpoolUploader()
+        self._spool_uploader: SpoolUploader = SpoolUploader(
+            upload_enabled_fn=lambda: self.upload_enabled
+        )
         self._trigger_channel: TriggerEventChannel = TriggerEventChannel(
             settings.trigger_queue_capacity
         )
@@ -1573,6 +1575,7 @@ class ScreenRecorder:
                 except Exception as cleanup_error:
                     logger.debug("Error during resource cleanup: %s", cleanup_error)
 
+                # Log upload status after successful capture
                 if not self.upload_enabled:
                     logger.debug(
                         "Upload disabled: buffered locally (will upload when enabled)"

@@ -7,7 +7,7 @@ import time
 import urllib.parse
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional
+from typing import Callable, Optional
 
 import requests
 
@@ -152,6 +152,7 @@ class SpoolUploader(threading.Thread):
       - 503 QUEUE_FULL: honour retry_after from response
       - network failure: exponential backoff 1s -> 2s -> 4s ... capped at 60s
       - success: reset backoff counter
+      - upload_disabled: pause upload but keep retrying (check every 1s)
     """
 
     def __init__(
@@ -159,20 +160,36 @@ class SpoolUploader(threading.Thread):
         spool: Optional[SpoolQueue] = None,
         stop_event: Optional[threading.Event] = None,
         name: str = "SpoolUploader",
+        upload_enabled_fn: Optional[Callable[[], bool]] = None,
     ) -> None:
         super().__init__(name=name, daemon=True)
         self.spool = spool or get_spool()
         self._stop_event = stop_event or threading.Event()
         self._retry_count = 0
+        self._upload_enabled_fn = upload_enabled_fn
 
     def stop(self) -> None:
         self._stop_event.set()
+
+    def _is_upload_enabled(self) -> bool:
+        """Check if upload is enabled."""
+        if self._upload_enabled_fn is None:
+            return True  # Default to enabled if no function provided
+        try:
+            return self._upload_enabled_fn()
+        except Exception:
+            return True  # Fail open - continue uploading if check fails
 
     def run(self) -> None:
         residual = self.spool.count()
         logger.info("v3_uploader: SpoolUploader started | residual=%d", residual)
 
         while not self._stop_event.is_set():
+            # Check if upload is enabled
+            if not self._is_upload_enabled():
+                self._stop_event.wait(timeout=1.0)
+                continue
+
             items = self.spool.get_pending(limit=1)
 
             if not items:

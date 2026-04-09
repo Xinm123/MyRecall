@@ -399,10 +399,6 @@
       left: 22px;
     }
 
-    /* Hide AI text when disabled */
-    body.hide-ai .ai-insight-text {
-      display: none;
-    }
   </style>
   
   {% block extra_head %}{% endblock %}
@@ -456,9 +452,9 @@
         
         <!-- Popover Menu -->
         <div x-show="open" @click.away="open = false" class="control-center-popover">
-          <!-- Privacy Section -->
+          <!-- Control Section -->
           <div class="control-section">
-            <div class="control-section-title">Privacy</div>
+            <div class="control-section-title">Control</div>
             <div class="control-item">
               <span class="control-item-label control-item-label-with-status">
                 <span>Recording</span>
@@ -469,7 +465,7 @@
                   <span x-text="config.client_online ? 'Connected' : 'Offline'"></span>
                 </span>
               </span>
-              <div 
+              <div
                 @click="toggleSetting('recording_enabled')"
                 :class="{ 'toggle-switch': true, 'active': config.recording_enabled }"
                 class="toggle-switch">
@@ -478,37 +474,9 @@
             </div>
             <div class="control-item">
               <span class="control-item-label">Upload</span>
-              <div 
+              <div
                 @click="toggleSetting('upload_enabled')"
                 :class="{ 'toggle-switch': true, 'active': config.upload_enabled }"
-                class="toggle-switch">
-                <div class="toggle-switch-thumb"></div>
-              </div>
-            </div>
-          </div>
-          
-          <!-- Intelligence Section -->
-          <div class="control-section">
-            <div class="control-section-title">Intelligence</div>
-            <div class="control-item">
-              <span class="control-item-label">AI Processing</span>
-              <div 
-                @click="toggleSetting('ai_processing_enabled')"
-                :class="{ 'toggle-switch': true, 'active': config.ai_processing_enabled }"
-                class="toggle-switch">
-                <div class="toggle-switch-thumb"></div>
-              </div>
-            </div>
-          </div>
-          
-          <!-- View Section -->
-          <div class="control-section">
-            <div class="control-section-title">View</div>
-            <div class="control-item">
-              <span class="control-item-label">Show AI</span>
-              <div 
-                @click="toggleSetting('ui_show_ai')"
-                :class="{ 'toggle-switch': true, 'active': config.ui_show_ai }"
                 class="toggle-switch">
                 <div class="toggle-switch-thumb"></div>
               </div>
@@ -530,8 +498,6 @@
         config: {
           recording_enabled: true,
           upload_enabled: true,
-          ai_processing_enabled: true,
-          ui_show_ai: true,
           client_online: false
         },
         _pollerId: null,
@@ -554,7 +520,6 @@
             .then(response => response.json())
             .then(data => {
               this.config = data;
-              this.updateBodyClass();
               if (this.open) {
                 console.log('Config refreshed:', this.config);
               }
@@ -574,10 +539,7 @@
           const previousValue = this.config[key];
           this.config[key] = !this.config[key];
           console.log(`Toggle ${key}: ${previousValue} -> ${this.config[key]}`);
-          
-          // Update body class immediately for ui_show_ai
-          this.updateBodyClass();
-          
+
           // Send to server
           fetch(EDGE_BASE_URL + '/api/config', {
             method: 'POST',
@@ -598,21 +560,7 @@
             console.error('Failed to update setting:', error);
             // Revert on error
             this.config[key] = previousValue;
-            this.updateBodyClass();
           });
-        },
-        
-        updateBodyClass() {
-          if (!this.config.ui_show_ai) {
-            document.body.classList.add('hide-ai');
-            console.log('Added hide-ai class');
-          } else {
-            document.body.classList.remove('hide-ai');
-            console.log('Removed hide-ai class');
-          }
-          // Debug: Check if AI elements exist
-          const aiElements = document.querySelectorAll('.ai-insight-text');
-          console.log(`Found ${aiElements.length} .ai-insight-text elements:`, aiElements);
         }
       };
     }
