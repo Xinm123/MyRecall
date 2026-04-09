@@ -291,31 +291,6 @@ class Settings(BaseSettings):
             "推荐范围: 640-1920，默认 960"
         ),
     )
-    embedding_provider: str = Field(
-        default="",
-        alias="OPENRECALL_EMBEDDING_PROVIDER",
-        description="Optional override for embedding provider; falls back to ai_provider when empty",
-    )
-    embedding_api_model_name: str = Field(
-        default="",
-        alias="OPENRECALL_EMBEDDING_MODEL_NAME",
-        description="Optional override for embedding API model; falls back to ai_model_name when empty",
-    )
-    embedding_api_key: str = Field(
-        default="",
-        alias="OPENRECALL_EMBEDDING_API_KEY",
-        description="Optional override for embedding API key; falls back to ai_api_key when empty",
-    )
-    embedding_api_base: str = Field(
-        default="",
-        alias="OPENRECALL_EMBEDDING_API_BASE",
-        description="Optional override for embedding API base URL; falls back to ai_api_base when empty",
-    )
-    embedding_model_name: str = Field(
-        default="qwen-text-v1",
-        alias="OPENRECALL_EMBEDDING_MODEL",
-        description="Embedding model for semantic search",
-    )
 
     # Description generation settings
     description_enabled: bool = Field(
@@ -344,15 +319,36 @@ class Settings(BaseSettings):
         description="Optional override for description API base URL; falls back to ai_api_base when empty",
     )
 
-    keyword_strategy: str = Field(
-        default="local",
-        alias="OPENRECALL_KEYWORD_STRATEGY",
-        description="Strategy for keyword extraction (local, rake, etc.)",
+    # Embedding Settings (multimodal)
+    embedding_enabled: bool = Field(
+        default=True,
+        alias="OPENRECALL_EMBEDDING_ENABLED",
+        description="Enable embedding generation for frames",
+    )
+    embedding_provider: str = Field(
+        default="openai",
+        alias="OPENRECALL_EMBEDDING_PROVIDER",
+        description="Embedding provider: openai, dashscope",
+    )
+    embedding_model: str = Field(
+        default="qwen3-vl-embedding",
+        alias="OPENRECALL_EMBEDDING_MODEL",
+        description="Embedding model name",
+    )
+    embedding_api_key: str = Field(
+        default="",
+        alias="OPENRECALL_EMBEDDING_API_KEY",
+        description="API key for embedding provider",
+    )
+    embedding_api_base: str = Field(
+        default="",
+        alias="OPENRECALL_EMBEDDING_API_BASE",
+        description="API base URL for embedding provider",
     )
     embedding_dim: int = Field(
         default=1024,
         alias="OPENRECALL_EMBEDDING_DIM",
-        description="Embedding vector dimension (must match model output)",
+        description="Embedding vector dimension",
     )
 
     # v3 Ingestion Configuration

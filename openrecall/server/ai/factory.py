@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING, Dict, Union
 
 if TYPE_CHECKING:
     from openrecall.server.description.providers.base import DescriptionProvider
+    from openrecall.server.embedding.providers.base import MultimodalEmbeddingProvider
 
 from openrecall.server.ai.base import (
     AIProvider,
@@ -167,6 +168,36 @@ def get_description_provider() -> "DescriptionProvider":
         )
     else:
         raise AIProviderConfigError(f"Unknown description provider: {provider}")
+
+    _instances[capability] = instance
+    return instance
+
+
+def get_multimodal_embedding_provider() -> "MultimodalEmbeddingProvider":
+    """Get or create a cached MultimodalEmbeddingProvider instance."""
+    from openrecall.server.embedding.providers import (
+        MultimodalEmbeddingProvider,
+        OpenAIMultimodalEmbeddingProvider,
+    )
+
+    capability = "multimodal_embedding"
+    cached = _instances.get(capability)
+    if cached is not None:
+        return cached  # type: ignore[return-value]
+
+    provider = settings.embedding_provider.strip().lower() if settings.embedding_provider else "openai"
+    model_name = settings.embedding_model
+    api_key = settings.embedding_api_key
+    api_base = settings.embedding_api_base
+
+    if provider == "openai":
+        instance: MultimodalEmbeddingProvider = OpenAIMultimodalEmbeddingProvider(
+            api_key=api_key,
+            model_name=model_name,
+            api_base=api_base,
+        )
+    else:
+        raise AIProviderConfigError(f"Unknown embedding provider: {provider}")
 
     _instances[capability] = instance
     return instance
