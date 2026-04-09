@@ -640,46 +640,15 @@ def get_frame(frame_id: int):
 def get_frame_context(frame_id: int):
     """Return frame context for chat grounding.
 
-    Query Parameters:
-        include_nodes: Optional. Whether to include parsed nodes from accessibility_tree_json.
-            Defaults to False (nodes omitted). Pass true to include nodes.
-        max_text_length: Optional. Maximum length of text field (truncates with "...").
-        max_nodes: Optional. Maximum number of nodes to return.
-            Only applies when include_nodes=true.
-
     Returns:
-        200 JSON — frame context with text, nodes (if include_nodes=true), urls, text_source
+        200 JSON — frame context (always includes description, text, urls, text_source)
         404 NOT_FOUND — frame_id not in DB
     """
     request_id = str(uuid.uuid4())
 
-    # Parse optional query parameters
-    include_nodes = False
-    max_text_length = None
-    max_nodes = None
-
-    include_nodes_raw = request.args.get("include_nodes")
-    if include_nodes_raw is not None:
-        include_nodes = include_nodes_raw.lower() in ("true", "1", "yes")
-
-    max_text_length_raw = request.args.get("max_text_length")
-    if max_text_length_raw:
-        try:
-            max_text_length = int(max_text_length_raw)
-        except ValueError:
-            pass
-
-    max_nodes_raw = request.args.get("max_nodes")
-    if max_nodes_raw:
-        try:
-            max_nodes = int(max_nodes_raw)
-        except ValueError:
-            pass
-
     store = _get_frames_store()
 
-    # Get basic context (handles its own connection internally)
-    context = store.get_frame_context(frame_id, include_nodes, max_text_length, max_nodes)
+    context = store.get_frame_context(frame_id)
 
     if context is None:
         return make_error_response(
@@ -689,20 +658,15 @@ def get_frame_context(frame_id: int):
             request_id=request_id,
         )
 
-    # Add description info
-    description_status = None
+    # Add description if completed
     description = None
     try:
         with store._connect() as conn:
-            # Get description_status from frames table
             row = conn.execute(
                 "SELECT description_status FROM frames WHERE id = ?",
                 (frame_id,),
             ).fetchone()
-            if row:
-                description_status = row["description_status"]
-            # Get description if completed
-            if description_status == "completed":
+            if row and row["description_status"] == "completed":
                 desc_row = store.get_frame_description(conn, frame_id)
                 if desc_row:
                     description = {
@@ -713,10 +677,22 @@ def get_frame_context(frame_id: int):
     except Exception as e:
         logger.warning(f"Failed to get description for frame {frame_id}: {e}")
 
-    context["description_status"] = description_status
-    context["description"] = description
+    # Insert description at the correct field position (after window_name, before text)
+    # Build ordered result dict
+    result = {
+        "frame_id": context["frame_id"],
+        "timestamp": context["timestamp"],
+        "app_name": context["app_name"],
+        "window_name": context["window_name"],
+        "description": description,
+        "text": context["text"],
+        "text_source": context["text_source"],
+        "urls": context["urls"],
+        "browser_url": context["browser_url"],
+        "status": context["status"],
+    }
 
-    return jsonify(context)
+    return jsonify(result)
 
 
 # ---------------------------------------------------------------------------
