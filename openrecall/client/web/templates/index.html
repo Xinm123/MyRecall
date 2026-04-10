@@ -15,6 +15,34 @@
 
 {% block extra_head %}
 <style>
+  /* Soft color system variables */
+  :root {
+    /* Soft status colors */
+    --color-success: #5BC88C;
+    --color-success-bg: rgba(91, 200, 140, 0.1);
+    --color-success-border: rgba(91, 200, 140, 0.15);
+
+    --color-primary: #4A9EFF;
+    --color-primary-bg: rgba(74, 158, 255, 0.1);
+    --color-primary-border: rgba(74, 158, 255, 0.15);
+
+    --color-warning: #FFB84D;
+    --color-warning-bg: rgba(255, 184, 77, 0.1);
+    --color-warning-border: rgba(255, 184, 77, 0.15);
+
+    --color-error: #FF6B6B;
+    --color-error-bg: rgba(255, 107, 107, 0.1);
+    --color-error-border: rgba(255, 107, 107, 0.15);
+
+    --color-neutral: #8E8E93;
+    --color-neutral-bg: rgba(142, 142, 147, 0.1);
+    --color-neutral-border: rgba(142, 142, 147, 0.15);
+
+    /* Text hierarchy */
+    --text-tertiary: #8E8E93;
+    --bg-footer: #FAFAFA;
+  }
+
   /* Form groups for toolbar */
   .form-group {
     display: flex;
@@ -48,7 +76,18 @@
     0% { transform: rotate(0deg); }
     100% { transform: rotate(360deg); }
   }
-  
+
+  @keyframes pulse-soft {
+    0%, 100% {
+      opacity: 1;
+      transform: scale(1);
+    }
+    50% {
+      opacity: 0.7;
+      transform: scale(0.95);
+    }
+  }
+
   .spinner {
     display: inline-block;
     width: 14px;
@@ -63,9 +102,9 @@
   /* Memory Grid Layout */
   .memory-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-    gap: 24px;
-    padding: 24px 0;
+    grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+    gap: 28px;
+    padding: 28px 0;
   }
   
   /* Memory Card */
@@ -80,8 +119,8 @@
   }
   
   .memory-card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+    transform: translateY(-4px);
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.1);
   }
   
   /* Card Header */
@@ -795,21 +834,21 @@
     }
   }
 
-  /* P1-S3: Status-specific card styling */
+  /* P1-S3: Status-specific card styling - Apple style subtle */
   .memory-card[data-frame-status="pending"] {
-    border-left: 3px solid #FF9500;
+    border-left: 2px solid var(--color-warning);
   }
 
   .memory-card[data-frame-status="processing"] {
-    border-left: 3px solid #007AFF;
+    border-left: 2px solid var(--color-primary);
   }
 
   .memory-card[data-frame-status="completed"] {
-    border-left: 3px solid #34C759;
+    border-left: 2px solid var(--color-success);
   }
 
   .memory-card[data-frame-status="failed"] {
-    border-left: 3px solid #FF3B30;
+    border-left: 2px solid var(--color-error);
   }
 
   /* Card header with window name */
