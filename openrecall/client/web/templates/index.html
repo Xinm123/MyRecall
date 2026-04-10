@@ -2025,10 +2025,10 @@
       getDescriptionStatusText(entry) {
         const status = entry.description_status || 'pending';
         const labels = {
-          pending: '○ pending',
-          processing: '<span class="pulse-dot"></span> processing',
-          completed: '● done',
-          failed: '✕ failed'
+          pending: '○',
+          processing: '<span class="pulse-dot"></span>',
+          completed: '●',
+          failed: '<span style="color: var(--color-error)">●</span>'
         };
         return labels[status] || labels.pending;
       },
@@ -2037,10 +2037,10 @@
       getEmbeddingStatusText(entry) {
         const status = entry.embedding_status || 'pending';
         const labels = {
-          pending: '○ pending',
-          processing: '<span class="pulse-dot"></span> processing',
-          completed: '● done',
-          failed: '✕ failed'
+          pending: '○',
+          processing: '<span class="pulse-dot"></span>',
+          completed: '●',
+          failed: '<span style="color: var(--color-error)">●</span>'
         };
         return labels[status] || labels.pending;
       },
