@@ -1548,6 +1548,73 @@
   [x-cloak] {
     display: none !important;
   }
+
+/* =============================================
+   Responsive Adaptations
+   ============================================= */
+
+@media (max-width: 768px) {
+  .memory-grid {
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 20px;
+    padding: 20px 0;
+  }
+
+  .card-header-v3 {
+    padding: 10px 12px;
+  }
+
+  .app-name {
+    font-size: 13px;
+  }
+
+  .window-name {
+    font-size: 12px;
+  }
+
+  .status-grid {
+    gap: 6px;
+  }
+
+  .status-cell {
+    padding: 6px 8px;
+  }
+
+  .cell-label {
+    font-size: 10px;
+  }
+
+  .cell-value {
+    font-size: 11px;
+  }
+
+  .stats-bar {
+    gap: 16px;
+    padding: 12px 18px;
+  }
+
+  .stat-item {
+    font-size: 13px;
+  }
+}
+
+@media (max-width: 480px) {
+  .memory-grid {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+
+  .stats-bar {
+    flex-wrap: wrap;
+    gap: 12px;
+    padding: 12px 16px;
+    width: auto;
+  }
+
+  .card-footer-grid {
+    padding: 10px 12px;
+  }
+}
 </style>
 
 <script id="initialEntriesData" type="application/json">{{ entries | tojson | safe }}</script>
