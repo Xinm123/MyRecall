@@ -729,7 +729,8 @@
   border-color: var(--color-success-border);
 }
 
-.status-cell.status-completed .cell-label {
+.status-cell.status-completed .cell-label,
+.status-cell.status-completed .cell-value {
   color: #2A9D4A;
 }
 
@@ -738,7 +739,8 @@
   border-color: var(--color-primary-border);
 }
 
-.status-cell.status-processing .cell-label {
+.status-cell.status-processing .cell-label,
+.status-cell.status-processing .cell-value {
   color: #0A6ED6;
 }
 
@@ -747,7 +749,8 @@
   border-color: var(--color-neutral-border);
 }
 
-.status-cell.status-pending .cell-label {
+.status-cell.status-pending .cell-label,
+.status-cell.status-pending .cell-value {
   color: var(--color-neutral);
 }
 
@@ -756,7 +759,8 @@
   border-color: var(--color-error-border);
 }
 
-.status-cell.status-failed .cell-label {
+.status-cell.status-failed .cell-label,
+.status-cell.status-failed .cell-value {
   color: #D63126;
 }
 
@@ -2028,7 +2032,7 @@
           pending: '○',
           processing: '<span class="pulse-dot"></span>',
           completed: '●',
-          failed: '<span style="color: var(--color-error)">●</span>'
+          failed: '●'
         };
         return labels[status] || labels.pending;
       },
@@ -2040,7 +2044,7 @@
           pending: '○',
           processing: '<span class="pulse-dot"></span>',
           completed: '●',
-          failed: '<span style="color: var(--color-error)">●</span>'
+          failed: '●'
         };
         return labels[status] || labels.pending;
       },
