@@ -644,9 +644,9 @@
 </div>
 
 <!-- Semantic Search Warning -->
-<div class="semantic-warning" x-show="(searchMode === 'vector' || searchMode === 'hybrid') && pendingEmbeddingCount > 0">
+<div class="semantic-warning" id="semantic-warning" style="display: none;">
   <span class="warning-icon">&#9888;</span>
-  <span x-text="pendingEmbeddingCount + ' 个结果尚未生成向量索引，语义搜索可能不完整'"></span>
+  <span id="semantic-warning-text"></span>
 </div>
 
 <div class="content-type-pills">
@@ -1035,6 +1035,18 @@
       ).length;
     } else {
       pendingEmbeddingCount = 0;
+    }
+
+    // Update semantic warning visibility
+    const warningEl = document.getElementById('semantic-warning');
+    const warningTextEl = document.getElementById('semantic-warning-text');
+    if (warningEl && warningTextEl) {
+      if ((searchMode === 'vector' || searchMode === 'hybrid') && pendingEmbeddingCount > 0) {
+        warningEl.style.display = 'flex';
+        warningTextEl.textContent = pendingEmbeddingCount + ' 个结果尚未生成向量索引，语义搜索可能不完整';
+      } else {
+        warningEl.style.display = 'none';
+      }
     }
 
     if (!data || data.length === 0) {
