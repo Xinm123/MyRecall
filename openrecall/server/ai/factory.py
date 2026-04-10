@@ -174,10 +174,15 @@ def get_description_provider() -> "DescriptionProvider":
 
 
 def get_multimodal_embedding_provider() -> "MultimodalEmbeddingProvider":
-    """Get or create a cached MultimodalEmbeddingProvider instance."""
+    """Get or create a cached MultimodalEmbeddingProvider instance.
+
+    Supports providers: openai, dashscope, multimodal
+    """
     from openrecall.server.embedding.providers import (
         MultimodalEmbeddingProvider,
-        OpenAIMultimodalEmbeddingProvider,
+        OpenAIEmbeddingProvider,
+        DashScopeEmbeddingProvider,
+        QwenVLEmbeddingProvider,
     )
 
     capability = "multimodal_embedding"
@@ -189,12 +194,26 @@ def get_multimodal_embedding_provider() -> "MultimodalEmbeddingProvider":
     model_name = settings.embedding_model
     api_key = settings.embedding_api_key
     api_base = settings.embedding_api_base
+    dimension = settings.embedding_dim
 
     if provider == "openai":
-        instance: MultimodalEmbeddingProvider = OpenAIMultimodalEmbeddingProvider(
+        instance: MultimodalEmbeddingProvider = OpenAIEmbeddingProvider(
             api_key=api_key,
             model_name=model_name,
             api_base=api_base,
+        )
+    elif provider == "dashscope":
+        instance = DashScopeEmbeddingProvider(
+            api_key=api_key,
+            model_name=model_name,
+            api_base=api_base,
+        )
+    elif provider == "multimodal":
+        instance = QwenVLEmbeddingProvider(
+            api_key=api_key,
+            model_name=model_name,
+            api_base=api_base,
+            dimension=dimension,
         )
     else:
         raise AIProviderConfigError(f"Unknown embedding provider: {provider}")
