@@ -1034,6 +1034,149 @@
     letter-spacing: -0.3px;
   }
 
+  /* =============================================
+     Header V3 - Apple Style Refined Layout
+     ============================================= */
+
+  .card-header-v3 {
+    display: flex;
+    flex-direction: column;
+    padding: 12px 16px;
+    gap: 6px;
+    border-bottom: 1px solid var(--border-color);
+    background: var(--bg-card);
+  }
+
+  /* Row 1: Context */
+  .header-row {
+    display: flex;
+    align-items: center;
+    min-height: 20px;
+  }
+
+  .context-row {
+    justify-content: space-between;
+  }
+
+  .context-left {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+    flex: 1;
+  }
+
+  .app-icon {
+    font-size: 14px;
+    width: 20px;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+
+  .app-name {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .app-name.fallback {
+    font-style: italic;
+    color: var(--text-secondary);
+  }
+
+  .trigger-badge {
+    font-size: 10px;
+    font-weight: 500;
+    padding: 2px 8px;
+    border-radius: 10px;
+    text-transform: capitalize;
+    flex-shrink: 0;
+    white-space: nowrap;
+    background: rgba(0, 0, 0, 0.05);
+    color: var(--text-secondary);
+  }
+
+  .trigger-badge[data-trigger="idle"] {
+    background: var(--color-warning-bg);
+    color: #D4840D;
+  }
+
+  .trigger-badge[data-trigger="app_switch"] {
+    background: var(--color-primary-bg);
+    color: #0A6ED6;
+  }
+
+  .trigger-badge[data-trigger="click"] {
+    background: var(--color-success-bg);
+    color: #2A9D4A;
+  }
+
+  .trigger-badge[data-trigger="manual"] {
+    background: rgba(175, 82, 222, 0.1);
+    color: #8E4DB0;
+  }
+
+  .frame-id {
+    font-size: 11px;
+    color: var(--text-tertiary);
+    font-weight: 500;
+    font-family: 'SF Mono', Monaco, Consolas, monospace;
+    flex-shrink: 0;
+  }
+
+  /* Row 2: Window title */
+  .window-row {
+    min-height: 18px;
+    display: flex;
+    align-items: center;
+  }
+
+  .window-name {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    line-height: 1.4;
+  }
+
+  /* Row 3: Meta info */
+  .meta-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 16px;
+    margin-top: 2px;
+    padding-top: 6px;
+    border-top: 1px solid rgba(0, 0, 0, 0.04);
+  }
+
+  .meta-row .timestamp,
+  .meta-row .relative-time,
+  .meta-row .device-name {
+    font-size: 11px;
+    color: var(--text-tertiary);
+    white-space: nowrap;
+  }
+
+  .meta-row .timestamp {
+    font-family: 'SF Mono', Monaco, Consolas, monospace;
+    letter-spacing: -0.2px;
+  }
+
+  .meta-row .separator {
+    font-size: 11px;
+    color: var(--text-tertiary);
+    opacity: 0.6;
+  }
+
   /* OCR info section */
   .ocr-info {
     display: flex;
