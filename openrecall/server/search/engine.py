@@ -199,7 +199,8 @@ class SearchEngine:
                        frames.browser_url,
                        frames.focused,
                        frames.device_name,
-                       frames.text_source"""
+                       frames.text_source,
+                       frames.embedding_status"""
             if has_text_query:
                 select_clause += ",\n                       frames_fts.rank AS fts_rank"
             else:
@@ -327,6 +328,7 @@ class SearchEngine:
                         "fts_rank": float(row["fts_rank"])
                         if row["fts_rank"] is not None
                         else None,
+                        "embedding_status": row["embedding_status"] or "",
                     }
                     results.append(result)
 

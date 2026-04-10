@@ -204,6 +204,7 @@ class HybridSearchEngine:
                 "file_path": frame.get("file_path", f"{frame.get('timestamp', '')}.jpg"),
                 "frame_url": f"/v1/frames/{frame_id}",
                 "tags": [],
+                "embedding_status": frame.get("embedding_status", ""),
             })
 
         return results, total

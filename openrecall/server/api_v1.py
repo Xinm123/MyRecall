@@ -1095,6 +1095,10 @@ def search():
                 # For pure vector search, hybrid_score is the cosine score
                 item["content"]["cosine_score"] = r["hybrid_score"]
 
+        # Add embedding_status if available
+        if "embedding_status" in r:
+            item["content"]["embedding_status"] = r["embedding_status"]
+
         data_items.append(item)
 
     return jsonify(
