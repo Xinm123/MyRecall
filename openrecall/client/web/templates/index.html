@@ -576,6 +576,214 @@
     font-size: 0.85rem;
   }
 
+  /* =============================================
+   Card Footer Flow Layout
+   ============================================= */
+
+  .card-footer-flow {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 14px;
+    min-height: 80px;
+  }
+
+  /* Text Source Section */
+  .flow-text-source {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-width: 90px;
+  }
+
+  .flow-source-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+  }
+
+  .flow-source-row .icon {
+    font-size: 14px;
+    width: 18px;
+    text-align: center;
+  }
+
+  .flow-source-row .label {
+    font-weight: 500;
+    min-width: 28px;
+  }
+
+  .flow-source-row .status-icon {
+    font-size: 11px;
+    width: 14px;
+    text-align: center;
+  }
+
+  .flow-source-row .char-count {
+    font-size: 11px;
+    color: var(--text-secondary);
+    font-family: 'SF Mono', monospace;
+  }
+
+  /* Status colors for text source */
+  .flow-source-row.active {
+    color: var(--text-primary);
+  }
+
+  .flow-source-row.inactive {
+    color: var(--text-secondary);
+    opacity: 0.6;
+  }
+
+  .flow-source-row.status-completed {
+    color: #34C759;
+  }
+
+  .flow-source-row.status-failed {
+    color: #FF3B30;
+  }
+
+  /* Parallel Processing Section */
+  .flow-parallel {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 8px;
+    background: rgba(0, 0, 0, 0.02);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    min-width: 100px;
+  }
+
+  .flow-parallel-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+  }
+
+  .flow-parallel-row .icon {
+    font-size: 13px;
+    width: 18px;
+    text-align: center;
+  }
+
+  .flow-parallel-row .label {
+    font-weight: 500;
+    min-width: 36px;
+  }
+
+  .flow-parallel-row .status-icon {
+    font-size: 11px;
+    margin-left: auto;
+  }
+
+  /* Status badge colors */
+  .status-badge-pending {
+    color: #FF9500;
+  }
+
+  .status-badge-processing {
+    color: #007AFF;
+  }
+
+  .status-badge-completed {
+    color: #34C759;
+  }
+
+  .status-badge-failed {
+    color: #FF3B30;
+  }
+
+  .status-badge-disabled {
+    color: #8E8E93;
+    opacity: 0.5;
+  }
+
+  .spinner-inline {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border: 1.5px solid rgba(0, 122, 255, 0.2);
+    border-top-color: #007AFF;
+    border-radius: 50%;
+    animation: spin 0.6s linear infinite;
+  }
+
+  /* Frame Status Section */
+  .flow-frame-status {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-width: 70px;
+    gap: 4px;
+  }
+
+  .flow-frame-status .status-icon-large {
+    font-size: 20px;
+    line-height: 1;
+  }
+
+  .flow-frame-status .status-text {
+    font-size: 11px;
+    font-weight: 500;
+    text-transform: lowercase;
+  }
+
+  .flow-frame-status.status-completed {
+    color: #34C759;
+  }
+
+  .flow-frame-status.status-processing {
+    color: #007AFF;
+  }
+
+  .flow-frame-status.status-pending {
+    color: #FF9500;
+  }
+
+  .flow-frame-status.status-failed {
+    color: #FF3B30;
+  }
+
+  /* Connector lines */
+  .flow-connector {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--border-color);
+    font-size: 14px;
+    padding: 0 2px;
+  }
+
+  /* Responsive: Mobile stack */
+  @media (max-width: 480px) {
+    .card-footer-flow {
+      flex-direction: column;
+      align-items: stretch;
+      gap: 10px;
+    }
+
+    .flow-connector {
+      transform: rotate(90deg);
+      padding: 4px 0;
+    }
+
+    .flow-text-source,
+    .flow-parallel,
+    .flow-frame-status {
+      width: 100%;
+    }
+
+    .flow-frame-status {
+      flex-direction: row;
+      justify-content: flex-start;
+      gap: 8px;
+    }
+  }
+
   /* P1-S3: Status-specific card styling */
   .memory-card[data-frame-status="pending"] {
     border-left: 3px solid #FF9500;
