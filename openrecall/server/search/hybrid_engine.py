@@ -113,15 +113,18 @@ class HybridSearchEngine:
         provider = get_multimodal_embedding_provider()
         query_vector = provider.embed_text(q)
 
-        # Search embeddings
-        embeddings = self._embedding_store.search(
+        # Search embeddings with distance scores
+        embeddings_with_distance = self._embedding_store.search_with_distance(
             query_vector.tolist(), limit=limit + offset
         )
 
         results = []
-        for emb in embeddings[offset : offset + limit]:
+        for emb, distance in embeddings_with_distance[offset : offset + limit]:
+            # Convert cosine distance to cosine similarity (cosine_sim = 1 - cosine_dist)
+            cosine_score = 1.0 - float(distance)
             results.append({
                 "frame_id": emb.frame_id,
+                "cosine_score": cosine_score,
                 "timestamp": emb.timestamp,
                 "text": "",  # Will need to fetch from frames if needed
                 "app_name": emb.app_name,
@@ -134,7 +137,7 @@ class HybridSearchEngine:
                 "tags": [],
             })
 
-        return results, len(embeddings)
+        return results, len(embeddings_with_distance)
 
     def _hybrid_search(
         self,
@@ -150,16 +153,21 @@ class HybridSearchEngine:
         fts_results, _ = self._fts_engine.search(q=q, limit=limit * 2, **kwargs)
 
         vector_results = []
+        vector_similarities = {}  # frame_id -> cosine_score
         if q and not q.isspace():
             from openrecall.server.ai.factory import get_multimodal_embedding_provider
             provider = get_multimodal_embedding_provider()
             query_vector = provider.embed_text(q)
-            embeddings = self._embedding_store.search(
+            embeddings_with_distance = self._embedding_store.search_with_distance(
                 query_vector.tolist(), limit=limit * 2
             )
             vector_results = [
-                {"frame_id": e.frame_id, "similarity": 1.0} for e in embeddings
+                {"frame_id": e.frame_id, "similarity": 1.0 - float(d)}  # cosine_sim = 1 - dist
+                for e, d in embeddings_with_distance
             ]
+            # Store cosine scores for later use
+            for e, d in embeddings_with_distance:
+                vector_similarities[e.frame_id] = 1.0 - float(d)
 
         # Merge with RRF
         merged = reciprocal_rank_fusion(
@@ -171,7 +179,7 @@ class HybridSearchEngine:
         merged = merged[offset : offset + limit]
 
         # Build final results - fetch full frame data from database
-        frame_ids = [frame_id for frame_id, score in merged]
+        frame_ids = [frame_id for frame_id, _ in merged]
         scores = {frame_id: score for frame_id, score in merged}
 
         # Fetch full frame data from frames table
@@ -185,6 +193,7 @@ class HybridSearchEngine:
             results.append({
                 "frame_id": frame_id,
                 "hybrid_score": scores.get(frame_id, 0.0),
+                "cosine_score": vector_similarities.get(frame_id),  # Raw vector similarity
                 "timestamp": frame.get("timestamp", ""),
                 "text": frame.get("full_text", "")[:200] if frame.get("full_text") else "",
                 "app_name": frame.get("app_name", ""),

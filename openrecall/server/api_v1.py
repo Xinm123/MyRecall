@@ -210,9 +210,10 @@ def ingest():
     metadata: dict[str, object] = {}
     if metadata_raw:
         try:
-            metadata = json.loads(metadata_raw)
-            if not isinstance(metadata, dict):
+            parsed_metadata = json.loads(metadata_raw)
+            if not isinstance(parsed_metadata, dict):
                 raise ValueError("metadata must be a JSON object")
+            metadata = parsed_metadata
         except (json.JSONDecodeError, ValueError) as exc:
             return make_error_response(
                 f"metadata must be valid JSON: {exc}",
@@ -1085,6 +1086,15 @@ def search():
         if "hybrid_score" in r:
             item["content"]["hybrid_score"] = r["hybrid_score"]
 
+        # Add cosine_score for vector/hybrid modes
+        if mode in ("vector", "hybrid"):
+            # cosine_score is the raw vector similarity before fusion
+            if "cosine_score" in r:
+                item["content"]["cosine_score"] = r["cosine_score"]
+            elif "hybrid_score" in r and mode == "vector":
+                # For pure vector search, hybrid_score is the cosine score
+                item["content"]["cosine_score"] = r["hybrid_score"]
+
         data_items.append(item)
 
     return jsonify(
@@ -1430,7 +1440,6 @@ def similar_frames(frame_id: int):
     from openrecall.server.database.embedding_store import EmbeddingStore
 
     store = EmbeddingStore()
-    frames_store = _get_frames_store()
 
     # Get the frame's embedding
     embedding = store.get_by_frame_id(frame_id)
