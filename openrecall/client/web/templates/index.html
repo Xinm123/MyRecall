@@ -711,12 +711,8 @@
 }
 
 /* Status-specific styles */
-.status-cell.active {
-  background: var(--color-success-bg);
-  border-color: var(--color-success-border);
-}
-
-.status-cell.active .cell-label {
+.status-cell.active .cell-label,
+.status-cell.active .cell-value {
   color: #2A9D4A;
 }
 
@@ -724,19 +720,9 @@
   opacity: 0.6;
 }
 
-.status-cell.status-completed {
-  background: var(--color-success-bg);
-  border-color: var(--color-success-border);
-}
-
 .status-cell.status-completed .cell-label,
 .status-cell.status-completed .cell-value {
   color: #2A9D4A;
-}
-
-.status-cell.status-processing {
-  background: var(--color-primary-bg);
-  border-color: var(--color-primary-border);
 }
 
 .status-cell.status-processing .cell-label,
@@ -744,19 +730,9 @@
   color: #0A6ED6;
 }
 
-.status-cell.status-pending {
-  background: var(--color-neutral-bg);
-  border-color: var(--color-neutral-border);
-}
-
 .status-cell.status-pending .cell-label,
 .status-cell.status-pending .cell-value {
   color: var(--color-neutral);
-}
-
-.status-cell.status-failed {
-  background: var(--color-error-bg);
-  border-color: var(--color-error-border);
 }
 
 .status-cell.status-failed .cell-label,
@@ -786,12 +762,10 @@
 }
 
 .frame-status-bar.status-completed {
-  background: var(--color-success-bg);
   color: #2A9D4A;
 }
 
 .frame-status-bar.status-processing {
-  background: var(--color-primary-bg);
   color: #0A6ED6;
 }
 
@@ -800,12 +774,10 @@
 }
 
 .frame-status-bar.status-pending {
-  background: var(--color-warning-bg);
   color: #D4840D;
 }
 
 .frame-status-bar.status-failed {
-  background: var(--color-error-bg);
   color: #D63126;
 }
 
