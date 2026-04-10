@@ -532,6 +532,41 @@
     color: white;
     border-color: var(--accent-color);
   }
+
+  /* Embedding Status Badge */
+  .embedding-badge {
+    font-size: 12px;
+    margin-left: 6px;
+    cursor: help;
+    opacity: 0.8;
+    transition: opacity 0.2s;
+  }
+
+  .embedding-badge:hover {
+    opacity: 1;
+  }
+
+  .embedding-badge.indexed {
+    filter: drop-shadow(0 0 2px rgba(0, 122, 255, 0.3));
+  }
+
+  /* Semantic Search Warning */
+  .semantic-warning {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 16px;
+    background: rgba(0, 122, 255, 0.08);
+    border: 1px solid rgba(0, 122, 255, 0.2);
+    border-radius: 8px;
+    margin-bottom: 16px;
+    font-size: 13px;
+    color: var(--accent-color);
+  }
+
+  .warning-icon {
+    font-size: 14px;
+  }
 </style>
 {% endblock %}
 
@@ -608,6 +643,12 @@
           tabindex="0">混合搜索</button>
 </div>
 
+<!-- Semantic Search Warning -->
+<div class="semantic-warning" x-show="(searchMode === 'vector' || searchMode === 'hybrid') && pendingEmbeddingCount > 0">
+  <span class="warning-icon">&#9888;</span>
+  <span x-text="pendingEmbeddingCount + ' 个结果尚未生成向量索引，语义搜索可能不完整'"></span>
+</div>
+
 <div class="content-type-pills">
   <button type="button" class="pill active" data-type="all">All</button>
   <button type="button" class="pill" data-type="ocr">OCR <span class="count">—</span></button>
@@ -652,6 +693,9 @@
 
   // Search mode state
   let searchMode = 'fts';
+
+  // Pending embedding count for semantic search warning
+  let pendingEmbeddingCount = 0;
 
   // Modal elements
   const modal = document.getElementById('imageModal');
@@ -967,10 +1011,31 @@
     return '';
   }
 
+  // Render embedding status badge
+  function renderEmbeddingBadge(content) {
+    const status = content.embedding_status;
+    if (status === 'completed') {
+      return '<span class="embedding-badge indexed" title="已生成向量索引">&#128306;</span>';
+    }
+    if (status === 'pending' || status === 'processing') {
+      return '<span class="embedding-badge pending" title="等待向量索引">&#11036;</span>';
+    }
+    return '';
+  }
+
   // Render search results
   function renderResults(data, pagination) {
     currentResults = data;
     currentPagination = pagination;
+
+    // Count pending embeddings for vector/hybrid modes
+    if (searchMode === 'vector' || searchMode === 'hybrid') {
+      pendingEmbeddingCount = data.filter(item =>
+        item.content.embedding_status !== 'completed'
+      ).length;
+    } else {
+      pendingEmbeddingCount = 0;
+    }
 
     if (!data || data.length === 0) {
       resultsGrid.innerHTML = `
@@ -1022,7 +1087,7 @@
           </div>
           <div class="card-footer">
             <div class="score-display">${renderScoreInfo(content, idx, pagination)}</div>
-            <span class="type-badge type-${item.type.toLowerCase()}">${item.type === 'Accessibility' ? 'AX' : item.type}</span>
+            <span class="type-badge type-${item.type.toLowerCase()}">${item.type === 'Accessibility' ? 'AX' : item.type}</span>${renderEmbeddingBadge(content)}
             <div class="result-position">#${idx + 1} / ${pagination.total}</div>
           </div>
         </article>
