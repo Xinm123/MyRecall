@@ -1659,40 +1659,42 @@
       <div class="memory-grid">
         <template x-for="(entry, i) in entries" :key="entry.id ?? (entry.timestamp + '-' + i)">
           <article class="memory-card" :data-frame-status="entry.status ? entry.status.toLowerCase() : 'pending'">
-            <div class="card-header-v2">
-              <!-- 第一行：应用 + 触发器 + [last known] + frame_id -->
+            <div class="card-header-v3">
+              <!-- Row 1: App + Trigger + Frame ID -->
               <div class="header-row context-row">
                 <div class="context-left">
+                  <span class="app-icon" x-html="getAppIcon(entry)"></span>
                   <span class="app-name"
                         :class="{ 'fallback': !entry.app_name && !entry.app && entry.last_known_app }"
                         x-text="getAppDisplay(entry)"
                         :title="getAppNameTooltip(entry)"
                   ></span>
-                  <span class="trigger-label"
+                  <span class="trigger-badge"
                         x-text="entry.capture_trigger"
                         x-show="entry.capture_trigger"
                         :data-trigger="entry.capture_trigger"
                   ></span>
-                  <span class="trigger-label fallback-label"
+                  <span class="trigger-badge fallback-label"
                         x-show="!entry.app_name && !entry.app && entry.last_known_app"
                   >last known</span>
                 </div>
-                <span class="frame-id" x-text="'#' + entry.frame_id"></span>
+                <span class="frame-id" x-text="'No.' + entry.frame_id"></span>
               </div>
 
-              <!-- 第二行：窗口标题（始终显示，无内容时占位） -->
+              <!-- Row 2: Window title -->
               <div class="header-row window-row">
                 <span class="window-name"
                       x-text="entry.window_title || entry.title || entry.last_known_window || ''"
+                      :title="entry.window_title || entry.title || entry.last_known_window || ''"
                 ></span>
               </div>
 
-              <!-- 第三行：绝对时间 + 相对时间 + 设备名称 -->
-              <div class="header-row time-row">
-                <span class="timestamp" x-text="formatTime(entry.timestamp)"
-                ></span>
-                <span class="relative-time" x-text="formatRelativeTime(entry.timestamp)"
-                ></span>
+              <!-- Row 3: Time info -->
+              <div class="header-row meta-row">
+                <span class="timestamp" x-text="formatTime(entry.timestamp)"></span>
+                <span class="separator">·</span>
+                <span class="relative-time" x-text="formatRelativeTime(entry.timestamp)"></span>
+                <span class="separator" x-show="entry.device_name">·</span>
                 <span class="device-name"
                       x-text="entry.device_name"
                       x-show="entry.device_name"
