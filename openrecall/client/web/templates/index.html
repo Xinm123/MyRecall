@@ -593,7 +593,7 @@
     display: flex;
     flex-direction: column;
     gap: 6px;
-    min-width: 90px;
+    min-width: 110px;
   }
 
   .flow-source-row {
@@ -601,47 +601,55 @@
     align-items: center;
     gap: 6px;
     font-size: 12px;
+    white-space: nowrap;
   }
 
   .flow-source-row .icon {
     font-size: 14px;
     width: 18px;
     text-align: center;
+    flex-shrink: 0;
   }
 
   .flow-source-row .label {
     font-weight: 500;
-    min-width: 28px;
+    min-width: 24px;
+    flex-shrink: 0;
   }
 
   .flow-source-row .status-icon {
     font-size: 11px;
-    width: 14px;
+    width: 16px;
     text-align: center;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
   }
 
   .flow-source-row .char-count {
     font-size: 11px;
     color: var(--text-secondary);
     font-family: 'SF Mono', monospace;
+    white-space: nowrap;
   }
 
-  /* Status colors for text source */
+  /* Status colors for text source - Apple style subtle colors */
   .flow-source-row.active {
     color: var(--text-primary);
   }
 
   .flow-source-row.inactive {
     color: var(--text-secondary);
-    opacity: 0.6;
+    opacity: 0.5;
   }
 
   .flow-source-row.status-completed {
-    color: #34C759;
+    color: #28a745;
   }
 
   .flow-source-row.status-failed {
-    color: #FF3B30;
+    color: #dc3545;
   }
 
   /* Parallel Processing Section */
@@ -649,56 +657,60 @@
     display: flex;
     flex-direction: column;
     gap: 8px;
-    padding: 8px;
-    background: rgba(0, 0, 0, 0.02);
-    border: 1px solid var(--border-color);
-    border-radius: 8px;
-    min-width: 100px;
+    padding: 10px 12px;
+    background: rgba(120, 120, 128, 0.08);
+    border: 1px solid rgba(120, 120, 128, 0.2);
+    border-radius: 10px;
+    min-width: 90px;
   }
 
   .flow-parallel-row {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: 8px;
     font-size: 12px;
   }
 
   .flow-parallel-row .icon {
     font-size: 13px;
-    width: 18px;
+    width: 16px;
     text-align: center;
+    flex-shrink: 0;
   }
 
   .flow-parallel-row .label {
     font-weight: 500;
-    min-width: 36px;
+    min-width: 32px;
   }
 
   .flow-parallel-row .status-icon {
     font-size: 11px;
     margin-left: auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
   }
 
-  /* Status badge colors */
+  /* Status badge colors - Apple style subtle */
   .status-badge-pending {
-    color: #FF9500;
+    color: #8e8e93;
   }
 
   .status-badge-processing {
-    color: #007AFF;
+    color: #007aff;
   }
 
   .status-badge-completed {
-    color: #34C759;
+    color: #34c759;
   }
 
   .status-badge-failed {
-    color: #FF3B30;
+    color: #ff3b30;
   }
 
   .status-badge-disabled {
-    color: #8E8E93;
-    opacity: 0.5;
+    color: #8e8e93;
+    opacity: 0.4;
   }
 
   /* Frame Status Section */
@@ -707,45 +719,54 @@
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    min-width: 70px;
-    gap: 4px;
+    min-width: 60px;
+    gap: 6px;
   }
 
   .flow-frame-status .status-icon-large {
-    font-size: 20px;
-    line-height: 1;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .flow-frame-status .status-icon-large svg {
+    width: 20px;
+    height: 20px;
   }
 
   .flow-frame-status .status-text {
     font-size: 11px;
     font-weight: 500;
     text-transform: lowercase;
+    letter-spacing: 0.3px;
   }
 
   .flow-frame-status.status-completed {
-    color: #34C759;
+    color: #8e8e93;
   }
 
   .flow-frame-status.status-processing {
-    color: #007AFF;
+    color: #007aff;
   }
 
   .flow-frame-status.status-pending {
-    color: #FF9500;
+    color: #8e8e93;
   }
 
   .flow-frame-status.status-failed {
-    color: #FF3B30;
+    color: #dc3545;
   }
 
-  /* Connector lines */
+  /* Connector lines - darker for visibility */
   .flow-connector {
     display: flex;
     align-items: center;
     justify-content: center;
-    color: var(--border-color);
+    color: rgba(120, 120, 128, 0.6);
     font-size: 14px;
-    padding: 0 2px;
+    padding: 0 4px;
   }
 
   /* Responsive: Mobile stack */
@@ -1812,17 +1833,19 @@
         const actualSource = (entry.text_source || 'ocr').toLowerCase();
         const isActive = actualSource === sourceType || actualSource === 'hybrid';
 
-        if (!isActive) return '—';
+        if (!isActive) return '<span style="color: var(--text-secondary); opacity: 0.4;">—</span>';
 
-        // For active source, show based on text availability
+        // For active source, show based on text availability - subtle dot
         const hasText = sourceType === 'accessibility'
           ? (entry.accessibility_text_length || entry.accessibility_text?.length || 0) > 0
           : (entry.ocr_text_length || entry.ocr_text?.length || 0) > 0;
 
         if (hasText) {
-          return '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>';
+          // Apple style: small filled dot for active with content
+          return '<svg width="8" height="8" viewBox="0 0 8 8" fill="currentColor"><circle cx="4" cy="4" r="3"/></svg>';
         }
-        return '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle></svg>';
+        // Empty circle for no content
+        return '<svg width="8" height="8" viewBox="0 0 8 8" fill="none" stroke="currentColor" stroke-width="1"><circle cx="4" cy="4" r="3"/></svg>';
       },
 
       getTextSourceStatusClass(entry, sourceType) {
@@ -1843,14 +1866,16 @@
         return entry.ocr_text_length || entry.ocr_text?.length || 0;
       },
 
-      // Parallel processing helpers
+      // Parallel processing helpers - Apple style subtle dots
       getDescriptionStatusIcon(entry) {
         const status = (entry.description_status || 'pending').toLowerCase();
-        if (status === 'completed') return '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>';
+        // Apple style: filled dot for completed, outlined for pending, spinner for processing
+        if (status === 'completed') return '<svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor"><circle cx="5" cy="5" r="4"/></svg>';
         if (status === 'processing') return '<span class="spinner-inline"></span>';
-        if (status === 'failed') return '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>';
-        if (status === 'disabled') return '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"></line></svg>';
-        return '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle></svg>';
+        if (status === 'failed') return '<svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="5" cy="5" r="4"/><line x1="3" y1="3" x2="7" y2="7"/><line x1="7" y1="3" x2="3" y2="7"/></svg>';
+        if (status === 'disabled') return '<svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1"><circle cx="5" cy="5" r="4"/><line x1="2" y1="2" x2="8" y2="8"/></svg>';
+        // Pending: outlined circle
+        return '<svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1"><circle cx="5" cy="5" r="4"/></svg>';
       },
 
       getDescriptionStatusClass(entry) {
@@ -1860,11 +1885,13 @@
 
       getEmbeddingStatusIcon(entry) {
         const status = (entry.embedding_status || 'pending').toLowerCase();
-        if (status === 'completed') return '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>';
+        // Apple style: filled dot for completed, outlined for pending, spinner for processing
+        if (status === 'completed') return '<svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor"><circle cx="5" cy="5" r="4"/></svg>';
         if (status === 'processing') return '<span class="spinner-inline"></span>';
-        if (status === 'failed') return '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>';
-        if (status === 'disabled') return '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"></line></svg>';
-        return '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle></svg>';
+        if (status === 'failed') return '<svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="5" cy="5" r="4"/><line x1="3" y1="3" x2="7" y2="7"/><line x1="7" y1="3" x2="3" y2="7"/></svg>';
+        if (status === 'disabled') return '<svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1"><circle cx="5" cy="5" r="4"/><line x1="2" y1="2" x2="8" y2="8"/></svg>';
+        // Pending: outlined circle
+        return '<svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1"><circle cx="5" cy="5" r="4"/></svg>';
       },
 
       getEmbeddingStatusClass(entry) {
@@ -1887,10 +1914,12 @@
 
       getFrameStatusIcon(entry) {
         const status = this.getFrameStatus(entry);
-        if (status === 'completed') return '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>';
+        // Apple style: filled circle for completed, more subtle
+        if (status === 'completed') return '<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" stroke="none"><circle cx="12" cy="12" r="6"/></svg>';
         if (status === 'processing') return '<span class="spinner-inline"></span>';
-        if (status === 'failed') return '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>';
-        return '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle></svg>';
+        if (status === 'failed') return '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>';
+        // Pending: empty circle
+        return '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="6"/></svg>';
       },
 
       getFrameStatusClass(entry) {
