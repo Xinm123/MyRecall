@@ -7,14 +7,26 @@ from openrecall.server.embedding.providers.base import (
     EmbeddingProviderUnavailableError,
 )
 from openrecall.server.embedding.providers.openai import (
-    OpenAIMultimodalEmbeddingProvider,
+    OpenAIEmbeddingProvider,
+    OpenAIMultimodalEmbeddingProvider,  # Backwards compatibility alias
+)
+from openrecall.server.embedding.providers.dashscope import (
+    DashScopeEmbeddingProvider,
+)
+from openrecall.server.embedding.providers.multimodal import (
+    QwenVLEmbeddingProvider,
 )
 
 __all__ = [
+    # Protocol and errors
     "MultimodalEmbeddingProvider",
     "EmbeddingProviderError",
     "EmbeddingProviderConfigError",
     "EmbeddingProviderRequestError",
     "EmbeddingProviderUnavailableError",
-    "OpenAIMultimodalEmbeddingProvider",
+    # Providers
+    "OpenAIEmbeddingProvider",
+    "OpenAIMultimodalEmbeddingProvider",  # Alias for backwards compat
+    "DashScopeEmbeddingProvider",
+    "QwenVLEmbeddingProvider",
 ]
