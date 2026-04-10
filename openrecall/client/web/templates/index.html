@@ -1817,6 +1817,93 @@
         return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
       },
 
+      // Text source display helpers
+      getTextSourceClass(entry, sourceType) {
+        const actualSource = (entry.text_source || 'ocr').toLowerCase();
+        if (actualSource === 'hybrid') return 'active';
+        if (actualSource === sourceType) return 'active';
+        return 'inactive';
+      },
+
+      getTextSourceStatusIcon(entry, sourceType) {
+        const actualSource = (entry.text_source || 'ocr').toLowerCase();
+        const isActive = actualSource === sourceType || actualSource === 'hybrid';
+
+        if (!isActive) return '—';
+
+        // For active source, show based on processing status
+        const status = (entry.status || 'pending').toLowerCase();
+        if (status === 'completed') return '✓';
+        if (status === 'processing') return '<span class="spinner-inline"></span>';
+        if (status === 'failed') return '✗';
+        return '○';
+      },
+
+      getTextSourceStatusClass(entry, sourceType) {
+        const actualSource = (entry.text_source || 'ocr').toLowerCase();
+        const isActive = actualSource === sourceType || actualSource === 'hybrid';
+
+        if (!isActive) return 'inactive';
+
+        const status = (entry.status || 'pending').toLowerCase();
+        return `status-${status}`;
+      },
+
+      getAccessibilityCharCount(entry) {
+        return entry.accessibility_text_length || entry.accessibility_text?.length || 0;
+      },
+
+      getOcrCharCount(entry) {
+        return entry.ocr_text_length || entry.ocr_text?.length || 0;
+      },
+
+      // Parallel processing helpers
+      getDescriptionStatusIcon(entry) {
+        const status = (entry.description_status || 'pending').toLowerCase();
+        if (status === 'completed') return '✓';
+        if (status === 'processing') return '<span class="spinner-inline"></span>';
+        if (status === 'failed') return '✗';
+        if (status === 'disabled') return '⊘';
+        return '○';
+      },
+
+      getDescriptionStatusClass(entry) {
+        const status = (entry.description_status || 'pending').toLowerCase();
+        return `status-badge-${status}`;
+      },
+
+      getEmbeddingStatusIcon(entry) {
+        const status = (entry.embedding_status || 'pending').toLowerCase();
+        if (status === 'completed') return '✓';
+        if (status === 'processing') return '<span class="spinner-inline"></span>';
+        if (status === 'failed') return '✗';
+        if (status === 'disabled') return '⊘';
+        return '○';
+      },
+
+      getEmbeddingStatusClass(entry) {
+        const status = (entry.embedding_status || 'pending').toLowerCase();
+        return `status-badge-${status}`;
+      },
+
+      // Frame status helpers
+      getFrameStatusIcon(entry) {
+        const status = (entry.status || 'pending').toLowerCase();
+        if (status === 'completed') return '✓';
+        if (status === 'processing') return '<span class="spinner-inline"></span>';
+        if (status === 'failed') return '✗';
+        return '○';
+      },
+
+      getFrameStatusClass(entry) {
+        const status = (entry.status || 'pending').toLowerCase();
+        return `status-${status}`;
+      },
+
+      getFrameStatusText(entry) {
+        return (entry.status || 'pending').toLowerCase();
+      },
+
       get selectedEntry() {
         if (this.selectedIndex === null) return null;
         return this.entries[this.selectedIndex] || null;
