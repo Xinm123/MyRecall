@@ -458,6 +458,45 @@
     color: var(--text-secondary);
     font-size: 14px;
   }
+
+  /* Search Mode Pills */
+  .search-mode-pills {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    margin-bottom: 12px;
+    flex-wrap: wrap;
+  }
+
+  .search-mode-pills .pills-label {
+    font-size: 13px;
+    color: var(--text-secondary);
+    margin-right: 4px;
+  }
+
+  /* Reuse existing .pill styles from content-type-pills */
+  .search-mode-pills .pill {
+    padding: 6px 14px;
+    border: 1px solid var(--border-color);
+    border-radius: 16px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    background: var(--bg-body);
+    color: var(--text-secondary);
+    transition: all 0.2s ease;
+  }
+
+  .search-mode-pills .pill:hover {
+    border-color: var(--accent-color);
+    color: var(--accent-color);
+  }
+
+  .search-mode-pills .pill.active {
+    background: var(--accent-color);
+    color: white;
+    border-color: var(--accent-color);
+  }
 </style>
 {% endblock %}
 
@@ -502,6 +541,38 @@
   <button type="submit" class="btn-search">Search</button>
 </form>
 
+<!-- Search Mode Pills -->
+<div class="search-mode-pills" role="radiogroup" aria-label="搜索模式">
+  <span class="pills-label">搜索模式:</span>
+  <button type="button"
+          class="pill"
+          :class="{ active: searchMode === 'fts' }"
+          @click="setSearchMode('fts')"
+          @keydown="handleModeKeydown($event, 'fts')"
+          role="radio"
+          :aria-checked="searchMode === 'fts'"
+          aria-label="全文搜索 - 基于关键词匹配"
+          tabindex="0">全文搜索</button>
+  <button type="button"
+          class="pill"
+          :class="{ active: searchMode === 'vector' }"
+          @click="setSearchMode('vector')"
+          @keydown="handleModeKeydown($event, 'vector')"
+          role="radio"
+          :aria-checked="searchMode === 'vector'"
+          aria-label="语义搜索 - 基于语义理解"
+          tabindex="0">语义搜索</button>
+  <button type="button"
+          class="pill"
+          :class="{ active: searchMode === 'hybrid' }"
+          @click="setSearchMode('hybrid')"
+          @keydown="handleModeKeydown($event, 'hybrid')"
+          role="radio"
+          :aria-checked="searchMode === 'hybrid'"
+          aria-label="混合搜索 - 结合全文和语义"
+          tabindex="0">混合搜索</button>
+</div>
+
 <div class="content-type-pills">
   <button type="button" class="pill active" data-type="all">All</button>
   <button type="button" class="pill" data-type="ocr">OCR <span class="count">—</span></button>
@@ -544,6 +615,9 @@
   // Content type filter state
   let selectedContentType = 'all';
 
+  // Search mode state
+  let searchMode = 'fts';
+
   // Modal elements
   const modal = document.getElementById('imageModal');
   const modalImage = document.getElementById('modalImage');
@@ -575,6 +649,58 @@
     if (urlContentType && ['ocr', 'accessibility', 'all'].includes(urlContentType)) {
       selectedContentType = urlContentType;
       updatePillActiveState();
+    }
+  }
+
+  // Initialize search mode from URL
+  function initSearchModeFromUrl() {
+    const params = new URLSearchParams(window.location.search);
+    const urlMode = params.get('mode');
+    if (urlMode && ['fts', 'vector', 'hybrid'].includes(urlMode)) {
+      searchMode = urlMode;
+    }
+  }
+
+  // Set search mode
+  function setSearchMode(mode) {
+    if (mode !== searchMode) {
+      searchMode = mode;
+      performSearch(0);
+    }
+  }
+
+  // Keyboard navigation for mode pills
+  function handleModeKeydown(event, currentMode) {
+    const modes = ['fts', 'vector', 'hybrid'];
+    const currentIndex = modes.indexOf(currentMode);
+
+    switch(event.key) {
+      case 'ArrowLeft':
+        event.preventDefault();
+        if (currentIndex > 0) {
+          const prevMode = modes[currentIndex - 1];
+          setSearchMode(prevMode);
+          event.target.previousElementSibling?.focus();
+        }
+        break;
+      case 'ArrowRight':
+        event.preventDefault();
+        if (currentIndex < modes.length - 1) {
+          const nextMode = modes[currentIndex + 1];
+          setSearchMode(nextMode);
+          event.target.nextElementSibling?.focus();
+        }
+        break;
+      case 'Home':
+        event.preventDefault();
+        setSearchMode(modes[0]);
+        event.target.parentElement?.firstElementChild?.nextElementSibling?.focus();
+        break;
+      case 'End':
+        event.preventDefault();
+        setSearchMode(modes[modes.length - 1]);
+        event.target.parentElement?.lastElementChild?.focus();
+        break;
     }
   }
 
@@ -685,6 +811,11 @@
   // Build query string from form
   function buildQueryString(offset = 0) {
     const params = getFormFilterParams();
+
+    // Add search mode (default 'fts' is omitted)
+    if (searchMode !== 'fts') {
+      params.set('mode', searchMode);
+    }
 
     // Add content type filter (default 'all' is omitted)
     if (selectedContentType !== 'all') {
@@ -897,6 +1028,7 @@
 
   // Initialize content type from URL
   initContentTypeFromUrl();
+  initSearchModeFromUrl();
 
   // Load initial results if URL has params
   if (window.location.search) {
