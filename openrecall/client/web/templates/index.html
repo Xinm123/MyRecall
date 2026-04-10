@@ -1362,15 +1362,6 @@
                   <div class="cell-value" x-text="formatCharCount(getAccessibilityCharCount(entry))"></div>
                 </div>
 
-                <!-- Description -->
-                <div class="status-cell" :class="getDescriptionStatusClass(entry)">
-                  <div class="cell-header">
-                    <span class="cell-icon">✨</span>
-                    <span class="cell-label">Desc</span>
-                  </div>
-                  <div class="cell-value" x-html="getDescriptionStatusText(entry)"></div>
-                </div>
-
                 <!-- OCR -->
                 <div class="status-cell" :class="[getTextSourceClass(entry, 'ocr'), getTextSourceStatusClass(entry, 'ocr')]">
                   <div class="cell-header">
@@ -1378,6 +1369,15 @@
                     <span class="cell-label">OCR</span>
                   </div>
                   <div class="cell-value" x-text="formatCharCount(getOcrCharCount(entry))"></div>
+                </div>
+
+                <!-- Description -->
+                <div class="status-cell" :class="getDescriptionStatusClass(entry)">
+                  <div class="cell-header">
+                    <span class="cell-icon">✨</span>
+                    <span class="cell-label">Desc</span>
+                  </div>
+                  <div class="cell-value" x-html="getDescriptionStatusText(entry)"></div>
                 </div>
 
                 <!-- Embedding -->
