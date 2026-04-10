@@ -1642,15 +1642,15 @@
   <template x-if="entries.length > 0">
     <div>
       <div class="stats-bar">
-        <div class="stat-item">
+        <div class="stat-item" data-status="completed">
           <span>Completed</span>
           <span class="stat-value" x-text="stats().completed"></span>
         </div>
-        <div class="stat-item">
+        <div class="stat-item" data-status="processing">
           <span>Processing</span>
           <span class="stat-value" x-text="stats().processing"></span>
         </div>
-        <div class="stat-item">
+        <div class="stat-item" data-status="pending">
           <span>Pending</span>
           <span class="stat-value" x-text="stats().pending"></span>
         </div>
