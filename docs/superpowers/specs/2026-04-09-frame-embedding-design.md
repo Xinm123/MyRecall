@@ -193,69 +193,13 @@ class MultimodalEmbeddingProvider(ABC):
         raise NotImplementedError
 ```
 
-### OpenAI-Compatible Provider
+### Provider Implementations
 
-Supports cloud APIs (DashScope) and local network services (vLLM):
+See **Multi-Provider Embedding Design** (`docs/superpowers/specs/2026-04-10-multi-provider-embedding-design.md`) for detailed provider implementations:
 
-```python
-class OpenAIMultimodalEmbeddingProvider(MultimodalEmbeddingProvider):
-    """OpenAI-compatible multimodal embedding provider"""
-
-    def __init__(
-        self,
-        api_key: str,
-        model_name: str,
-        api_base: str = ""
-    ):
-        self.api_key = api_key.strip() if api_key else ""
-        self.model_name = model_name.strip()
-        self.api_base = _normalize_api_base(api_base or "https://api.openai.com/v1")
-
-    def embed_image(self, image_path: str, text: Optional[str] = None) -> np.ndarray:
-        # API call with image + optional text
-        ...
-
-    def embed_text(self, text: str) -> np.ndarray:
-        # API call with text only (for queries)
-        ...
-```
-
-### Configuration
-
-```toml
-# server.toml
-
-[embedding]
-enabled = true
-provider = "openai"           # openai (supports DashScope and vLLM)
-model = "qwen3-vl-embedding"  # Embedding model name
-api_key = ""                  # API key (optional for local vLLM)
-api_base = ""                 # API base URL (e.g., http://localhost:8000/v1)
-dim = 1024                    # Embedding dimension
-
-# Worker settings (optional, defaults shown)
-poll_interval_ms = 2000       # Polling interval for task queue
-max_retries = 3               # Max retry attempts before marking failed
-```
-
-**Examples:**
-
-```toml
-# Local vLLM service (no auth required)
-[embedding]
-enabled = true
-provider = "openai"
-model = "qwen3-vl-embedding"
-api_base = "http://localhost:8000/v1"
-
-# DashScope cloud API
-[embedding]
-enabled = true
-provider = "openai"
-model = "text-embedding-v3"
-api_key = "sk-xxx"
-api_base = "https://dashscope.aliyuncs.com/compatible-mode/v1"
-```
+- **QwenVLEmbeddingProvider** (`provider = "multimodal"`): Custom qwen3-vl-embedding API with true image+text fusion
+- **OpenAIEmbeddingProvider** (`provider = "openai"`): OpenAI text-embedding API (text only)
+- **DashScopeEmbeddingProvider** (`provider = "dashscope"`): DashScope native API (skeleton)
 
 ---
 

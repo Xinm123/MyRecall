@@ -113,15 +113,17 @@ pip install -e ".[test]"    # Include test dependencies
 
 **Components:**
 - **Ingest API**: `POST /v1/ingest` (idempotent)
-- **Worker**: Processing worker (`V3ProcessingWorker` for OCR mode, `DescriptionWorker` for frame descriptions)
+- **Worker**: Processing worker (`V3ProcessingWorker` for OCR mode, `DescriptionWorker` for frame descriptions, `EmbeddingWorker` for vector embeddings)
 - **Database**:
   - `~/.myrecall/server/db/edge.db`: Frames metadata + FTS5 tables (frames_fts, ocr_text_fts, accessibility_fts)
   - `~/.myrecall/server/fts.db`: Legacy schema (used by old API layer)
   - `~/.myrecall/server/frames/`: JPEG snapshots
-- **Search Engine**: FTS5 + metadata filtering (P1)
-  - Filters: time range, app_name, window_name, browser_url, focused
+  - `~/.myrecall/server/lancedb/`: Vector embeddings (frame embeddings for semantic search)
+- **Search Engine**: Hybrid search (FTS5 + vector)
+  - FTS5 filters: time range, app_name, window_name, browser_url, focused
   - `content_type` parameter: `ocr`, `accessibility`, or `all` (default)
-  - No vector embeddings in production P1 (reserved for P2+ experimental)
+  - Vector search via LanceDB with qwen3-vl-embedding (multimodal fusion)
+  - Hybrid mode with RRF (Reciprocal Rank Fusion)
 - **CORS Middleware**: Echo-back `Origin` header for cross-origin browser requests from Client web UI
 
 **API Routes:** `/v1/*`, `/api/*` — all responses include `Access-Control-Allow-Origin: <browser-origin>`
@@ -144,18 +146,23 @@ pip install -e ".[test]"    # Include test dependencies
 - text_source ('accessibility'|'ocr'|'hybrid')
 - accessibility_tree_json (full AX tree as JSON)
 - processing_status (pending/processing/completed/failed)
+- embedding_status (NULL/pending/processing/completed/failed)
 - event_ts (capture event timestamp, separate from frame timestamp)
 ```
 
 **FTS5 Tables**:
 - `frames_fts`: Full-text index on full_text + metadata (app_name, window_name, browser_url)
 
+**Embedding Tables** (`edge.db`):
+- `embedding_tasks`: Queue for embedding generation with retry logic
+
 ## Key Architecture Decisions
 
 Key decisions embedded in this document:
 - **Edge-Centric**: Host captures/uploads, Edge processes/indexes/searches
 - **Vision + AX + OCR**: AX-first text extraction with OCR fallback; both indexed separately
-- **FTS5 Search**: Full-text search via `frames_fts` indexing `frames.full_text` (merged accessibility + OCR text)
+- **Hybrid Search**: FTS5 full-text search + LanceDB vector search with RRF fusion
+- **Multimodal Embedding**: qwen3-vl-embedding for true image+text fusion (single embedding per frame)
 
 Architecture baselines: `docs/baselines/` (chat, search)
 
@@ -212,7 +219,10 @@ openrecall/
 │   │   └── sql.py          # Legacy SQLStore (fts.db)
 │   ├── search/      # FTS5 search engine
 │   ├── processing/  # V3ProcessingWorker, OCR processor
-│   └── description/ # DescriptionWorker (frame descriptions)
+│   ├── description/ # DescriptionWorker (frame descriptions)
+│   └── embedding/   # EmbeddingWorker, multimodal providers
+│       ├── providers/  # QwenVL, OpenAI, DashScope providers
+│       └── service.py  # EmbeddingService, LanceDB storage
 └── shared/          # Common utilities
     ├── config.py    # Settings management
     └── models.py    # Data models

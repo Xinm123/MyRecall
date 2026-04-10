@@ -68,7 +68,20 @@ api_base = ""                       # Base URL (e.g., http://127.0.0.1:8090/v1)
 # IMPORTANT: [embedding] section is INDEPENDENT from [ai] section.
 # Configure explicitly for embedding generation.
 #
-# For qwen3-vl-embedding via DashScope:
+# Provider Options:
+#   - "multimodal": Custom qwen3-vl-embedding API (true image+text fusion)
+#   - "openai": OpenAI text-embedding API (text only, no image support)
+#   - "dashscope": DashScope native API (implementation pending)
+#
+# Example - Custom multimodal API (qwen3-vl-embedding):
+#   [embedding]
+#   enabled = true
+#   provider = "multimodal"
+#   model = "qwen3-vl-embedding"
+#   api_base = "http://localhost:8070/v1"
+#   dim = 1024
+#
+# Example - DashScope OpenAI-compatible mode:
 #   [embedding]
 #   enabled = true
 #   provider = "openai"
@@ -76,20 +89,20 @@ api_base = ""                       # Base URL (e.g., http://127.0.0.1:8090/v1)
 #   api_key = "sk-..."
 #   api_base = "https://dashscope.aliyuncs.com/compatible-mode/v1"
 #
-# For local vLLM service:
+# Example - OpenAI official:
 #   [embedding]
 #   enabled = true
 #   provider = "openai"
-#   model = "qwen3-vl-embedding"
-#   api_base = "http://localhost:8000/v1"
+#   model = "text-embedding-3-small"
+#   api_key = "sk-..."
 # ==============================================================================
 [embedding]
 enabled = true                      # Enable embedding generation
-provider = "openai"                 # Options: openai
+provider = "openai"                 # Options: multimodal, openai, dashscope
 model = "qwen3-vl-embedding"        # Embedding model name
 api_key = ""                        # API key if required
-api_base = ""                       # API base URL (e.g., http://localhost:8000/v1)
-dim = 1024                          # Embedding dimension
+api_base = ""                       # API base URL (e.g., http://localhost:8070/v1)
+dim = 1024                          # Embedding dimension (for multimodal provider)
 
 # ==============================================================================
 # Reranker Settings
