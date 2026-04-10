@@ -173,14 +173,14 @@ class TestQwenVLEmbeddingProvider:
             assert "text" not in content
 
 
-class TestOpenAIMultimodalEmbeddingProvider:
+class TestOpenAIEmbeddingProvider:
     def test_init_allows_empty_api_key_for_local_vllm(self):
         """Empty api_key is allowed for local vLLM without auth."""
         from openrecall.server.embedding.providers.openai import (
-            OpenAIMultimodalEmbeddingProvider,
+            OpenAIEmbeddingProvider,
         )
 
-        provider = OpenAIMultimodalEmbeddingProvider(
+        provider = OpenAIEmbeddingProvider(
             api_key="", model_name="qwen3-vl-embedding"
         )
         assert provider.api_key == ""
@@ -188,18 +188,18 @@ class TestOpenAIMultimodalEmbeddingProvider:
 
     def test_init_requires_model_name(self):
         from openrecall.server.embedding.providers.openai import (
-            OpenAIMultimodalEmbeddingProvider,
+            OpenAIEmbeddingProvider,
         )
 
         with pytest.raises(EmbeddingProviderConfigError):
-            OpenAIMultimodalEmbeddingProvider(api_key="sk-test", model_name="")
+            OpenAIEmbeddingProvider(api_key="sk-test", model_name="")
 
     def test_init_normalizes_api_base(self):
         from openrecall.server.embedding.providers.openai import (
-            OpenAIMultimodalEmbeddingProvider,
+            OpenAIEmbeddingProvider,
         )
 
-        provider = OpenAIMultimodalEmbeddingProvider(
+        provider = OpenAIEmbeddingProvider(
             api_key="test",
             model_name="test-model",
             api_base="http://localhost:8000/v1/",
@@ -209,10 +209,10 @@ class TestOpenAIMultimodalEmbeddingProvider:
     def test_embed_text_returns_normalized_vector(self):
         """embed_text should return normalized vector (L2 norm = 1)."""
         from openrecall.server.embedding.providers.openai import (
-            OpenAIMultimodalEmbeddingProvider,
+            OpenAIEmbeddingProvider,
         )
 
-        provider = OpenAIMultimodalEmbeddingProvider(
+        provider = OpenAIEmbeddingProvider(
             api_key="test", model_name="test-model"
         )
 
@@ -232,35 +232,33 @@ class TestOpenAIMultimodalEmbeddingProvider:
         norm = np.linalg.norm(result)
         assert abs(norm - 1.0) < 0.001
 
-    def test_embed_image_returns_normalized_vector(self, tmp_path):
-        """embed_image should return normalized vector for image input."""
+    def test_embed_image_raises_error(self, tmp_path):
+        """embed_image should raise error - OpenAI doesn't support image embedding."""
         from openrecall.server.embedding.providers.openai import (
-            OpenAIMultimodalEmbeddingProvider,
+            OpenAIEmbeddingProvider,
         )
 
-        # Create a test image file
         test_image = tmp_path / "test.jpg"
         test_image.write_bytes(b"\xff\xd8\xff\xe0" + b"\x00" * 100)
 
-        provider = OpenAIMultimodalEmbeddingProvider(
-            api_key="test", model_name="test-model"
+        provider = OpenAIEmbeddingProvider(
+            api_key="test", model_name="text-embedding-3-small"
         )
 
-        # Mock the API response
-        mock_response = Mock()
-        mock_response.ok = True
-        mock_response.json.return_value = {
-            "data": [{"embedding": [0.5] * 1024}]
-        }
+        with pytest.raises(EmbeddingProviderRequestError) as exc_info:
+            provider.embed_image(str(test_image))
 
-        with patch("requests.post", return_value=mock_response):
-            result = provider.embed_image(str(test_image), text="test context")
+        assert "OpenAI does not support image embedding" in str(exc_info.value)
+        assert "multimodal" in str(exc_info.value)
 
-        assert isinstance(result, np.ndarray)
-        assert result.shape == (1024,)
-        # Check L2 normalization
-        norm = np.linalg.norm(result)
-        assert abs(norm - 1.0) < 0.001
+    def test_backwards_compat_alias_exists(self):
+        """OpenAIMultimodalEmbeddingProvider should be an alias for OpenAIEmbeddingProvider."""
+        from openrecall.server.embedding.providers.openai import (
+            OpenAIEmbeddingProvider,
+            OpenAIMultimodalEmbeddingProvider,
+        )
+
+        assert OpenAIMultimodalEmbeddingProvider is OpenAIEmbeddingProvider
 
 
 class TestDashScopeEmbeddingProvider:
