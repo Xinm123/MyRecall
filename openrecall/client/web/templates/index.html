@@ -574,34 +574,53 @@
     color: var(--text-secondary);
   }
 
-  /* Stats Bar */
+  /* Stats Bar - Refined */
   .stats-bar {
     display: flex;
-    gap: 20px;
-    margin-bottom: 20px;
-    padding: 12px 20px;
+    gap: 24px;
+    margin-bottom: 24px;
+    padding: 14px 24px;
     background: var(--bg-card);
     border-radius: 12px;
     border: 1px solid var(--border-color);
     width: fit-content;
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
   }
-  
+
   .stat-item {
     display: flex;
     align-items: center;
     gap: 8px;
-    font-size: 0.9rem;
+    font-size: 14px;
     color: var(--text-secondary);
   }
-  
+
   .stat-value {
     font-weight: 600;
     color: var(--text-primary);
-    background: rgba(0, 0, 0, 0.05);
-    padding: 2px 8px;
-    border-radius: 6px;
-    font-size: 0.85rem;
+    background: rgba(0, 0, 0, 0.04);
+    padding: 3px 10px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-family: 'SF Mono', Monaco, Consolas, monospace;
+    min-width: 24px;
+    text-align: center;
+  }
+
+  /* Stats status colors */
+  .stat-item[data-status="completed"] .stat-value {
+    background: var(--color-success-bg);
+    color: #2A9D4A;
+  }
+
+  .stat-item[data-status="processing"] .stat-value {
+    background: var(--color-primary-bg);
+    color: #0A6ED6;
+  }
+
+  .stat-item[data-status="pending"] .stat-value {
+    background: var(--color-warning-bg);
+    color: #D4840D;
   }
 
   .status-pending {
