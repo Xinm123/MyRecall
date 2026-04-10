@@ -2,11 +2,11 @@
 
 **Date:** 2026-04-10
 **Author:** Claude
-**Status:** Approved
+**Status:** Approved (Updated)
 
 ## Overview
 
-Refactor embedding providers to support multiple API formats with distinct implementations. Each provider handles its own request/response format, enabling compatibility with OpenAI, DashScope native API, and custom multimodal services.
+Refactor embedding providers to support multiple API formats with distinct implementations. Each provider handles its own request/response format, enabling compatibility with OpenAI, DashScope native API, and custom multimodal services (qwen3-vl-embedding).
 
 ## Goals
 
@@ -56,28 +56,44 @@ openrecall/server/embedding/providers/
 
 ## Provider Specifications
 
-### 1. MultimodalEmbeddingProvider (Custom API)
+### 1. MultimodalEmbeddingProvider (Custom API - qwen3-vl-embedding)
 
 **Target API:** Custom service at `/v1/embeddings/multimodal`
+
+**Verified API Format** (tested against http://10.77.3.162:8070):
 
 **Request Format:**
 
 ```python
-# embed_image(image_path, text)
+# embed_image(image_path, text) - Fused multimodal embedding
 POST /v1/embeddings/multimodal
 {
-    "images": ["<base64_encoded_jpeg>"],  // Pure base64, no prefix
-    "texts": ["<ocr_or_ax_text>"],        // Optional
     "model": "qwen3-vl-embedding",
-    "encoding_format": "float"
+    "input": {
+        "contents": [
+            {
+                "text": "<OCR/AX text from frame>",
+                "image": "<base64_encoded_jpeg>"
+            }
+        ]
+    },
+    "parameters": {
+        "dimension": 1024
+    }
 }
 
-# embed_text(text) - for search queries
+# embed_text(text) - Text-only embedding for search queries
 POST /v1/embeddings/multimodal
 {
-    "texts": ["<query_text>"],
     "model": "qwen3-vl-embedding",
-    "encoding_format": "float"
+    "input": {
+        "contents": [
+            {"text": "<query text>"}
+        ]
+    },
+    "parameters": {
+        "dimension": 1024
+    }
 }
 ```
 
@@ -85,15 +101,31 @@ POST /v1/embeddings/multimodal
 
 ```json
 {
-    "data": [{"index": 0, "embedding": [0.1, 0.2, ...]}],
-    "model": "qwen3-vl-embedding"
+    "output": {
+        "embeddings": [
+            {
+                "text_index": 0,
+                "image_index": 0,
+                "embedding": [0.1, 0.2, ...]
+            }
+        ]
+    },
+    "usage": {"prompt_tokens": 100, "total_tokens": 100},
+    "model": "Qwen3-VL-Embedding-2B",
+    "dimension": 1024,
+    "output_type": "dense"
 }
 ```
+
+**Key Features:**
+- **True fusion**: text + image produces a fused embedding (verified: cosine similarity ~0.6 to each modality)
+- **Configurable dimension**: via `parameters.dimension` (default 1024)
+- **Response path**: `output.embeddings[0].embedding` (NOT OpenAI standard)
 
 **Implementation Notes:**
 - Image encoding: Read JPEG file, base64 encode (no `data:image/jpeg;base64,` prefix)
 - L2 normalize output vector
-- Handle empty text case (skip `texts` field)
+- Handle empty text case: only include `image` key in content dict
 
 ---
 
@@ -163,7 +195,7 @@ class DashScopeEmbeddingProvider(MultimodalEmbeddingProvider):
 ### TOML Examples
 
 ```toml
-# Custom multimodal API (current deployment)
+# Custom multimodal API (current deployment - qwen3-vl-embedding)
 [embedding]
 enabled = true
 provider = "multimodal"
@@ -210,6 +242,7 @@ def get_multimodal_embedding_provider() -> "MultimodalEmbeddingProvider":
     model_name = settings.embedding_model
     api_key = settings.embedding_api_key
     api_base = settings.embedding_api_base
+    dimension = settings.embedding_dim  # For multimodal provider
 
     if provider == "openai":
         instance: MultimodalEmbeddingProvider = OpenAIEmbeddingProvider(
@@ -228,6 +261,7 @@ def get_multimodal_embedding_provider() -> "MultimodalEmbeddingProvider":
             api_key=api_key,
             model_name=model_name,
             api_base=api_base,
+            dimension=dimension,
         )
     else:
         raise AIProviderConfigError(f"Unknown embedding provider: {provider}")
@@ -246,9 +280,21 @@ def get_multimodal_embedding_provider() -> "MultimodalEmbeddingProvider":
 
 ---
 
+## API Verification Summary
+
+| Test | Result |
+|------|--------|
+| Text-only embedding | ✅ Works |
+| Image-only embedding | ✅ Works |
+| Text + Image fusion | ✅ Works (verified: cosine sim ~0.6 to each modality) |
+| Dimension parameter | ✅ Works (default 2048, configurable to 1024) |
+| Response format | Non-OpenAI: `output.embeddings[0].embedding` |
+
+---
+
 ## Implementation Order
 
-1. Create `multimodal.py` with correct API format
+1. Create `multimodal.py` with correct qwen3-vl-embedding API format
 2. Refactor `openai.py` (rename class, text-only support, clear error for images)
 3. Create `dashscope.py` skeleton
 4. Update `__init__.py` exports
@@ -258,15 +304,8 @@ def get_multimodal_embedding_provider() -> "MultimodalEmbeddingProvider":
 
 ---
 
-## Open Questions
-
-1. **DashScope API format:** To be documented when implementation is needed
-2. **OpenAI multimodal future:** Monitor OpenAI API updates for image embedding support
-
----
-
 ## References
 
-- Custom multimodal API docs: Provided by user (see conversation)
+- Custom multimodal API source: `hmdemo/server/embedding_server.py` (provided by user)
 - OpenAI Embeddings API: https://platform.openai.com/docs/api-reference/embeddings
 - DashScope API: https://help.aliyun.com/product/441277.html

@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Refactor embedding providers to support three distinct API formats: OpenAI (text-only), DashScope (skeleton), and custom multimodal API.
+**Goal:** Refactor embedding providers to support three distinct API formats: OpenAI (text-only), DashScope (skeleton), and custom multimodal API (qwen3-vl-embedding).
 
 **Architecture:** Create three separate provider classes with distinct request formats. Factory selects provider by name (`openai`, `dashscope`, `multimodal`). Each provider implements `MultimodalEmbeddingProvider` protocol with `embed_image()` and `embed_text()` methods.
 
@@ -18,7 +18,7 @@ openrecall/server/embedding/providers/
 ├── base.py              # No changes (existing protocol)
 ├── openai.py            # Refactor: rename class, text-only, clear error for images
 ├── dashscope.py         # Create: skeleton implementation
-└── multimodal.py        # Create: custom multimodal API provider
+└── multimodal.py        # Create: qwen3-vl-embedding API provider
 
 openrecall/server/ai/
 └── factory.py           # Update: add provider selection logic
@@ -29,7 +29,7 @@ tests/
 
 ---
 
-## Task 1: Create MultimodalEmbeddingProvider (Custom API)
+## Task 1: Create MultimodalEmbeddingProvider (qwen3-vl-embedding API)
 
 **Files:**
 - Create: `openrecall/server/embedding/providers/multimodal.py`
@@ -48,10 +48,11 @@ class TestMultimodalEmbeddingProvider:
         )
 
         provider = CustomMultimodalProvider(
-            api_key="", model_name="qwen3-vl-embedding"
+            api_key="", model_name="qwen3-vl-embedding", dimension=1024
         )
         assert provider.api_key == ""
         assert provider.model_name == "qwen3-vl-embedding"
+        assert provider.dimension == 1024
 
     def test_init_requires_model_name(self):
         from openrecall.server.embedding.providers.multimodal import (
@@ -59,7 +60,7 @@ class TestMultimodalEmbeddingProvider:
         )
 
         with pytest.raises(EmbeddingProviderConfigError):
-            CustomMultimodalProvider(api_key="test", model_name="")
+            CustomMultimodalProvider(api_key="test", model_name="", dimension=1024)
 
     def test_init_normalizes_api_base(self):
         from openrecall.server.embedding.providers.multimodal import (
@@ -70,6 +71,7 @@ class TestMultimodalEmbeddingProvider:
             api_key="test",
             model_name="test-model",
             api_base="http://localhost:8070/v1/",
+            dimension=1024,
         )
         assert provider.api_base == "http://localhost:8070/v1"
 ```
@@ -84,7 +86,7 @@ Expected: FAIL with "ModuleNotFoundError: No module named 'openrecall.server.emb
 Create `openrecall/server/embedding/providers/multimodal.py`:
 
 ```python
-"""Custom multimodal embedding provider for /v1/embeddings/multimodal API."""
+"""Custom multimodal embedding provider for qwen3-vl-embedding API."""
 from __future__ import annotations
 
 import base64
@@ -120,10 +122,27 @@ def _l2_normalize(vec: np.ndarray) -> np.ndarray:
 
 
 class MultimodalEmbeddingProvider(MultimodalEmbeddingProvider):
-    """Custom multimodal embedding provider.
+    """Multimodal embedding provider for qwen3-vl-embedding API.
 
-    Targets /v1/embeddings/multimodal endpoint with format:
-    {"images": [...], "texts": [...], "model": "..."}
+    Supports true fusion of text and image into a single embedding.
+
+    API Format:
+        POST /v1/embeddings/multimodal
+        {
+            "model": "qwen3-vl-embedding",
+            "input": {
+                "contents": [{"text": "...", "image": "<base64>"}]
+            },
+            "parameters": {"dimension": 1024}
+        }
+
+    Response Format:
+        {
+            "output": {
+                "embeddings": [{"text_index": 0, "image_index": 0, "embedding": [...]}]
+            },
+            "dimension": 1024
+        }
     """
 
     def __init__(
@@ -131,6 +150,7 @@ class MultimodalEmbeddingProvider(MultimodalEmbeddingProvider):
         api_key: str,
         model_name: str,
         api_base: str = "",
+        dimension: int = 1024,
     ) -> None:
         if not model_name:
             raise EmbeddingProviderConfigError("model_name is required")
@@ -140,9 +160,10 @@ class MultimodalEmbeddingProvider(MultimodalEmbeddingProvider):
         self.api_base = _normalize_api_base(
             api_base or "http://localhost:8070/v1"
         )
+        self.dimension = dimension
         logger.info(
             f"MultimodalEmbeddingProvider initialized: "
-            f"base={self.api_base} model={self.model_name}"
+            f"base={self.api_base} model={self.model_name} dim={self.dimension}"
         )
 
     def embed_image(
@@ -150,14 +171,14 @@ class MultimodalEmbeddingProvider(MultimodalEmbeddingProvider):
         image_path: str,
         text: Optional[str] = None,
     ) -> np.ndarray:
-        """Generate embedding for image with optional text context.
+        """Generate fused embedding for image with optional text context.
 
         Args:
             image_path: Path to image file
             text: Optional text context (OCR/AX text)
 
         Returns:
-            Normalized embedding vector (1024 dimensions)
+            Normalized embedding vector (self.dimension dimensions)
         """
         path = Path(image_path).resolve()
         if not path.is_file():
@@ -171,15 +192,20 @@ class MultimodalEmbeddingProvider(MultimodalEmbeddingProvider):
         if self.api_key:
             headers["Authorization"] = f"Bearer {self.api_key}"
 
-        # Build multimodal request format
-        # API expects: {"images": [...], "texts": [...], "model": "..."}
+        # Build qwen3-vl-embedding API format
+        content = {"image": encoded}
+        if text and text.strip():
+            content["text"] = text.strip()
+
         payload = {
             "model": self.model_name,
-            "images": [encoded],
-            "encoding_format": "float",
+            "input": {
+                "contents": [content]
+            },
+            "parameters": {
+                "dimension": self.dimension
+            }
         }
-        if text and text.strip():
-            payload["texts"] = [text]
 
         try:
             resp = requests.post(
@@ -201,12 +227,13 @@ class MultimodalEmbeddingProvider(MultimodalEmbeddingProvider):
 
         try:
             data = resp.json()
-            items = data.get("data") or []
-            if not items:
+            # qwen3-vl-embedding response format
+            embeddings = data.get("output", {}).get("embeddings", [])
+            if not embeddings:
                 raise EmbeddingProviderRequestError(
                     "No embedding in response"
                 )
-            emb = items[0].get("embedding")
+            emb = embeddings[0].get("embedding")
             if not isinstance(emb, list):
                 raise EmbeddingProviderRequestError(
                     "Invalid embedding format in response"
@@ -227,10 +254,10 @@ class MultimodalEmbeddingProvider(MultimodalEmbeddingProvider):
             text: Query text
 
         Returns:
-            Normalized embedding vector (1024 dimensions)
+            Normalized embedding vector (self.dimension dimensions)
         """
         if not text or text.isspace():
-            return np.zeros(1024, dtype=np.float32)
+            return np.zeros(self.dimension, dtype=np.float32)
 
         url = f"{self.api_base}/embeddings/multimodal"
         headers = {"Content-Type": "application/json"}
@@ -239,8 +266,12 @@ class MultimodalEmbeddingProvider(MultimodalEmbeddingProvider):
 
         payload = {
             "model": self.model_name,
-            "texts": [text],
-            "encoding_format": "float",
+            "input": {
+                "contents": [{"text": text}]
+            },
+            "parameters": {
+                "dimension": self.dimension
+            }
         }
 
         try:
@@ -263,12 +294,12 @@ class MultimodalEmbeddingProvider(MultimodalEmbeddingProvider):
 
         try:
             data = resp.json()
-            items = data.get("data") or []
-            if not items:
+            embeddings = data.get("output", {}).get("embeddings", [])
+            if not embeddings:
                 raise EmbeddingProviderRequestError(
                     "No embedding in response"
                 )
-            emb = items[0].get("embedding")
+            emb = embeddings[0].get("embedding")
             if not isinstance(emb, list):
                 raise EmbeddingProviderRequestError(
                     "Invalid embedding format in response"
@@ -300,23 +331,28 @@ Add to `tests/test_embedding_provider.py` in `TestMultimodalEmbeddingProvider`:
         )
 
         provider = CustomMultimodalProvider(
-            api_key="test", model_name="test-model"
+            api_key="test", model_name="test-model", dimension=1024
         )
 
-        # Mock the API response
+        # Mock the API response - qwen3-vl-embedding format
         mock_response = Mock()
         mock_response.ok = True
         mock_response.json.return_value = {
-            "data": [{"embedding": [0.5] * 1024}]
+            "output": {
+                "embeddings": [{"text_index": 0, "image_index": -1, "embedding": [0.5] * 1024}]
+            },
+            "dimension": 1024
         }
 
         with patch("requests.post", return_value=mock_response) as mock_post:
             result = provider.embed_text("test query")
 
-            # Verify request format
+            # Verify qwen3-vl-embedding request format
             call_args = mock_post.call_args
-            assert call_args[1]["json"]["texts"] == ["test query"]
-            assert call_args[1]["json"]["model"] == "test-model"
+            payload = call_args[1]["json"]
+            assert payload["model"] == "test-model"
+            assert payload["input"]["contents"] == [{"text": "test query"}]
+            assert payload["parameters"]["dimension"] == 1024
 
         assert isinstance(result, np.ndarray)
         assert result.shape == (1024,)
@@ -329,52 +365,57 @@ Add to `tests/test_embedding_provider.py` in `TestMultimodalEmbeddingProvider`:
 Run: `pytest tests/test_embedding_provider.py::TestMultimodalEmbeddingProvider::test_embed_text_returns_normalized_vector -v`
 Expected: PASS
 
-- [ ] **Step 1.7: Write failing test for embed_image**
+- [ ] **Step 1.7: Write failing test for embed_image (fusion)**
 
 Add to `tests/test_embedding_provider.py` in `TestMultimodalEmbeddingProvider`:
 
 ```python
     def test_embed_image_returns_normalized_vector(self, tmp_path):
-        """embed_image should return normalized vector for image input."""
+        """embed_image should return normalized vector for fused image+text."""
         from openrecall.server.embedding.providers.multimodal import (
             MultimodalEmbeddingProvider as CustomMultimodalProvider,
         )
 
-        # Create a test image file
         test_image = tmp_path / "test.jpg"
         test_image.write_bytes(b"\xff\xd8\xff\xe0" + b"\x00" * 100)
 
         provider = CustomMultimodalProvider(
-            api_key="test", model_name="test-model"
+            api_key="test", model_name="test-model", dimension=1024
         )
 
-        # Mock the API response
+        # Mock the API response - qwen3-vl-embedding format with fusion
         mock_response = Mock()
         mock_response.ok = True
         mock_response.json.return_value = {
-            "data": [{"embedding": [0.5] * 1024}]
+            "output": {
+                "embeddings": [
+                    {"text_index": 0, "image_index": 0, "embedding": [0.5] * 1024}
+                ]
+            },
+            "dimension": 1024
         }
 
         with patch("requests.post", return_value=mock_response) as mock_post:
             result = provider.embed_image(str(test_image), text="test context")
 
-            # Verify request format uses multimodal endpoint
+            # Verify qwen3-vl-embedding request format
             call_args = mock_post.call_args
             url = call_args[1]["url"] if "url" in call_args[1] else call_args[0][0]
             assert "/embeddings/multimodal" in url
-            # Verify images and texts in payload
+
             payload = call_args[1]["json"]
-            assert "images" in payload
-            assert len(payload["images"]) == 1
-            assert payload["texts"] == ["test context"]
+            content = payload["input"]["contents"][0]
+            assert "image" in content
+            assert content["text"] == "test context"
+            assert payload["parameters"]["dimension"] == 1024
 
         assert isinstance(result, np.ndarray)
         assert result.shape == (1024,)
         norm = np.linalg.norm(result)
         assert abs(norm - 1.0) < 0.001
 
-    def test_embed_image_without_text_omits_texts_field(self, tmp_path):
-        """embed_image without text should not include texts field."""
+    def test_embed_image_without_text_omits_text_field(self, tmp_path):
+        """embed_image without text should only include image in content."""
         from openrecall.server.embedding.providers.multimodal import (
             MultimodalEmbeddingProvider as CustomMultimodalProvider,
         )
@@ -383,21 +424,24 @@ Add to `tests/test_embedding_provider.py` in `TestMultimodalEmbeddingProvider`:
         test_image.write_bytes(b"\xff\xd8\xff\xe0" + b"\x00" * 100)
 
         provider = CustomMultimodalProvider(
-            api_key="test", model_name="test-model"
+            api_key="test", model_name="test-model", dimension=1024
         )
 
         mock_response = Mock()
         mock_response.ok = True
         mock_response.json.return_value = {
-            "data": [{"embedding": [0.5] * 1024}]
+            "output": {
+                "embeddings": [{"text_index": -1, "image_index": 0, "embedding": [0.5] * 1024}]
+            }
         }
 
         with patch("requests.post", return_value=mock_response) as mock_post:
             provider.embed_image(str(test_image), text=None)
 
             payload = mock_post.call_args[1]["json"]
-            assert "texts" not in payload
-            assert "images" in payload
+            content = payload["input"]["contents"][0]
+            assert "image" in content
+            assert "text" not in content
 ```
 
 - [ ] **Step 1.8: Run tests to verify they pass**
@@ -409,7 +453,7 @@ Expected: All PASS
 
 ```bash
 git add openrecall/server/embedding/providers/multimodal.py tests/test_embedding_provider.py
-git commit -m "feat(embedding): add MultimodalEmbeddingProvider for custom API"
+git commit -m "feat(embedding): add MultimodalEmbeddingProvider for qwen3-vl-embedding API"
 ```
 
 ---
@@ -488,7 +532,7 @@ def _l2_normalize(vec: np.ndarray) -> np.ndarray:
     return (vec / norm).astype(np.float32)
 
 
-# Keep old name as alias for backwards compatibility
+# Backwards compatibility alias
 OpenAIMultimodalEmbeddingProvider: type
 
 
@@ -856,7 +900,6 @@ git commit -m "feat(embedding): export all embedding providers"
 
 **Files:**
 - Modify: `openrecall/server/ai/factory.py`
-- Test: Existing tests should pass
 
 ### Step 5.1: Update get_multimodal_embedding_provider function
 
@@ -884,6 +927,7 @@ def get_multimodal_embedding_provider() -> "MultimodalEmbeddingProvider":
     model_name = settings.embedding_model
     api_key = settings.embedding_api_key
     api_base = settings.embedding_api_base
+    dimension = settings.embedding_dim
 
     if provider == "openai":
         instance: MultimodalEmbeddingProvider = OpenAIEmbeddingProvider(
@@ -902,6 +946,7 @@ def get_multimodal_embedding_provider() -> "MultimodalEmbeddingProvider":
             api_key=api_key,
             model_name=model_name,
             api_base=api_base,
+            dimension=dimension,
         )
     else:
         raise AIProviderConfigError(f"Unknown embedding provider: {provider}")
@@ -944,8 +989,9 @@ git commit -m "feat(embedding): multi-provider architecture complete
 
 - OpenAIEmbeddingProvider: text-only, clear error for images
 - DashScopeEmbeddingProvider: skeleton for future implementation
-- MultimodalEmbeddingProvider: custom /v1/embeddings/multimodal API
-- Factory supports provider selection: openai, dashscope, multimodal"
+- MultimodalEmbeddingProvider: qwen3-vl-embedding API with true fusion
+- Factory supports provider selection: openai, dashscope, multimodal
+- Dimension configurable via embedding.dim setting"
 ```
 
 ---
