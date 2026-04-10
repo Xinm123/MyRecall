@@ -531,7 +531,9 @@ class FramesStore:
                            f.last_known_window, f.text_source, f.processed_at,
                            f.capture_trigger, f.device_name, f.error_message,
                            f.accessibility_text, f.ocr_text, f.browser_url, f.focused,
-                           f.description_status,
+                           f.description_status, f.embedding_status,
+                           LENGTH(f.accessibility_text) as accessibility_text_length,
+                           LENGTH(f.ocr_text) as ocr_text_length,
                            o.text_length, o.ocr_engine,
                            CASE
                              WHEN f.text_source = 'accessibility' THEN SUBSTR(f.accessibility_text, 1, 100)
@@ -583,6 +585,10 @@ class FramesStore:
                             "error_message": row["error_message"] or "",
                             # Description status (P1-S3+)
                             "description_status": row["description_status"] or "",
+                            # Embedding status and text lengths (Task 8)
+                            "embedding_status": row["embedding_status"] or "",
+                            "accessibility_text_length": row["accessibility_text_length"] or 0,
+                            "ocr_text_length": row["ocr_text_length"] or 0,
                         }
                     )
         except sqlite3.Error as e:
