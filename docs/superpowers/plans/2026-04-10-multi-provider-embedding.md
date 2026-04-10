@@ -29,25 +29,25 @@ tests/
 
 ---
 
-## Task 1: Create MultimodalEmbeddingProvider (qwen3-vl-embedding API)
+## Task 1: Create QwenVLEmbeddingProvider (qwen3-vl-embedding API)
 
 **Files:**
 - Create: `openrecall/server/embedding/providers/multimodal.py`
 - Test: `tests/test_embedding_provider.py`
 
-### Step 1.1: Write failing test for MultimodalEmbeddingProvider initialization
+### Step 1.1: Write failing test for QwenVLEmbeddingProvider initialization
 
 Add to `tests/test_embedding_provider.py`:
 
 ```python
-class TestMultimodalEmbeddingProvider:
+class TestQwenVLEmbeddingProvider:
     def test_init_allows_empty_api_key(self):
         """Empty api_key is allowed for local services without auth."""
         from openrecall.server.embedding.providers.multimodal import (
-            MultimodalEmbeddingProvider as CustomMultimodalProvider,
+            QwenVLEmbeddingProvider,
         )
 
-        provider = CustomMultimodalProvider(
+        provider = QwenVLEmbeddingProvider(
             api_key="", model_name="qwen3-vl-embedding", dimension=1024
         )
         assert provider.api_key == ""
@@ -56,18 +56,18 @@ class TestMultimodalEmbeddingProvider:
 
     def test_init_requires_model_name(self):
         from openrecall.server.embedding.providers.multimodal import (
-            MultimodalEmbeddingProvider as CustomMultimodalProvider,
+            QwenVLEmbeddingProvider,
         )
 
         with pytest.raises(EmbeddingProviderConfigError):
-            CustomMultimodalProvider(api_key="test", model_name="", dimension=1024)
+            QwenVLEmbeddingProvider(api_key="test", model_name="", dimension=1024)
 
     def test_init_normalizes_api_base(self):
         from openrecall.server.embedding.providers.multimodal import (
-            MultimodalEmbeddingProvider as CustomMultimodalProvider,
+            QwenVLEmbeddingProvider,
         )
 
-        provider = CustomMultimodalProvider(
+        provider = QwenVLEmbeddingProvider(
             api_key="test",
             model_name="test-model",
             api_base="http://localhost:8070/v1/",
@@ -78,15 +78,15 @@ class TestMultimodalEmbeddingProvider:
 
 - [ ] **Step 1.2: Run test to verify it fails**
 
-Run: `pytest tests/test_embedding_provider.py::TestMultimodalEmbeddingProvider -v`
+Run: `pytest tests/test_embedding_provider.py::TestQwenVLEmbeddingProvider -v`
 Expected: FAIL with "ModuleNotFoundError: No module named 'openrecall.server.embedding.providers.multimodal'"
 
-- [ ] **Step 1.3: Create multimodal.py with initialization code**
+- [ ] **Step 1.3: Create multimodal.py with QwenVLEmbeddingProvider class**
 
 Create `openrecall/server/embedding/providers/multimodal.py`:
 
 ```python
-"""Custom multimodal embedding provider for qwen3-vl-embedding API."""
+"""Qwen3-VL embedding provider for qwen3-vl-embedding API."""
 from __future__ import annotations
 
 import base64
@@ -121,8 +121,8 @@ def _l2_normalize(vec: np.ndarray) -> np.ndarray:
     return (vec / norm).astype(np.float32)
 
 
-class MultimodalEmbeddingProvider(MultimodalEmbeddingProvider):
-    """Multimodal embedding provider for qwen3-vl-embedding API.
+class QwenVLEmbeddingProvider(MultimodalEmbeddingProvider):
+    """Qwen3-VL embedding provider for qwen3-vl-embedding API.
 
     Supports true fusion of text and image into a single embedding.
 
@@ -162,7 +162,7 @@ class MultimodalEmbeddingProvider(MultimodalEmbeddingProvider):
         )
         self.dimension = dimension
         logger.info(
-            f"MultimodalEmbeddingProvider initialized: "
+            f"QwenVLEmbeddingProvider initialized: "
             f"base={self.api_base} model={self.model_name} dim={self.dimension}"
         )
 
@@ -316,21 +316,21 @@ class MultimodalEmbeddingProvider(MultimodalEmbeddingProvider):
 
 - [ ] **Step 1.4: Run initialization tests**
 
-Run: `pytest tests/test_embedding_provider.py::TestMultimodalEmbeddingProvider::test_init_allows_empty_api_key tests/test_embedding_provider.py::TestMultimodalEmbeddingProvider::test_init_requires_model_name tests/test_embedding_provider.py::TestMultimodalEmbeddingProvider::test_init_normalizes_api_base -v`
+Run: `pytest tests/test_embedding_provider.py::TestQwenVLEmbeddingProvider::test_init_allows_empty_api_key tests/test_embedding_provider.py::TestQwenVLEmbeddingProvider::test_init_requires_model_name tests/test_embedding_provider.py::TestQwenVLEmbeddingProvider::test_init_normalizes_api_base -v`
 Expected: PASS
 
 - [ ] **Step 1.5: Write failing test for embed_text**
 
-Add to `tests/test_embedding_provider.py` in `TestMultimodalEmbeddingProvider`:
+Add to `tests/test_embedding_provider.py` in `TestQwenVLEmbeddingProvider`:
 
 ```python
     def test_embed_text_returns_normalized_vector(self):
         """embed_text should return normalized vector (L2 norm = 1)."""
         from openrecall.server.embedding.providers.multimodal import (
-            MultimodalEmbeddingProvider as CustomMultimodalProvider,
+            QwenVLEmbeddingProvider,
         )
 
-        provider = CustomMultimodalProvider(
+        provider = QwenVLEmbeddingProvider(
             api_key="test", model_name="test-model", dimension=1024
         )
 
@@ -362,24 +362,24 @@ Add to `tests/test_embedding_provider.py` in `TestMultimodalEmbeddingProvider`:
 
 - [ ] **Step 1.6: Run test to verify it passes**
 
-Run: `pytest tests/test_embedding_provider.py::TestMultimodalEmbeddingProvider::test_embed_text_returns_normalized_vector -v`
+Run: `pytest tests/test_embedding_provider.py::TestQwenVLEmbeddingProvider::test_embed_text_returns_normalized_vector -v`
 Expected: PASS
 
 - [ ] **Step 1.7: Write failing test for embed_image (fusion)**
 
-Add to `tests/test_embedding_provider.py` in `TestMultimodalEmbeddingProvider`:
+Add to `tests/test_embedding_provider.py` in `TestQwenVLEmbeddingProvider`:
 
 ```python
     def test_embed_image_returns_normalized_vector(self, tmp_path):
         """embed_image should return normalized vector for fused image+text."""
         from openrecall.server.embedding.providers.multimodal import (
-            MultimodalEmbeddingProvider as CustomMultimodalProvider,
+            QwenVLEmbeddingProvider,
         )
 
         test_image = tmp_path / "test.jpg"
         test_image.write_bytes(b"\xff\xd8\xff\xe0" + b"\x00" * 100)
 
-        provider = CustomMultimodalProvider(
+        provider = QwenVLEmbeddingProvider(
             api_key="test", model_name="test-model", dimension=1024
         )
 
@@ -417,13 +417,13 @@ Add to `tests/test_embedding_provider.py` in `TestMultimodalEmbeddingProvider`:
     def test_embed_image_without_text_omits_text_field(self, tmp_path):
         """embed_image without text should only include image in content."""
         from openrecall.server.embedding.providers.multimodal import (
-            MultimodalEmbeddingProvider as CustomMultimodalProvider,
+            QwenVLEmbeddingProvider,
         )
 
         test_image = tmp_path / "test.jpg"
         test_image.write_bytes(b"\xff\xd8\xff\xe0" + b"\x00" * 100)
 
-        provider = CustomMultimodalProvider(
+        provider = QwenVLEmbeddingProvider(
             api_key="test", model_name="test-model", dimension=1024
         )
 
@@ -446,14 +446,14 @@ Add to `tests/test_embedding_provider.py` in `TestMultimodalEmbeddingProvider`:
 
 - [ ] **Step 1.8: Run tests to verify they pass**
 
-Run: `pytest tests/test_embedding_provider.py::TestMultimodalEmbeddingProvider -v`
+Run: `pytest tests/test_embedding_provider.py::TestQwenVLEmbeddingProvider -v`
 Expected: All PASS
 
-- [ ] **Step 1.9: Commit multimodal provider**
+- [ ] **Step 1.9: Commit QwenVLEmbeddingProvider**
 
 ```bash
 git add openrecall/server/embedding/providers/multimodal.py tests/test_embedding_provider.py
-git commit -m "feat(embedding): add MultimodalEmbeddingProvider for qwen3-vl-embedding API"
+git commit -m "feat(embedding): add QwenVLEmbeddingProvider for qwen3-vl-embedding API"
 ```
 
 ---
@@ -466,7 +466,7 @@ git commit -m "feat(embedding): add MultimodalEmbeddingProvider for qwen3-vl-emb
 
 ### Step 2.1: Write failing test for embed_image error
 
-Add to `tests/test_embedding_provider.py` in `TestOpenAIMultimodalEmbeddingProvider`:
+Add to `tests/test_embedding_provider.py` in `TestOpenAIEmbeddingProvider`:
 
 ```python
     def test_embed_image_raises_error(self, tmp_path):
@@ -491,7 +491,7 @@ Add to `tests/test_embedding_provider.py` in `TestOpenAIMultimodalEmbeddingProvi
 
 - [ ] **Step 2.2: Run test to verify it fails**
 
-Run: `pytest tests/test_embedding_provider.py::TestOpenAIMultimodalEmbeddingProvider::test_embed_image_raises_error -v`
+Run: `pytest tests/test_embedding_provider.py::TestOpenAIEmbeddingProvider::test_embed_image_raises_error -v`
 Expected: FAIL (current implementation tries to call API)
 
 - [ ] **Step 2.3: Refactor openai.py - rename class and add image error**
@@ -645,9 +645,9 @@ class OpenAIEmbeddingProvider(MultimodalEmbeddingProvider):
 OpenAIMultimodalEmbeddingProvider = OpenAIEmbeddingProvider
 ```
 
-- [ ] **Step 2.4: Update test class name references**
+- [ ] **Step 2.4: Update test class name**
 
-In `tests/test_embedding_provider.py`, update `TestOpenAIMultimodalEmbeddingProvider` to use the new class name. Change all imports from:
+In `tests/test_embedding_provider.py`, rename the test class from `TestOpenAIMultimodalEmbeddingProvider` to `TestOpenAIEmbeddingProvider` and update all imports from:
 
 ```python
 from openrecall.server.embedding.providers.openai import (
@@ -667,7 +667,7 @@ And update all provider instantiations from `OpenAIMultimodalEmbeddingProvider` 
 
 - [ ] **Step 2.5: Run all OpenAI provider tests**
 
-Run: `pytest tests/test_embedding_provider.py::TestOpenAIMultimodalEmbeddingProvider -v`
+Run: `pytest tests/test_embedding_provider.py::TestOpenAIEmbeddingProvider -v`
 Expected: All PASS
 
 - [ ] **Step 2.6: Commit OpenAI provider refactor**
@@ -864,7 +864,7 @@ from openrecall.server.embedding.providers.dashscope import (
     DashScopeEmbeddingProvider,
 )
 from openrecall.server.embedding.providers.multimodal import (
-    MultimodalEmbeddingProvider as CustomMultimodalEmbeddingProvider,
+    QwenVLEmbeddingProvider,
 )
 
 __all__ = [
@@ -878,13 +878,13 @@ __all__ = [
     "OpenAIEmbeddingProvider",
     "OpenAIMultimodalEmbeddingProvider",  # Alias for backwards compat
     "DashScopeEmbeddingProvider",
-    "CustomMultimodalEmbeddingProvider",
+    "QwenVLEmbeddingProvider",
 ]
 ```
 
 - [ ] **Step 4.2: Verify imports work**
 
-Run: `python -c "from openrecall.server.embedding.providers import OpenAIEmbeddingProvider, DashScopeEmbeddingProvider, CustomMultimodalEmbeddingProvider; print('OK')"`
+Run: `python -c "from openrecall.server.embedding.providers import OpenAIEmbeddingProvider, DashScopeEmbeddingProvider, QwenVLEmbeddingProvider; print('OK')"`
 Expected: "OK"
 
 - [ ] **Step 4.3: Commit exports update**
@@ -915,7 +915,7 @@ def get_multimodal_embedding_provider() -> "MultimodalEmbeddingProvider":
         MultimodalEmbeddingProvider,
         OpenAIEmbeddingProvider,
         DashScopeEmbeddingProvider,
-        CustomMultimodalEmbeddingProvider,
+        QwenVLEmbeddingProvider,
     )
 
     capability = "multimodal_embedding"
@@ -942,7 +942,7 @@ def get_multimodal_embedding_provider() -> "MultimodalEmbeddingProvider":
             api_base=api_base,
         )
     elif provider == "multimodal":
-        instance = CustomMultimodalEmbeddingProvider(
+        instance = QwenVLEmbeddingProvider(
             api_key=api_key,
             model_name=model_name,
             api_base=api_base,
@@ -989,9 +989,9 @@ git commit -m "feat(embedding): multi-provider architecture complete
 
 - OpenAIEmbeddingProvider: text-only, clear error for images
 - DashScopeEmbeddingProvider: skeleton for future implementation
-- MultimodalEmbeddingProvider: qwen3-vl-embedding API with true fusion
+- QwenVLEmbeddingProvider: qwen3-vl-embedding API with true fusion
 - Factory supports provider selection: openai, dashscope, multimodal
-- Dimension configurable via embedding.dim setting"
+- Dimension configurable via embedding.dim setting (default 1024)"
 ```
 
 ---
@@ -1000,7 +1000,7 @@ git commit -m "feat(embedding): multi-provider architecture complete
 
 | Task | Description | Files Changed |
 |------|-------------|---------------|
-| 1 | Create MultimodalEmbeddingProvider | `providers/multimodal.py` (new), tests |
+| 1 | Create QwenVLEmbeddingProvider | `providers/multimodal.py` (new), tests |
 | 2 | Refactor OpenAI provider | `providers/openai.py`, tests |
 | 3 | Create DashScope skeleton | `providers/dashscope.py` (new), tests |
 | 4 | Update exports | `providers/__init__.py` |

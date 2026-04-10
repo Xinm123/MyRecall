@@ -38,7 +38,7 @@ get_multimodal_embedding_provider()
       │
       ├─ "openai"     → OpenAIEmbeddingProvider
       ├─ "dashscope"  → DashScopeEmbeddingProvider
-      └─ "multimodal" → MultimodalEmbeddingProvider
+      └─ "multimodal" → QwenVLEmbeddingProvider
 ```
 
 ### File Structure
@@ -49,14 +49,14 @@ openrecall/server/embedding/providers/
 ├── base.py              # MultimodalEmbeddingProvider protocol (existing)
 ├── openai.py            # OpenAI official API (refactored)
 ├── dashscope.py         # DashScope native API (skeleton)
-└── multimodal.py        # Custom multimodal API (new)
+└── multimodal.py        # qwen3-vl-embedding API (QwenVLEmbeddingProvider)
 ```
 
 ---
 
 ## Provider Specifications
 
-### 1. MultimodalEmbeddingProvider (Custom API - qwen3-vl-embedding)
+### 1. QwenVLEmbeddingProvider (Custom API - qwen3-vl-embedding)
 
 **Target API:** Custom service at `/v1/embeddings/multimodal`
 
@@ -230,7 +230,7 @@ def get_multimodal_embedding_provider() -> "MultimodalEmbeddingProvider":
         MultimodalEmbeddingProvider,
         OpenAIEmbeddingProvider,
         DashScopeEmbeddingProvider,
-        MultimodalEmbeddingProvider as CustomMultimodalProvider,
+        QwenVLEmbeddingProvider,
     )
 
     capability = "multimodal_embedding"
@@ -257,7 +257,7 @@ def get_multimodal_embedding_provider() -> "MultimodalEmbeddingProvider":
             api_base=api_base,
         )
     elif provider == "multimodal":
-        instance = CustomMultimodalProvider(
+        instance = QwenVLEmbeddingProvider(
             api_key=api_key,
             model_name=model_name,
             api_base=api_base,
@@ -294,7 +294,7 @@ def get_multimodal_embedding_provider() -> "MultimodalEmbeddingProvider":
 
 ## Implementation Order
 
-1. Create `multimodal.py` with correct qwen3-vl-embedding API format
+1. Create `multimodal.py` with `QwenVLEmbeddingProvider` class
 2. Refactor `openai.py` (rename class, text-only support, clear error for images)
 3. Create `dashscope.py` skeleton
 4. Update `__init__.py` exports
