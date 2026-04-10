@@ -330,6 +330,41 @@
     font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
   }
 
+/* Score display */
+  .score-display {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+
+  .score-item {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    font-size: 11px;
+    font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
+  }
+
+  .score-item .score-label {
+    color: var(--text-secondary);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+  }
+
+  .score-item .score-value {
+    color: var(--accent-color);
+    font-weight: 600;
+    font-size: 12px;
+  }
+
+  .score-separator {
+    color: var(--text-tertiary, #8E8E93);
+    font-size: 10px;
+    margin: 0 2px;
+  }
+
   .modal {
     display: none;
     position: fixed;
@@ -882,6 +917,56 @@
     return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
   }
 
+  // Render mode-specific score info
+  function renderScoreInfo(content, idx, pagination) {
+    const offset = pagination.offset;
+    const rank = offset + idx + 1;
+
+    if (searchMode === 'fts') {
+      return `<div class="score-display">
+        <div class="score-item">
+          <span class="score-label">BM25:</span>
+          <span class="score-value">${content.fts_rank !== null && content.fts_rank !== undefined && !isNaN(Number(content.fts_rank)) ? Number(content.fts_rank).toFixed(4) : '—'}</span>
+        </div>
+        <span class="score-separator">|</span>
+        <div class="score-item">
+          <span class="score-label">Rank:</span>
+          <span class="score-value">#${rank}</span>
+        </div>
+      </div>`;
+    } else if (searchMode === 'vector') {
+      return `<div class="score-display">
+        <div class="score-item">
+          <span class="score-label">Cosine:</span>
+          <span class="score-value">${content.vector_rank !== null && content.vector_rank !== undefined && !isNaN(Number(content.vector_rank)) ? Number(content.vector_rank).toFixed(4) : '—'}</span>
+        </div>
+        <span class="score-separator">|</span>
+        <div class="score-item">
+          <span class="score-label">Rank:</span>
+          <span class="score-value">#${rank}</span>
+        </div>
+      </div>`;
+    } else if (searchMode === 'hybrid') {
+      return `<div class="score-display">
+        <div class="score-item">
+          <span class="score-label">BM25:</span>
+          <span class="score-value">${content.fts_rank !== null && content.fts_rank !== undefined && !isNaN(Number(content.fts_rank)) ? Number(content.fts_rank).toFixed(4) : '—'}</span>
+        </div>
+        <span class="score-separator">|</span>
+        <div class="score-item">
+          <span class="score-label">Cosine:</span>
+          <span class="score-value">${content.vector_rank !== null && content.vector_rank !== undefined && !isNaN(Number(content.vector_rank)) ? Number(content.vector_rank).toFixed(4) : '—'}</span>
+        </div>
+        <span class="score-separator">|</span>
+        <div class="score-item">
+          <span class="score-label">Hybrid:</span>
+          <span class="score-value">${content.hybrid_rank !== null && content.hybrid_rank !== undefined && !isNaN(Number(content.hybrid_rank)) ? Number(content.hybrid_rank).toFixed(4) : '—'}</span>
+        </div>
+      </div>`;
+    }
+    return '';
+  }
+
   // Render search results
   function renderResults(data, pagination) {
     currentResults = data;
@@ -936,10 +1021,7 @@
             >
           </div>
           <div class="card-footer">
-            <div class="rank-info">
-              <span class="rank-label">Rank</span>
-              <span class="rank-value">${content.fts_rank !== null && content.fts_rank !== undefined ? Number(content.fts_rank).toFixed(4) : '—'}</span>
-            </div>
+            <div class="score-display">${renderScoreInfo(content, idx, pagination)}</div>
             <span class="type-badge type-${item.type.toLowerCase()}">${item.type === 'Accessibility' ? 'AX' : item.type}</span>
             <div class="result-position">#${idx + 1} / ${pagination.total}</div>
           </div>
