@@ -1714,57 +1714,50 @@
               >
             </div>
 
-            <div class="card-footer-flow" role="region" aria-label="处理流程状态">
-              <!-- Text Source Section -->
-              <div class="flow-text-source" role="group" aria-label="文本来源">
-                <!-- AX Row -->
-                <div class="flow-source-row"
-                     :class="[getTextSourceClass(entry, 'accessibility'), getTextSourceStatusClass(entry, 'accessibility')]"
-                     :aria-label="'无障碍文本: ' + getAccessibilityCharCount(entry) + '字符, 状态: ' + (getTextSourceClass(entry, 'accessibility') === 'active' ? '已使用' : '未使用')">
-                  <span class="icon" aria-hidden="true">📱</span>
-                  <span class="label">AX</span>
-                  <span class="status-icon" x-html="getTextSourceStatusIcon(entry, 'accessibility')" aria-hidden="true"></span>
-                  <span class="char-count" x-text="getAccessibilityCharCount(entry) + '字'"></span>
+            <div class="card-footer-grid" role="region" aria-label="Processing Status">
+              <!-- 2x2 Grid -->
+              <div class="status-grid">
+                <!-- AX -->
+                <div class="status-cell" :class="[getTextSourceClass(entry, 'accessibility'), getTextSourceStatusClass(entry, 'accessibility')]">
+                  <div class="cell-header">
+                    <span class="cell-icon">📱</span>
+                    <span class="cell-label">AX</span>
+                  </div>
+                  <div class="cell-value" x-text="formatCharCount(getAccessibilityCharCount(entry))"></div>
                 </div>
 
-                <!-- OCR Row -->
-                <div class="flow-source-row"
-                     :class="[getTextSourceClass(entry, 'ocr'), getTextSourceStatusClass(entry, 'ocr')]"
-                     :aria-label="'OCR文本: ' + getOcrCharCount(entry) + '字符, 状态: ' + (getTextSourceClass(entry, 'ocr') === 'active' ? '已使用' : '未使用')">
-                  <span class="icon" aria-hidden="true">📝</span>
-                  <span class="label">OCR</span>
-                  <span class="status-icon" x-html="getTextSourceStatusIcon(entry, 'ocr')" aria-hidden="true"></span>
-                  <span class="char-count" x-text="getOcrCharCount(entry) + '字'"></span>
-                </div>
-              </div>
-
-              <!-- Connector -->
-              <div class="flow-connector" aria-hidden="true">→</div>
-
-              <!-- Parallel Processing Section -->
-              <div class="flow-parallel" role="group" aria-label="并行处理">
-                <!-- Description Row -->
-                <div class="flow-parallel-row" :aria-label="'描述生成: ' + (entry.description_status || 'pending')">
-                  <span class="icon" aria-hidden="true">✨</span>
-                  <span class="label">Desc</span>
-                  <span class="status-icon" :class="getDescriptionStatusClass(entry)" x-html="getDescriptionStatusIcon(entry)" aria-hidden="true"></span>
+                <!-- Description -->
+                <div class="status-cell" :class="getDescriptionStatusClass(entry)">
+                  <div class="cell-header">
+                    <span class="cell-icon">✨</span>
+                    <span class="cell-label">Desc</span>
+                  </div>
+                  <div class="cell-value" x-html="getDescriptionStatusText(entry)"></div>
                 </div>
 
-                <!-- Embedding Row -->
-                <div class="flow-parallel-row" :aria-label="'向量嵌入: ' + (entry.embedding_status || 'pending')">
-                  <span class="icon" aria-hidden="true">🧠</span>
-                  <span class="label">Embed</span>
-                  <span class="status-icon" :class="getEmbeddingStatusClass(entry)" x-html="getEmbeddingStatusIcon(entry)" aria-hidden="true"></span>
+                <!-- OCR -->
+                <div class="status-cell" :class="[getTextSourceClass(entry, 'ocr'), getTextSourceStatusClass(entry, 'ocr')]">
+                  <div class="cell-header">
+                    <span class="cell-icon">📝</span>
+                    <span class="cell-label">OCR</span>
+                  </div>
+                  <div class="cell-value" x-text="formatCharCount(getOcrCharCount(entry))"></div>
+                </div>
+
+                <!-- Embedding -->
+                <div class="status-cell" :class="getEmbeddingStatusClass(entry)">
+                  <div class="cell-header">
+                    <span class="cell-icon">🧠</span>
+                    <span class="cell-label">Embed</span>
+                  </div>
+                  <div class="cell-value" x-html="getEmbeddingStatusText(entry)"></div>
                 </div>
               </div>
 
-              <!-- Connector -->
-              <div class="flow-connector" aria-hidden="true">→</div>
-
-              <!-- Frame Status Section -->
-              <div class="flow-frame-status" :class="getFrameStatusClass(entry)" role="status" :aria-label="'帧状态: ' + getFrameStatusText(entry)">
-                <span class="status-icon-large" x-html="getFrameStatusIcon(entry)" aria-hidden="true"></span>
-                <span class="status-text" x-text="getFrameStatusText(entry)"></span>
+              <!-- Frame status bar -->
+              <div class="frame-status-bar" :class="getFrameStatusClass(entry)">
+                <span class="status-dot"></span>
+                <span class="status-label" x-text="getFrameStatusText(entry)"></span>
               </div>
             </div>
           </article>
