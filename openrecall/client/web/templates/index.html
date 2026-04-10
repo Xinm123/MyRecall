@@ -2358,6 +2358,57 @@
         return this.getFrameStatus(entry);
       },
 
+      // Format character count (add thousand separators)
+      formatCharCount(count) {
+        const num = parseInt(count) || 0;
+        if (num === 0) return '0';
+        return num.toLocaleString('en-US') + ' chars';
+      },
+
+      // Get app icon
+      getAppIcon(entry) {
+        const appName = entry.app_name || entry.app || '';
+        const iconMap = {
+          'Code': '💻',
+          'code': '💻',
+          'cursor': '💻',
+          'Google Chrome': '🌐',
+          'chrome': '🌐',
+          'Safari': '🌐',
+          'Firefox': '🌐',
+          'cmux': '📱',
+          'Terminal': '⌨️',
+          'terminal': '⌨️',
+          'iTerm': '⌨️',
+          'default': '📱'
+        };
+        return iconMap[appName] || iconMap['default'];
+      },
+
+      // Get description status text
+      getDescriptionStatusText(entry) {
+        const status = entry.description_status || 'pending';
+        const labels = {
+          pending: '○ pending',
+          processing: '<span class="pulse-dot"></span> processing',
+          completed: '● done',
+          failed: '✕ failed'
+        };
+        return labels[status] || labels.pending;
+      },
+
+      // Get embedding status text
+      getEmbeddingStatusText(entry) {
+        const status = entry.embedding_status || 'pending';
+        const labels = {
+          pending: '○ pending',
+          processing: '<span class="pulse-dot"></span> processing',
+          completed: '● done',
+          failed: '✕ failed'
+        };
+        return labels[status] || labels.pending;
+      },
+
       get selectedEntry() {
         if (this.selectedIndex === null) return null;
         return this.entries[this.selectedIndex] || null;
