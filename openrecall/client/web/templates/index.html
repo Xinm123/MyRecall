@@ -1947,7 +1947,7 @@
 
       getDescriptionStatusClass(entry) {
         const status = (entry.description_status || 'pending').toLowerCase();
-        return `status-badge-${status}`;
+        return `status-${status}`;
       },
 
       getEmbeddingStatusIcon(entry) {
@@ -1963,7 +1963,7 @@
 
       getEmbeddingStatusClass(entry) {
         const status = (entry.embedding_status || 'pending').toLowerCase();
-        return `status-badge-${status}`;
+        return `status-${status}`;
       },
 
       // Frame status helpers - derived from description and embedding status
