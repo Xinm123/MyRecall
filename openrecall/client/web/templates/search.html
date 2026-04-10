@@ -982,7 +982,7 @@
       return `<div class="score-display">
         <div class="score-item">
           <span class="score-label">Cosine:</span>
-          <span class="score-value">${content.vector_rank !== null && content.vector_rank !== undefined && !isNaN(Number(content.vector_rank)) ? Number(content.vector_rank).toFixed(4) : '—'}</span>
+          <span class="score-value">${content.cosine_score !== null && content.cosine_score !== undefined && !isNaN(Number(content.cosine_score)) ? Number(content.cosine_score).toFixed(4) : '—'}</span>
         </div>
         <span class="score-separator">|</span>
         <div class="score-item">
@@ -999,12 +999,12 @@
         <span class="score-separator">|</span>
         <div class="score-item">
           <span class="score-label">Cosine:</span>
-          <span class="score-value">${content.vector_rank !== null && content.vector_rank !== undefined && !isNaN(Number(content.vector_rank)) ? Number(content.vector_rank).toFixed(4) : '—'}</span>
+          <span class="score-value">${content.cosine_score !== null && content.cosine_score !== undefined && !isNaN(Number(content.cosine_score)) ? Number(content.cosine_score).toFixed(4) : '—'}</span>
         </div>
         <span class="score-separator">|</span>
         <div class="score-item">
           <span class="score-label">Hybrid:</span>
-          <span class="score-value">${content.hybrid_rank !== null && content.hybrid_rank !== undefined && !isNaN(Number(content.hybrid_rank)) ? Number(content.hybrid_rank).toFixed(4) : '—'}</span>
+          <span class="score-value">${content.hybrid_score !== null && content.hybrid_score !== undefined && !isNaN(Number(content.hybrid_score)) ? Number(content.hybrid_score).toFixed(4) : '—'}</span>
         </div>
       </div>`;
     }
