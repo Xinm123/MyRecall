@@ -1814,12 +1814,15 @@
 
         if (!isActive) return '—';
 
-        // For active source, show based on processing status
-        const status = (entry.status || 'pending').toLowerCase();
-        if (status === 'completed') return '✓';
-        if (status === 'processing') return '<span class="spinner-inline"></span>';
-        if (status === 'failed') return '✗';
-        return '○';
+        // For active source, show based on text availability
+        const hasText = sourceType === 'accessibility'
+          ? (entry.accessibility_text_length || entry.accessibility_text?.length || 0) > 0
+          : (entry.ocr_text_length || entry.ocr_text?.length || 0) > 0;
+
+        if (hasText) {
+          return '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>';
+        }
+        return '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle></svg>';
       },
 
       getTextSourceStatusClass(entry, sourceType) {
@@ -1843,11 +1846,11 @@
       // Parallel processing helpers
       getDescriptionStatusIcon(entry) {
         const status = (entry.description_status || 'pending').toLowerCase();
-        if (status === 'completed') return '✓';
+        if (status === 'completed') return '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>';
         if (status === 'processing') return '<span class="spinner-inline"></span>';
-        if (status === 'failed') return '✗';
-        if (status === 'disabled') return '⊘';
-        return '○';
+        if (status === 'failed') return '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>';
+        if (status === 'disabled') return '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"></line></svg>';
+        return '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle></svg>';
       },
 
       getDescriptionStatusClass(entry) {
@@ -1857,11 +1860,11 @@
 
       getEmbeddingStatusIcon(entry) {
         const status = (entry.embedding_status || 'pending').toLowerCase();
-        if (status === 'completed') return '✓';
+        if (status === 'completed') return '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>';
         if (status === 'processing') return '<span class="spinner-inline"></span>';
-        if (status === 'failed') return '✗';
-        if (status === 'disabled') return '⊘';
-        return '○';
+        if (status === 'failed') return '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>';
+        if (status === 'disabled') return '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"></line></svg>';
+        return '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle></svg>';
       },
 
       getEmbeddingStatusClass(entry) {
@@ -1869,22 +1872,34 @@
         return `status-badge-${status}`;
       },
 
-      // Frame status helpers
+      // Frame status helpers - derived from description and embedding status
+      getFrameStatus(entry) {
+        const descStatus = (entry.description_status || 'pending').toLowerCase();
+        const embedStatus = (entry.embedding_status || 'pending').toLowerCase();
+
+        // Priority: failed > processing > pending > completed
+        if (descStatus === 'failed' || embedStatus === 'failed') return 'failed';
+        if (descStatus === 'processing' || embedStatus === 'processing') return 'processing';
+        if (descStatus === 'pending' || embedStatus === 'pending') return 'pending';
+        if (descStatus === 'completed' && embedStatus === 'completed') return 'completed';
+        return 'pending';
+      },
+
       getFrameStatusIcon(entry) {
-        const status = (entry.status || 'pending').toLowerCase();
-        if (status === 'completed') return '✓';
+        const status = this.getFrameStatus(entry);
+        if (status === 'completed') return '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>';
         if (status === 'processing') return '<span class="spinner-inline"></span>';
-        if (status === 'failed') return '✗';
-        return '○';
+        if (status === 'failed') return '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>';
+        return '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle></svg>';
       },
 
       getFrameStatusClass(entry) {
-        const status = (entry.status || 'pending').toLowerCase();
+        const status = this.getFrameStatus(entry);
         return `status-${status}`;
       },
 
       getFrameStatusText(entry) {
-        return (entry.status || 'pending').toLowerCase();
+        return this.getFrameStatus(entry);
       },
 
       get selectedEntry() {
