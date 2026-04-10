@@ -134,6 +134,7 @@ class ServerSettings(TOMLConfig):
             (self.paths_data_dir / "db").mkdir(parents=True, exist_ok=True)
             (self.paths_data_dir / "frames").mkdir(parents=True, exist_ok=True)
             (self.paths_data_dir / "screenshots").mkdir(parents=True, exist_ok=True)
+            (self.paths_data_dir / "lancedb").mkdir(parents=True, exist_ok=True)
         except PermissionError:
             self.paths_data_dir = Path(tempfile.gettempdir()) / "MRS"
             self.paths_cache_dir = self.paths_data_dir / "cache"
@@ -142,6 +143,7 @@ class ServerSettings(TOMLConfig):
             (self.paths_data_dir / "db").mkdir(parents=True, exist_ok=True)
             (self.paths_data_dir / "frames").mkdir(parents=True, exist_ok=True)
             (self.paths_data_dir / "screenshots").mkdir(parents=True, exist_ok=True)
+            (self.paths_data_dir / "lancedb").mkdir(parents=True, exist_ok=True)
 
     @property
     def debug(self) -> bool:
@@ -190,6 +192,11 @@ class ServerSettings(TOMLConfig):
     @property
     def model_cache_path(self) -> Path:
         return self.paths_data_dir / "models"
+
+    @property
+    def lancedb_path(self) -> Path:
+        """Path to the LanceDB directory for embedding storage."""
+        return self.paths_data_dir / "lancedb"
 
     @property
     def ocr_rapid_use_local(self) -> bool:
