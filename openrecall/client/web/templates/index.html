@@ -671,8 +671,8 @@
 
 .status-cell {
   display: flex;
-  flex-direction: column;
-  gap: 4px;
+  align-items: center;
+  gap: 6px;
   padding: 8px 10px;
   background: rgba(255, 255, 255, 0.8);
   border-radius: 8px;
@@ -685,12 +685,6 @@
   border-color: rgba(0, 0, 0, 0.08);
 }
 
-.cell-header {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
 .cell-icon {
   font-size: 13px;
 }
@@ -699,8 +693,6 @@
   font-size: 11px;
   font-weight: 600;
   color: var(--text-secondary);
-  text-transform: uppercase;
-  letter-spacing: 0.3px;
 }
 
 .cell-value {
@@ -1331,38 +1323,30 @@
               <div class="status-grid">
                 <!-- AX -->
                 <div class="status-cell" :class="[getTextSourceClass(entry, 'accessibility'), getTextSourceStatusClass(entry, 'accessibility')]">
-                  <div class="cell-header">
-                    <span class="cell-icon">📱</span>
-                    <span class="cell-label">AX</span>
-                  </div>
-                  <div class="cell-value" x-text="formatCharCount(getAccessibilityCharCount(entry))"></div>
+                  <span class="cell-icon">📱</span>
+                  <span class="cell-label">AX</span>
+                  <span class="cell-value" x-text="formatCharCount(getAccessibilityCharCount(entry))"></span>
                 </div>
 
                 <!-- OCR -->
                 <div class="status-cell" :class="[getTextSourceClass(entry, 'ocr'), getTextSourceStatusClass(entry, 'ocr')]">
-                  <div class="cell-header">
-                    <span class="cell-icon">📝</span>
-                    <span class="cell-label">OCR</span>
-                  </div>
-                  <div class="cell-value" x-text="formatCharCount(getOcrCharCount(entry))"></div>
+                  <span class="cell-icon">📝</span>
+                  <span class="cell-label">OCR</span>
+                  <span class="cell-value" x-text="formatCharCount(getOcrCharCount(entry))"></span>
                 </div>
 
                 <!-- Description -->
                 <div class="status-cell" :class="getDescriptionStatusClass(entry)">
-                  <div class="cell-header">
-                    <span class="cell-icon">✨</span>
-                    <span class="cell-label">Desc</span>
-                  </div>
-                  <div class="cell-value" x-html="getDescriptionStatusText(entry)"></div>
+                  <span class="cell-icon">✨</span>
+                  <span class="cell-label">Desc</span>
+                  <span class="cell-value" x-html="getDescriptionStatusText(entry)"></span>
                 </div>
 
                 <!-- Embedding -->
                 <div class="status-cell" :class="getEmbeddingStatusClass(entry)">
-                  <div class="cell-header">
-                    <span class="cell-icon">🧠</span>
-                    <span class="cell-label">Embed</span>
-                  </div>
-                  <div class="cell-value" x-html="getEmbeddingStatusText(entry)"></div>
+                  <span class="cell-icon">🧠</span>
+                  <span class="cell-label">Embed</span>
+                  <span class="cell-value" x-html="getEmbeddingStatusText(entry)"></span>
                 </div>
               </div>
 
