@@ -261,3 +261,69 @@ class TestOpenAIMultimodalEmbeddingProvider:
         # Check L2 normalization
         norm = np.linalg.norm(result)
         assert abs(norm - 1.0) < 0.001
+
+
+class TestDashScopeEmbeddingProvider:
+    def test_init_allows_empty_api_key_for_local(self):
+        """Empty api_key is allowed for testing."""
+        from openrecall.server.embedding.providers.dashscope import (
+            DashScopeEmbeddingProvider,
+        )
+
+        provider = DashScopeEmbeddingProvider(
+            api_key="", model_name="text-embedding-v3"
+        )
+        assert provider.api_key == ""
+        assert provider.model_name == "text-embedding-v3"
+
+    def test_init_requires_model_name(self):
+        from openrecall.server.embedding.providers.dashscope import (
+            DashScopeEmbeddingProvider,
+        )
+
+        with pytest.raises(EmbeddingProviderConfigError):
+            DashScopeEmbeddingProvider(api_key="test", model_name="")
+
+    def test_init_uses_default_api_base(self):
+        """Should use default DashScope API base if not specified."""
+        from openrecall.server.embedding.providers.dashscope import (
+            DashScopeEmbeddingProvider,
+        )
+
+        provider = DashScopeEmbeddingProvider(
+            api_key="test", model_name="text-embedding-v3"
+        )
+        assert provider.api_base == "https://dashscope.aliyuncs.com/api/v1"
+
+    def test_embed_image_raises_not_implemented(self, tmp_path):
+        """embed_image should raise NotImplementedError - not yet implemented."""
+        from openrecall.server.embedding.providers.dashscope import (
+            DashScopeEmbeddingProvider,
+        )
+
+        test_image = tmp_path / "test.jpg"
+        test_image.write_bytes(b"\xff\xd8\xff\xe0" + b"\x00" * 100)
+
+        provider = DashScopeEmbeddingProvider(
+            api_key="test", model_name="text-embedding-v3"
+        )
+
+        with pytest.raises(NotImplementedError) as exc_info:
+            provider.embed_image(str(test_image))
+
+        assert "not yet implemented" in str(exc_info.value)
+
+    def test_embed_text_raises_not_implemented(self):
+        """embed_text should raise NotImplementedError - not yet implemented."""
+        from openrecall.server.embedding.providers.dashscope import (
+            DashScopeEmbeddingProvider,
+        )
+
+        provider = DashScopeEmbeddingProvider(
+            api_key="test", model_name="text-embedding-v3"
+        )
+
+        with pytest.raises(NotImplementedError) as exc_info:
+            provider.embed_text("test query")
+
+        assert "not yet implemented" in str(exc_info.value)
