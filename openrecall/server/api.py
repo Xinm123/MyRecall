@@ -229,10 +229,6 @@ def queue_status():
             cursor.execute("SELECT status, COUNT(*) FROM entries GROUP BY status")
             status_counts = dict(cursor.fetchall())
 
-        processing_mode = (
-            "LIFO" if pending > settings.processing_lifo_threshold else "FIFO"
-        )
-
         response = {
             "queue": {
                 "pending": pending,
@@ -241,8 +237,7 @@ def queue_status():
                 "failed": status_counts.get("FAILED", 0),
             },
             "config": {
-                "lifo_threshold": settings.processing_lifo_threshold,
-                "current_mode": processing_mode,
+                "current_mode": "FIFO",
             },
             "system": {
                 "debug": settings.debug,
@@ -330,9 +325,7 @@ def upload():
             if settings.debug:
                 response_data["debug"] = {
                     "queue_size": pending_count,
-                    "processing_mode": "LIFO"
-                    if pending_count > settings.processing_lifo_threshold
-                    else "FIFO",
+                    "processing_mode": "FIFO",
                 }
 
             return jsonify(response_data), 202  # HTTP 202 Accepted
