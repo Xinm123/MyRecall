@@ -122,7 +122,7 @@
     text-align: center;
   }
 
-  /* Type badge on result cards */
+  /* Type badge on result cards - DEPRECATED: type field removed from response */
   .type-badge {
     font-size: 10px;
     font-weight: 600;
@@ -140,6 +140,18 @@
   .type-badge.type-accessibility {
     background: rgba(175, 82, 222, 0.1);
     color: #AF52DE;
+  }
+
+  /* Description summary in card footer */
+  .description-summary {
+    font-size: 13px;
+    color: var(--text-secondary);
+    max-height: 1.4em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    flex: 1;
+    margin-right: 12px;
   }
 
   /* Spinner Animation */
@@ -626,14 +638,6 @@
       <option value="false">No</option>
     </select>
   </div>
-  <div class="form-group">
-    <label for="min_length">Min Text Length</label>
-    <input type="number" id="min_length" name="min_length" placeholder="0" min="0" value="{{ request.args.get('min_length', '') }}">
-  </div>
-  <div class="form-group">
-    <label for="max_length">Max Text Length</label>
-    <input type="number" id="max_length" name="max_length" placeholder="∞" min="0" value="{{ request.args.get('max_length', '') }}">
-  </div>
   <button type="submit" class="btn-search">Search</button>
 </form>
 
@@ -641,10 +645,10 @@
 <div class="search-mode-pills" role="radiogroup" aria-label="搜索模式" id="searchModePills">
   <span class="pills-label">搜索模式:</span>
   <button type="button"
-          class="pill active"
+          class="pill"
           data-mode="fts"
           role="radio"
-          aria-checked="true"
+          aria-checked="false"
           aria-label="全文搜索 - 基于关键词匹配"
           tabindex="0">全文搜索</button>
   <button type="button"
@@ -655,10 +659,10 @@
           aria-label="语义搜索 - 基于语义理解"
           tabindex="0">语义搜索</button>
   <button type="button"
-          class="pill"
+          class="pill active"
           data-mode="hybrid"
           role="radio"
-          aria-checked="false"
+          aria-checked="true"
           aria-label="混合搜索 - 结合全文和语义"
           tabindex="0">混合搜索</button>
 </div>
@@ -712,7 +716,7 @@
   let selectedContentType = 'all';
 
   // Search mode state
-  let searchMode = 'fts';
+  let searchMode = 'hybrid';
 
   // Pending embedding count for semantic search warning
   let pendingEmbeddingCount = 0;
@@ -870,10 +874,10 @@
     if (!currentResults.length) return;
     currentIndex = normalizeIndex(currentIndex);
     const item = currentResults[currentIndex];
-    modalImage.src = `${EDGE_BASE_URL}/v1/frames/${item.content.frame_id}`;
+    modalImage.src = `${EDGE_BASE_URL}/v1/frames/${item.frame_id}`;
     modalCount.textContent = `${currentIndex + 1} / ${currentResults.length}`;
-    modalApp.textContent = item.content.app_name || 'Unknown';
-    modalTime.textContent = formatTimestamp(item.content.timestamp);
+    modalApp.textContent = item.app_name || 'Unknown';
+    modalTime.textContent = formatTimestamp(item.timestamp);
   }
 
   function openModalAt(index) {
@@ -922,8 +926,6 @@
     const appName = document.getElementById('app_name').value.trim();
     const windowName = document.getElementById('window_name').value.trim();
     const focused = document.getElementById('focused').value;
-    const minLength = document.getElementById('min_length').value;
-    const maxLength = document.getElementById('max_length').value;
 
     if (q) params.set('q', q);
     if (startTime) params.set('start_time', startTime + ':00');
@@ -931,8 +933,6 @@
     if (appName) params.set('app_name', appName);
     if (windowName) params.set('window_name', windowName);
     if (focused) params.set('focused', focused);
-    if (minLength) params.set('min_length', minLength);
-    if (maxLength) params.set('max_length', maxLength);
 
     return params;
   }
@@ -941,8 +941,8 @@
   function buildQueryString(offset = 0) {
     const params = getFormFilterParams();
 
-    // Add search mode (default 'fts' is omitted)
-    if (searchMode !== 'fts') {
+    // Add search mode (default 'hybrid' is omitted)
+    if (searchMode !== 'hybrid') {
       params.set('mode', searchMode);
     }
 
@@ -950,6 +950,9 @@
     if (selectedContentType !== 'all') {
       params.set('content_type', selectedContentType);
     }
+
+    // Include text for grid view display
+    params.set('include_text', 'true');
 
     params.set('limit', '20');
     params.set('offset', offset.toString());
@@ -1012,7 +1015,7 @@
   }
 
   // Render mode-specific score info
-  function renderScoreInfo(content, idx, pagination) {
+  function renderScoreInfo(item, idx, pagination) {
     const offset = pagination.offset;
     const rank = offset + idx + 1;
 
@@ -1020,7 +1023,7 @@
       return `<div class="score-display">
         <div class="score-item">
           <span class="score-label">BM25:</span>
-          <span class="score-value">${content.fts_rank !== null && content.fts_rank !== undefined && !isNaN(Number(content.fts_rank)) ? Number(content.fts_rank).toFixed(4) : '—'}</span>
+          <span class="score-value">${item.fts_score !== null && item.fts_score !== undefined && !isNaN(Number(item.fts_score)) ? Number(item.fts_score).toFixed(4) : '—'}</span>
         </div>
         <span class="score-separator">|</span>
         <div class="score-item">
@@ -1032,7 +1035,7 @@
       return `<div class="score-display">
         <div class="score-item">
           <span class="score-label">Cosine:</span>
-          <span class="score-value">${content.cosine_score !== null && content.cosine_score !== undefined && !isNaN(Number(content.cosine_score)) ? Number(content.cosine_score).toFixed(4) : '—'}</span>
+          <span class="score-value">${item.cosine_score !== null && item.cosine_score !== undefined && !isNaN(Number(item.cosine_score)) ? Number(item.cosine_score).toFixed(4) : '—'}</span>
         </div>
         <span class="score-separator">|</span>
         <div class="score-item">
@@ -1041,14 +1044,14 @@
         </div>
       </div>`;
     } else if (searchMode === 'hybrid') {
-      const ftsRank = content.fts_result_rank || content.fts_rank;
-      const vectorRank = content.vector_rank;
-      const hybridRank = content.hybrid_rank || rank;
+      const ftsRank = item.fts_result_rank || item.fts_rank;
+      const vectorRank = item.vector_rank;
+      const hybridRank = item.hybrid_rank || rank;
       return `<div class="score-display score-display-vertical">
         <div class="score-row">
           <div class="score-item">
             <span class="score-label">BM25:</span>
-            <span class="score-value">${content.fts_rank !== null && content.fts_rank !== undefined && !isNaN(Number(content.fts_rank)) ? Number(content.fts_rank).toFixed(4) : '—'}</span>
+            <span class="score-value">${item.fts_score !== null && item.fts_score !== undefined && !isNaN(Number(item.fts_score)) ? Number(item.fts_score).toFixed(4) : '—'}</span>
           </div>
           <div class="score-item score-rank">
             <span class="score-label">Rank:</span>
@@ -1058,7 +1061,7 @@
         <div class="score-row">
           <div class="score-item">
             <span class="score-label">Cosine:</span>
-            <span class="score-value">${content.cosine_score !== null && content.cosine_score !== undefined && !isNaN(Number(content.cosine_score)) ? Number(content.cosine_score).toFixed(4) : '—'}</span>
+            <span class="score-value">${item.cosine_score !== null && item.cosine_score !== undefined && !isNaN(Number(item.cosine_score)) ? Number(item.cosine_score).toFixed(4) : '—'}</span>
           </div>
           <div class="score-item score-rank">
             <span class="score-label">Rank:</span>
@@ -1068,7 +1071,7 @@
         <div class="score-row">
           <div class="score-item">
             <span class="score-label">Hybrid:</span>
-            <span class="score-value">${content.hybrid_score !== null && content.hybrid_score !== undefined && !isNaN(Number(content.hybrid_score)) ? Number(content.hybrid_score).toFixed(4) : '—'}</span>
+            <span class="score-value">${item.hybrid_score !== null && item.hybrid_score !== undefined && !isNaN(Number(item.hybrid_score)) ? Number(item.hybrid_score).toFixed(4) : '—'}</span>
           </div>
           <div class="score-item score-rank">
             <span class="score-label">Rank:</span>
@@ -1081,11 +1084,11 @@
   }
 
   // Render embedding status badge
-  function renderEmbeddingBadge(content) {
-    const status = content.embedding_status;
+  function renderEmbeddingBadge(item) {
+    const status = item.embedding_status;
     // If frame has cosine_score (appears in vector search results), it's indexed
     const hasEmbedding = status === 'completed' ||
-                         (content.cosine_score !== null && content.cosine_score !== undefined);
+                         (item.cosine_score !== null && item.cosine_score !== undefined);
     if (hasEmbedding) {
       return '<span class="embedding-badge indexed" title="已生成向量索引">&#128306;</span>';
     }
@@ -1103,7 +1106,7 @@
     // Count pending embeddings for vector/hybrid modes
     if (searchMode === 'vector' || searchMode === 'hybrid') {
       pendingEmbeddingCount = data.filter(item =>
-        item.content.embedding_status !== 'completed'
+        item.embedding_status !== 'completed'
       ).length;
     } else {
       pendingEmbeddingCount = 0;
@@ -1132,13 +1135,12 @@
     }
 
     const html = data.map((item, idx) => {
-      const content = item.content;
-      const frameId = content.frame_id;
-      const timestamp = formatTimestamp(content.timestamp);
-      const relativeTime = formatRelativeTime(content.timestamp);
-      const appName = content.app_name || 'Unknown';
-      const windowName = content.window_name || '';
-      const text = content.text || '';
+      const frameId = item.frame_id;
+      const timestamp = formatTimestamp(item.timestamp);
+      const relativeTime = formatRelativeTime(item.timestamp);
+      const appName = item.app_name || 'Unknown';
+      const windowName = item.window_name || '';
+      const descriptionSummary = item.description?.summary || '';
 
       return `
         <article class="memory-card">
@@ -1157,21 +1159,21 @@
             <!-- Row 3: Timestamp + Device name -->
             <div class="header-row time-row">
               <span class="timestamp">${timestamp}</span>
-              <span class="device-name">${content.device_name || 'monitor_0'}</span>
+              <span class="device-name">${item.device_name || 'monitor_0'}</span>
             </div>
           </div>
           <div class="card-image-wrapper">
-            <img 
-              src="${EDGE_BASE_URL}/v1/frames/${frameId}" 
-              alt="Screenshot" 
+            <img
+              src="${EDGE_BASE_URL}/v1/frames/${frameId}"
+              alt="Screenshot"
               class="card-image js-open-modal"
               loading="lazy"
               data-index="${idx}"
             >
           </div>
           <div class="card-footer">
-            <div class="score-display">${renderScoreInfo(content, idx, pagination)}</div>
-            <span class="type-badge type-${item.type.toLowerCase()}">${item.type === 'Accessibility' ? 'AX' : item.type}</span>${renderEmbeddingBadge(content)}
+            <div class="description-summary">${descriptionSummary}</div>
+            <div class="score-display">${renderScoreInfo(item, idx, pagination)}${renderEmbeddingBadge(item)}</div>
             <div class="result-position">#${idx + 1} / ${pagination.total}</div>
           </div>
         </article>
