@@ -355,8 +355,7 @@ Key settings (see `openrecall/shared/config.py`):
 - P95 latency target: < 200ms for typical queries
 
 **Queue Processing:**
-- LIFO mode when pending >= `processing_lifo_threshold` (default 10) — newest first
-- FIFO mode when pending < threshold — oldest first
+- Processing order: FIFO (oldest first) — deterministic chronological processing
 - Trigger queue: bounded `queue.Queue` with capacity `trigger_queue_capacity` (default 1000)
 - Backpressure protection via queue overflow handling
 
