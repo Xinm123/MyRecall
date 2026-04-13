@@ -284,6 +284,46 @@ def get_dedup_force_after_skip_sec() -> int:
     return getattr(settings, "max_skip_duration_sec", 30)
 
 
+def get_recording_enabled() -> bool:
+    """Get recording enabled setting from client local storage.
+
+    Priority: SQLite runtime settings > True (default)
+    This setting is controlled locally by the client, not by the server.
+
+    Returns:
+        True if recording is enabled
+    """
+    store = _get_store()
+    if store is not None:
+        try:
+            value = store.get("recording_enabled", "")
+            if value:
+                return value.lower() == "true"
+        except (ValueError, TypeError) as e:
+            logger.warning(f"Invalid recording_enabled in runtime settings: {e}")
+    return True
+
+
+def get_upload_enabled() -> bool:
+    """Get upload enabled setting from client local storage.
+
+    Priority: SQLite runtime settings > True (default)
+    This setting is controlled locally by the client, not by the server.
+
+    Returns:
+        True if upload is enabled
+    """
+    store = _get_store()
+    if store is not None:
+        try:
+            value = store.get("upload_enabled", "")
+            if value:
+                return value.lower() == "true"
+        except (ValueError, TypeError) as e:
+            logger.warning(f"Invalid upload_enabled in runtime settings: {e}")
+    return True
+
+
 _config_change_event = threading.Event()
 
 

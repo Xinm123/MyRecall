@@ -544,9 +544,16 @@ class FramesStore:
                              WHEN f.text_source = 'accessibility' THEN LENGTH(f.accessibility_text)
                              WHEN f.text_source = 'ocr' THEN LENGTH(f.ocr_text)
                              ELSE 0
-                           END AS text_length_computed
+                           END AS text_length_computed,
+                           fd.narrative, fd.summary,
+                           CASE
+                             WHEN fd.narrative IS NOT NULL OR fd.summary IS NOT NULL
+                               THEN LENGTH(COALESCE(fd.narrative, '') || ' ' || COALESCE(fd.summary, ''))
+                             ELSE 0
+                           END AS description_length
                     FROM frames f
                     LEFT JOIN ocr_text o ON f.id = o.frame_id
+                    LEFT JOIN frame_descriptions fd ON f.id = fd.frame_id
                     ORDER BY f.timestamp DESC
                     LIMIT ?
                     """,
@@ -585,6 +592,8 @@ class FramesStore:
                             "error_message": row["error_message"] or "",
                             # Description status (P1-S3+)
                             "description_status": row["description_status"] or "",
+                            "description_text": (row["narrative"] if row["narrative"] else row["summary"]) or "",
+                            "description_length": row["description_length"] or 0,
                             # Embedding status and text lengths (Task 8)
                             "embedding_status": row["embedding_status"] or "",
                             "accessibility_text_length": row["accessibility_text_length"] or 0,

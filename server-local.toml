@@ -49,7 +49,19 @@ enabled = true
 provider = "openai"
 model = "Qwen3-VL-8B-Instruct"
 api_key = "EMPTY"
-api_base = "http://10.77.3.162:8090/v1/"
+api_base = "http://10.77.21.189:8090/v1/"
+
+# ==============================================================================
+# Embedding Settings
+# ==============================================================================
+[embedding]
+enabled = true
+provider = "multimodal"
+model = "qwen3-vl-embedding"
+api_key = ""
+api_base = "http://10.77.21.189:8070/v1"
+dim = 1024
+
 
 # ==============================================================================
 # Reranker Settings

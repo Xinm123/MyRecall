@@ -58,7 +58,7 @@ Optimize the search API for better usability, cleaner interface, and improved se
 | `device_name` | string | Device/monitor name |
 | `frame_url` | string | API path to fetch frame image |
 | `embedding_status` | string | Embedding status: `completed` / `pending` / `failed` / empty |
-| `description` | object | Description object if available: `{ narrative, summary, tags }` |
+| `description` | object | Description object if available: `{ narrative, summary, tags[] }` (note: `tags` here is distinct from the removed top-level `tags` field) |
 
 ### Score Fields by Mode
 
@@ -66,8 +66,8 @@ Optimize the search API for better usability, cleaner interface, and improved se
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `score` | float | BM25 relevance score (negative, lower = more relevant) |
-| `fts_score` | float | Raw BM25 score (same as `score` in fts mode) |
+| `score` | float | Unified score (same as `fts_score` in fts mode) |
+| `fts_score` | float | BM25 relevance score (negative, lower = more relevant) |
 
 **`mode=vector`:**
 
@@ -105,7 +105,7 @@ Optimize the search API for better usability, cleaner interface, and improved se
     {
       "frame_id": "abc123",
       "timestamp": "2026-04-13T10:30:00Z",
-      "text": "Screenshot text content...",
+      // "text" field only present when include_text=true (omitted here)
       "text_source": "accessibility",
       "app_name": "Chrome",
       "window_name": "Google Search",
@@ -160,7 +160,7 @@ Optimize the search API for better usability, cleaner interface, and improved se
 | `description` | N/A | New (when available) |
 | `fts_rank` | BM25 score | Renamed to `fts_score` |
 | `fts_result_rank` | FTS rank position | Renamed to `fts_rank` |
-| Score fields | All returned | By mode |
+| Score fields | All returned | By mode (unified `score` field added to all modes) |
 
 ---
 

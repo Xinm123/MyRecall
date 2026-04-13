@@ -105,8 +105,13 @@ class HybridSearchEngine:
         self, q: str, limit: int, offset: int
     ) -> Tuple[List[Dict[str, Any]], int]:
         """Vector-only search."""
+        from openrecall.server.database.frames_store import FramesStore
+
+        frames_store = FramesStore()
+
+        # If no query, return recent frames with embeddings (browse mode)
         if not q or q.isspace():
-            return [], 0
+            return self._get_recent_embedded_frames(frames_store, limit, offset)
 
         # Get query embedding
         from openrecall.server.ai.factory import get_multimodal_embedding_provider
@@ -118,26 +123,100 @@ class HybridSearchEngine:
             query_vector.tolist(), limit=limit + offset
         )
 
+        # Collect frame IDs to fetch full frame data
+        frame_ids = []
+        vector_similarities = {}
+        for emb, distance in embeddings_with_distance:
+            frame_ids.append(emb.frame_id)
+            vector_similarities[emb.frame_id] = 1.0 - float(distance)
+
+        # Fetch full frame data from database
+        frame_data_map = frames_store.get_frames_by_ids(frame_ids)
+
         results = []
         for emb, distance in embeddings_with_distance[offset : offset + limit]:
+            frame_id = emb.frame_id
+            frame = frame_data_map.get(frame_id, {})
             # Convert cosine distance to cosine similarity (cosine_sim = 1 - cosine_dist)
             cosine_score = 1.0 - float(distance)
             results.append({
-                "frame_id": emb.frame_id,
+                "frame_id": frame_id,
                 "cosine_score": cosine_score,
-                "timestamp": emb.timestamp,
-                "text": "",  # Will need to fetch from frames if needed
-                "app_name": emb.app_name,
-                "window_name": emb.window_name,
-                "browser_url": None,
-                "focused": None,
-                "device_name": "monitor_0",
-                "file_path": f"{emb.timestamp}.jpg",
-                "frame_url": f"/v1/frames/{emb.frame_id}",
+                "timestamp": frame.get("timestamp", emb.timestamp),
+                "text": frame.get("full_text", "")[:200] if frame.get("full_text") else "",
+                "text_source": frame.get("text_source", "ocr"),
+                "app_name": frame.get("app_name", emb.app_name),
+                "window_name": frame.get("window_name", emb.window_name),
+                "browser_url": frame.get("browser_url"),
+                "focused": frame.get("focused"),
+                "device_name": frame.get("device_name", "monitor_0"),
+                "file_path": frame.get("file_path", f"{emb.timestamp}.jpg"),
+                "frame_url": f"/v1/frames/{frame_id}",
                 "tags": [],
+                "embedding_status": frame.get("embedding_status", ""),
             })
 
         return results, len(embeddings_with_distance)
+
+    def _get_recent_embedded_frames(
+        self, frames_store, limit: int, offset: int
+    ) -> Tuple[List[Dict[str, Any]], int]:
+        """Get recent frames that have embeddings (browse mode for vector search)."""
+        import sqlite3
+
+        try:
+            conn = sqlite3.connect(str(frames_store.db_path))
+            conn.row_factory = sqlite3.Row
+
+            # Count total frames with embeddings
+            count_row = conn.execute(
+                """
+                SELECT COUNT(*) as total FROM frames
+                WHERE embedding_status = 'completed' AND status = 'completed'
+                """
+            ).fetchone()
+            total = count_row["total"] if count_row else 0
+
+            # Get recent frames with embeddings
+            rows = conn.execute(
+                """
+                SELECT id as frame_id, timestamp, full_text, text_source,
+                       app_name, window_name, browser_url, focused,
+                       device_name, file_path, embedding_status
+                FROM frames
+                WHERE embedding_status = 'completed' AND status = 'completed'
+                ORDER BY timestamp DESC
+                LIMIT ? OFFSET ?
+                """,
+                (limit, offset),
+            ).fetchall()
+
+            results = []
+            for row in rows:
+                ts = row["timestamp"]
+                results.append({
+                    "frame_id": row["frame_id"],
+                    "cosine_score": None,
+                    "timestamp": ts,
+                    "text": row["full_text"] or "",
+                    "text_source": row["text_source"] or "ocr",
+                    "app_name": row["app_name"],
+                    "window_name": row["window_name"],
+                    "browser_url": row["browser_url"],
+                    "focused": bool(row["focused"]) if row["focused"] is not None else None,
+                    "device_name": row["device_name"] or "monitor_0",
+                    "file_path": row["file_path"] or f"{ts}.jpg",
+                    "frame_url": f"/v1/frames/{row['frame_id']}",
+                    "tags": [],
+                    "embedding_status": row["embedding_status"] or "",
+                })
+
+            conn.close()
+            return results, total
+
+        except sqlite3.Error as e:
+            logger.error("Failed to get recent embedded frames: %s", e)
+            return [], 0
 
     def _hybrid_search(
         self,
@@ -154,6 +233,7 @@ class HybridSearchEngine:
 
         vector_results = []
         vector_similarities = {}  # frame_id -> cosine_score
+        vector_ranks = {}  # frame_id -> rank in vector results
         if q and not q.isspace():
             from openrecall.server.ai.factory import get_multimodal_embedding_provider
             provider = get_multimodal_embedding_provider()
@@ -165,9 +245,14 @@ class HybridSearchEngine:
                 {"frame_id": e.frame_id, "similarity": 1.0 - float(d)}  # cosine_sim = 1 - dist
                 for e, d in embeddings_with_distance
             ]
-            # Store cosine scores for later use
-            for e, d in embeddings_with_distance:
+            # Store cosine scores and ranks for later use
+            for rank, (e, d) in enumerate(embeddings_with_distance, start=1):
                 vector_similarities[e.frame_id] = 1.0 - float(d)
+                vector_ranks[e.frame_id] = rank
+
+        # Build FTS rank and BM25 score maps from FTS results
+        fts_ranks = {r["frame_id"]: idx + 1 for idx, r in enumerate(fts_results)}
+        fts_bm25_scores = {r["frame_id"]: r.get("fts_rank") for r in fts_results}
 
         # Merge with RRF
         merged = reciprocal_rank_fusion(
@@ -188,14 +273,19 @@ class HybridSearchEngine:
         frame_data_map = frames_store.get_frames_by_ids(frame_ids)
 
         results = []
-        for frame_id in frame_ids:
+        for hybrid_rank, frame_id in enumerate(frame_ids, start=offset + 1):
             frame = frame_data_map.get(frame_id, {})
             results.append({
                 "frame_id": frame_id,
                 "hybrid_score": scores.get(frame_id, 0.0),
+                "hybrid_rank": hybrid_rank,
                 "cosine_score": vector_similarities.get(frame_id),  # Raw vector similarity
+                "vector_rank": vector_ranks.get(frame_id),  # Rank in vector search results
+                "fts_rank": fts_bm25_scores.get(frame_id),  # BM25 score from FTS results
+                "fts_result_rank": fts_ranks.get(frame_id),  # Rank in FTS search results
                 "timestamp": frame.get("timestamp", ""),
                 "text": frame.get("full_text", "")[:200] if frame.get("full_text") else "",
+                "text_source": frame.get("text_source", "ocr"),
                 "app_name": frame.get("app_name", ""),
                 "window_name": frame.get("window_name", ""),
                 "browser_url": frame.get("browser_url"),

@@ -32,6 +32,8 @@ class ClientSettingsStore:
         "dedup.for_click": "true",
         "dedup.for_app_switch": "false",
         "dedup.force_after_skip_seconds": "30",
+        "recording_enabled": "true",
+        "upload_enabled": "true",
     }
 
     def __init__(self, db_path: Path):

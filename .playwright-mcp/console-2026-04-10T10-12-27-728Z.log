@@ -1,0 +1,2 @@
+[      84ms] [LOG] Control Center initializing... @ http://localhost:8889/search?q=browser&mode=hybrid:1228
+[     106ms] [ERROR] Failed to load resource: the server responded with a status of 404 (NOT FOUND) @ http://localhost:8889/favicon.ico:0

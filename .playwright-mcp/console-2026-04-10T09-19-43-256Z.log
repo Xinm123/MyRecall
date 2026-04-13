@@ -1,0 +1,6 @@
+[      57ms] [LOG] Control Center initializing... @ http://localhost:8889/search?q=browser&mode=fts:1228
+[  420938ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_RESET @ http://localhost:8083/v1/health:0
+[  420938ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_RESET @ http://localhost:8083/api/config:0
+[  420938ms] [ERROR] Failed to fetch config: TypeError: Failed to fetch
+    at Proxy.refreshConfig (http://localhost:8889/search?q=browser&mode=fts:1242:18)
+    at http://localhost:8889/search?q=browser&mode=fts:1231:51 @ http://localhost:8889/search?q=browser&mode=fts:1250

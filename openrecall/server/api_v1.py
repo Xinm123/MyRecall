@@ -1095,6 +1095,15 @@ def search():
                 # For pure vector search, hybrid_score is the cosine score
                 item["content"]["cosine_score"] = r["hybrid_score"]
 
+        # Add rank fields for hybrid mode
+        if mode == "hybrid":
+            if "hybrid_rank" in r:
+                item["content"]["hybrid_rank"] = r["hybrid_rank"]
+            if "vector_rank" in r:
+                item["content"]["vector_rank"] = r["vector_rank"]
+            if "fts_result_rank" in r:
+                item["content"]["fts_result_rank"] = r["fts_result_rank"]
+
         # Add embedding_status if available
         if "embedding_status" in r:
             item["content"]["embedding_status"] = r["embedding_status"]

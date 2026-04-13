@@ -492,6 +492,9 @@
   </main>
   
   <script>
+    // Client-side control settings API (works even when server is offline)
+    const CLIENT_CONTROL_API = '/api/client/control';
+
     function controlCenter() {
       return {
         open: false,
@@ -501,11 +504,16 @@
           client_online: false
         },
         _pollerId: null,
-        
+        _healthPollerId: null,
+
         init() {
           console.log('Control Center initializing...');
           this.refreshConfig();
+          this.checkServerHealth();
+          // Poll control settings less frequently (local, fast)
           this._pollerId = setInterval(() => this.refreshConfig(), 5000);
+          // Poll server health separately
+          this._healthPollerId = setInterval(() => this.checkServerHealth(), 5000);
         },
 
         destroy() {
@@ -513,35 +521,62 @@
             clearInterval(this._pollerId);
             this._pollerId = null;
           }
+          if (this._healthPollerId) {
+            clearInterval(this._healthPollerId);
+            this._healthPollerId = null;
+          }
         },
 
-        refreshConfig() {
-          return fetch(EDGE_BASE_URL + '/api/config')
-            .then(response => response.json())
-            .then(data => {
-              this.config = data;
-              if (this.open) {
-                console.log('Config refreshed:', this.config);
-              }
+        // Check if server is online (for display only, doesn't affect control)
+        checkServerHealth() {
+          return fetch(EDGE_BASE_URL + '/v1/health', { method: 'GET' })
+            .then(response => {
+              this.config.client_online = response.ok;
             })
-            .catch(error => {
-              console.error('Failed to fetch config:', error);
+            .catch(() => {
               this.config.client_online = false;
             });
         },
-        
+
+        // Read control settings from local client API (works offline)
+        refreshConfig() {
+          return fetch(CLIENT_CONTROL_API)
+            .then(response => {
+              if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+              }
+              return response.json();
+            })
+            .then(data => {
+              this.config.recording_enabled = data.recording_enabled;
+              this.config.upload_enabled = data.upload_enabled;
+              if (this.open) {
+                console.log('Control config refreshed:', data);
+              }
+            })
+            .catch(error => {
+              console.error('Failed to fetch control config:', error);
+              // Keep existing values on error
+            });
+        },
+
         toggle() {
           this.open = !this.open;
           console.log('Popover toggled:', this.open);
         },
-        
+
         toggleSetting(key) {
+          if (key !== 'recording_enabled' && key !== 'upload_enabled') {
+            console.error('Unknown setting:', key);
+            return;
+          }
+
           const previousValue = this.config[key];
           this.config[key] = !this.config[key];
           console.log(`Toggle ${key}: ${previousValue} -> ${this.config[key]}`);
 
-          // Send to server
-          fetch(EDGE_BASE_URL + '/api/config', {
+          // Send to local client API (works even when server is offline)
+          fetch(CLIENT_CONTROL_API, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ [key]: this.config[key] })
@@ -553,7 +588,7 @@
             return response.json();
           })
           .then(data => {
-            console.log('Config updated on server:', data);
+            console.log('Control setting updated:', data);
             window.dispatchEvent(new CustomEvent('openrecall-config-changed', { detail: data }));
           })
           .catch(error => {

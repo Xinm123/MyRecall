@@ -146,7 +146,8 @@ git commit -m "feat(search): add batch description fetch for search results"
 - `hybrid_score` → `score`
 - `fts_rank` (BM25 score) → `fts_score`
 - `fts_result_rank` → `fts_rank`
-- Add `score` to vector mode results too
+- Add `score` field to vector mode results (same as `cosine_score`)
+- Add `score` field to fts mode results (same as `fts_score`, providing unified metric across all modes)
 
 - [ ] **Step 1: Write the failing test**
 
@@ -183,6 +184,8 @@ class TestHybridEngineScoreRenaming:
         mock_emb = MagicMock()
         mock_emb.search_with_distance.return_value = []
 
+        # _hybrid_search reads fts_rank from each result, then computes
+        # fts_bm25_scores / fts_ranks internally — test validates output field names.
         with patch.object(HybridSearchEngine, '__init__', lambda self: None):
             engine = HybridSearchEngine()
             engine._fts_engine = mock_fts
@@ -291,7 +294,7 @@ results.append({
     "hybrid_rank": hybrid_rank,
     "cosine_score": vector_similarities.get(frame_id),
     "vector_rank": vector_ranks.get(frame_id),
-    "fts_rank": fts_bm25_scores.get(frame_id),  # BM25 score
+    "fts_score": fts_bm25_scores.get(frame_id),  # BM25 score
     "fts_result_rank": fts_ranks.get(frame_id),  # FTS rank
     ...
 })
@@ -713,10 +716,18 @@ def test_no_min_length_parameter(app):
         assert "min_length" not in call_kwargs
 
 
-def test_no_max_length_parameter(app):
-    """max_length parameter is not accepted."""
-    # Similar to min_length test
-```
+def test_max_length_parameter_ignored(app):
+    """max_length parameter is ignored (not accepted as input)."""
+    mock_fts = MagicMock()
+    mock_fts.search.return_value = ([], 0)
+
+    with patch("openrecall.server.api_v1._get_search_engine", return_value=mock_fts):
+        with patch("openrecall.server.api_v1.HybridSearchEngine") as mock_hybrid_cls:
+            mock_hybrid_cls.return_value.search.return_value = ([], 0)
+            client = app.test_client()
+            response = client.get("/v1/search?q=test&max_length=500")
+            assert response.status_code == 200
+            assert "max_length" not in mock_fts.search.call_args.kwargs
 
 - [ ] **Step 2: Run test to verify it fails**
 
@@ -895,7 +906,7 @@ git commit -m "feat(search): optimize API - flatten response, add include_text/d
    - Remove `file_path` references
    - **Add description rendering**: In the card footer, render `description.summary` (if available) as a one-line text preview. Style: `font-size: 13px`, `color: var(--text-secondary)`, `max-height: 1.4em`, `overflow: hidden`, `text-overflow: ellipsis`, `white-space: nowrap`. Example HTML:
      ```html
-     <div class="description-summary">${content.description?.summary || ''}</div>
+     <div class="description-summary">${item.description?.summary || ''}</div>
      ```
    - Update `renderScoreInfo` to use new field names (`fts_score` instead of `fts_rank` for BM25 score, `fts_rank` for FTS result rank position)
 
@@ -1056,3 +1067,4 @@ git commit -m "docs: mark search API optimization as implemented"
 | Add `score` field (all modes) | Task 2 + Task 3 |
 | Frontend update | Task 5 |
 | Test updates | Task 6 |
+| Update spec status to Implemented | Task 7 |

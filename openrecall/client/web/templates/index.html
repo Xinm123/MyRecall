@@ -693,6 +693,8 @@
   font-size: 11px;
   font-weight: 600;
   color: var(--text-secondary);
+  min-width: 32px;
+  text-align: left;
 }
 
 .cell-value {
@@ -1325,14 +1327,14 @@
                 <div class="status-cell" :class="[getTextSourceClass(entry, 'accessibility'), getTextSourceStatusClass(entry, 'accessibility')]">
                   <span class="cell-icon">📱</span>
                   <span class="cell-label">AX</span>
-                  <span class="cell-value" x-text="formatCharCount(getAccessibilityCharCount(entry))"></span>
+                  <span class="cell-value" x-html="formatAxCount(entry)"></span>
                 </div>
 
                 <!-- OCR -->
                 <div class="status-cell" :class="[getTextSourceClass(entry, 'ocr'), getTextSourceStatusClass(entry, 'ocr')]">
                   <span class="cell-icon">📝</span>
                   <span class="cell-label">OCR</span>
-                  <span class="cell-value" x-text="formatCharCount(getOcrCharCount(entry))"></span>
+                  <span class="cell-value" x-html="formatOcrCount(entry)"></span>
                 </div>
 
                 <!-- Description -->
@@ -1954,11 +1956,15 @@
         return this.getFrameStatus(entry);
       },
 
-      // Format character count (add thousand separators)
-      formatCharCount(count) {
-        const num = parseInt(count) || 0;
-        if (num === 0) return '0';
-        return num.toLocaleString('en-US') + ' chars';
+      // Format AX count (show ○ when no text, char count otherwise)
+      formatAxCount(entry) {
+        const source = (entry.text_source || '').toLowerCase();
+        const isActive = source === 'accessibility' || source === 'hybrid';
+        const count = this.getAccessibilityCharCount(entry);
+        if (count > 0) {
+          return count.toLocaleString('en-US');
+        }
+        return '○';
       },
 
       // Get app icon
@@ -1981,28 +1987,41 @@
         return iconMap[appName] || iconMap['default'];
       },
 
-      // Get description status text
-      getDescriptionStatusText(entry) {
-        const status = entry.description_status || 'pending';
-        const labels = {
-          pending: '○',
-          processing: '<span class="pulse-dot"></span>',
-          completed: '●',
-          failed: '●'
-        };
-        return labels[status] || labels.pending;
+      // Format OCR count (show ○ when no text, char count otherwise)
+      formatOcrCount(entry) {
+        const count = this.getOcrCharCount(entry);
+        if (count > 0) {
+          return count.toLocaleString('en-US');
+        }
+        return '○';
       },
 
-      // Get embedding status text
+      getDescriptionCharCount(entry) {
+        const text = entry.description_text || entry.description || '';
+        return text.length || entry.description_length || 0;
+      },
+
+      // Get description status text (with char count when completed)
+      getDescriptionStatusText(entry) {
+        const status = (entry.description_status || 'pending').toLowerCase();
+        if (status === 'pending') return '○';
+        if (status === 'processing') return '<span class="pulse-dot"></span>';
+        if (status === 'completed') {
+          const chars = this.getDescriptionCharCount(entry);
+          return chars > 0 ? chars.toLocaleString('en-US') : '—';
+        }
+        if (status === 'failed') return '●';
+        return '○';
+      },
+
+      // Get embedding status text (with dimension when completed)
       getEmbeddingStatusText(entry) {
-        const status = entry.embedding_status || 'pending';
-        const labels = {
-          pending: '○',
-          processing: '<span class="pulse-dot"></span>',
-          completed: '●',
-          failed: '●'
-        };
-        return labels[status] || labels.pending;
+        const status = (entry.embedding_status || 'pending').toLowerCase();
+        if (status === 'pending') return '○';
+        if (status === 'processing') return '<span class="pulse-dot"></span>';
+        if (status === 'completed') return '1024d';
+        if (status === 'failed') return '●';
+        return '○';
       },
 
       get selectedEntry() {

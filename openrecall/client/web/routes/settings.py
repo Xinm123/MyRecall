@@ -77,6 +77,8 @@ def update_settings():
         "dedup.for_click": lambda v: str(v).lower() in ("true", "false"),
         "dedup.for_app_switch": lambda v: str(v).lower() in ("true", "false"),
         "dedup.force_after_skip_seconds": lambda v: str(v).isdigit() and 1 <= int(v) <= 3600,
+        "recording_enabled": lambda v: str(v).lower() in ("true", "false"),
+        "upload_enabled": lambda v: str(v).lower() in ("true", "false"),
     }
 
     for key, value in data.items():
@@ -105,6 +107,69 @@ def reset_settings():
     store = get_settings_store()
     store.reset_to_defaults()
     return jsonify(store.get_all())
+
+
+@settings_bp.route("/control", methods=["GET"])
+def get_control_settings():
+    """Get client control settings (recording_enabled, upload_enabled).
+
+    These settings are controlled locally by the client, not by the server.
+    They are read from client.db and can be modified even when server is offline.
+
+    Returns:
+        JSON object with recording_enabled and upload_enabled
+    """
+    store = get_settings_store()
+
+    recording_enabled = store.get("recording_enabled", "true").lower() == "true"
+    upload_enabled = store.get("upload_enabled", "true").lower() == "true"
+
+    return jsonify({
+        "recording_enabled": recording_enabled,
+        "upload_enabled": upload_enabled,
+    })
+
+
+@settings_bp.route("/control", methods=["POST"])
+def update_control_settings():
+    """Update client control settings.
+
+    Request body:
+        JSON object with recording_enabled and/or upload_enabled
+
+    Returns:
+        JSON object with updated settings
+    """
+    store = get_settings_store()
+    data = request.get_json()
+
+    if not isinstance(data, dict):
+        return jsonify({"error": "Request body must be a JSON object"}), 400
+
+    # Validate and update recording_enabled
+    if "recording_enabled" in data:
+        value = str(data["recording_enabled"]).lower()
+        if value not in ("true", "false"):
+            return jsonify({"error": "Invalid value for recording_enabled"}), 400
+        store.set("recording_enabled", value)
+        logger.info(f"recording_enabled updated to {value}")
+
+    # Validate and update upload_enabled
+    if "upload_enabled" in data:
+        value = str(data["upload_enabled"]).lower()
+        if value not in ("true", "false"):
+            return jsonify({"error": "Invalid value for upload_enabled"}), 400
+        store.set("upload_enabled", value)
+        logger.info(f"upload_enabled updated to {value}")
+
+    # Notify runtime config so hot-reload consumers pick up the changes
+    from openrecall.client import runtime_config
+    runtime_config.notify_config_changed()
+
+    return jsonify({
+        "recording_enabled": store.get("recording_enabled", "true").lower() == "true",
+        "upload_enabled": store.get("upload_enabled", "true").lower() == "true",
+    })
 
 
 @settings_bp.route("/settings/edge/health", methods=["GET"])

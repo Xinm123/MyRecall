@@ -1,0 +1,3 @@
+[      77ms] [LOG] Control Center initializing... @ http://localhost:8889/:2139
+[     334ms] [ERROR] Failed to load resource: the server responded with a status of 404 (NOT FOUND) @ http://localhost:8889/favicon.ico:0
+[    4408ms] [LOG] Control Center initializing... @ http://localhost:8889/:2139

@@ -11,8 +11,8 @@ debug = true
 # Server Connection Settings
 # ==============================================================================
 [server]
-api_url = "http://10.77.3.162:8083/api"   # Remote Edge server
-edge_base_url = "http://10.77.3.162:8083"  # Remote Edge base URL
+api_url = "http://10.77.21.189:8083/api"   # Remote Edge server
+edge_base_url = "http://10.77.21.189:8083"  # Remote Edge base URL
 upload_timeout = 180
 
 # ==============================================================================

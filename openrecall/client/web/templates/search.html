@@ -365,6 +365,32 @@
     margin: 0 2px;
   }
 
+  /* Vertical score display for hybrid mode */
+  .score-display-vertical {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+  }
+
+  .score-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    gap: 12px;
+  }
+
+  .score-rank .score-label {
+    font-size: 9px;
+    color: var(--text-tertiary);
+  }
+
+  .score-rank .score-value {
+    font-size: 10px;
+    color: var(--text-secondary);
+    font-weight: 500;
+  }
+
   .modal {
     display: none;
     position: fixed;
@@ -612,33 +638,27 @@
 </form>
 
 <!-- Search Mode Pills -->
-<div class="search-mode-pills" role="radiogroup" aria-label="搜索模式">
+<div class="search-mode-pills" role="radiogroup" aria-label="搜索模式" id="searchModePills">
   <span class="pills-label">搜索模式:</span>
   <button type="button"
-          class="pill"
-          :class="{ active: searchMode === 'fts' }"
-          @click="setSearchMode('fts')"
-          @keydown="handleModeKeydown($event, 'fts')"
+          class="pill active"
+          data-mode="fts"
           role="radio"
-          :aria-checked="searchMode === 'fts'"
+          aria-checked="true"
           aria-label="全文搜索 - 基于关键词匹配"
           tabindex="0">全文搜索</button>
   <button type="button"
           class="pill"
-          :class="{ active: searchMode === 'vector' }"
-          @click="setSearchMode('vector')"
-          @keydown="handleModeKeydown($event, 'vector')"
+          data-mode="vector"
           role="radio"
-          :aria-checked="searchMode === 'vector'"
+          aria-checked="false"
           aria-label="语义搜索 - 基于语义理解"
           tabindex="0">语义搜索</button>
   <button type="button"
           class="pill"
-          :class="{ active: searchMode === 'hybrid' }"
-          @click="setSearchMode('hybrid')"
-          @keydown="handleModeKeydown($event, 'hybrid')"
+          data-mode="hybrid"
           role="radio"
-          :aria-checked="searchMode === 'hybrid'"
+          aria-checked="false"
           aria-label="混合搜索 - 结合全文和语义"
           tabindex="0">混合搜索</button>
 </div>
@@ -721,6 +741,9 @@
   const ocrCountSpan = document.querySelector('.pill[data-type="ocr"] .count');
   const axCountSpan = document.querySelector('.pill[data-type="accessibility"] .count');
 
+  // Search mode pills
+  const searchModePills = document.querySelectorAll('#searchModePills .pill');
+
   // Initialize content type from URL
   function initContentTypeFromUrl() {
     const params = new URLSearchParams(window.location.search);
@@ -738,50 +761,77 @@
     if (urlMode && ['fts', 'vector', 'hybrid'].includes(urlMode)) {
       searchMode = urlMode;
     }
+    updateSearchModePillState();
   }
 
   // Set search mode
   function setSearchMode(mode) {
     if (mode !== searchMode) {
       searchMode = mode;
+      updateSearchModePillState();
       performSearch(0);
     }
   }
 
-  // Keyboard navigation for mode pills
-  function handleModeKeydown(event, currentMode) {
-    const modes = ['fts', 'vector', 'hybrid'];
-    const currentIndex = modes.indexOf(currentMode);
-
-    switch(event.key) {
-      case 'ArrowLeft':
-        event.preventDefault();
-        if (currentIndex > 0) {
-          const prevMode = modes[currentIndex - 1];
-          setSearchMode(prevMode);
-          event.target.previousElementSibling?.focus();
-        }
-        break;
-      case 'ArrowRight':
-        event.preventDefault();
-        if (currentIndex < modes.length - 1) {
-          const nextMode = modes[currentIndex + 1];
-          setSearchMode(nextMode);
-          event.target.nextElementSibling?.focus();
-        }
-        break;
-      case 'Home':
-        event.preventDefault();
-        setSearchMode(modes[0]);
-        event.target.parentElement?.firstElementChild?.nextElementSibling?.focus();
-        break;
-      case 'End':
-        event.preventDefault();
-        setSearchMode(modes[modes.length - 1]);
-        event.target.parentElement?.lastElementChild?.focus();
-        break;
-    }
+  // Update search mode pill active state
+  function updateSearchModePillState() {
+    searchModePills.forEach(pill => {
+      const mode = pill.dataset.mode;
+      if (mode === searchMode) {
+        pill.classList.add('active');
+        pill.setAttribute('aria-checked', 'true');
+      } else {
+        pill.classList.remove('active');
+        pill.setAttribute('aria-checked', 'false');
+      }
+    });
   }
+
+  // Handle search mode pill click
+  searchModePills.forEach(pill => {
+    pill.addEventListener('click', () => {
+      const newMode = pill.dataset.mode;
+      setSearchMode(newMode);
+    });
+  });
+
+  // Keyboard navigation for mode pills
+  searchModePills.forEach(pill => {
+    pill.addEventListener('keydown', (event) => {
+      const modes = ['fts', 'vector', 'hybrid'];
+      const currentMode = pill.dataset.mode;
+      const currentIndex = modes.indexOf(currentMode);
+
+      switch(event.key) {
+        case 'ArrowLeft':
+          event.preventDefault();
+          if (currentIndex > 0) {
+            const prevMode = modes[currentIndex - 1];
+            setSearchMode(prevMode);
+            pill.previousElementSibling?.focus();
+          }
+          break;
+        case 'ArrowRight':
+          event.preventDefault();
+          if (currentIndex < modes.length - 1) {
+            const nextMode = modes[currentIndex + 1];
+            setSearchMode(nextMode);
+            pill.nextElementSibling?.focus();
+          }
+          break;
+        case 'Home':
+          event.preventDefault();
+          setSearchMode(modes[0]);
+          searchModePills[0]?.focus();
+          break;
+        case 'End':
+          event.preventDefault();
+          setSearchMode(modes[modes.length - 1]);
+          searchModePills[searchModePills.length - 1]?.focus();
+          break;
+      }
+    });
+  });
 
   // Update pill active state
   function updatePillActiveState() {
@@ -991,20 +1041,39 @@
         </div>
       </div>`;
     } else if (searchMode === 'hybrid') {
-      return `<div class="score-display">
-        <div class="score-item">
-          <span class="score-label">BM25:</span>
-          <span class="score-value">${content.fts_rank !== null && content.fts_rank !== undefined && !isNaN(Number(content.fts_rank)) ? Number(content.fts_rank).toFixed(4) : '—'}</span>
+      const ftsRank = content.fts_result_rank || content.fts_rank;
+      const vectorRank = content.vector_rank;
+      const hybridRank = content.hybrid_rank || rank;
+      return `<div class="score-display score-display-vertical">
+        <div class="score-row">
+          <div class="score-item">
+            <span class="score-label">BM25:</span>
+            <span class="score-value">${content.fts_rank !== null && content.fts_rank !== undefined && !isNaN(Number(content.fts_rank)) ? Number(content.fts_rank).toFixed(4) : '—'}</span>
+          </div>
+          <div class="score-item score-rank">
+            <span class="score-label">Rank:</span>
+            <span class="score-value">#${ftsRank || '—'}</span>
+          </div>
         </div>
-        <span class="score-separator">|</span>
-        <div class="score-item">
-          <span class="score-label">Cosine:</span>
-          <span class="score-value">${content.cosine_score !== null && content.cosine_score !== undefined && !isNaN(Number(content.cosine_score)) ? Number(content.cosine_score).toFixed(4) : '—'}</span>
+        <div class="score-row">
+          <div class="score-item">
+            <span class="score-label">Cosine:</span>
+            <span class="score-value">${content.cosine_score !== null && content.cosine_score !== undefined && !isNaN(Number(content.cosine_score)) ? Number(content.cosine_score).toFixed(4) : '—'}</span>
+          </div>
+          <div class="score-item score-rank">
+            <span class="score-label">Rank:</span>
+            <span class="score-value">#${vectorRank || '—'}</span>
+          </div>
         </div>
-        <span class="score-separator">|</span>
-        <div class="score-item">
-          <span class="score-label">Hybrid:</span>
-          <span class="score-value">${content.hybrid_score !== null && content.hybrid_score !== undefined && !isNaN(Number(content.hybrid_score)) ? Number(content.hybrid_score).toFixed(4) : '—'}</span>
+        <div class="score-row">
+          <div class="score-item">
+            <span class="score-label">Hybrid:</span>
+            <span class="score-value">${content.hybrid_score !== null && content.hybrid_score !== undefined && !isNaN(Number(content.hybrid_score)) ? Number(content.hybrid_score).toFixed(4) : '—'}</span>
+          </div>
+          <div class="score-item score-rank">
+            <span class="score-label">Rank:</span>
+            <span class="score-value">#${hybridRank}</span>
+          </div>
         </div>
       </div>`;
     }
@@ -1014,7 +1083,10 @@
   // Render embedding status badge
   function renderEmbeddingBadge(content) {
     const status = content.embedding_status;
-    if (status === 'completed') {
+    // If frame has cosine_score (appears in vector search results), it's indexed
+    const hasEmbedding = status === 'completed' ||
+                         (content.cosine_score !== null && content.cosine_score !== undefined);
+    if (hasEmbedding) {
       return '<span class="embedding-badge indexed" title="已生成向量索引">&#128306;</span>';
     }
     if (status === 'pending' || status === 'processing') {

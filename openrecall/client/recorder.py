@@ -85,8 +85,11 @@ class HeartbeatThread(threading.Thread):
     """Independent background thread that sends heartbeat to server.
 
     Runs its own 5-second timer loop, completely decoupled from the
-    capture loop. Posts /heartbeat and updates recording_enabled /
-    upload_enabled from the server response.
+    capture loop. Posts /heartbeat with local control settings.
+
+    recording_enabled and upload_enabled are controlled locally by the client
+    (via Web UI -> /api/client/control), not by the server. This allows
+    control even when server is offline.
 
     Thread-safety: All reads from ScreenRecorder use snapshot copies
     (dict.copy(), set.copy(), TriggerChannel.snapshot()) to avoid
@@ -121,7 +124,9 @@ class HeartbeatThread(threading.Thread):
         logger.info("heartbeat: HeartbeatThread stopped")
 
     def _send_heartbeat(self) -> None:
-        """Build payload, POST to /heartbeat, update config from response."""
+        """Build payload, POST to /heartbeat with local control settings."""
+        from openrecall.client import runtime_config
+
         url = f"{_get_api_url().rstrip('/')}/heartbeat"
 
         # Build snapshot of recorder state (thread-safe reads)
@@ -148,6 +153,13 @@ class HeartbeatThread(threading.Thread):
             "last_capture_outcome": self.recorder._last_capture_outcome.copy(),
         }
 
+        # Local control settings - read from local SQLite (client-controlled)
+        # These are reported to server for status display, not controlled by server
+        payload["config"] = {
+            "recording_enabled": runtime_config.get_recording_enabled(),
+            "upload_enabled": runtime_config.get_upload_enabled(),
+        }
+
         try:
             response = requests.post(
                 url,
@@ -156,17 +168,11 @@ class HeartbeatThread(threading.Thread):
             )
             response.raise_for_status()
 
-            data = response.json()
-            config = data.get("config", {})
-            # Write back to recorder (safe: next capture loop iteration sees new value)
-            self.recorder.recording_enabled = config.get("recording_enabled", True)
-            self.recorder.upload_enabled = config.get("upload_enabled", True)
-
             if settings.debug:
                 logger.debug(
-                    "heartbeat: synced recording=%s upload=%s",
-                    self.recorder.recording_enabled,
-                    self.recorder.upload_enabled,
+                    "heartbeat: reported recording=%s upload=%s",
+                    payload["config"]["recording_enabled"],
+                    payload["config"]["upload_enabled"],
                 )
         except requests.RequestException as e:
             logger.warning("heartbeat: network error: %s", e)
@@ -285,8 +291,10 @@ class ScreenRecorder:
         self._stop_event = threading.Event()
 
         # Phase 8.2: Runtime configuration state
-        self.recording_enabled: bool = True
-        self.upload_enabled: bool = True
+        # recording_enabled and upload_enabled are controlled locally via Web UI
+        # and stored in client.db. Read from runtime_config for hot-reload support.
+        self.recording_enabled: bool = runtime_config.get_recording_enabled()
+        self.upload_enabled: bool = runtime_config.get_upload_enabled()
         self._warned_capture_issue: bool = False
         self.consumer: UploaderConsumer | None = consumer
 
@@ -294,8 +302,9 @@ class ScreenRecorder:
         runtime_config.init_runtime_config(settings.client_data_dir)
 
         self._spool: SpoolQueue = get_spool()
+        # SpoolUploader checks upload_enabled from runtime_config for hot-reload
         self._spool_uploader: SpoolUploader = SpoolUploader(
-            upload_enabled_fn=lambda: self.upload_enabled
+            upload_enabled_fn=runtime_config.get_upload_enabled
         )
         self._trigger_channel: TriggerEventChannel = TriggerEventChannel(
             settings.trigger_queue_capacity
@@ -1207,8 +1216,18 @@ class ScreenRecorder:
                 self._last_stats_report_time = current_time
 
             # Phase 8.2: Rule 1 - Stop recording if recording_enabled=False
-            if not self.recording_enabled:
-                logger.info("⏸️  Recording paused (recording_enabled=False)")
+            # Read from runtime_config for hot-reload support (controlled locally)
+            if not runtime_config.get_recording_enabled():
+                # Drain trigger channel to prevent event flood on resume.
+                # Event sources (CGEventTap, app_switch_monitor) keep running so
+                # the recording state is observable, but queued events are
+                # dropped — user activity during pause is not retroactively
+                # captured when resumed.
+                while True:
+                    try:
+                        self._trigger_channel.get_nowait()
+                    except queue.Empty:
+                        break
                 time.sleep(1)
                 continue
             if self._permission_state_machine.is_degraded():
@@ -1576,7 +1595,8 @@ class ScreenRecorder:
                     logger.debug("Error during resource cleanup: %s", cleanup_error)
 
                 # Log upload status after successful capture
-                if not self.upload_enabled:
+                # Check runtime_config for hot-reload support (controlled locally)
+                if not runtime_config.get_upload_enabled():
                     logger.debug(
                         "Upload disabled: buffered locally (will upload when enabled)"
                     )

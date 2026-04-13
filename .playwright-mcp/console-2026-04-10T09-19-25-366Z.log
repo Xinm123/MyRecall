@@ -1,0 +1,6 @@
+[      47ms] [LOG] Control Center initializing... @ http://localhost:8889/search?q=browser&mode=vector:1228
+[    4751ms] [ERROR] Access to fetch at 'http://localhost:8083/v1/search?q=browser&mode=vector&limit=20&offset=0' from origin 'http://localhost:8889' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource. @ http://localhost:8889/search?q=browser&mode=vector&limit=20&offset=0:0
+[    4752ms] [ERROR] Failed to load resource: net::ERR_FAILED @ http://localhost:8083/v1/search?q=browser&mode=vector&limit=20&offset=0:0
+[    4752ms] [ERROR] Search error: TypeError: Failed to fetch
+    at performSearch (http://localhost:8889/search?q=browser&mode=vector:1885:30)
+    at http://localhost:8889/search?q=browser&mode=vector:1935:5 @ http://localhost:8889/search?q=browser&mode=vector:1894
