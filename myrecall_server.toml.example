@@ -120,7 +120,6 @@ api_key = ""                         # API key if required
 [processing]
 mode = "ocr"                  # Processing mode: ocr
 queue_capacity = 200          # Queue capacity
-lifo_threshold = 10           # LIFO threshold
 preload_models = true         # Preload models at startup
 
 # ==============================================================================
