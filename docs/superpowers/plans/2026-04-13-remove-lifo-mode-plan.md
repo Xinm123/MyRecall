@@ -180,7 +180,7 @@ git commit -m "refactor(worker): remove LIFO mode, always use FIFO"
 **Files:**
 - Modify: `openrecall/server/api.py:232-246, 329-336`
 
-- [ ] **Step 1: Simplify queue status endpoint**
+- [ ] **Step 1: Simplify queue status endpoint (backwards compatible)**
 
 Current code (lines 232-246):
 ```python
@@ -208,7 +208,7 @@ Current code (lines 232-246):
         }
 ```
 
-New code:
+New code (backwards compatible - keep `current_mode`, remove `lifo_threshold`):
 ```python
         response = {
             "queue": {
@@ -218,7 +218,7 @@ New code:
                 "failed": status_counts.get("FAILED", 0),
             },
             "config": {
-                "processing_mode": "FIFO",
+                "current_mode": "FIFO",
             },
             "system": {
                 "debug": settings.debug,
@@ -257,7 +257,9 @@ New code:
 
 ```bash
 git add openrecall/server/api.py
-git commit -m "refactor(api): simplify queue status, always report FIFO mode"
+git commit -m "refactor(api): simplify queue status, always report FIFO mode
+
+Backwards compatible: keep 'current_mode' field name, remove 'lifo_threshold'."
 ```
 
 ---
@@ -357,16 +359,26 @@ git commit -m "docs(config): remove lifo_threshold from example config"
 ### Task 7: Update CLAUDE.md documentation
 
 **Files:**
-- Modify: `CLAUDE.md:358`
+- Modify: `CLAUDE.md:358-360`
 
-- [ ] **Step 1: Remove LIFO documentation**
+- [ ] **Step 1: Update Queue Processing section**
 
-Find and remove the LIFO reference in the Queue Processing section. Search for:
+Current code (lines 357-361):
 ```markdown
+**Queue Processing:**
 - LIFO mode when pending >= `processing_lifo_threshold` (default 10) — newest first
+- FIFO mode when pending < threshold — oldest first
+- Trigger queue: bounded `queue.Queue` with capacity `trigger_queue_capacity` (default 1000)
+- Backpressure protection via queue overflow handling
 ```
 
-Remove this line from the "Queue Processing" section.
+New code:
+```markdown
+**Queue Processing:**
+- Processing order: FIFO (oldest first) — deterministic chronological processing
+- Trigger queue: bounded `queue.Queue` with capacity `trigger_queue_capacity` (default 1000)
+- Backpressure protection via queue overflow handling
+```
 
 - [ ] **Step 2: Commit**
 

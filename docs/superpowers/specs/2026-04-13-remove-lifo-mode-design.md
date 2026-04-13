@@ -117,9 +117,12 @@ def get_next_task(self, conn: sqlite3.Connection) -> Optional[RecallEntry]:
 ```
 
 **New code:**
-Remove these lines or simplify to always return `"FIFO"` / `"processing_mode": "FIFO"`.
-
-Actually, consider removing `processing_mode` entirely since it's now constant. Keep `mode` field for backwards compatibility but always return `"FIFO"`.
+Remove `lifo_threshold` field, keep `current_mode` field for backwards compatibility:
+```python
+"config": {
+    "current_mode": "FIFO",
+},
+```
 
 ### 4. `openrecall/shared/config.py`
 
@@ -165,7 +168,8 @@ No database migration required. This is a code-only change.
 
 **Backwards Compatibility:**
 - Existing `myrecall_server.toml` files with `lifo_threshold` will log a warning about unknown config key (handled by existing TOML parser)
-- API responses will still include `mode` field but always return `"FIFO"`
+- API responses keep `current_mode` field name (backwards compatible), but always return `"FIFO"`
+- API responses remove `lifo_threshold` field (clients should not depend on it)
 
 ---
 
