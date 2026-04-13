@@ -1761,6 +1761,57 @@ class FramesStore:
             "generated_at": row[4],
         }
 
+    def get_frame_descriptions_batch(
+        self,
+        frame_ids: List[int],
+        conn: Optional[sqlite3.Connection] = None,
+    ) -> dict[int, dict]:
+        """Get descriptions for multiple frames in one query.
+
+        Only returns descriptions for frames where description_status = 'completed'.
+
+        Args:
+            frame_ids: List of frame IDs to retrieve descriptions for
+            conn: Optional existing connection. If None, creates a new one.
+
+        Returns:
+            Dict mapping frame_id to description dict {narrative, summary, tags}
+        """
+
+        if not frame_ids:
+            return {}
+
+        def _query(c: sqlite3.Connection) -> dict[int, dict]:
+            placeholders = ",".join("?" * len(frame_ids))
+            rows = c.execute(
+                f"""
+                SELECT fd.frame_id, fd.narrative, fd.summary, fd.tags_json
+                FROM frame_descriptions fd
+                INNER JOIN frames f ON fd.frame_id = f.id
+                WHERE fd.frame_id IN ({placeholders})
+                  AND f.description_status = 'completed'
+                """,
+                frame_ids,
+            ).fetchall()
+            return {
+                row[0]: {
+                    "narrative": row[1],
+                    "summary": row[2],
+                    "tags": json.loads(row[3]) if row[3] else [],
+                }
+                for row in rows
+            }
+
+        if conn is not None:
+            return _query(conn)
+
+        try:
+            with self._connect() as conn:
+                return _query(conn)
+        except sqlite3.Error as e:
+            logger.error("get_frame_descriptions_batch failed: %s", e)
+            return {}
+
     def get_recent_descriptions(
         self,
         conn: sqlite3.Connection,
