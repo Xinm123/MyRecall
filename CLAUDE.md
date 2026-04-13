@@ -98,10 +98,23 @@ pip install -e ".[test]"    # Include test dependencies
 - **Uploader**: Background consumer, posts to Edge `/v1/ingest`
 - **Web Server**: Flask app on port 8889 serving Jinja2 templates; browser JS fetches API from Edge (port 8083) via CORS
 
-**Web Routes (served by Client):**
+**Web Routes (served by Client on port 8889):**
 - `/` (Grid), `/search`, `/timeline` — Jinja2 templates
+- `/chat` — Chat interface with AI assistant
+- `/settings` — Runtime settings management
 - `/vendor/*` — Alpine.js static assets
 - `/screenshots/*` — Proxy to Edge `/v1/frames/` (for legacy fallback)
+
+**Chat API (served by Client at `/chat/api/*`):**
+- `POST /chat/api/stream` — SSE streaming chat response
+- `GET /chat/api/conversations` — List conversations
+- `POST /chat/api/conversations` — Create conversation
+- `GET /chat/api/conversations/<id>` — Get conversation
+- `DELETE /chat/api/conversations/<id>` — Delete conversation
+- `POST /chat/api/new-session` — Reset Pi session
+- `GET /chat/api/pi-status` — Get Pi process status
+- `GET /chat/api/config` — Get LLM config
+- `POST /chat/api/config` — Save API key and model selection
 
 **Web Server:** Flask app in `openrecall/client/web/app.py` serving templates from `openrecall/client/web/templates/`
 
@@ -121,9 +134,10 @@ pip install -e ".[test]"    # Include test dependencies
   - `~/.myrecall/server/lancedb/`: Vector embeddings (frame embeddings for semantic search)
 - **Search Engine**: Hybrid search (FTS5 + vector)
   - FTS5 filters: time range, app_name, window_name, browser_url, focused
-  - `content_type` parameter: `ocr`, `accessibility`, or `all` (default)
   - Vector search via LanceDB with qwen3-vl-embedding (multimodal fusion)
-  - Hybrid mode with RRF (Reciprocal Rank Fusion)
+  - Hybrid mode (default) with RRF (Reciprocal Rank Fusion)
+  - Modes: `hybrid` (default), `fts`, `vector`
+  - `content_type` parameter is deprecated — all searches return merged results
 - **CORS Middleware**: Echo-back `Origin` header for cross-origin browser requests from Client web UI
 
 **API Routes:** `/v1/*`, `/api/*` — all responses include `Access-Control-Allow-Origin: <browser-origin>`
@@ -205,8 +219,14 @@ openrecall/
 │   │   ├── macos.py    # macOS AX API bindings
 │   │   ├── policy.py   # AX vs OCR decision logic
 │   │   └── types.py    # AccessibilityDecision types
+│   ├── chat/        # Chat module (AI assistant)
+│   │   ├── routes.py   # Chat API endpoints
+│   │   ├── service.py  # ChatService, Pi RPC
+│   │   ├── config_manager.py  # LLM provider config
+│   │   └── skills/     # Chat skills (myrecall-search)
 │   └── web/         # Flask web UI (port 8889)
 │       ├── app.py
+│       ├── routes/     # Settings routes
 │       └── templates/
 ├── server/          # Edge process
 │   ├── __main__.py  # Entry point
@@ -217,7 +237,9 @@ openrecall/
 │   ├── database/    # SQLite + migrations
 │   │   ├── frames_store.py  # v3 FramesStore (edge.db)
 │   │   └── sql.py          # Legacy SQLStore (fts.db)
-│   ├── search/      # FTS5 search engine
+│   ├── search/      # Search engines
+│   │   ├── engine.py       # FTS5 search engine
+│   │   └── hybrid_engine.py  # Hybrid (FTS + vector) search
 │   ├── processing/  # V3ProcessingWorker, OCR processor
 │   ├── description/ # DescriptionWorker (frame descriptions)
 │   └── embedding/   # EmbeddingWorker, multimodal providers
@@ -279,33 +301,64 @@ Key settings (see `openrecall/shared/config.py`):
 **v1 API Endpoints** (`/v1/*`):
 - `POST /v1/ingest`: Upload frame (idempotent, supports AX-canonical payload)
 - `GET /v1/frames/<frame_id>`: Retrieve frame JPEG
+- `GET /v1/frames/<frame_id>/context`: Frame context for chat grounding
+- `GET /v1/frames/<frame_id>/similar`: Find similar frames via vector search
+- `POST /v1/frames/<frame_id>/embedding`: Manually trigger embedding generation
+- `GET /v1/frames/<frame_id>/ocr-vis`: OCR visualization data
 - `GET /v1/health`: Health check
 - `GET /v1/ingest/queue/status`: Queue status
-- `GET /v1/search`: Search with `content_type` filter (`ocr`/`accessibility`/`all`)
+- `GET /v1/search`: Full-text/vector/hybrid search (default: hybrid mode)
+  - Parameters: `q`, `mode` (fts/vector/hybrid), `limit`, `offset`, `start_time`, `end_time`
+  - `app_name`, `window_name`, `browser_url`, `focused`, `include_text`, `max_text_length`
 - `GET /v1/search/counts`: Get result counts by content type
+- `GET /v1/search/keyword`: Keyword extraction for query
+- `GET /v1/timeline`: Timeline data for UI
+- `GET /v1/activity-summary`: Broad overview of screen activity (apps, descriptions)
+- `POST /v1/frames/<frame_id>/description`: Manually trigger description generation
+- `GET /v1/description/tasks/status`: Description task queue statistics
+- `POST /v1/admin/description/backfill`: Trigger description backfill
+- `GET /v1/embedding/tasks/status`: Embedding task queue statistics
+- `POST /v1/admin/embedding/backfill`: Trigger embedding backfill
+
+**Chat API Endpoints** (`/chat/api/*` on Client port 8889):
+- `POST /chat/api/stream`: SSE streaming chat (event: message_update, agent_end)
+- `GET /chat/api/conversations`: List all conversations
+- `POST /chat/api/conversations`: Create new conversation
+- `GET /chat/api/conversations/<id>`: Get conversation by ID
+- `DELETE /chat/api/conversations/<id>`: Delete conversation
+- `POST /chat/api/new-session`: Reset Pi session (clear context)
+- `GET /chat/api/pi-status`: Get Pi process status
+- `POST /chat/api/pi-restart`: Restart Pi process
+- `GET /chat/api/config`: Get LLM configuration (provider, model, has_api_key)
+- `POST /chat/api/config`: Save API key and model selection
 
 **Legacy API** (`/api/*`):
 - Deprecated, returns 410 Gone for all endpoints
 - All functionality migrated to `/v1/*`
 
-See `docs/archive/v3/http_contract_ledger.md` for complete API documentation (archived).
+> **Note**: The `content_type` parameter for `/v1/search` is deprecated. All searches return merged results from both OCR and accessibility text.
 
 ## Performance Characteristics
 
 **Capture Frequency:**
-- P1/P2: 1Hz maximum (intentional deviation from screenpipe's 5Hz)
-- Debounce: Three-layer (click 3000ms, trigger 3000ms, capture 3000ms)
-- Idle fallback: 60000ms timeout
+- Minimum capture interval controlled by three-layer debounce
+- Layer 1 (click): `click_debounce_ms` (default 3000ms)
+- Layer 2 (trigger): `trigger_debounce_ms` (default 3000ms) for APP_SWITCH/IDLE/MANUAL
+- Layer 3 (capture): `capture_debounce_ms` (default 3000ms) global gate
+- Idle fallback: `idle_capture_interval_ms` (default 60000ms)
 
 **Search:**
-- FTS5-based full-text search
+- **Hybrid search (default)**: Combines FTS5 + vector search via RRF fusion
+- **FTS5 mode**: BM25 full-text search with metadata filters
+- **Vector mode**: LanceDB similarity search with qwen3-vl-embedding
 - B-tree indexes on metadata (app, window, timestamp)
 - P95 latency target: < 200ms for typical queries
 
 **Queue Processing:**
-- LIFO mode when queue >= threshold (newest first)
-- FIFO mode otherwise (oldest first)
-- Backpressure protection via bounded channels
+- LIFO mode when pending >= `processing_lifo_threshold` (default 10) — newest first
+- FIFO mode when pending < threshold — oldest first
+- Trigger queue: bounded `queue.Queue` with capacity `trigger_queue_capacity` (default 1000)
+- Backpressure protection via queue overflow handling
 
 ## Common Patterns
 
