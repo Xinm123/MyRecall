@@ -385,11 +385,6 @@ class Settings(BaseSettings):
         description="Optional API key specifically for the reranker service",
     )
 
-    processing_lifo_threshold: int = Field(
-        default=10,
-        alias="OPENRECALL_PROCESSING_LIFO_THRESHOLD",
-        description="When pending tasks > threshold, use LIFO (newest first) instead of FIFO",
-    )
     show_ai_description: bool = Field(
         default=True,
         alias="OPENRECALL_SHOW_AI_DESCRIPTION",
