@@ -917,9 +917,9 @@ def search():
 
     Query Parameters:
         q: Text query (sanitized via sanitize_fts5_query)
-        mode: "fts", "vector", or "hybrid" (default: "fts")
+        mode: "fts", "vector", or "hybrid" (default: "hybrid")
         content_type: "ocr", "accessibility", or "all" (default: "all")
-        limit: Max results (default 20, max 100)
+        limit: Max results (default 20, no maximum)
         offset: Pagination offset (default 0)
         start_time: ISO8601 UTC start timestamp
         end_time: ISO8601 UTC end timestamp
@@ -927,20 +927,19 @@ def search():
         window_name: Filter by window name (exact match via FTS)
         browser_url: Filter by browser URL
         focused: Filter by focused state (true/false)
-        min_length: Minimum text length
-        max_length: Maximum text length
+        include_text: Include text field in response (default: false)
+        max_text_length: Maximum text length when include_text=true (default: 1000)
 
     Returns:
-        JSON response with search results matching mvp.md Search Contract.
-        Returns typed union entries: {"type": "OCR", ...} or {"type": "Accessibility", ...}
+        JSON response with flat frame objects (no content wrapper, no type/tags/file_path).
     """
     # Parse query parameters
     q = request.args.get("q", "").strip()
 
-    # Parse mode (default: "fts")
-    mode = request.args.get("mode", "fts").strip().lower()
+    # Parse mode (default: "hybrid")
+    mode = request.args.get("mode", "hybrid").strip().lower()
     if mode not in ("fts", "vector", "hybrid"):
-        mode = "fts"
+        mode = "hybrid"
 
     # Parse content_type (default: "all")
     content_type = request.args.get("content_type", "all").strip().lower()
@@ -954,12 +953,12 @@ def search():
             content_type,
         )
 
-    # Parse limit (default 20, max 100)
+    # Parse limit (default 20, no maximum)
     try:
         limit = int(request.args.get("limit", 20))
     except (ValueError, TypeError):
         limit = 20
-    limit = max(1, min(limit, 100))
+    limit = max(1, limit)
 
     # Parse offset (default 0)
     try:
@@ -967,6 +966,17 @@ def search():
     except (ValueError, TypeError):
         offset = 0
     offset = max(0, offset)
+
+    # Parse include_text (default false)
+    include_text_str = request.args.get("include_text", "false").strip().lower()
+    include_text = include_text_str in ("true", "1", "yes")
+
+    # Parse max_text_length (default 1000)
+    try:
+        max_text_length = int(request.args.get("max_text_length", 1000))
+    except (ValueError, TypeError):
+        max_text_length = 1000
+    max_text_length = max(1, max_text_length)
 
     # Parse time range
     start_time = request.args.get("start_time")
@@ -1001,18 +1011,6 @@ def search():
         elif focused_lower in ("false", "0", "no"):
             focused = False
 
-    # Parse text length
-    min_length = None
-    max_length = None
-    try:
-        min_length = int(request.args.get("min_length", 0)) or None
-    except (ValueError, TypeError):
-        pass
-    try:
-        max_length = int(request.args.get("max_length", 0)) or None
-    except (ValueError, TypeError):
-        pass
-
     # Execute search
     if mode == "fts":
         # Use existing FTS engine
@@ -1027,8 +1025,6 @@ def search():
             window_name=window_name,
             browser_url=browser_url,
             focused=focused,
-            min_length=min_length,
-            max_length=max_length,
             content_type=content_type,
         )
     else:
@@ -1047,66 +1043,50 @@ def search():
             window_name=window_name,
             browser_url=browser_url,
             focused=focused,
-            min_length=min_length,
-            max_length=max_length,
         )
 
-    # Build response per mvp.md Search Contract
-    # Returns typed union entries based on text_source
+    # Batch fetch descriptions for all frame_ids
+    frame_ids = [r.get("frame_id") for r in results if r.get("frame_id")]
+    store = _get_frames_store()
+    descriptions = store.get_frame_descriptions_batch(frame_ids) if frame_ids else {}
+
+    # Build response with flat structure
     data_items = []
     for r in results:
-        # Determine type based on text_source
-        text_source = r.get("text_source")
-        if text_source in ("accessibility", "hybrid"):
-            entry_type = "Accessibility"
-        else:
-            # Default to OCR for both "ocr" and null text_source
-            entry_type = "OCR"
+        frame_id = r.get("frame_id")
 
         item = {
-            "type": entry_type,
-            "content": {
-                "frame_id": r["frame_id"],
-                "text": r.get("text", ""),
-                "text_source": text_source,
-                "timestamp": r.get("timestamp"),
-                "file_path": r.get("file_path", ""),
-                "frame_url": r.get("frame_url", ""),
-                "app_name": r.get("app_name"),
-                "window_name": r.get("window_name"),
-                "browser_url": r.get("browser_url"),
-                "focused": r.get("focused"),
-                "device_name": r.get("device_name", "monitor_0"),
-                "tags": [],  # Reserved, always empty in MVP
-                "fts_rank": r.get("fts_rank"),  # BM25 rank (null when no text query)
-            },
+            "frame_id": frame_id,
+            "timestamp": r.get("timestamp"),
+            "text_source": r.get("text_source"),
+            "app_name": r.get("app_name"),
+            "window_name": r.get("window_name"),
+            "browser_url": r.get("browser_url"),
+            "focused": r.get("focused"),
+            "device_name": r.get("device_name", "monitor_0"),
+            "frame_url": r.get("frame_url"),
+            "embedding_status": r.get("embedding_status"),
         }
 
-        # Add hybrid_score for hybrid/vector mode results
-        if "hybrid_score" in r:
-            item["content"]["hybrid_score"] = r["hybrid_score"]
+        # Add text only if include_text=true
+        if include_text:
+            raw_text = r.get("text", "") or ""
+            if len(raw_text) > max_text_length:
+                half = max_text_length // 2
+                removed = len(raw_text) - max_text_length
+                item["text"] = raw_text[:half] + f"...{removed} chars..." + raw_text[-half:]
+            else:
+                item["text"] = raw_text
 
-        # Add cosine_score for vector/hybrid modes
-        if mode in ("vector", "hybrid"):
-            # cosine_score is the raw vector similarity before fusion
-            if "cosine_score" in r:
-                item["content"]["cosine_score"] = r["cosine_score"]
-            elif "hybrid_score" in r and mode == "vector":
-                # For pure vector search, hybrid_score is the cosine score
-                item["content"]["cosine_score"] = r["hybrid_score"]
+        # Add description if available
+        desc = descriptions.get(frame_id)
+        if desc:
+            item["description"] = desc
 
-        # Add rank fields for hybrid mode
-        if mode == "hybrid":
-            if "hybrid_rank" in r:
-                item["content"]["hybrid_rank"] = r["hybrid_rank"]
-            if "vector_rank" in r:
-                item["content"]["vector_rank"] = r["vector_rank"]
-            if "fts_result_rank" in r:
-                item["content"]["fts_result_rank"] = r["fts_result_rank"]
-
-        # Add embedding_status if available
-        if "embedding_status" in r:
-            item["content"]["embedding_status"] = r["embedding_status"]
+        # Add score fields (all modes)
+        for score_field in ["score", "fts_score", "fts_rank", "cosine_score", "hybrid_rank", "vector_rank"]:
+            if score_field in r:
+                item[score_field] = r[score_field]
 
         data_items.append(item)
 
