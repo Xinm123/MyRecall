@@ -142,18 +142,6 @@
     color: #AF52DE;
   }
 
-  /* Description summary in card footer */
-  .description-summary {
-    font-size: 13px;
-    color: var(--text-secondary);
-    max-height: 1.4em;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    flex: 1;
-    margin-right: 12px;
-  }
-
   /* Spinner Animation */
   @keyframes spin {
     0% { transform: rotate(0deg); }
@@ -1140,7 +1128,6 @@
       const relativeTime = formatRelativeTime(item.timestamp);
       const appName = item.app_name || 'Unknown';
       const windowName = item.window_name || '';
-      const descriptionSummary = item.description?.summary || '';
 
       return `
         <article class="memory-card">
@@ -1172,7 +1159,6 @@
             >
           </div>
           <div class="card-footer">
-            <div class="description-summary">${descriptionSummary}</div>
             <div class="score-display">${renderScoreInfo(item, idx, pagination)}${renderEmbeddingBadge(item)}</div>
             <div class="result-position">#${idx + 1} / ${pagination.total}</div>
           </div>

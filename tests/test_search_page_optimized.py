@@ -157,35 +157,6 @@ class TestSearchPageFlatResponse:
                 )
 
 
-class TestSearchPageDescription:
-    """Tests for description rendering."""
-
-    def test_description_css_exists(self, search_html_content: str) -> None:
-        """Test that description-summary CSS class is defined."""
-        assert ".description-summary" in search_html_content, \
-            "CSS class .description-summary should be defined for description preview"
-
-    def test_description_render_in_template(self, search_html_content: str) -> None:
-        """Test that description.summary is rendered in results."""
-        # Should have item.description?.summary or similar in template
-        assert "description" in search_html_content.lower(), \
-            "Template should include description field handling"
-
-    def test_description_css_has_ellipsis(self, search_html_content: str) -> None:
-        """Test that description CSS includes ellipsis for overflow."""
-        # Find the description-summary CSS block
-        css_pattern = r"\.description-summary\s*\{[^}]+\}"
-        css_match = re.search(css_pattern, search_html_content, re.DOTALL)
-
-        assert css_match, "CSS for .description-summary should be defined"
-
-        css_block = css_match.group(0)
-
-        # Check for text-overflow: ellipsis
-        assert "text-overflow" in css_block or "overflow" in css_block, \
-            "Description CSS should handle overflow with ellipsis"
-
-
 class TestSearchPageScoreFields:
     """Tests for score field handling."""
 
