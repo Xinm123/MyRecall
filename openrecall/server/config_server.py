@@ -64,7 +64,6 @@ class ServerSettings(TOMLConfig):
     # [processing]
     processing_mode: str = "ocr"
     processing_queue_capacity: int = 200
-    processing_lifo_threshold: int = 10
     processing_preload_models: bool = True
 
     # [ui]
@@ -115,7 +114,6 @@ class ServerSettings(TOMLConfig):
             embedding_dim=data.get("embedding.dim", 1024),
             processing_mode=data.get("processing.mode", "ocr"),
             processing_queue_capacity=data.get("processing.queue_capacity", 200),
-            processing_lifo_threshold=data.get("processing.lifo_threshold", 10),
             processing_preload_models=data.get("processing.preload_models", True),
             ui_show_ai_description=data.get("ui.show_ai_description", True),
             fusion_log_enabled=data.get("advanced.fusion_log_enabled", False),
