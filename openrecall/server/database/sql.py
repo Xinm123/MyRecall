@@ -155,15 +155,14 @@ class SQLStore:
             logger.error(f"Database error while counting pending tasks: {e}")
         return count
 
-    def get_next_task(self, conn: sqlite3.Connection, lifo_mode: bool = False) -> Optional[RecallEntry]:
-        """Get the next pending task to process."""
+    def get_next_task(self, conn: sqlite3.Connection) -> Optional[RecallEntry]:
+        """Get the next pending task to process (FIFO - oldest first)."""
         try:
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
-            order = "DESC" if lifo_mode else "ASC"
             cursor.execute(
-                f"SELECT id, app, title, text, description, timestamp, embedding, status "
-                f"FROM entries WHERE status IN ('PENDING', 'CANCELLED') ORDER BY timestamp {order} LIMIT 1"
+                "SELECT id, app, title, text, description, timestamp, embedding, status "
+                "FROM entries WHERE status IN ('PENDING', 'CANCELLED') ORDER BY timestamp ASC LIMIT 1"
             )
             row = cursor.fetchone()
             if row:
