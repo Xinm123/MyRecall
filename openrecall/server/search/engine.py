@@ -325,9 +325,12 @@ class SearchEngine:
                         "file_path": f"{ts}.jpg",
                         "frame_url": f"/v1/frames/{frame_id}",
                         "tags": [],  # Reserved, always empty in P1
-                        "fts_rank": float(row["fts_rank"])
+                        "fts_score": float(row["fts_rank"])
                         if row["fts_rank"] is not None
-                        else None,
+                        else None,  # BM25 score (renamed from fts_rank)
+                        "score": float(row["fts_rank"])
+                        if row["fts_rank"] is not None
+                        else None,  # unified score field
                         "embedding_status": row["embedding_status"] or "",
                     }
                     results.append(result)

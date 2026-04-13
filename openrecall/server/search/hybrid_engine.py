@@ -255,7 +255,7 @@ class HybridSearchEngine:
 
         # Build FTS rank and BM25 score maps from FTS results
         fts_ranks = {r["frame_id"]: idx + 1 for idx, r in enumerate(fts_results)}
-        fts_bm25_scores = {r["frame_id"]: r.get("fts_rank") for r in fts_results}
+        fts_bm25_scores = {r["frame_id"]: r.get("fts_score") for r in fts_results}
 
         # Merge with RRF
         merged = reciprocal_rank_fusion(

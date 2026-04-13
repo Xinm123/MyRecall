@@ -23,11 +23,12 @@ def _make_engine():
     return engine
 
 
-def _make_fts_result(frame_id, fts_rank_value=-1.5):
+def _make_fts_result(frame_id, fts_score_value=-1.5):
     """Return a minimal FTS result dict (as returned by FTS engine)."""
     return {
         "frame_id": frame_id,
-        "fts_rank": fts_rank_value,  # BM25 score (renamed from fts_rank in Task 3)
+        "fts_score": fts_score_value,  # BM25 score (renamed in Task 3)
+        "score": fts_score_value,  # unified score
         "timestamp": "2026-01-01T00:00:00Z",
         "text": "sample text",
         "text_source": "ocr",
@@ -55,7 +56,7 @@ class TestHybridSearchFieldRenames:
         """
         engine = _make_engine()
 
-        fts_results = [_make_fts_result(fid, fts_rank_value=-1.0 * (i + 1))
+        fts_results = [_make_fts_result(fid, fts_score_value=-1.0 * (i + 1))
                        for i, fid in enumerate(frame_ids)]
 
         # Mock FTS engine
@@ -205,4 +206,114 @@ class TestVectorOnlySearchScoreField:
         # score should equal cosine_score (1 - 0.2 = 0.8)
         assert abs(first["score"] - 0.8) < 1e-6, (
             f"Expected score=0.8, got {first['score']}"
+        )
+
+
+# ---------------------------------------------------------------------------
+# Task 3: FTS engine score field renaming
+# ---------------------------------------------------------------------------
+
+class TestFTSEngineScoreRenaming:
+    """Verify FTS-only search returns fts_score (BM25) and score fields.
+
+    Task 3: Rename fts_rank -> fts_score in FTS engine output, add score field.
+    """
+
+    def test_fts_result_has_fts_score_not_fts_rank(self):
+        """FTS-only result should have fts_score (BM25), not fts_rank."""
+        from openrecall.server.search.engine import SearchEngine
+        from unittest.mock import patch, MagicMock
+
+        # Create engine with mocked database
+        engine = SearchEngine()
+
+        # Mock a database connection that returns FTS results
+        mock_conn = MagicMock()
+        mock_row = MagicMock()
+        mock_row.__getitem__ = lambda _, key: {
+            "frame_id": 123,
+            "timestamp": "2026-01-01T00:00:00Z",
+            "full_text": "hello world",
+            "app_name": "TestApp",
+            "window_name": "TestWindow",
+            "browser_url": None,
+            "focused": 1,
+            "device_name": "monitor_0",
+            "text_source": "ocr",
+            "embedding_status": "completed",
+            "fts_rank": -1.5,  # BM25 score (negative, lower is better)
+        }.get(key)
+        mock_row.keys.return_value = [
+            "frame_id", "timestamp", "full_text", "app_name", "window_name",
+            "browser_url", "focused", "device_name", "text_source",
+            "embedding_status", "fts_rank"
+        ]
+
+        # Mock count result
+        mock_count_row = MagicMock()
+        mock_count_row.__getitem__ = lambda _, key: 1 if key == "total" else 0
+
+        mock_cursor = MagicMock()
+        mock_cursor.fetchall.return_value = [mock_row]
+        mock_cursor.fetchone.return_value = mock_count_row
+        mock_conn.execute.return_value = mock_cursor
+        mock_conn.__enter__ = lambda _: _
+        mock_conn.__exit__ = lambda _, *__: None
+
+        with patch.object(engine, "_connect", return_value=mock_conn):
+            results, _ = engine.search(q="hello", limit=10)
+
+        assert len(results) == 1
+        first = results[0]
+        assert "fts_score" in first, "Expected 'fts_score' field (BM25 score) in FTS result"
+        assert "fts_rank" not in first, "Field 'fts_rank' should be renamed to 'fts_score'"
+
+    def test_fts_result_has_score_field(self):
+        """FTS-only result should have a unified 'score' field."""
+        from openrecall.server.search.engine import SearchEngine
+        from unittest.mock import patch, MagicMock
+
+        engine = SearchEngine()
+
+        # Mock a database connection that returns FTS results
+        mock_conn = MagicMock()
+        mock_row = MagicMock()
+        mock_row.__getitem__ = lambda _, key: {
+            "frame_id": 456,
+            "timestamp": "2026-01-01T00:00:00Z",
+            "full_text": "test query",
+            "app_name": "TestApp",
+            "window_name": "TestWindow",
+            "browser_url": None,
+            "focused": 1,
+            "device_name": "monitor_0",
+            "text_source": "ocr",
+            "embedding_status": "completed",
+            "fts_rank": -2.0,  # BM25 score
+        }.get(key)
+        mock_row.keys.return_value = [
+            "frame_id", "timestamp", "full_text", "app_name", "window_name",
+            "browser_url", "focused", "device_name", "text_source",
+            "embedding_status", "fts_rank"
+        ]
+
+        mock_count_row = MagicMock()
+        mock_count_row.__getitem__ = lambda _, key: 1 if key == "total" else 0
+
+        mock_cursor = MagicMock()
+        mock_cursor.fetchall.return_value = [mock_row]
+        mock_cursor.fetchone.return_value = mock_count_row
+        mock_conn.execute.return_value = mock_cursor
+        mock_conn.__enter__ = lambda _: _
+        mock_conn.__exit__ = lambda _, *__: None
+
+        with patch.object(engine, "_connect", return_value=mock_conn):
+            results, _ = engine.search(q="test", limit=10)
+
+        assert len(results) == 1
+        first = results[0]
+        assert "score" in first, "Expected 'score' field in FTS result"
+        # score should equal fts_score (both are BM25)
+        assert first["score"] == first["fts_score"], (
+            f"score ({first['score']}) should equal fts_score ({first['fts_score']})"
         )
