@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 from collections import defaultdict
+from pathlib import Path
 from typing import List, Tuple, Dict, Any
 
 logger = logging.getLogger(__name__)
@@ -111,7 +112,7 @@ class HybridSearchEngine:
 
         # If no query, return recent frames with embeddings (browse mode)
         if not q or q.isspace():
-            return self._get_recent_embedded_frames(frames_store, limit, offset)
+            return self._get_recent_embedded_frames(frames_store.db_path, limit, offset)
 
         # Get query embedding
         from openrecall.server.ai.factory import get_multimodal_embedding_provider
@@ -141,6 +142,7 @@ class HybridSearchEngine:
             cosine_score = 1.0 - float(distance)
             results.append({
                 "frame_id": frame_id,
+                "score": cosine_score,
                 "cosine_score": cosine_score,
                 "timestamp": frame.get("timestamp", emb.timestamp),
                 "text": frame.get("full_text", "")[:200] if frame.get("full_text") else "",
@@ -159,13 +161,13 @@ class HybridSearchEngine:
         return results, len(embeddings_with_distance)
 
     def _get_recent_embedded_frames(
-        self, frames_store, limit: int, offset: int
+        self, db_path: Path, limit: int, offset: int
     ) -> Tuple[List[Dict[str, Any]], int]:
         """Get recent frames that have embeddings (browse mode for vector search)."""
         import sqlite3
 
         try:
-            conn = sqlite3.connect(str(frames_store.db_path))
+            conn = sqlite3.connect(str(db_path))
             conn.row_factory = sqlite3.Row
 
             # Count total frames with embeddings
@@ -196,6 +198,7 @@ class HybridSearchEngine:
                 ts = row["timestamp"]
                 results.append({
                     "frame_id": row["frame_id"],
+                    "score": None,
                     "cosine_score": None,
                     "timestamp": ts,
                     "text": row["full_text"] or "",
@@ -277,12 +280,12 @@ class HybridSearchEngine:
             frame = frame_data_map.get(frame_id, {})
             results.append({
                 "frame_id": frame_id,
-                "hybrid_score": scores.get(frame_id, 0.0),
+                "score": scores.get(frame_id, 0.0),
                 "hybrid_rank": hybrid_rank,
                 "cosine_score": vector_similarities.get(frame_id),  # Raw vector similarity
                 "vector_rank": vector_ranks.get(frame_id),  # Rank in vector search results
-                "fts_rank": fts_bm25_scores.get(frame_id),  # BM25 score from FTS results
-                "fts_result_rank": fts_ranks.get(frame_id),  # Rank in FTS search results
+                "fts_score": fts_bm25_scores.get(frame_id),  # BM25 score from FTS results
+                "fts_rank": fts_ranks.get(frame_id),  # Rank in FTS search results
                 "timestamp": frame.get("timestamp", ""),
                 "text": frame.get("full_text", "")[:200] if frame.get("full_text") else "",
                 "text_source": frame.get("text_source", "ocr"),
