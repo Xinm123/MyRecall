@@ -35,19 +35,22 @@ def mock_search_engine():
     """Create a mock search engine with test data."""
     mock_engine = MagicMock(spec=SearchEngine)
 
+    # Flat structure results (no content wrapper)
     test_results = [
         {
             "frame_id": 1,
             "timestamp": "2026-03-18T10:00:00Z",
             "text": "Hello world from Safari",
+            "text_source": "ocr",
             "app_name": "Safari",
             "window_name": "Web Browser",
             "browser_url": None,
             "focused": True,
             "device_name": "monitor_0",
-            "file_path": "2026-03-18T10:00:00Z.jpg",
             "frame_url": "/v1/frames/1",
-            "tags": [],
+            "embedding_status": None,
+            "score": 0.9,
+            "fts_score": -2.5,
         },
     ]
 
@@ -66,20 +69,6 @@ def mock_empty_search_engine():
 class TestResponseSchemaSuccess:
     """Success response structure validation."""
 
-    def test_response_type_is_ocr(self, app_with_search_route, mock_search_engine):
-        """Each data item has type field 'OCR' for OCR results."""
-        with patch(
-            "openrecall.server.api_v1._get_search_engine",
-            return_value=mock_search_engine,
-        ):
-            client = app_with_search_route.test_client()
-            response = client.get("/v1/search?q=hello")
-            data = json.loads(response.data)
-
-            # Each item in data should have type "OCR" (OCR-canonical frames)
-            for item in data.get("data", []):
-                assert item.get("type") == "OCR"
-
     def test_response_has_data_array(self, app_with_search_route, mock_search_engine):
         """Response has data field as array."""
         with patch(
@@ -87,7 +76,7 @@ class TestResponseSchemaSuccess:
             return_value=mock_search_engine,
         ):
             client = app_with_search_route.test_client()
-            response = client.get("/v1/search?q=hello")
+            response = client.get("/v1/search?q=hello&mode=fts")
             data = json.loads(response.data)
 
             assert "data" in data
@@ -100,59 +89,43 @@ class TestResponseSchemaSuccess:
             return_value=mock_search_engine,
         ):
             client = app_with_search_route.test_client()
-            response = client.get("/v1/search?q=hello")
+            response = client.get("/v1/search?q=hello&mode=fts")
             data = json.loads(response.data)
 
             assert "pagination" in data
             assert isinstance(data["pagination"], dict)
 
 
-class TestContentFieldCompleteness:
-    """Content object field completeness tests."""
+class TestItemFieldCompleteness:
+    """Item field completeness tests (flat structure, no content wrapper)."""
 
-    def test_content_has_all_required_fields(
+    def test_items_have_all_required_fields(
         self, app_with_search_route, mock_search_engine
     ):
-        """Each content item has all required fields per spec."""
+        """Each item has all required fields per spec (flat structure)."""
         with patch(
             "openrecall.server.api_v1._get_search_engine",
             return_value=mock_search_engine,
         ):
             client = app_with_search_route.test_client()
-            response = client.get("/v1/search?q=hello")
+            response = client.get("/v1/search?q=hello&mode=fts")
             data = json.loads(response.data)
 
             required_fields = [
                 "frame_id",
-                "text",
                 "timestamp",
-                "file_path",
+                "text_source",
                 "frame_url",
                 "app_name",
                 "window_name",
                 "browser_url",
                 "focused",
                 "device_name",
-                "tags",
             ]
 
             for item in data.get("data", []):
-                content = item.get("content", {})
                 for field in required_fields:
-                    assert field in content, f"Missing required field: {field}"
-
-    def test_content_has_type_field(self, app_with_search_route, mock_search_engine):
-        """Each data item has type field set to 'OCR'."""
-        with patch(
-            "openrecall.server.api_v1._get_search_engine",
-            return_value=mock_search_engine,
-        ):
-            client = app_with_search_route.test_client()
-            response = client.get("/v1/search?q=hello")
-            data = json.loads(response.data)
-
-            for item in data.get("data", []):
-                assert item.get("type") == "OCR"
+                    assert field in item, f"Missing required field: {field}"
 
     def test_frame_id_is_integer(self, app_with_search_route, mock_search_engine):
         """frame_id is an integer."""
@@ -161,12 +134,11 @@ class TestContentFieldCompleteness:
             return_value=mock_search_engine,
         ):
             client = app_with_search_route.test_client()
-            response = client.get("/v1/search?q=hello")
+            response = client.get("/v1/search?q=hello&mode=fts")
             data = json.loads(response.data)
 
             for item in data.get("data", []):
-                content = item.get("content", {})
-                assert isinstance(content.get("frame_id"), int)
+                assert isinstance(item.get("frame_id"), int)
 
     def test_timestamp_is_string(self, app_with_search_route, mock_search_engine):
         """timestamp is a string (ISO8601)."""
@@ -175,12 +147,11 @@ class TestContentFieldCompleteness:
             return_value=mock_search_engine,
         ):
             client = app_with_search_route.test_client()
-            response = client.get("/v1/search?q=hello")
+            response = client.get("/v1/search?q=hello&mode=fts")
             data = json.loads(response.data)
 
             for item in data.get("data", []):
-                content = item.get("content", {})
-                assert isinstance(content.get("timestamp"), str)
+                assert isinstance(item.get("timestamp"), str)
 
     def test_focused_is_boolean(self, app_with_search_route, mock_search_engine):
         """focused field is boolean."""
@@ -189,47 +160,45 @@ class TestContentFieldCompleteness:
             return_value=mock_search_engine,
         ):
             client = app_with_search_route.test_client()
-            response = client.get("/v1/search?q=hello")
+            response = client.get("/v1/search?q=hello&mode=fts")
             data = json.loads(response.data)
 
             for item in data.get("data", []):
-                content = item.get("content", {})
-                assert isinstance(content.get("focused"), bool)
+                assert isinstance(item.get("focused"), bool)
 
 
-class TestReservedFields:
-    """Reserved fields validation tests."""
+class TestOptionalFields:
+    """Optional fields validation tests."""
 
-    def test_browser_url_is_null(self, app_with_search_route, mock_search_engine):
-        """browser_url is null (reserved for P2)."""
+    def test_browser_url_can_be_null(self, app_with_search_route, mock_search_engine):
+        """browser_url can be null for non-browser frames."""
         with patch(
             "openrecall.server.api_v1._get_search_engine",
             return_value=mock_search_engine,
         ):
             client = app_with_search_route.test_client()
-            response = client.get("/v1/search?q=hello")
+            response = client.get("/v1/search?q=hello&mode=fts")
             data = json.loads(response.data)
 
             for item in data.get("data", []):
-                content = item.get("content", {})
-                assert "browser_url" in content
-                assert content.get("browser_url") is None
+                # browser_url is present, but may be null
+                assert "browser_url" in item
 
-    def test_tags_is_empty_list(self, app_with_search_route, mock_search_engine):
-        """tags is an empty list (reserved for P2)."""
+    def test_score_fields_present(self, app_with_search_route, mock_search_engine):
+        """Score fields are present in search results."""
         with patch(
             "openrecall.server.api_v1._get_search_engine",
             return_value=mock_search_engine,
         ):
             client = app_with_search_route.test_client()
-            response = client.get("/v1/search?q=hello")
+            response = client.get("/v1/search?q=hello&mode=fts")
             data = json.loads(response.data)
 
             for item in data.get("data", []):
-                content = item.get("content", {})
-                assert "tags" in content
-                assert content.get("tags") == []
-                assert isinstance(content.get("tags"), list)
+                # Score fields should be present
+                assert "score" in item
+                # fts_score is the renamed BM25 score
+                assert "fts_score" in item
 
 
 class TestPaginationStructure:
@@ -242,7 +211,7 @@ class TestPaginationStructure:
             return_value=mock_search_engine,
         ):
             client = app_with_search_route.test_client()
-            response = client.get("/v1/search?q=hello&limit=10")
+            response = client.get("/v1/search?q=hello&limit=10&mode=fts")
             data = json.loads(response.data)
 
             pagination = data.get("pagination", {})
@@ -256,7 +225,7 @@ class TestPaginationStructure:
             return_value=mock_search_engine,
         ):
             client = app_with_search_route.test_client()
-            response = client.get("/v1/search?q=hello&offset=5")
+            response = client.get("/v1/search?q=hello&offset=5&mode=fts")
             data = json.loads(response.data)
 
             pagination = data.get("pagination", {})
@@ -270,7 +239,7 @@ class TestPaginationStructure:
             return_value=mock_search_engine,
         ):
             client = app_with_search_route.test_client()
-            response = client.get("/v1/search?q=hello")
+            response = client.get("/v1/search?q=hello&mode=fts")
             data = json.loads(response.data)
 
             pagination = data.get("pagination", {})
@@ -284,7 +253,7 @@ class TestPaginationStructure:
             return_value=mock_search_engine,
         ):
             client = app_with_search_route.test_client()
-            response = client.get("/v1/search?q=hello")
+            response = client.get("/v1/search?q=hello&mode=fts")
             data = json.loads(response.data)
 
             pagination = data.get("pagination", {})
@@ -300,7 +269,7 @@ class TestPaginationStructure:
             return_value=mock_search_engine,
         ):
             client = app_with_search_route.test_client()
-            response = client.get("/v1/search?q=hello&limit=5&offset=0")
+            response = client.get("/v1/search?q=hello&limit=5&offset=0&mode=fts")
             data = json.loads(response.data)
 
             pagination = data.get("pagination", {})
@@ -321,7 +290,7 @@ class TestEmptyResultStructure:
             return_value=mock_empty_search_engine,
         ):
             client = app_with_search_route.test_client()
-            response = client.get("/v1/search?q=nonexistent")
+            response = client.get("/v1/search?q=nonexistent&mode=fts")
             data = json.loads(response.data)
 
             assert "data" in data
@@ -337,7 +306,7 @@ class TestEmptyResultStructure:
             return_value=mock_empty_search_engine,
         ):
             client = app_with_search_route.test_client()
-            response = client.get("/v1/search?q=nonexistent")
+            response = client.get("/v1/search?q=nonexistent&mode=fts")
             data = json.loads(response.data)
 
             pagination = data.get("pagination", {})
@@ -354,7 +323,7 @@ class TestEmptyResultStructure:
             return_value=mock_empty_search_engine,
         ):
             client = app_with_search_route.test_client()
-            response = client.get("/v1/search?q=nonexistent")
+            response = client.get("/v1/search?q=nonexistent&mode=fts")
 
             assert response.status_code == 200
 
@@ -367,10 +336,10 @@ class TestEmptyResultStructure:
             return_value=mock_empty_search_engine,
         ):
             client = app_with_search_route.test_client()
-            response = client.get("/v1/search?q=nonexistent")
+            response = client.get("/v1/search?q=nonexistent&mode=fts")
             data = json.loads(response.data)
 
-            # Top-level structure (per mvp.md - no top-level type field)
+            # Top-level structure (no type field at any level)
             assert "data" in data
             assert "pagination" in data
 
@@ -391,7 +360,7 @@ class TestErrorResponseFormat:
             return_value=mock_search_engine,
         ):
             client = app_with_search_route.test_client()
-            response = client.get("/v1/search?q=hello&limit=invalid")
+            response = client.get("/v1/search?q=hello&limit=invalid&mode=fts")
 
             # Should not error, defaults are used
             assert response.status_code == 200
@@ -405,7 +374,7 @@ class TestErrorResponseFormat:
             return_value=mock_search_engine,
         ):
             client = app_with_search_route.test_client()
-            response = client.get("/v1/search?q=hello&offset=invalid")
+            response = client.get("/v1/search?q=hello&offset=invalid&mode=fts")
 
             # Should not error, defaults are used
             assert response.status_code == 200
@@ -417,7 +386,7 @@ class TestErrorResponseFormat:
             return_value=mock_search_engine,
         ):
             client = app_with_search_route.test_client()
-            response = client.get("/v1/search?q=hello&limit=-5")
+            response = client.get("/v1/search?q=hello&limit=-5&mode=fts")
             data = json.loads(response.data)
 
             assert response.status_code == 200
@@ -430,7 +399,7 @@ class TestErrorResponseFormat:
             return_value=mock_search_engine,
         ):
             client = app_with_search_route.test_client()
-            response = client.get("/v1/search?q=hello&offset=-5")
+            response = client.get("/v1/search?q=hello&offset=-5&mode=fts")
             data = json.loads(response.data)
 
             assert response.status_code == 200

@@ -71,7 +71,7 @@ class TestTimeRangeFilterMapping:
             return_value=mock_search_engine,
         ):
             client = app_with_search_route.test_client()
-            client.get("/v1/search?q=&start_time=2026-03-18T09:00:00Z")
+            client.get("/v1/search?q=&mode=fts&start_time=2026-03-18T09:00:00Z&mode=fts")
 
             call_args = mock_search_engine.search.call_args
             assert call_args.kwargs.get("start_time") == "2026-03-18T09:00:00Z"
@@ -83,7 +83,7 @@ class TestTimeRangeFilterMapping:
             return_value=mock_search_engine,
         ):
             client = app_with_search_route.test_client()
-            client.get("/v1/search?q=&end_time=2026-03-18T17:00:00Z")
+            client.get("/v1/search?q=&mode=fts&end_time=2026-03-18T17:00:00Z&mode=fts")
 
             call_args = mock_search_engine.search.call_args
             assert call_args.kwargs.get("end_time") == "2026-03-18T17:00:00Z"
@@ -96,7 +96,7 @@ class TestTimeRangeFilterMapping:
         ):
             client = app_with_search_route.test_client()
             client.get(
-                "/v1/search?q=&start_time=2026-03-18T09:00:00Z&end_time=2026-03-18T17:00:00Z"
+                "/v1/search?q=&mode=fts&start_time=2026-03-18T09:00:00Z&end_time=2026-03-18T17:00:00Z&mode=fts"
             )
 
             call_args = mock_search_engine.search.call_args
@@ -113,7 +113,7 @@ class TestTimeRangeFilterMapping:
             return_value=mock_search_engine,
         ):
             client = app_with_search_route.test_client()
-            client.get(f"/v1/search?q=&start_time={iso_time}")
+            client.get(f"/v1/search?q=&mode=fts&start_time={iso_time}")
 
             call_args = mock_search_engine.search.call_args
             assert call_args.kwargs.get("start_time") == iso_time
@@ -129,7 +129,7 @@ class TestAppNameFilterMapping:
             return_value=mock_search_engine,
         ):
             client = app_with_search_route.test_client()
-            client.get("/v1/search?q=&app_name=Safari")
+            client.get("/v1/search?q=&mode=fts&app_name=Safari")
 
             call_args = mock_search_engine.search.call_args
             assert call_args.kwargs.get("app_name") == "Safari"
@@ -141,7 +141,7 @@ class TestAppNameFilterMapping:
             return_value=mock_search_engine,
         ):
             client = app_with_search_route.test_client()
-            client.get("/v1/search?q=&app_name=Visual%20Studio%20Code")
+            client.get("/v1/search?q=&mode=fts&app_name=Visual%20Studio%20Code")
 
             call_args = mock_search_engine.search.call_args
             assert call_args.kwargs.get("app_name") == "Visual Studio Code"
@@ -155,7 +155,7 @@ class TestAppNameFilterMapping:
             return_value=mock_search_engine,
         ):
             client = app_with_search_route.test_client()
-            client.get("/v1/search?q=&app_name=WeChat")
+            client.get("/v1/search?q=&mode=fts&app_name=WeChat")
 
             call_args = mock_search_engine.search.call_args
             assert call_args.kwargs.get("app_name") == "WeChat"
@@ -173,7 +173,7 @@ class TestWindowNameFilterMapping:
             return_value=mock_search_engine,
         ):
             client = app_with_search_route.test_client()
-            client.get("/v1/search?q=&window_name=main.py")
+            client.get("/v1/search?q=&mode=fts&window_name=main.py")
 
             call_args = mock_search_engine.search.call_args
             assert call_args.kwargs.get("window_name") == "main.py"
@@ -185,7 +185,7 @@ class TestWindowNameFilterMapping:
             return_value=mock_search_engine,
         ):
             client = app_with_search_route.test_client()
-            client.get("/v1/search?q=&window_name=project%2Fsrc%2Fmain.py")
+            client.get("/v1/search?q=&mode=fts&window_name=project%2Fsrc%2Fmain.py")
 
             call_args = mock_search_engine.search.call_args
             assert call_args.kwargs.get("window_name") == "project/src/main.py"
@@ -197,7 +197,7 @@ class TestWindowNameFilterMapping:
             return_value=mock_search_engine,
         ):
             client = app_with_search_route.test_client()
-            client.get("/v1/search?q=&window_name=Google%20Chrome")
+            client.get("/v1/search?q=&mode=fts&window_name=Google%20Chrome")
 
             call_args = mock_search_engine.search.call_args
             assert call_args.kwargs.get("window_name") == "Google Chrome"
@@ -215,7 +215,7 @@ class TestFocusedFilterMapping:
             return_value=mock_search_engine,
         ):
             client = app_with_search_route.test_client()
-            client.get("/v1/search?q=&focused=true")
+            client.get("/v1/search?q=&mode=fts&focused=true")
 
             call_args = mock_search_engine.search.call_args
             assert call_args.kwargs.get("focused") is True
@@ -229,7 +229,7 @@ class TestFocusedFilterMapping:
             return_value=mock_search_engine,
         ):
             client = app_with_search_route.test_client()
-            client.get("/v1/search?q=&focused=false")
+            client.get("/v1/search?q=&mode=fts&focused=false")
 
             call_args = mock_search_engine.search.call_args
             assert call_args.kwargs.get("focused") is False
@@ -241,7 +241,7 @@ class TestFocusedFilterMapping:
             return_value=mock_search_engine,
         ):
             client = app_with_search_route.test_client()
-            client.get("/v1/search?q=&focused=TRUE")
+            client.get("/v1/search?q=&mode=fts&focused=TRUE")
 
             call_args = mock_search_engine.search.call_args
             assert call_args.kwargs.get("focused") is True
@@ -253,7 +253,7 @@ class TestFocusedFilterMapping:
             return_value=mock_search_engine,
         ):
             client = app_with_search_route.test_client()
-            client.get("/v1/search?q=&focused=1")
+            client.get("/v1/search?q=&mode=fts&focused=1")
 
             call_args = mock_search_engine.search.call_args
             assert call_args.kwargs.get("focused") is True
@@ -265,7 +265,7 @@ class TestFocusedFilterMapping:
             return_value=mock_search_engine,
         ):
             client = app_with_search_route.test_client()
-            client.get("/v1/search?q=&focused=0")
+            client.get("/v1/search?q=&mode=fts&focused=0")
 
             call_args = mock_search_engine.search.call_args
             assert call_args.kwargs.get("focused") is False
@@ -283,7 +283,7 @@ class TestCombinedFilterMapping:
             return_value=mock_search_engine,
         ):
             client = app_with_search_route.test_client()
-            client.get("/v1/search?q=&app_name=VSCode&window_name=main.py")
+            client.get("/v1/search?q=&mode=fts&app_name=VSCode&window_name=main.py")
 
             call_args = mock_search_engine.search.call_args
             assert call_args.kwargs.get("app_name") == "VSCode"
@@ -298,7 +298,7 @@ class TestCombinedFilterMapping:
             return_value=mock_search_engine,
         ):
             client = app_with_search_route.test_client()
-            client.get("/v1/search?q=&app_name=Safari&focused=true")
+            client.get("/v1/search?q=&mode=fts&app_name=Safari&focused=true")
 
             call_args = mock_search_engine.search.call_args
             assert call_args.kwargs.get("app_name") == "Safari"
@@ -314,7 +314,7 @@ class TestCombinedFilterMapping:
         ):
             client = app_with_search_route.test_client()
             client.get(
-                "/v1/search?q=&start_time=2026-03-18T09:00:00Z"
+                "/v1/search?q=&mode=fts&start_time=2026-03-18T09:00:00Z"
                 "&end_time=2026-03-18T17:00:00Z&app_name=Terminal"
             )
 
@@ -331,7 +331,7 @@ class TestCombinedFilterMapping:
         ):
             client = app_with_search_route.test_client()
             client.get(
-                "/v1/search?q=test&start_time=2026-03-18T09:00:00Z"
+                "/v1/search?q=test&mode=fts&start_time=2026-03-18T09:00:00Z"
                 "&end_time=2026-03-18T17:00:00Z"
                 "&app_name=VSCode"
                 "&window_name=main.py"
@@ -354,7 +354,7 @@ class TestCombinedFilterMapping:
             return_value=mock_search_engine,
         ):
             client = app_with_search_route.test_client()
-            client.get("/v1/search?q=&app_name=Safari&limit=10&offset=20")
+            client.get("/v1/search?q=&mode=fts&app_name=Safari&limit=10&offset=20")
 
             call_args = mock_search_engine.search.call_args
             assert call_args.kwargs.get("app_name") == "Safari"
@@ -371,7 +371,7 @@ class TestCombinedFilterMapping:
         ):
             client = app_with_search_route.test_client()
             client.get(
-                "/v1/search?q=error&app_name=Terminal&window_name=bash&focused=false"
+                "/v1/search?q=error&mode=fts&app_name=Terminal&window_name=bash&focused=false"
                 "&start_time=2026-03-18T00:00:00Z&end_time=2026-03-18T23:59:59Z"
             )
 

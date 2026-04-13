@@ -76,6 +76,12 @@ def temp_db():
         ).read_text()
         conn.executescript(init_sql)
 
+        # Run embedding migration (adds embedding_status column)
+        embedding_sql = Path(
+            "openrecall/server/database/migrations/20260409120000_add_frame_embedding.sql"
+        ).read_text()
+        conn.executescript(embedding_sql)
+
         # Run FTS unification migration
         migration_sql = Path(
             "openrecall/server/database/migrations/20260325120000_consolidate_fts_to_full_text.sql"
@@ -378,6 +384,12 @@ class TestUnifiedFtsSearch:
             "openrecall/server/database/migrations/20260227000001_initial_schema.sql"
         ).read_text()
         conn.executescript(init_sql)
+
+        # Run embedding migration (adds embedding_status column)
+        embedding_sql = Path(
+            "openrecall/server/database/migrations/20260409120000_add_frame_embedding.sql"
+        ).read_text()
+        conn.executescript(embedding_sql)
 
         # Run FTS unification migration
         migration_sql = Path(

@@ -32,46 +32,52 @@ def mock_search_engine():
     """Create a mock search engine with test data."""
     mock_engine = MagicMock(spec=SearchEngine)
 
-    # Default test results
+    # Default test results (flat structure, no content wrapper)
     test_results = [
         {
             "frame_id": 1,
             "timestamp": "2026-03-18T10:00:00Z",
             "text": "Hello world from Safari",
+            "text_source": "ocr",
             "app_name": "Safari",
             "window_name": "Web Browser",
             "browser_url": None,
             "focused": True,
             "device_name": "monitor_0",
-            "file_path": "2026-03-18T10:00:00Z.jpg",
             "frame_url": "/v1/frames/1",
-            "tags": [],
+            "embedding_status": None,
+            "score": 0.9,
+            "fts_score": -2.5,
         },
         {
             "frame_id": 2,
             "timestamp": "2026-03-18T11:00:00Z",
             "text": "def hello(): pass",
+            "text_source": "ocr",
             "app_name": "VSCode",
             "window_name": "main.py",
             "browser_url": None,
             "focused": True,
             "device_name": "monitor_0",
-            "file_path": "2026-03-18T11:00:00Z.jpg",
             "frame_url": "/v1/frames/2",
-            "tags": [],
+            "embedding_status": None,
+            "score": 0.8,
+            "fts_score": -3.0,
         },
         {
             "frame_id": 3,
             "timestamp": "2026-03-18T12:00:00Z",
             "text": "git status",
+            "text_source": "ocr",
             "app_name": "Terminal",
             "window_name": "bash",
             "browser_url": None,
             "focused": False,
             "device_name": "monitor_0",
-            "file_path": "2026-03-18T12:00:00Z.jpg",
             "frame_url": "/v1/frames/3",
-            "tags": [],
+            "embedding_status": None,
+            "score": 0.7,
+            "fts_score": -3.5,
         },
     ]
 
@@ -86,21 +92,21 @@ class TestSearchAPIBasic:
         """Search endpoint returns 200."""
         with patch("openrecall.server.api_v1._get_search_engine", return_value=mock_search_engine):
             client = app_with_search_route.test_client()
-            response = client.get("/v1/search?q=hello")
+            response = client.get("/v1/search?q=hello&mode=fts")
             assert response.status_code == 200
 
     def test_search_returns_json(self, app_with_search_route, mock_search_engine):
         """Search endpoint returns JSON."""
         with patch("openrecall.server.api_v1._get_search_engine", return_value=mock_search_engine):
             client = app_with_search_route.test_client()
-            response = client.get("/v1/search?q=hello")
+            response = client.get("/v1/search?q=hello&mode=fts")
             assert response.content_type.startswith("application/json")
 
     def test_search_empty_query(self, app_with_search_route, mock_search_engine):
         """Empty query returns all frames."""
         with patch("openrecall.server.api_v1._get_search_engine", return_value=mock_search_engine):
             client = app_with_search_route.test_client()
-            response = client.get("/v1/search?q=")
+            response = client.get("/v1/search?q=&mode=fts")
             data = json.loads(response.data)
 
             assert "data" in data
@@ -111,7 +117,7 @@ class TestSearchAPIBasic:
         """Missing q parameter returns all frames."""
         with patch("openrecall.server.api_v1._get_search_engine", return_value=mock_search_engine):
             client = app_with_search_route.test_client()
-            response = client.get("/v1/search")
+            response = client.get("/v1/search?mode=fts")
             data = json.loads(response.data)
 
             assert data["pagination"]["total"] == 3
@@ -120,77 +126,71 @@ class TestSearchAPIBasic:
 class TestSearchAPIResponseSchema:
     """Response schema tests."""
 
-    def test_data_items_have_type_field(self, app_with_search_route, mock_search_engine):
-        """Each data item has type field set to 'OCR' for OCR-canonical frames."""
+    def test_data_items_have_frame_id(self, app_with_search_route, mock_search_engine):
+        """Each data item has frame_id field."""
         with patch("openrecall.server.api_v1._get_search_engine", return_value=mock_search_engine):
             client = app_with_search_route.test_client()
-            response = client.get("/v1/search?q=hello")
+            response = client.get("/v1/search?q=hello&mode=fts")
             data = json.loads(response.data)
 
-            # Each item in data should have a type field (per mvp.md format)
+            # Each item in data should have a frame_id field (flat structure)
             for item in data.get("data", []):
-                assert "type" in item
-                assert item.get("type") == "OCR"
+                assert "frame_id" in item
+                assert isinstance(item.get("frame_id"), int)
 
     def test_data_is_array(self, app_with_search_route, mock_search_engine):
         """Data field is an array."""
         with patch("openrecall.server.api_v1._get_search_engine", return_value=mock_search_engine):
             client = app_with_search_route.test_client()
-            response = client.get("/v1/search?q=")
+            response = client.get("/v1/search?q=&mode=fts")
             data = json.loads(response.data)
 
             assert isinstance(data.get("data"), list)
 
-    def test_content_has_required_fields(self, app_with_search_route, mock_search_engine):
-        """Each content item has required fields."""
+    def test_items_have_required_fields(self, app_with_search_route, mock_search_engine):
+        """Each item has required fields (flat structure, no content wrapper)."""
         with patch("openrecall.server.api_v1._get_search_engine", return_value=mock_search_engine):
             client = app_with_search_route.test_client()
-            response = client.get("/v1/search?q=")
+            response = client.get("/v1/search?q=&mode=fts")
             data = json.loads(response.data)
 
             required_fields = [
-                "frame_id", "text", "timestamp", "file_path", "frame_url",
-                "app_name", "window_name", "browser_url", "focused", "device_name", "tags"
+                "frame_id", "timestamp", "text_source",
+                "app_name", "window_name", "browser_url", "focused",
+                "device_name", "frame_url"
             ]
 
             for item in data.get("data", []):
-                content = item.get("content", {})
                 for field in required_fields:
-                    assert field in content, f"Missing field: {field}"
+                    assert field in item, f"Missing field: {field}"
 
     def test_reference_fields_non_null(self, app_with_search_route, mock_search_engine):
         """frame_id and timestamp are non-null."""
         with patch("openrecall.server.api_v1._get_search_engine", return_value=mock_search_engine):
             client = app_with_search_route.test_client()
-            response = client.get("/v1/search?q=")
+            response = client.get("/v1/search?q=&mode=fts")
             data = json.loads(response.data)
 
             for item in data.get("data", []):
-                content = item.get("content", {})
-                assert content.get("frame_id") is not None
-                assert content.get("timestamp") is not None
+                assert item.get("frame_id") is not None
+                assert item.get("timestamp") is not None
 
-    def test_reserved_fields_present(self, app_with_search_route, mock_search_engine):
-        """Reserved fields are present as null/empty."""
+    def test_browser_url_is_present(self, app_with_search_route, mock_search_engine):
+        """browser_url field is present (may be null)."""
         with patch("openrecall.server.api_v1._get_search_engine", return_value=mock_search_engine):
             client = app_with_search_route.test_client()
-            response = client.get("/v1/search?q=")
+            response = client.get("/v1/search?q=&mode=fts")
             data = json.loads(response.data)
 
             for item in data.get("data", []):
-                content = item.get("content", {})
-                # browser_url should be present (null for P1)
-                assert "browser_url" in content
-                assert content.get("browser_url") is None
-                # tags should be present (empty list for P1)
-                assert "tags" in content
-                assert content.get("tags") == []
+                # browser_url should be present (null for non-browser frames)
+                assert "browser_url" in item
 
     def test_pagination_structure(self, app_with_search_route, mock_search_engine):
         """Pagination has required fields."""
         with patch("openrecall.server.api_v1._get_search_engine", return_value=mock_search_engine):
             client = app_with_search_route.test_client()
-            response = client.get("/v1/search?q=&limit=2&offset=1")
+            response = client.get("/v1/search?q=&limit=2&offset=1&mode=fts")
             data = json.loads(response.data)
 
             pagination = data.get("pagination", {})
@@ -212,19 +212,21 @@ class TestSearchAPIParameters:
             "frame_id": 1,
             "timestamp": "2026-03-18T10:00:00Z",
             "text": "Hello",
+            "text_source": "ocr",
             "app_name": "Safari",
             "window_name": "Web",
             "browser_url": None,
             "focused": True,
             "device_name": "monitor_0",
-            "file_path": "test.jpg",
             "frame_url": "/v1/frames/1",
-            "tags": [],
+            "embedding_status": None,
+            "score": 0.9,
+            "fts_score": -2.5,
         }], 3)
 
         with patch("openrecall.server.api_v1._get_search_engine", return_value=mock_search_engine):
             client = app_with_search_route.test_client()
-            response = client.get("/v1/search?q=&limit=1")
+            response = client.get("/v1/search?q=&limit=1&mode=fts")
             data = json.loads(response.data)
 
             assert len(data.get("data", [])) == 1
@@ -237,19 +239,21 @@ class TestSearchAPIParameters:
             "frame_id": 1,
             "timestamp": "2026-03-18T10:00:00Z",
             "text": "Hello",
+            "text_source": "ocr",
             "app_name": "Safari",
             "window_name": "Web",
             "browser_url": None,
             "focused": True,
             "device_name": "monitor_0",
-            "file_path": "test.jpg",
             "frame_url": "/v1/frames/1",
-            "tags": [],
+            "embedding_status": None,
+            "score": 0.9,
+            "fts_score": -2.5,
         }], 3)
 
         with patch("openrecall.server.api_v1._get_search_engine", return_value=mock_search_engine):
             client = app_with_search_route.test_client()
-            response1 = client.get("/v1/search?q=&limit=1&offset=0")
+            response1 = client.get("/v1/search?q=&limit=1&offset=0&mode=fts")
             data1 = json.loads(response1.data)
 
             # Second result
@@ -257,41 +261,43 @@ class TestSearchAPIParameters:
                 "frame_id": 2,
                 "timestamp": "2026-03-18T11:00:00Z",
                 "text": "World",
+                "text_source": "ocr",
                 "app_name": "VSCode",
                 "window_name": "main.py",
                 "browser_url": None,
                 "focused": True,
                 "device_name": "monitor_0",
-                "file_path": "test.jpg",
                 "frame_url": "/v1/frames/2",
-                "tags": [],
+                "embedding_status": None,
+                "score": 0.8,
+                "fts_score": -3.0,
             }], 3)
 
-            response2 = client.get("/v1/search?q=&limit=1&offset=1")
+            response2 = client.get("/v1/search?q=&limit=1&offset=1&mode=fts")
             data2 = json.loads(response2.data)
 
-            # Different results
-            id1 = data1["data"][0]["content"]["frame_id"]
-            id2 = data2["data"][0]["content"]["frame_id"]
+            # Different results (flat structure - no content wrapper)
+            id1 = data1["data"][0]["frame_id"]
+            id2 = data2["data"][0]["frame_id"]
             assert id1 != id2
 
-    def test_limit_exceeds_max_clamped(self, app_with_search_route, mock_search_engine):
-        """Limit exceeds max is clamped to 100."""
+    def test_limit_exceeds_max_not_clamped(self, app_with_search_route, mock_search_engine):
+        """Limit is not clamped (no maximum)."""
         with patch("openrecall.server.api_v1._get_search_engine", return_value=mock_search_engine):
             client = app_with_search_route.test_client()
-            response = client.get("/v1/search?q=&limit=500")
+            response = client.get("/v1/search?q=&limit=500&mode=fts")
             data = json.loads(response.data)
 
-            # Should not error, limit is clamped to 100
+            # Should not error, limit is passed through
             assert response.status_code == 200
-            # Limit in response should be 100 (clamped)
-            assert data["pagination"]["limit"] == 100
+            # Limit in response should be the requested value (no clamping)
+            assert data["pagination"]["limit"] == 500
 
     def test_app_name_filter(self, app_with_search_route, mock_search_engine):
         """app_name filter is passed to search engine."""
         with patch("openrecall.server.api_v1._get_search_engine", return_value=mock_search_engine):
             client = app_with_search_route.test_client()
-            client.get("/v1/search?q=&app_name=Safari")
+            client.get("/v1/search?q=&app_name=Safari&mode=fts")
 
             # Verify app_name was passed to search
             call_args = mock_search_engine.search.call_args
@@ -301,7 +307,7 @@ class TestSearchAPIParameters:
         """focused=true filter is passed to search engine."""
         with patch("openrecall.server.api_v1._get_search_engine", return_value=mock_search_engine):
             client = app_with_search_route.test_client()
-            client.get("/v1/search?q=&focused=true")
+            client.get("/v1/search?q=&focused=true&mode=fts")
 
             # Verify focused was passed as True
             call_args = mock_search_engine.search.call_args
@@ -311,7 +317,7 @@ class TestSearchAPIParameters:
         """Time range filter is passed to search engine."""
         with patch("openrecall.server.api_v1._get_search_engine", return_value=mock_search_engine):
             client = app_with_search_route.test_client()
-            client.get("/v1/search?q=&start_time=2026-03-18T10:30:00Z&end_time=2026-03-18T11:30:00Z")
+            client.get("/v1/search?q=&start_time=2026-03-18T10:30:00Z&end_time=2026-03-18T11:30:00Z&mode=fts")
 
             # Verify time range was passed
             call_args = mock_search_engine.search.call_args
@@ -323,7 +329,7 @@ class TestSearchAPIParameters:
         with patch("openrecall.server.api_v1._get_search_engine", return_value=mock_search_engine):
             client = app_with_search_route.test_client()
             # Should not error
-            response = client.get("/v1/search?q=&browser_url=http://example.com")
+            response = client.get("/v1/search?q=&browser_url=http://example.com&mode=fts")
             assert response.status_code == 200
 
 
@@ -336,7 +342,7 @@ class TestSearchAPINoResults:
 
         with patch("openrecall.server.api_v1._get_search_engine", return_value=mock_search_engine):
             client = app_with_search_route.test_client()
-            response = client.get("/v1/search?q=nonexistentterm12345xyz")
+            response = client.get("/v1/search?q=nonexistentterm12345xyz&mode=fts")
             data = json.loads(response.data)
 
             assert data.get("data") == []

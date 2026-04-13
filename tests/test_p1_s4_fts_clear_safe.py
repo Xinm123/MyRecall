@@ -48,6 +48,7 @@ def temp_db():
             "20260317000001_ocr_text_unique_frame_id.sql",
             "20260321120000_dual_hash_storage.sql",
             "20260324120000_add_frame_description.sql",
+            "20260409120000_add_frame_embedding.sql",
         ]:
             mig_sql = Path(f"openrecall/server/database/migrations/{mig}").read_text()
             conn.executescript(mig_sql)
