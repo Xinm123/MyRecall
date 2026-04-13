@@ -50,9 +50,7 @@ class _FallbackEmbeddingProvider:
 class ProcessingWorker(threading.Thread):
     """Background worker thread that processes PENDING screenshot tasks.
 
-    Implements dynamic flow control:
-    - LIFO mode (newest first) when queue size >= threshold
-    - FIFO mode (oldest first) when queue size < threshold
+    Uses FIFO (oldest first) processing order for deterministic behavior.
 
     Thread-safe with isolated database connection.
     """
@@ -133,15 +131,9 @@ class ProcessingWorker(threading.Thread):
                         runtime_settings.wait_for_change(0.4)
                         continue
 
-                    # Determine LIFO vs FIFO mode
-                    lifo_mode = pending_count >= settings.processing_lifo_threshold
-                    mode_str = (
-                        "LIFO (newest first)" if lifo_mode else "FIFO (oldest first)"
-                    )
-
-                    # Get next task
+                    # Get next task (FIFO - oldest first)
                     task = (
-                        sql_store.get_next_task(conn, lifo_mode=lifo_mode)
+                        sql_store.get_next_task(conn)
                         if sql_store
                         else None
                     )
@@ -157,7 +149,7 @@ class ProcessingWorker(threading.Thread):
                     if settings.debug:
                         logger.info(
                             f"📥 Processing task #{task.id} (timestamp={task.timestamp}) "
-                            f"[Queue: {pending_count}, Mode: {mode_str}]"
+                            f"[Queue: {pending_count}]"
                         )
 
                     # Mark as PROCESSING
