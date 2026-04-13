@@ -34,7 +34,7 @@
 
 **Approach:** Add a method `get_frame_descriptions_batch(frame_ids)` that fetches descriptions for multiple frames in one query, similar to `get_frames_by_ids`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Add to `tests/` (create `tests/test_search_description_batch.py`):
 
@@ -61,14 +61,14 @@ def test_get_frame_descriptions_batch_empty_input():
     assert result == {}
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 ```
 pytest tests/test_search_description_batch.py -v
 ```
 Expected: FAIL with "FramesStore has no attribute 'get_frame_descriptions_batch'"
 
-- [ ] **Step 3: Write implementation**
+- [x] **Step 3: Write implementation**
 
 In `frames_store.py`, after `get_frame_description` (~line 1750), add:
 
@@ -121,14 +121,14 @@ def get_frame_descriptions_batch(
         return _query(c)
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 ```
 pytest tests/test_search_description_batch.py -v
 ```
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add openrecall/server/database/frames_store.py tests/test_search_description_batch.py
@@ -149,7 +149,7 @@ git commit -m "feat(search): add batch description fetch for search results"
 - Add `score` field to vector mode results (same as `cosine_score`)
 - Add `score` field to fts mode results (same as `fts_score`, providing unified metric across all modes)
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `tests/test_search_score_renaming.py`:
 
@@ -282,7 +282,7 @@ pytest tests/test_search_score_renaming.py -v
 ```
 Expected: FAIL — fields don't exist yet
 
-- [ ] **Step 3: Implement field renames in hybrid_engine.py**
+- [x] **Step 3: Implement field renames in hybrid_engine.py**
 
 In `_hybrid_search` method, change result building (~line 278-298):
 
@@ -333,14 +333,14 @@ results.append({
 
 Note: `_fts_only_search` delegates to `_fts_engine.search()`, so FTS field renaming is handled in Task 3.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 ```
 pytest tests/test_search_score_renaming.py -v
 ```
 Expected: PASS (or update tests to match actual engine output)
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add openrecall/server/search/hybrid_engine.py tests/test_search_score_renaming.py
@@ -358,7 +358,7 @@ git commit -m "refactor(search): rename score fields in hybrid engine"
 - `fts_rank` (BM25 score) → `fts_score`
 - Add `score` field = `fts_score` in fts mode
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 In `tests/test_search_score_renaming.py`, add:
 
@@ -402,14 +402,14 @@ class TestFTSEngineScoreNaming:
         assert isinstance(results, list)
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 ```
 pytest tests/test_search_score_renaming.py::test_fts_mode_has_fts_score_not_fts_rank -v
 ```
 Expected: FAIL
 
-- [ ] **Step 3: Implement field renames in engine.py**
+- [x] **Step 3: Implement field renames in engine.py**
 
 In the `search` method result building (~line 313-333), change:
 
@@ -432,14 +432,14 @@ result = {
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 ```
 pytest tests/test_search_score_renaming.py -v
 ```
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add openrecall/server/search/engine.py
@@ -467,7 +467,7 @@ git commit -m "refactor(search): rename fts_rank to fts_score, add score field"
 10. **Update `max_text_length` usage** — apply truncation when `include_text=true`
 11. **Remove `hybrid_score` rename** — already done in engine (now `score`)
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `tests/test_search_api_optimized.py`:
 
@@ -729,14 +729,14 @@ def test_max_length_parameter_ignored(app):
             assert response.status_code == 200
             assert "max_length" not in mock_fts.search.call_args.kwargs
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 ```
 pytest tests/test_search_api_optimized.py -v
 ```
 Expected: FAIL — old behavior persists
 
-- [ ] **Step 3: Implement all endpoint changes**
+- [x] **Step 3: Implement all endpoint changes**
 
 Read the current search endpoint code (~lines 915-1122) and make these changes:
 
@@ -869,14 +869,14 @@ if "score" in r:
 
 Remove all references to `hybrid_score`, `file_path`, `tags`, `type`.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 ```
 pytest tests/test_search_api_optimized.py -v
 ```
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add openrecall/server/api_v1.py tests/test_search_api_optimized.py
@@ -926,7 +926,7 @@ git commit -m "feat(search): optimize API - flatten response, add include_text/d
 
 6. **Update modal** — Change `item.content.frame_id` to `item.frame_id` (flat structure).
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `tests/test_search_page_optimized.py`:
 
@@ -966,25 +966,25 @@ def test_search_page_has_include_text_param():
     assert "include_text" in content
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 ```
 pytest tests/test_search_page_optimized.py -v
 ```
 Expected: FAIL
 
-- [ ] **Step 3: Implement frontend changes**
+- [x] **Step 3: Implement frontend changes**
 
 Make all the changes listed above in the HTML file.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 ```
 pytest tests/test_search_page_optimized.py -v
 ```
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add openrecall/client/web/templates/search.html tests/test_search_page_optimized.py
@@ -1000,7 +1000,7 @@ git commit -m "feat(search): update frontend for optimized API - hybrid default,
 
 **Changes:** Update all tests that check for `type`, `tags`, `file_path`, `content` wrapper, `fts_rank` field names, `min_length`/`max_length` behavior, and limit max clamping.
 
-- [ ] **Step 1: Update test_p1_s4_api_search.py**
+- [x] **Step 1: Update test_p1_s4_api_search.py**
 
 Key changes:
 - `test_data_items_have_type_field` → remove (type field no longer exists)
@@ -1010,21 +1010,21 @@ Key changes:
 - `test_limit_exceeds_max_clamped` → change expectation (limit no longer clamped to 100)
 - Update mock data to remove `type`, `tags`, `file_path` fields, add `fts_score` instead of `fts_rank`
 
-- [ ] **Step 2: Update test_p1_s4_response_schema.py**
+- [x] **Step 2: Update test_p1_s4_response_schema.py**
 
 Same changes as above — update required fields, remove deprecated field checks.
 
-- [ ] **Step 3: Update test_p1_s4_reference_fields.py**
+- [x] **Step 3: Update test_p1_s4_reference_fields.py**
 
 Update field names and remove deprecated fields.
 
-- [ ] **Step 4: Run all tests**
+- [x] **Step 4: Run all tests**
 
 ```
 pytest tests/test_p1_s4_api_search.py tests/test_p1_s4_response_schema.py tests/test_p1_s4_reference_fields.py -v
 ```
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add tests/test_p1_s4_api_search.py tests/test_p1_s4_response_schema.py tests/test_p1_s4_reference_fields.py
@@ -1035,11 +1035,11 @@ git commit -m "test(search): update tests for optimized API schema"
 
 ## Task 7: Update spec status
 
-- [ ] **Step 1: Update spec status to implemented**
+- [x] **Step 1: Update spec status to implemented**
 
 Change `Status: Draft` to `Status: Implemented` in `docs/superpowers/specs/2026-04-13-search-api-optimization-design.md`.
 
-- [ ] **Step 2: Commit**
+- [x] **Step 2: Commit**
 
 ```bash
 git add docs/superpowers/specs/2026-04-13-search-api-optimization-design.md
@@ -1068,3 +1068,28 @@ git commit -m "docs: mark search API optimization as implemented"
 | Frontend update | Task 5 |
 | Test updates | Task 6 |
 | Update spec status to Implemented | Task 7 |
+
+---
+
+## Implementation Summary
+
+**Completion Date:** 2026-04-13
+
+**Commits:**
+1. `341a9ee` feat(search): add batch description fetch for search results
+2. `04954b7` refactor(search): rename score fields in hybrid engine
+3. `b4a269f` refactor(search): rename fts_rank to fts_score in FTS engine, add score field
+4. `3fd624d` feat(search): optimize API - flatten response, add include_text/description, remove deprecated fields
+5. `a8c61f8` feat(search): update frontend for optimized API - hybrid default, flat response
+6. `666c24e` test(search): update tests for optimized API schema
+7. `f373ca9` docs: mark search API optimization as implemented
+8. `1eb3e0a` fix(search): use score field instead of hybrid_score in hybrid mode display
+9. `bd21e59` fix(search): clean up deprecated fields and remove limit clamping
+
+**Test Coverage:** 125 tests passing
+
+**Cleanup Applied:**
+- Removed `file_path` and `tags` from engine result dicts
+- Removed `MAX_LIMIT = 100` clamp from FTS engine
+- Removed `min_length`/`max_length` parameters from all layers
+- Removed deprecated `type-badge` CSS from frontend
