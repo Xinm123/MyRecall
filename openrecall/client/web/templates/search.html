@@ -1032,7 +1032,7 @@
         </div>
       </div>`;
     } else if (searchMode === 'hybrid') {
-      const ftsRank = item.fts_result_rank || item.fts_rank;
+      const ftsRank = item.fts_rank;
       const vectorRank = item.vector_rank;
       const hybridRank = item.hybrid_rank || rank;
       return `<div class="score-display score-display-vertical">
@@ -1059,7 +1059,7 @@
         <div class="score-row">
           <div class="score-item">
             <span class="score-label">Hybrid:</span>
-            <span class="score-value">${item.hybrid_score !== null && item.hybrid_score !== undefined && !isNaN(Number(item.hybrid_score)) ? Number(item.hybrid_score).toFixed(4) : '—'}</span>
+            <span class="score-value">${item.score !== null && item.score !== undefined && !isNaN(Number(item.score)) ? Number(item.score).toFixed(4) : '—'}</span>
           </div>
           <div class="score-item score-rank">
             <span class="score-label">Rank:</span>
