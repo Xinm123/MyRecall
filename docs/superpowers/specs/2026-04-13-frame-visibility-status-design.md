@@ -45,7 +45,7 @@ A frame is queryable when **all** of the following are complete:
 
 ### Worker Update Logic
 
-**Shared helper in `FramesStore`:**
+**Shared helpers in `FramesStore`:**
 
 ```python
 def try_set_queryable(self, conn: sqlite3.Connection, frame_id: int) -> bool:
@@ -54,9 +54,14 @@ def try_set_queryable(self, conn: sqlite3.Connection, frame_id: int) -> bool:
     Called by each worker after completing their stage.
     Idempotent - safe to call multiple times.
 
-    Returns True if frame was marked queryable.
+    Args:
+        conn: Database connection (caller manages transaction)
+        frame_id: Frame ID to update
+
+    Returns:
+        True if frame was marked queryable, False otherwise.
     """
-    conn.execute(
+    cursor = conn.execute(
         """
         UPDATE frames
         SET visibility_status = 'queryable'
@@ -68,21 +73,50 @@ def try_set_queryable(self, conn: sqlite3.Connection, frame_id: int) -> bool:
         """,
         (frame_id,),
     )
-    return conn.total_changes > 0
-```
+    return cursor.rowcount > 0
 
-**Worker integration points:**
+def try_set_queryable_standalone(self, frame_id: int) -> bool:
+    """Set visibility_status='queryable' if all stages are complete.
 
-1. **V3ProcessingWorker** - after marking `status='completed'`
-2. **DescriptionWorker** - after marking `description_status='completed'`
-3. **EmbeddingWorker** - after marking `embedding_status='completed'`
+    Standalone version that manages its own database connection.
+    Used by V3ProcessingWorker which doesn't pass connections.
 
-**Failure handling:**
+    Args:
+        frame_id: Frame ID to update
 
-```python
+    Returns:
+        True if frame was marked queryable, False otherwise.
+    """
+    try:
+        with self._connect() as conn:
+            cursor = conn.execute(
+                """
+                UPDATE frames
+                SET visibility_status = 'queryable'
+                WHERE id = ?
+                  AND status = 'completed'
+                  AND description_status = 'completed'
+                  AND embedding_status = 'completed'
+                  AND visibility_status = 'pending'
+                """,
+                (frame_id,),
+            )
+            return cursor.rowcount > 0
+    except sqlite3.Error as e:
+        logger.error("try_set_queryable_standalone failed frame_id=%d: %s", frame_id, e)
+        return False
+
 def try_set_failed(self, conn: sqlite3.Connection, frame_id: int) -> bool:
-    """Mark frame as failed if any stage failed."""
-    conn.execute(
+    """Mark frame as failed if any stage failed.
+
+    Args:
+        conn: Database connection (caller manages transaction)
+        frame_id: Frame ID to update
+
+    Returns:
+        True if frame was marked failed, False otherwise.
+    """
+    cursor = conn.execute(
         """
         UPDATE frames
         SET visibility_status = 'failed'
@@ -91,9 +125,43 @@ def try_set_failed(self, conn: sqlite3.Connection, frame_id: int) -> bool:
         """,
         (frame_id,),
     )
+    return cursor.rowcount > 0
+
+def try_set_failed_standalone(self, frame_id: int) -> bool:
+    """Mark frame as failed if any stage failed.
+
+    Standalone version that manages its own database connection.
+
+    Args:
+        frame_id: Frame ID to update
+
+    Returns:
+        True if frame was marked failed, False otherwise.
+    """
+    try:
+        with self._connect() as conn:
+            cursor = conn.execute(
+                """
+                UPDATE frames
+                SET visibility_status = 'failed'
+                WHERE id = ? AND visibility_status = 'pending'
+                  AND (status = 'failed' OR description_status = 'failed' OR embedding_status = 'failed')
+                """,
+                (frame_id,),
+            )
+            return cursor.rowcount > 0
+    except sqlite3.Error as e:
+        logger.error("try_set_failed_standalone failed frame_id=%d: %s", frame_id, e)
+        return False
 ```
 
-Each worker calls this after marking their stage as failed.
+**Worker integration points:**
+
+1. **V3ProcessingWorker** (`openrecall/server/processing/v3_worker.py`) - after marking `status='completed'`
+2. **FramesStore.complete_description_task** (`openrecall/server/database/frames_store.py`) - after setting `description_status='completed'`
+3. **EmbeddingService.mark_completed** (`openrecall/server/embedding/service.py`) - after setting `embedding_status='completed'`
+
+Each worker calls `try_set_queryable()` (or `try_set_queryable_standalone()`) after completing their stage, and `try_set_failed()` (or `try_set_failed_standalone()`) after permanent failure.
 
 ### API Query Changes
 
@@ -114,7 +182,7 @@ Each worker calls this after marking their stage as failed.
 
 ### Migration
 
-**File:** `openrecall/server/database/migrations/20260413HHMMSS_add_visibility_status.sql`
+**File:** `openrecall/server/database/migrations/20260414000000_add_visibility_status.sql`
 
 ```sql
 -- Add visibility_status column
@@ -156,11 +224,10 @@ WHERE status = 'failed'
 
 | File | Change |
 |------|--------|
-| `openrecall/server/database/migrations/20260413HHMMSS_add_visibility_status.sql` | New migration |
-| `openrecall/server/database/frames_store.py` | Add helpers + query filters |
-| `openrecall/server/processing/v3_worker.py` | Call `try_set_queryable()` |
-| `openrecall/server/description/worker.py` | Call `try_set_queryable()` |
-| `openrecall/server/embedding/worker.py` | Call `try_set_queryable()` |
+| `openrecall/server/database/migrations/20260414000000_add_visibility_status.sql` | New migration |
+| `openrecall/server/database/frames_store.py` | Add helpers (`try_set_queryable*`, `try_set_failed*`) + query filters + integrate in `complete_description_task`/`fail_description_task` |
+| `openrecall/server/processing/v3_worker.py` | Call `try_set_queryable_standalone()` after completion, `try_set_failed_standalone()` on failure |
+| `openrecall/server/embedding/service.py` | Call `try_set_queryable()` in `mark_completed()`, `try_set_failed()` in `mark_failed()` |
 | `openrecall/server/search/engine.py` | Update WHERE clause |
 | `openrecall/server/search/hybrid_engine.py` | Update WHERE clause |
 | `openrecall/server/api_v1.py` | Frame context visibility check |

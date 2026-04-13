@@ -239,6 +239,31 @@ class TestTrySetFailed:
                 "SELECT visibility_status FROM frames WHERE id = 1"
             ).fetchone()
             assert row["visibility_status"] == "queryable"
+
+
+class TestTrySetFailedStandalone:
+    """Tests for try_set_failed_standalone method (manages own connection)."""
+
+    def test_sets_failed_when_any_stage_failed(self, temp_store):
+        """Should set visibility_status='failed' using own connection."""
+        with temp_store._connect() as conn:
+            conn.execute(
+                """
+                INSERT INTO frames (id, status, description_status, embedding_status, visibility_status)
+                VALUES (1, 'completed', 'failed', 'pending', 'pending')
+                """
+            )
+
+        # Call standalone version (no conn passed)
+        result = temp_store.try_set_failed_standalone(1)
+
+        assert result is True
+
+        with temp_store._connect() as conn:
+            row = conn.execute(
+                "SELECT visibility_status FROM frames WHERE id = 1"
+            ).fetchone()
+            assert row["visibility_status"] == "failed"
 ```
 
 - [ ] **Step 2: Run test to verify it fails**
@@ -333,6 +358,37 @@ Add to `openrecall/server/database/frames_store.py` after the `mark_failed` meth
             (frame_id,),
         )
         return cursor.rowcount > 0
+
+    def try_set_failed_standalone(self, frame_id: int) -> bool:
+        """Mark frame as failed if any stage failed.
+
+        Standalone version that manages its own database connection.
+
+        Args:
+            frame_id: Frame ID to update
+
+        Returns:
+            True if frame was marked failed, False otherwise.
+        """
+        try:
+            with self._connect() as conn:
+                cursor = conn.execute(
+                    """
+                    UPDATE frames
+                    SET visibility_status = 'failed'
+                    WHERE id = ? AND visibility_status = 'pending'
+                      AND (status = 'failed' OR description_status = 'failed' OR embedding_status = 'failed')
+                    """,
+                    (frame_id,),
+                )
+                return cursor.rowcount > 0
+        except sqlite3.Error as e:
+            logger.error(
+                "try_set_failed_standalone failed frame_id=%d: %s",
+                frame_id,
+                e,
+            )
+            return False
 ```
 
 - [ ] **Step 4: Run test to verify it passes**
@@ -444,8 +500,7 @@ Also add call in `_mark_failed` method (around line 341) after `self._store.mark
                 capture_id=capture_id,
             )
             # Mark visibility_status as failed
-            with self._store._connect() as conn:
-                self._store.try_set_failed(conn, frame_id)
+            self._store.try_set_failed_standalone(frame_id)
         except Exception as exc:
             logger.error(
                 "V3ProcessingWorker: mark_failed DB write failed frame_id=%d: %s",
