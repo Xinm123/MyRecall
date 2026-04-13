@@ -51,8 +51,6 @@ class SearchParams:
     app_name: Optional[str] = None
     window_name: Optional[str] = None
     focused: Optional[bool] = None
-    min_length: Optional[int] = None
-    max_length: Optional[int] = None
     browser_url: Optional[str] = None
     content_type: str = "all"  # Deprecated, accepted but ignored
 
@@ -69,9 +67,7 @@ class SearchResult:
     browser_url: Optional[str]  # Reserved, always null in P1
     focused: Optional[bool]
     device_name: str
-    file_path: str
     frame_url: str
-    tags: list[str]  # Reserved, always empty in P1
 
 
 class SearchEngine:
@@ -87,7 +83,6 @@ class SearchEngine:
 
     # Pagination limits
     DEFAULT_LIMIT = 20
-    MAX_LIMIT = 100
 
     # COUNT query latency warning threshold (ms)
     COUNT_WARNING_THRESHOLD_MS = 500
@@ -162,13 +157,6 @@ class SearchEngine:
             where_parts.append("frames.timestamp <= ?")
             params_list.append(params.end_time)
 
-        if params.min_length is not None:
-            where_parts.append("LENGTH(frames.full_text) >= ?")
-            params_list.append(params.min_length)
-        if params.max_length is not None:
-            where_parts.append("LENGTH(frames.full_text) <= ?")
-            params_list.append(params.max_length)
-
         return " AND ".join(where_parts), params_list
 
     def _build_query(
@@ -224,7 +212,7 @@ class SearchEngine:
             else:
                 sql_parts.append("ORDER BY frames.timestamp DESC")
 
-            limit = min(max(1, params.limit), self.MAX_LIMIT)
+            limit = max(1, params.limit)
             offset = max(0, params.offset)
             sql_parts.append(f"LIMIT {limit} OFFSET {offset}")
 
@@ -241,8 +229,6 @@ class SearchEngine:
         app_name: Optional[str] = None,
         window_name: Optional[str] = None,
         focused: Optional[bool] = None,
-        min_length: Optional[int] = None,
-        max_length: Optional[int] = None,
         browser_url: Optional[str] = None,
         content_type: str = "all",
     ) -> tuple[list[dict[str, Any]], int]:
@@ -253,15 +239,13 @@ class SearchEngine:
 
         Args:
             q: Text query (sanitized via sanitize_fts5_query)
-            limit: Max results (clamped to 1-100)
+            limit: Max results (no maximum)
             offset: Pagination offset
             start_time: ISO8601 UTC start timestamp
             end_time: ISO8601 UTC end timestamp
             app_name: Filter by app name (exact match via FTS)
             window_name: Filter by window name (exact match via FTS)
             focused: Filter by focused state
-            min_length: Minimum full_text length
-            max_length: Maximum full_text length
             browser_url: Filter by browser URL
             content_type: Deprecated, accepted but ignored
 
@@ -291,8 +275,6 @@ class SearchEngine:
             app_name=app_name,
             window_name=window_name,
             focused=focused,
-            min_length=min_length,
-            max_length=max_length,
             browser_url=browser_url,
             content_type=content_type,
         )
@@ -322,9 +304,7 @@ class SearchEngine:
                         if row["focused"] is not None
                         else None,
                         "device_name": row["device_name"] or "monitor_0",
-                        "file_path": f"{ts}.jpg",
                         "frame_url": f"/v1/frames/{frame_id}",
-                        "tags": [],  # Reserved, always empty in P1
                         "fts_score": float(row["fts_rank"])
                         if row["fts_rank"] is not None
                         else None,  # BM25 score (renamed from fts_rank)
@@ -376,8 +356,6 @@ class SearchEngine:
         app_name: Optional[str] = None,
         window_name: Optional[str] = None,
         focused: Optional[bool] = None,
-        min_length: Optional[int] = None,
-        max_length: Optional[int] = None,
     ) -> int:
         """Count matching frames without returning results.
 
@@ -394,8 +372,6 @@ class SearchEngine:
             app_name=app_name,
             window_name=window_name,
             focused=focused,
-            min_length=min_length,
-            max_length=max_length,
         )
 
         try:
@@ -415,8 +391,6 @@ class SearchEngine:
         app_name: Optional[str] = None,
         window_name: Optional[str] = None,
         focused: Optional[bool] = None,
-        min_length: Optional[int] = None,
-        max_length: Optional[int] = None,
         browser_url: Optional[str] = None,
     ) -> dict[str, int]:
         """Count matching frames by text_source.
@@ -437,8 +411,6 @@ class SearchEngine:
             app_name=app_name,
             window_name=window_name,
             focused=focused,
-            min_length=min_length,
-            max_length=max_length,
             browser_url=browser_url,
         )
 

@@ -1118,8 +1118,6 @@ def search_counts():
         window_name: Filter by window name
         browser_url: Filter by browser URL
         focused: Filter by focused state
-        min_length: Minimum text length
-        max_length: Maximum text length
 
     Returns:
         {"counts": {"ocr": 142, "accessibility": 23}}
@@ -1159,18 +1157,6 @@ def search_counts():
         elif focused_lower in ("false", "0", "no"):
             focused = False
 
-    # Parse text length
-    min_length = None
-    max_length = None
-    try:
-        min_length = int(request.args.get("min_length", 0)) or None
-    except (ValueError, TypeError):
-        pass
-    try:
-        max_length = int(request.args.get("max_length", 0)) or None
-    except (ValueError, TypeError):
-        pass
-
     # Execute counts
     engine = _get_search_engine()
     counts = engine.count_by_type(
@@ -1181,8 +1167,6 @@ def search_counts():
         window_name=window_name,
         browser_url=browser_url,
         focused=focused,
-        min_length=min_length,
-        max_length=max_length,
     )
 
     return jsonify({"counts": counts})

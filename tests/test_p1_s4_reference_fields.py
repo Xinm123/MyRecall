@@ -413,38 +413,6 @@ class TestReferenceFieldCompletenessHardGate:
         self._assert_all_results_have_reference_fields(results, "filter_end_time")
 
     # =========================================================================
-    # Text Length Filter Tests
-    # =========================================================================
-
-    def test_filter_by_min_length(self, temp_db_with_frames):
-        """Min length filter maintains reference fields."""
-        db_path, frames_dir = temp_db_with_frames
-        engine = SearchEngine(db_path=db_path, frames_dir=frames_dir)
-
-        results, total = engine.search(q="", limit=100, offset=0, min_length=30)
-        assert total >= 1
-        self._assert_all_results_have_reference_fields(results, "filter_min_length")
-
-    def test_filter_by_max_length(self, temp_db_with_frames):
-        """Max length filter maintains reference fields."""
-        db_path, frames_dir = temp_db_with_frames
-        engine = SearchEngine(db_path=db_path, frames_dir=frames_dir)
-
-        results, total = engine.search(q="", limit=100, offset=0, max_length=25)
-        assert total >= 1
-        self._assert_all_results_have_reference_fields(results, "filter_max_length")
-
-    def test_filter_by_length_range(self, temp_db_with_frames):
-        """Length range filter maintains reference fields."""
-        db_path, frames_dir = temp_db_with_frames
-        engine = SearchEngine(db_path=db_path, frames_dir=frames_dir)
-
-        results, total = engine.search(
-            q="", limit=100, offset=0, min_length=20, max_length=35
-        )
-        self._assert_all_results_have_reference_fields(results, "filter_length_range")
-
-    # =========================================================================
     # Combined Filter Tests
     # =========================================================================
 

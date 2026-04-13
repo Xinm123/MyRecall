@@ -75,8 +75,6 @@ def test_count_by_type_returns_ocr_and_accessibility_counts(test_db):
         app_name=None,
         window_name=None,
         focused=None,
-        min_length=None,
-        max_length=None,
         browser_url=None,
     )
 

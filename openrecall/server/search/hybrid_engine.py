@@ -152,9 +152,7 @@ class HybridSearchEngine:
                 "browser_url": frame.get("browser_url"),
                 "focused": frame.get("focused"),
                 "device_name": frame.get("device_name", "monitor_0"),
-                "file_path": frame.get("file_path", f"{emb.timestamp}.jpg"),
                 "frame_url": f"/v1/frames/{frame_id}",
-                "tags": [],
                 "embedding_status": frame.get("embedding_status", ""),
             })
 
@@ -208,9 +206,7 @@ class HybridSearchEngine:
                     "browser_url": row["browser_url"],
                     "focused": bool(row["focused"]) if row["focused"] is not None else None,
                     "device_name": row["device_name"] or "monitor_0",
-                    "file_path": row["file_path"] or f"{ts}.jpg",
                     "frame_url": f"/v1/frames/{row['frame_id']}",
-                    "tags": [],
                     "embedding_status": row["embedding_status"] or "",
                 })
 
@@ -294,9 +290,7 @@ class HybridSearchEngine:
                 "browser_url": frame.get("browser_url"),
                 "focused": frame.get("focused"),
                 "device_name": frame.get("device_name", "monitor_0"),
-                "file_path": frame.get("file_path", f"{frame.get('timestamp', '')}.jpg"),
                 "frame_url": f"/v1/frames/{frame_id}",
-                "tags": [],
                 "embedding_status": frame.get("embedding_status", ""),
             })
 

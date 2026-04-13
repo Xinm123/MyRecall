@@ -104,16 +104,6 @@ class TestSearchCountsAPI:
             call_args = mock_search_engine.count_by_type.call_args
             assert call_args.kwargs.get("browser_url") == "http://example.com"
 
-    def test_search_counts_endpoint_passes_text_length_filters(self, app_with_search_counts_route, mock_search_engine):
-        """Test /v1/search/counts passes min_length and max_length params."""
-        with patch("openrecall.server.api_v1._get_search_engine", return_value=mock_search_engine):
-            client = app_with_search_counts_route.test_client()
-            client.get("/v1/search/counts?q=test&min_length=10&max_length=1000")
-
-            call_args = mock_search_engine.count_by_type.call_args
-            assert call_args.kwargs.get("min_length") == 10
-            assert call_args.kwargs.get("max_length") == 1000
-
     def test_search_counts_endpoint_empty_query(self, app_with_search_counts_route, mock_search_engine):
         """Test /v1/search/counts handles empty query."""
         with patch("openrecall.server.api_v1._get_search_engine", return_value=mock_search_engine):
