@@ -2,7 +2,7 @@
 
 > **Purpose:** Single source of truth for v1 API response contracts.
 > All other documentation (mvp.md, skill definitions, HTTP contracts) must reference this document.
-> Last updated: 2026-03-26
+> Last updated: 2026-04-13
 
 ---
 
@@ -119,42 +119,17 @@
 
 ## GET /v1/search
 
-**Purpose:** Full-text search across frames with metadata filtering.
+**Purpose:** Full-text and semantic search across frames with metadata filtering. Default mode is `hybrid` (combines FTS + vector search).
 
 **Returns:** `application/json`
-
-### Response Fields
-
-| Field | Type | Always Present | Description |
-|-------|------|:--------------:|-------------|
-| `data` | `object[]` | Yes | Array of matching frames |
-| `data[].type` | `string` | Yes | `"OCR"` or `"Accessibility"` (capitalized). Note: inconsistent with `text_source` in other endpoints. |
-| `data[].content` | `object` | Yes | Frame content details |
-| `data[].content.frame_id` | `int` | Yes | Frame identifier |
-| `data[].content.text` | `string` | Yes | `full_text` from frames table (merged accessibility + OCR text) |
-| `data[].content.text_source` | `string \| null` | Yes | `"ocr"` \| `"accessibility"` \| `"hybrid"` \| `null`. Maps to `data[].type` as follows: `"accessibility"`/`"hybrid"` → `"Accessibility"`, `"ocr"`/`null` → `"OCR"`. |
-| `data[].content.timestamp` | `string` | Yes | ISO8601 UTC timestamp |
-| `data[].content.file_path` | `string` | Yes | Filename only: `{timestamp}.jpg` |
-| `data[].content.frame_url` | `string` | Yes | URL to fetch frame image: `/v1/frames/{frame_id}` |
-| `data[].content.app_name` | `string \| null` | Yes | Application name |
-| `data[].content.window_name` | `string \| null` | Yes | Window name |
-| `data[].content.browser_url` | `string \| null` | Yes | Browser URL if applicable |
-| `data[].content.focused` | `boolean \| null` | Yes | Whether this frame's app was focused |
-| `data[].content.device_name` | `string` | Yes | Defaults to `"monitor_0"` |
-| `data[].content.tags` | `string[]` | Yes | Reserved for future use — currently always `[]` |
-| `data[].content.fts_rank` | `number \| null` | No | BM25 rank score when text query present. `null` for metadata-only queries. |
-| `pagination` | `object` | Yes | Pagination info |
-| `pagination.limit` | `int` | Yes | Requested page size |
-| `pagination.offset` | `int` | Yes | Current offset |
-| `pagination.total` | `int` | Yes | Total matching results |
 
 ### Query Parameters
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `q` | `string` | — | Text search query (FTS5) |
-| `content_type` | `string` | `"all"` | Filter by text source: `"ocr"` \| `"accessibility"` \| `"all"`. **Deprecated** — ignored after FTS unification (migration 20260325120000). |
-| `limit` | `int` | `20` | Max results per page (max 100) |
+| `q` | `string` | `""` | Text search query. Empty query returns browse mode (recent frames). |
+| `mode` | `string` | `"hybrid"` | Search mode: `"fts"` \| `"vector"` \| `"hybrid"` |
+| `limit` | `int` | `20` | Max results per page (no max limit) |
 | `offset` | `int` | `0` | Pagination offset |
 | `start_time` | `string` | — | ISO8601 start of time range |
 | `end_time` | `string` | — | ISO8601 end of time range |
@@ -162,51 +137,103 @@
 | `window_name` | `string` | — | Filter by window name |
 | `browser_url` | `string` | — | Filter by browser URL |
 | `focused` | `boolean` | — | Filter by focus state |
-| `min_length` | `int` | — | Minimum text length |
-| `max_length` | `int` | — | Maximum text length |
+| `include_text` | `boolean` | `false` | Include `text` field in response |
+| `max_text_length` | `int` | `1000` | Max characters for `text` field (middle-truncated) |
+| `content_type` | `string` | `"all"` | **Deprecated** — ignored. All searches return merged results. |
+
+### Response Fields
+
+| Field | Type | Always Present | Description |
+|-------|------|:--------------:|-------------|
+| `data` | `object[]` | Yes | Array of matching frames (flat structure, no wrapper) |
+| `data[].frame_id` | `int` | Yes | Frame identifier |
+| `data[].timestamp` | `string` | Yes | ISO8601 UTC timestamp |
+| `data[].text_source` | `string \| null` | Yes | `"ocr"` \| `"accessibility"` \| `"hybrid"` \| `null` |
+| `data[].text` | `string` | No | Frame text (only when `include_text=true`). Middle-truncated if exceeds `max_text_length`. |
+| `data[].app_name` | `string \| null` | Yes | Application name |
+| `data[].window_name` | `string \| null` | Yes | Window name |
+| `data[].browser_url` | `string \| null` | Yes | Browser URL if applicable |
+| `data[].focused` | `boolean \| null` | Yes | Whether this frame's app was focused |
+| `data[].device_name` | `string` | Yes | Defaults to `"monitor_0"` |
+| `data[].frame_url` | `string` | Yes | URL to fetch frame image: `/v1/frames/{frame_id}` |
+| `data[].embedding_status` | `string` | Yes | `"completed"` \| `"pending"` \| `"failed"` \| `""` |
+| `data[].description` | `object \| null` | No | AI-generated description (when available): `{narrative, summary, tags[]}` |
+| `data[].score` | `number` | No | Unified relevance score (all modes) |
+| `data[].fts_score` | `number \| null` | No | BM25 score (fts/hybrid modes). Negative, higher (closer to 0) = more relevant. |
+| `data[].fts_rank` | `int \| null` | No | Position in FTS results (hybrid mode) |
+| `data[].cosine_score` | `number \| null` | No | Vector cosine similarity 0-1, higher = more similar (vector/hybrid modes) |
+| `data[].hybrid_rank` | `int \| null` | No | Final RRF fused rank (hybrid mode) |
+| `data[].vector_rank` | `int \| null` | No | Position in vector results (hybrid mode) |
+| `pagination` | `object` | Yes | Pagination info |
+| `pagination.limit` | `int` | Yes | Requested page size |
+| `pagination.offset` | `int` | Yes | Current offset |
+| `pagination.total` | `int` | Yes | Total matching results |
+
+### Score Fields by Mode
+
+| Mode | Score Fields Returned |
+|------|----------------------|
+| `fts` | `score`, `fts_score` |
+| `vector` | `score`, `cosine_score` |
+| `hybrid` | `score`, `fts_score`, `fts_rank`, `cosine_score`, `hybrid_rank`, `vector_rank` |
+
+### Description Object (when description is not null)
+
+| Field | Type | Always Present | Description |
+|-------|------|:--------------:|-------------|
+| `narrative` | `string` | Yes | Human-readable description of what's happening in the frame |
+| `summary` | `string` | Yes | Brief one-line summary |
+| `tags` | `string[]` | Yes | Array of descriptive tags |
 
 ### Example Response
 
 ```json
 // GET /v1/search?q=claude+code&limit=2
+// Default mode=hybrid returns all score fields
 
 {
   "data": [
     {
-      "type": "Accessibility",
-      "content": {
-        "frame_id": 42,
-        "text": "MyRecall v3 Chat API MyRecall Search Claude Code Today 14:32",
-        "text_source": "accessibility",
-        "timestamp": "2026-03-26T14:32:05Z",
-        "file_path": "2026-03-26T14:32:05Z.jpg",
-        "frame_url": "/v1/frames/42",
-        "app_name": "Claude Code",
-        "window_name": "Claude Code — ~/chat/MyRecall",
-        "browser_url": null,
-        "focused": true,
-        "device_name": "monitor_0",
-        "tags": [],
-        "fts_rank": 0.82
-      }
+      "frame_id": 42,
+      "timestamp": "2026-04-13T14:32:05Z",
+      "text_source": "accessibility",
+      "app_name": "Claude Code",
+      "window_name": "Claude Code — ~/chat/MyRecall",
+      "browser_url": null,
+      "focused": true,
+      "device_name": "monitor_0",
+      "frame_url": "/v1/frames/42",
+      "embedding_status": "completed",
+      "description": {
+        "narrative": "User is working on API documentation...",
+        "summary": "Working on API docs in Claude Code",
+        "tags": ["claude-code", "documentation"]
+      },
+      "score": 0.0082,
+      "fts_score": -1.1317,
+      "fts_rank": 1,
+      "cosine_score": 0.95,
+      "hybrid_rank": 1,
+      "vector_rank": 2
     },
     {
-      "type": "OCR",
-      "content": {
-        "frame_id": 41,
-        "text": "claude code --model opus thinking idle 30",
-        "text_source": "ocr",
-        "timestamp": "2026-03-26T14:31:05Z",
-        "file_path": "2026-03-26T14:31:05Z.jpg",
-        "frame_url": "/v1/frames/41",
-        "app_name": "Terminal",
-        "window_name": "zsh — 120×40",
-        "browser_url": null,
-        "focused": false,
-        "device_name": "monitor_0",
-        "tags": [],
-        "fts_rank": 0.65
-      }
+      "frame_id": 41,
+      "timestamp": "2026-04-13T14:31:05Z",
+      "text_source": "ocr",
+      "app_name": "Terminal",
+      "window_name": "zsh — 120×40",
+      "browser_url": null,
+      "focused": false,
+      "device_name": "monitor_0",
+      "frame_url": "/v1/frames/41",
+      "embedding_status": "completed",
+      "description": null,
+      "score": 0.0065,
+      "fts_score": -1.5234,
+      "fts_rank": 2,
+      "cosine_score": 0.88,
+      "hybrid_rank": 2,
+      "vector_rank": 3
     }
   ],
   "pagination": {
@@ -218,28 +245,33 @@
 ```
 
 ```json
-// GET /v1/search?app_name=Chrome&start_time=2026-03-26T00:00:00Z&end_time=2026-03-26T23:59:59Z&limit=1
-// (no text query — returns metadata-only results, no fts_rank)
+// GET /v1/search?app_name=Chrome&start_time=2026-04-13T00:00:00Z&end_time=2026-04-13T23:59:59Z&limit=1&include_text=true&max_text_length=50
 
 {
   "data": [
     {
-      "type": "Accessibility",
-      "content": {
-        "frame_id": 99,
-        "text": "GitHub Dashboard Pull requests Issues Actions MyRecall openrecall MyRecall",
-        "text_source": "accessibility",
-        "timestamp": "2026-03-26T10:15:33Z",
-        "file_path": "2026-03-26T10:15:33Z.jpg",
-        "frame_url": "/v1/frames/99",
-        "app_name": "Chrome",
-        "window_name": "GitHub — MyRecall — openrecall — Dashboard",
-        "browser_url": "https://github.com/pyw/openrecall",
-        "focused": true,
-        "device_name": "monitor_0",
-        "tags": [],
-        "fts_rank": null
-      }
+      "frame_id": 99,
+      "timestamp": "2026-04-13T10:15:33Z",
+      "text": "GitHub Dashboard Pull requests Issues...143 chars...openrecall MyRecall",
+      "text_source": "accessibility",
+      "app_name": "Chrome",
+      "window_name": "GitHub — MyRecall — Dashboard",
+      "browser_url": "https://github.com/pyw/openrecall",
+      "focused": true,
+      "device_name": "monitor_0",
+      "frame_url": "/v1/frames/99",
+      "embedding_status": "completed",
+      "description": {
+        "narrative": "User viewing GitHub repository dashboard...",
+        "summary": "Browsing GitHub repo",
+        "tags": ["github", "code"]
+      },
+      "score": 0.005,
+      "fts_score": -2.1,
+      "fts_rank": 1,
+      "cosine_score": null,
+      "hybrid_rank": 1,
+      "vector_rank": null
     }
   ],
   "pagination": {
@@ -250,14 +282,20 @@
 }
 ```
 
-### Field Naming Inconsistency
+### Text Truncation Format
 
-> **⚠️ Naming mismatch:** `/v1/search` uses `type: "OCR"|"Accessibility"` (capitalized, in `data[].type`) while `/v1/frames/{id}/context` uses `text_source: "ocr"|"accessibility"` (lowercase). This inconsistency should be resolved.
+When `include_text=true` and text exceeds `max_text_length`:
+```
+"first_half...N chars...second_half"
+```
+
+Example: `"Hello world this is a...143 chars...the end of the document"`
 
 ### Known Gaps (vs screenpipe)
 
-- ❌ `tags` — reserved but always empty (`[]`)
-- ❌ `frame_url` exists but no direct inline image URL (`frame` field in screenpipe)
+- ❌ `tags` at top level — removed; use `description.tags` instead
+- ❌ `file_path` — removed; use `frame_url` to fetch image
+- ❌ `type` field — removed; use `text_source` instead
 
 ---
 
@@ -395,14 +433,6 @@ This document is the **authoritative reference** for field names. When adding, r
 3. Update test fixtures and contracts
 4. Propagate changes to skill definitions and UI code
 
-### Known Naming Inconsistencies to Resolve
-
-| Issue | Location | Should Be |
-|-------|----------|-----------|
-| `type` vs `text_source` | search returns `data[].type`, context returns `text_source` | Normalize to one format |
-| Capitalization | search uses `"OCR"`/`"Accessibility"`, context uses `"ocr"`/`"accessibility"` | Pick one convention (recommend lowercase) |
-| `minutes` field meaning | activity-summary: estimated; search: no equivalent | N/A — different endpoints |
-
 ---
 
 ## Changelog
@@ -415,3 +445,4 @@ This document is the **authoritative reference** for field names. When adding, r
 | 2026-03-26 | Fixed three doc/code inconsistencies: (1) corrected `max_descriptions` description — it limits `descriptions` count, not `recent_texts` (which has a separate fixed cap of 10); (2) documented `apps[].name` fallback to `"Unknown"` when DB `app_name` is NULL; (3) documented that `descriptions` returns `[]` when no frames in range have completed descriptions. |
 | 2026-03-26 | Added `timestamp`, `app_name`, `window_name` fields to `GET /v1/frames/{id}/context` response. Fixed bounds description: normalized 0.0–1.0 floats, rounded to 3 decimal places. Removed resolved gaps from Known Gaps table. |
 | 2026-04-01 | Major activity-summary redesign: (1) removed `recent_texts` field entirely; (2) `apps[].minutes` now uses screenpipe LEAD() method with 5-min threshold; (3) added `apps[].first_seen` and `apps[].last_seen`; (4) `apps` ordered by `minutes DESC`; (5) `descriptions[]` now has `frame_id, timestamp, summary, intent, entities` (narrative removed); (6) `max_descriptions` has no default (returns all available); (7) Known Gaps table updated — first_seen/last_seen and minutes calculation gaps are now resolved. |
+| 2026-04-13 | **Major search API optimization**: (1) Response structure flattened — removed `type` field and `content` wrapper; (2) Removed `tags` and `file_path` fields; (3) Default mode changed to `hybrid`; (4) Added `mode` parameter (`fts`/`vector`/`hybrid`); (5) Added `include_text` and `max_text_length` parameters; (6) Removed `min_length`/`max_length` parameters; (7) No limit max (was 100); (8) Added score fields: `score`, `fts_score`, `fts_rank`, `cosine_score`, `hybrid_rank`, `vector_rank`; (9) Added `description` and `embedding_status` fields; (10) Resolved naming inconsistency — now uses `text_source` consistently (removed `type`). |
