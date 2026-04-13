@@ -15,14 +15,13 @@
 | File | Responsibility |
 |------|----------------|
 | `openrecall/server/database/migrations/20260414000000_add_visibility_status.sql` | Migration: add column, index, backfill |
-| `openrecall/server/database/frames_store.py` | Helper methods: `try_set_queryable()`, `try_set_queryable_standalone()`, update queries |
-| `openrecall/server/processing/v3_worker.py` | Call helper after OCR completes |
-| `openrecall/server/description/service.py` | Call helper in `mark_completed()` |
-| `openrecall/server/embedding/service.py` | Call helper in `mark_completed()` |
+| `openrecall/server/database/frames_store.py` | Helper methods (`try_set_queryable*`, `try_set_failed*`), query filters, integrate in `complete_description_task`/`fail_description_task` |
+| `openrecall/server/processing/v3_worker.py` | Call `try_set_queryable_standalone()` and `try_set_failed_standalone()` |
+| `openrecall/server/embedding/service.py` | Call `try_set_queryable()` and `try_set_failed()` |
 | `openrecall/server/search/engine.py` | Update WHERE clause |
 | `openrecall/server/search/hybrid_engine.py` | Update WHERE clause |
 | `openrecall/server/api_v1.py` | Frame context visibility check |
-| `tests/test_visibility_status.py` | Unit tests |
+| `tests/test_visibility_status.py` | Unit and integration tests |
 
 ---
 
@@ -172,6 +171,26 @@ class TestTrySetQueryable:
             result = temp_store.try_set_queryable(conn, 1)
 
             assert result is False  # No change made
+
+    def test_returns_false_when_status_is_null(self, temp_store):
+        """Should return False when any status is NULL (incomplete processing)."""
+        with temp_store._connect() as conn:
+            # Insert a frame with NULL description_status (newly ingested)
+            conn.execute(
+                """
+                INSERT INTO frames (id, status, description_status, embedding_status, visibility_status)
+                VALUES (1, 'completed', NULL, NULL, 'pending')
+                """
+            )
+
+            result = temp_store.try_set_queryable(conn, 1)
+
+            assert result is False
+
+            row = conn.execute(
+                "SELECT visibility_status FROM frames WHERE id = 1"
+            ).fetchone()
+            assert row["visibility_status"] == "pending"
 
 
 class TestTrySetQueryableStandalone:
