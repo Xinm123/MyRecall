@@ -169,7 +169,7 @@ Optimize the search API for better usability, cleaner interface, and improved se
 1. **Description Field**: Read from `frame_descriptions` table, only included when `description_status = 'completed'`
 
 2. **Text Truncation**: Middle-truncation when exceeds `max_text_length`:
-   - `"first_half...(truncated N chars)...second_half"`
+   - `"first_half...N chars...second_half"` (e.g., `"Hello worl...500 chars...orld Python"`)
 
 3. **Score Normalization**:
    - `score` field provides unified relevance metric
