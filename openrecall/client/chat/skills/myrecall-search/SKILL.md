@@ -133,13 +133,19 @@ curl "http://localhost:8083/v1/activity-summary?start_time=${START}&end_time=${E
 
 ## 2. Search — `GET /v1/search`
 
-**Purpose**: Full-text search across all captured screen content.
+**Purpose**: Full-text and semantic search across all captured screen content. Default mode is `hybrid` (combines FTS + vector search).
 
 ```bash
-# Search for "GitHub PR" in the last 2 hours
+# Search for "GitHub PR" in the last 2 hours (default: hybrid mode)
 START=$(date -u +%Y-%m-%dT%H:%M:%SZ -d "2 hours ago")
 END=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 curl "http://localhost:8083/v1/search?q=GitHub+PR&start_time=${START}&end_time=${END}&limit=10"
+
+# FTS-only search (faster, keyword-based)
+curl "http://localhost:8083/v1/search?q=GitHub+PR&mode=fts&start_time=${START}&end_time=${END}&limit=10"
+
+# Vector-only search (semantic similarity)
+curl "http://localhost:8083/v1/search?q=GitHub+PR&mode=vector&start_time=${START}&end_time=${END}&limit=10"
 ```
 
 ### ⚠️  `content_type` Parameter is Deprecated
@@ -152,17 +158,18 @@ curl "http://localhost:8083/v1/search?q=GitHub+PR&start_time=${START}&end_time=$
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `q` | string | **Yes** | Search query. Matched against all screen text. |
-| `limit` | integer | No | Max results (default: 20, max: 100) |
+| `q` | string | No | Search query. Matched against all screen text. Empty query returns browse mode. |
+| `mode` | string | No | Search mode: `fts`, `vector`, `hybrid` (default: `hybrid`) |
+| `limit` | integer | No | Max results (default: 20, no max limit) |
 | `offset` | integer | No | Pagination offset (default: 0) |
-| `start_time` | ISO 8601 | **Yes** | Start of time range |
-| `end_time` | ISO 8601 | **Yes** | End of time range |
+| `start_time` | ISO 8601 | Recommended | Start of time range |
+| `end_time` | ISO 8601 | Recommended | End of time range |
 | `app_name` | string | No | Filter by exact app name |
 | `window_name` | string | No | Filter by window title |
 | `browser_url` | string | No | Filter by browser URL substring |
 | `focused` | boolean | No | Only focused windows (`true`/`false`) |
-| `min_length` | integer | No | Minimum text length |
-| `max_length` | integer | No | Maximum text length |
+| `include_text` | boolean | No | Include `text` field in response (default: `false`) |
+| `max_text_length` | integer | No | Max characters for `text` field with middle-truncation (default: 1000) |
 
 > **Always include `start_time` and `end_time`**. Unbounded searches will return
 > excessive results and may be slow.
@@ -173,40 +180,27 @@ curl "http://localhost:8083/v1/search?q=GitHub+PR&start_time=${START}&end_time=$
 {
   "data": [
     {
-      "type": "OCR",
-      "content": {
-        "frame_id": 42,
-        "timestamp": "2026-03-25T10:30:00Z",
-        "text": "Reviewing pull request #123...",
-        "text_source": "accessibility",
-        "app_name": "Safari",
-        "window_name": "Pull Request #123 — GitHub",
-        "browser_url": "https://github.com/...",
-        "focused": true,
-        "file_path": "/path/to/frame.jpg",
-        "frame_url": "http://localhost:8083/v1/frames/42",
-        "device_name": "monitor_0",
-        "tags": [],
-        "fts_rank": 0.123
-      }
-    },
-    {
-      "type": "Accessibility",
-      "content": {
-        "frame_id": 43,
-        "timestamp": "2026-03-25T10:29:00Z",
-        "text": "Click to merge",
-        "text_source": "accessibility",
-        "app_name": "Safari",
-        "window_name": "Pull Request #123 — GitHub",
-        "browser_url": "https://github.com/...",
-        "focused": true,
-        "file_path": "/path/to/frame43.jpg",
-        "frame_url": "http://localhost:8083/v1/frames/43",
-        "device_name": "monitor_0",
-        "tags": [],
-        "fts_rank": 0.456
-      }
+      "frame_id": 42,
+      "timestamp": "2026-03-25T10:30:00Z",
+      "text_source": "accessibility",
+      "app_name": "Safari",
+      "window_name": "Pull Request #123 — GitHub",
+      "browser_url": "https://github.com/...",
+      "focused": true,
+      "device_name": "monitor_0",
+      "frame_url": "/v1/frames/42",
+      "embedding_status": "completed",
+      "description": {
+        "narrative": "The user is reviewing a pull request on GitHub...",
+        "summary": "GitHub PR review",
+        "tags": ["code_review", "github"]
+      },
+      "score": 0.0082,
+      "fts_score": -1.1317,
+      "fts_rank": 1,
+      "cosine_score": 0.95,
+      "hybrid_rank": 1,
+      "vector_rank": 2
     }
   ],
   "pagination": {
@@ -217,16 +211,36 @@ curl "http://localhost:8083/v1/search?q=GitHub+PR&start_time=${START}&end_time=$
 }
 ```
 
-### Content Fields
+### Response Fields
 
 | Field | Description |
 |-------|-------------|
-| `type` | `"OCR"` or `"Accessibility"` — the text source of this result |
 | `frame_id` | Unique frame ID — use with `/frames/{id}/context` for details |
+| `timestamp` | ISO8601 UTC capture time |
 | `text_source` | Either `accessibility` (from AX tree) or `ocr` (from OCR fallback) |
-| `text` | Matched screen text |
-| `fts_rank` | BM25 relevance score. Higher = more relevant. Useful for comparing result quality. |
-| `browser_url` | Current browser URL at capture time (only for browser frames) |
+| `text` | Screen text (only included when `include_text=true`, truncated to `max_text_length`) |
+| `app_name` | Application name at capture time |
+| `window_name` | Window title at capture time |
+| `browser_url` | Browser URL at capture time (only for browser frames) |
+| `focused` | Whether window was focused |
+| `device_name` | Monitor/device name |
+| `frame_url` | API path to fetch frame image |
+| `embedding_status` | Vector embedding status: `completed`, `pending`, `failed`, or empty |
+| `description` | AI-generated description object with `narrative`, `summary`, `tags[]`. Null if not generated. |
+| `score` | Unified relevance score (all modes) |
+| `fts_score` | BM25 relevance score (fts/hybrid modes). Negative value, higher (closer to 0) = more relevant. |
+| `fts_rank` | Position in FTS results (hybrid mode only) |
+| `cosine_score` | Vector cosine similarity 0-1, higher = more similar (vector/hybrid modes) |
+| `hybrid_rank` | Final RRF fused rank (hybrid mode only) |
+| `vector_rank` | Position in vector results (hybrid mode only) |
+
+### Score Fields by Mode
+
+| Mode | Score Fields Returned |
+|------|----------------------|
+| `fts` | `score`, `fts_score` |
+| `vector` | `score`, `cosine_score` |
+| `hybrid` | `score`, `fts_score`, `fts_rank`, `cosine_score`, `hybrid_rank`, `vector_rank` |
 
 ### When to Use
 
@@ -382,6 +396,8 @@ User asks a question
 7. **Do NOT use `content_type` parameter** — it is deprecated and ignored
 8. **Max 2-3 frames per response** — don't overwhelm the context with many frame details
 9. **Frame context text is capped at 5000 chars** — long content will be truncated with "..." suffix
+10. **Use `include_text=true`** only when you need the frame text — default is `false` to reduce response size
+11. **Default mode is `hybrid`** — combines FTS and vector search for best results
 
 ---
 
@@ -409,4 +425,5 @@ These screenpipe endpoints do **not exist** in MyRecall:
 | `POST /raw_sql` | None | Not exposed to agents |
 | `screenpipe://` deeplinks | None | Not supported |
 | `content_type=memory\|audio\|input` | `content_type` is deprecated | Ignored — always returns merged results |
+| `min_length` / `max_length` params | None | Removed — filter via query instead |
 | `/frames/{id}/context?include_nodes=true` | `/frames/{id}/context` | Query parameters not supported — simplified API always returns the same structure |
