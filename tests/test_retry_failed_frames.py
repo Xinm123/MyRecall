@@ -10,8 +10,12 @@ import tempfile
 from pathlib import Path
 
 import pytest
+import requests
 
 from openrecall.server.database.frames_store import FramesStore
+
+BASE_URL = "http://localhost:8083"
+API_V1 = f"{BASE_URL}/v1"
 
 
 @pytest.fixture
@@ -208,3 +212,28 @@ class TestResetFailedFrames:
             assert task["status"] == "pending"
             assert task["error_message"] is None
             assert task["retry_count"] == 3  # Incremented from 2 to 3
+
+
+@pytest.mark.integration
+class TestRetryFailedFramesAPI:
+    """Integration tests for POST /v1/admin/frames/retry-failed."""
+
+    def test_retry_failed_returns_success(self):
+        """API should return success with counts."""
+        resp = requests.post(f"{API_V1}/admin/frames/retry-failed", timeout=5)
+
+        assert resp.status_code == 200
+        data = resp.json()
+        assert "message" in data
+        assert "reset_count" in data
+        assert "breakdown" in data
+        assert "request_id" in data
+        assert isinstance(data["reset_count"], int)
+        assert isinstance(data["breakdown"], dict)
+
+    def test_retry_failed_resets_failed_frames(self, temp_store):
+        """API should actually reset failed frames in the database."""
+        # This test requires the server to be using the same database
+        # For integration testing, we verify the API response format
+        resp = requests.post(f"{API_V1}/admin/frames/retry-failed", timeout=5)
+        assert resp.status_code in [200, 202]

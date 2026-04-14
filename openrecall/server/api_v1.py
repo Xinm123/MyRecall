@@ -11,6 +11,7 @@ This module defines the v1_bp Blueprint and implements:
   - GET  /v1/search              — FTS5/hybrid/vector search
   - GET  /v1/embedding/tasks/status — embedding task queue statistics
   - POST /v1/admin/embedding/backfill — trigger embedding backfill
+  - POST /v1/admin/frames/retry-failed — retry all failed frames
 
 SSOT: docs/v3/spec.md §4.7, §4.8.1, §4.9; docs/v3/http_contract_ledger.md
 """
@@ -1530,4 +1531,42 @@ def embedding_backfill():
             "estimated_count": count,
             "request_id": request_id,
         }), 202
+
+
+# ---------------------------------------------------------------------------
+# POST /v1/admin/frames/retry-failed — retry all failed frames
+# ---------------------------------------------------------------------------
+
+
+@v1_bp.route("/admin/frames/retry-failed", methods=["POST"])
+def retry_failed_frames():
+    """Reset all failed frames to pending for reprocessing."""
+    request_id = str(uuid.uuid4())
+    store = _get_frames_store()
+
+    try:
+        result = store.reset_failed_frames()
+
+        logger.info(
+            "retry_failed_frames: reset_count=%d breakdown=%s request_id=%s",
+            result["total"],
+            result["breakdown"],
+            request_id,
+        )
+
+        return jsonify({
+            "message": "Retry triggered",
+            "reset_count": result["total"],
+            "breakdown": result["breakdown"],
+            "request_id": request_id,
+        }), 200
+
+    except Exception as exc:
+        logger.exception("retry_failed_frames failed: %s request_id=%s", exc, request_id)
+        return make_error_response(
+            "Failed to reset failed frames",
+            "INTERNAL_ERROR",
+            500,
+            request_id=request_id,
+        )
 
