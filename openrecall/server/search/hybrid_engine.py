@@ -172,7 +172,7 @@ class HybridSearchEngine:
             count_row = conn.execute(
                 """
                 SELECT COUNT(*) as total FROM frames
-                WHERE embedding_status = 'completed' AND status = 'completed'
+                WHERE visibility_status = 'queryable'
                 """
             ).fetchone()
             total = count_row["total"] if count_row else 0
@@ -184,7 +184,7 @@ class HybridSearchEngine:
                        app_name, window_name, browser_url, focused,
                        device_name, file_path, embedding_status
                 FROM frames
-                WHERE embedding_status = 'completed' AND status = 'completed'
+                WHERE visibility_status = 'queryable'
                 ORDER BY timestamp DESC
                 LIMIT ? OFFSET ?
                 """,
