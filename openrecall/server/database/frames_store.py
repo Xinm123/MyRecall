@@ -601,6 +601,110 @@ class FramesStore:
             )
             return False
 
+    def reset_failed_frames(self) -> dict:
+        """Reset all failed frames to pending status.
+
+        Smart reset: only resets the stage(s) that failed.
+        - OCR failed -> status = 'pending', error_message = NULL
+        - Description failed -> description_status = 'pending', enqueue task
+        - Embedding failed -> embedding_status = 'pending', enqueue task
+
+        Returns:
+            Dict with 'total' count and 'breakdown' by stage.
+        """
+        breakdown = {"ocr": 0, "description": 0, "embedding": 0}
+
+        try:
+            with self._connect() as conn:
+                # Count unique failed frames before reset
+                total_result = conn.execute("""
+                    SELECT COUNT(*) as cnt FROM frames WHERE visibility_status = 'failed'
+                """).fetchone()
+                total = total_result["cnt"] if total_result else 0
+
+                if total == 0:
+                    return {"total": 0, "breakdown": breakdown}
+
+                # 1. Reset OCR failures
+                cursor = conn.execute("""
+                    UPDATE frames
+                    SET status = 'pending', error_message = NULL
+                    WHERE visibility_status = 'failed' AND status = 'failed'
+                """)
+                breakdown["ocr"] = cursor.rowcount
+
+                # 2. Reset description failures and enqueue tasks
+                desc_failed_rows = conn.execute("""
+                    SELECT id FROM frames
+                    WHERE visibility_status = 'failed' AND description_status = 'failed'
+                """).fetchall()
+
+                for row in desc_failed_rows:
+                    frame_id = row["id"]
+                    # Reset existing failed task to pending (if exists)
+                    conn.execute("""
+                        UPDATE description_tasks
+                        SET status = 'pending', error_message = NULL, retry_count = retry_count + 1
+                        WHERE frame_id = ? AND status = 'failed'
+                    """, (frame_id,))
+                    # Insert new task if one doesn't exist
+                    conn.execute("""
+                        INSERT OR IGNORE INTO description_tasks (frame_id, status)
+                        VALUES (?, 'pending')
+                    """, (frame_id,))
+
+                cursor = conn.execute("""
+                    UPDATE frames
+                    SET description_status = 'pending'
+                    WHERE visibility_status = 'failed' AND description_status = 'failed'
+                """)
+                breakdown["description"] = cursor.rowcount
+
+                # 3. Reset embedding failures and enqueue tasks
+                embed_failed_rows = conn.execute("""
+                    SELECT id FROM frames
+                    WHERE visibility_status = 'failed' AND embedding_status = 'failed'
+                """).fetchall()
+
+                for row in embed_failed_rows:
+                    frame_id = row["id"]
+                    # Reset existing failed task to pending (if exists)
+                    conn.execute("""
+                        UPDATE embedding_tasks
+                        SET status = 'pending', error_message = NULL, retry_count = retry_count + 1
+                        WHERE frame_id = ? AND status = 'failed'
+                    """, (frame_id,))
+                    # Insert new task if one doesn't exist
+                    conn.execute("""
+                        INSERT OR IGNORE INTO embedding_tasks (frame_id, status)
+                        VALUES (?, 'pending')
+                    """, (frame_id,))
+
+                cursor = conn.execute("""
+                    UPDATE frames
+                    SET embedding_status = 'pending'
+                    WHERE visibility_status = 'failed' AND embedding_status = 'failed'
+                """)
+                breakdown["embedding"] = cursor.rowcount
+
+                # 4. Set visibility_status back to pending for all failed frames
+                conn.execute("""
+                    UPDATE frames
+                    SET visibility_status = 'pending'
+                    WHERE visibility_status = 'failed'
+                """)
+
+                conn.commit()
+
+                return {
+                    "total": total,
+                    "breakdown": breakdown
+                }
+
+        except sqlite3.Error as e:
+            logger.error("reset_failed_frames failed: %s", e)
+            return {"total": 0, "breakdown": breakdown}
+
     def get_last_frame_timestamp(self) -> Optional[str]:
         try:
             with self._connect() as conn:
@@ -645,7 +749,7 @@ class FramesStore:
                            f.last_known_window, f.text_source, f.processed_at,
                            f.capture_trigger, f.device_name, f.error_message,
                            f.accessibility_text, f.ocr_text, f.browser_url, f.focused,
-                           f.description_status, f.embedding_status,
+                           f.description_status, f.embedding_status, f.visibility_status,
                            LENGTH(f.accessibility_text) as accessibility_text_length,
                            LENGTH(f.ocr_text) as ocr_text_length,
                            o.text_length, o.ocr_engine,
@@ -712,6 +816,8 @@ class FramesStore:
                             "embedding_status": row["embedding_status"] or "",
                             "accessibility_text_length": row["accessibility_text_length"] or 0,
                             "ocr_text_length": row["ocr_text_length"] or 0,
+                            # Visibility status (combined OCR + description + embedding)
+                            "visibility_status": row["visibility_status"] or "pending",
                         }
                     )
         except sqlite3.Error as e:
@@ -784,6 +890,7 @@ class FramesStore:
                            f.snapshot_path, f.status, f.ingested_at, f.last_known_app,
                            f.last_known_window, f.text_source, f.processed_at,
                            f.capture_trigger, f.device_name, f.error_message,
+                           f.description_status, f.embedding_status, f.visibility_status,
                            o.text_length, o.ocr_engine, o.text AS ocr_text,
                            SUBSTR(o.text, 1, 100) AS ocr_text_preview
                     FROM frames f
@@ -820,6 +927,11 @@ class FramesStore:
                             "capture_trigger": row["capture_trigger"] or "",
                             "device_name": row["device_name"] or "",
                             "error_message": row["error_message"] or "",
+                            # Description and embedding status
+                            "description_status": row["description_status"] or "",
+                            "embedding_status": row["embedding_status"] or "",
+                            # Visibility status (combined OCR + description + embedding)
+                            "visibility_status": row["visibility_status"] or "pending",
                         }
                     )
         except sqlite3.Error as e:
