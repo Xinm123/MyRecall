@@ -123,7 +123,7 @@ class SearchEngine:
             Tuple of (WHERE clause string, parameters list)
         """
         has_text_query = bool(params.q and params.q.strip())
-        where_parts = ["frames.status = 'completed'", "frames.full_text IS NOT NULL"]
+        where_parts = ["frames.visibility_status = 'queryable'", "frames.full_text IS NOT NULL"]
         params_list: list[Any] = []
 
         if has_text_query:
