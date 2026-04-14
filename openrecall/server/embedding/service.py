@@ -138,7 +138,7 @@ class EmbeddingService:
             conn.execute(
                 """
                 UPDATE embedding_tasks
-                SET retry_count = ?, next_retry_at = ?, error_message = ?
+                SET status = 'pending', retry_count = ?, next_retry_at = ?, error_message = ?
                 WHERE id = ?
                 """,
                 (retry_count + 1, next_retry.isoformat(), error_message, task_id),
