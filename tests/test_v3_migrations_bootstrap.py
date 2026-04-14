@@ -453,3 +453,122 @@ class TestFtsUnificationMigration:
         ).fetchone()
         assert result2 is None
         conn.close()
+
+
+class TestVisibilityStatusMigration:
+    """Tests for the visibility_status migration (20260414000000).
+
+    Verifies that the migration correctly:
+    - Adds visibility_status column to frames
+    - Backfills fully processed frames as 'queryable'
+    - Leaves partially processed frames as 'pending'
+    - Marks frames with failures as 'failed'
+    """
+
+    @pytest.fixture
+    def db_pre_migration(self, tmp_path: Path) -> tuple[sqlite3.Connection, Path]:
+        """Create a db with migrations applied up to (but not including) visibility_status.
+
+        This allows inserting test data BEFORE the visibility_status migration,
+        then applying the migration to test backfill behavior.
+        """
+        db_path = tmp_path / "edge.db"
+
+        # Bootstrap using the initial schema SQL directly
+        initial_sql = (
+            Path(__file__).resolve().parent.parent
+            / "openrecall/server/database/migrations/20260227000001_initial_schema.sql"
+        ).read_text()
+
+        conn = sqlite3.connect(db_path)
+        conn.executescript(initial_sql)
+
+        # Apply subsequent migrations up to (but not including) visibility_status
+        migrations_dir = (
+            Path(__file__).resolve().parent.parent
+            / "openrecall/server/database/migrations"
+        )
+        for sql_file in sorted(migrations_dir.glob("*.sql")):
+            version = sql_file.stem.split("_")[0]
+            if version >= "20260414000000":  # Stop before visibility_status migration
+                break
+            if not conn.execute(
+                "SELECT COUNT(*) FROM schema_migrations WHERE version = ?", (version,)
+            ).fetchone()[0]:
+                script = sql_file.read_text(encoding="utf-8")
+                conn.executescript(script)
+                conn.execute(
+                    "INSERT INTO schema_migrations(version, description) VALUES (?, ?)",
+                    (version, sql_file.stem),
+                )
+        conn.commit()
+
+        return conn, db_path
+
+    def _apply_visibility_status_migration(
+        self, db_path: Path
+    ) -> sqlite3.Connection:
+        """Apply the visibility_status migration to a db that already has prior migrations."""
+        migrations_dir = (
+            Path(__file__).resolve().parent.parent
+            / "openrecall/server/database/migrations"
+        )
+        conn = sqlite3.connect(db_path)
+        run_migrations(conn, migrations_dir)
+        conn.commit()
+        return conn
+
+    def test_visibility_status_migration_backfill(self, db_pre_migration) -> None:
+        """Verify visibility_status migration correctly backfills existing frames."""
+        conn, db_path = db_pre_migration
+
+        # Insert test data BEFORE the visibility_status migration
+        # Insert a fully processed frame
+        conn.execute("""
+            INSERT INTO frames (capture_id, timestamp, status, description_status,
+                               embedding_status, app_name)
+            VALUES ('test-1', '2026-04-14T00:00:00Z', 'completed', 'completed',
+                    'completed', 'TestApp')
+        """)
+        # Insert a partially processed frame
+        conn.execute("""
+            INSERT INTO frames (capture_id, timestamp, status, description_status,
+                               embedding_status, app_name)
+            VALUES ('test-2', '2026-04-14T00:01:00Z', 'completed', 'completed',
+                    'pending', 'TestApp')
+        """)
+        # Insert a failed frame
+        conn.execute("""
+            INSERT INTO frames (capture_id, timestamp, status, description_status,
+                               embedding_status, app_name)
+            VALUES ('test-3', '2026-04-14T00:02:00Z', 'failed', 'pending',
+                    'pending', 'TestApp')
+        """)
+        conn.commit()
+        conn.close()
+
+        # Apply the visibility_status migration (this triggers backfill)
+        conn = self._apply_visibility_status_migration(db_path)
+
+        # Verify backfill
+        conn.row_factory = sqlite3.Row
+
+        # Check fully processed frame is queryable
+        row = conn.execute(
+            "SELECT visibility_status FROM frames WHERE capture_id = 'test-1'"
+        ).fetchone()
+        assert row["visibility_status"] == "queryable"
+
+        # Check partially processed frame is pending
+        row = conn.execute(
+            "SELECT visibility_status FROM frames WHERE capture_id = 'test-2'"
+        ).fetchone()
+        assert row["visibility_status"] == "pending"
+
+        # Check failed frame is failed
+        row = conn.execute(
+            "SELECT visibility_status FROM frames WHERE capture_id = 'test-3'"
+        ).fetchone()
+        assert row["visibility_status"] == "failed"
+
+        conn.close()
