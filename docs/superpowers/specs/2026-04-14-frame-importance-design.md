@@ -100,6 +100,22 @@ CREATE INDEX IF NOT EXISTS idx_frames_importance ON frames(importance);
 4. 批量更新 frames 表：`UPDATE frames SET importance = importance + ? WHERE id = ?`
 5. 返回更新的 frame 数量
 
+### 评分影响范围
+
+**仅影响 `myrecall-search` 工具调用的结果：**
+
+| 工具调用 | 是否影响 importance | 说明 |
+|----------|-------------------|------|
+| `myrecall-search` | ✅ 是 | 从 `result.data[].frame_id` 提取 |
+| `myrecall-activity-summary` | ❌ 否 | 活动摘要不含 frame 细节，评分返回 `no_frames` 错误 |
+| 其他工具 | ❌ 否 | 评分返回 `no_frames` 错误 |
+
+**多轮对话处理：**
+- 每条 assistant 消息都有独立的评分按钮
+- 评分只影响该条消息引用的 frames
+- 历史消息可以评分（用户滚动回去点击）
+- 无 frame 引用的消息评分时显示错误提示
+
 ## 前端 UI 设计
 
 ### 组件位置
