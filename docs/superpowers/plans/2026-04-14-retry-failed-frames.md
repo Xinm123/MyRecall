@@ -75,6 +75,8 @@ def temp_store():
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     frame_id INTEGER,
                     status TEXT DEFAULT 'pending',
+                    error_message TEXT,
+                    retry_count INTEGER DEFAULT 0,
                     UNIQUE(frame_id)
                 )
             """)
@@ -83,6 +85,8 @@ def temp_store():
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     frame_id INTEGER,
                     status TEXT DEFAULT 'pending',
+                    error_message TEXT,
+                    retry_count INTEGER DEFAULT 0,
                     UNIQUE(frame_id)
                 )
             """)
@@ -211,6 +215,32 @@ class TestResetFailedFrames:
         assert result["breakdown"]["ocr"] == 0
         assert result["breakdown"]["description"] == 0
         assert result["breakdown"]["embedding"] == 0
+
+    def test_reset_resets_existing_failed_task(self, temp_store):
+        """Existing failed task should be reset to pending, not ignored."""
+        with temp_store._connect() as conn:
+            conn.execute("""
+                INSERT INTO frames (id, frame_id, status, description_status, visibility_status, snapshot_path)
+                VALUES (1, 'test-6', 'completed', 'failed', 'failed', '/tmp/test.jpg')
+            """)
+            # Insert existing failed task
+            conn.execute("""
+                INSERT INTO description_tasks (frame_id, status, error_message, retry_count)
+                VALUES (1, 'failed', 'Previous error', 2)
+            """)
+            conn.commit()
+
+        result = temp_store.reset_failed_frames()
+
+        assert result["breakdown"]["description"] == 1
+
+        with temp_store._connect() as conn:
+            task = conn.execute(
+                "SELECT status, error_message, retry_count FROM description_tasks WHERE frame_id = 1"
+            ).fetchone()
+            assert task["status"] == "pending"
+            assert task["error_message"] is None
+            assert task["retry_count"] == 3  # Incremented from 2 to 3
 ```
 
 - [ ] **Step 2: Run test to verify it fails**
@@ -263,6 +293,13 @@ def reset_failed_frames(self) -> dict:
 
             for row in desc_failed_rows:
                 frame_id = row["id"]
+                # Reset existing failed task to pending (if exists)
+                conn.execute("""
+                    UPDATE description_tasks
+                    SET status = 'pending', error_message = NULL, retry_count = retry_count + 1
+                    WHERE frame_id = ? AND status = 'failed'
+                """, (frame_id,))
+                # Insert new task if one doesn't exist
                 conn.execute("""
                     INSERT OR IGNORE INTO description_tasks (frame_id, status)
                     VALUES (?, 'pending')
@@ -283,6 +320,13 @@ def reset_failed_frames(self) -> dict:
 
             for row in embed_failed_rows:
                 frame_id = row["id"]
+                # Reset existing failed task to pending (if exists)
+                conn.execute("""
+                    UPDATE embedding_tasks
+                    SET status = 'pending', error_message = NULL, retry_count = retry_count + 1
+                    WHERE frame_id = ? AND status = 'failed'
+                """, (frame_id,))
+                # Insert new task if one doesn't exist
                 conn.execute("""
                     INSERT OR IGNORE INTO embedding_tasks (frame_id, status)
                     VALUES (?, 'pending')

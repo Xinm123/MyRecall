@@ -43,8 +43,8 @@ When any stage fails, `visibility_status` is set to `'failed'` and the frame bec
 2. For each frame, determine which stage(s) failed
 3. Reset only the failed stage(s) to `pending`:
    - OCR failed → `status = 'pending'`, clear `error_message`
-   - Description failed → `description_status = 'pending'`, clear `description_error`, enqueue task
-   - Embedding failed → `embedding_status = 'pending'`, enqueue task
+   - Description failed → `description_status = 'pending'`, reset task to pending, enqueue if needed
+   - Embedding failed → `embedding_status = 'pending'`, reset task to pending, enqueue if needed
 4. Set `visibility_status = 'pending'` for all affected frames
 5. Return count and breakdown
 
@@ -85,13 +85,13 @@ When any stage fails, `visibility_status` is set to `'failed'` and the frame bec
 async retryFailed() {
   this.retrying = true;
   try {
-    const res = await fetch(`${this.apiBase}/v1/admin/frames/retry-failed`, {
+    const res = await fetch(`${EDGE_BASE_URL}/v1/admin/frames/retry-failed`, {
       method: 'POST'
     });
     if (res.ok) {
       const data = await res.json();
       // Optionally show toast with count
-      this.loadEntries();
+      this.refreshRecent();
     }
   } finally {
     this.retrying = false;
