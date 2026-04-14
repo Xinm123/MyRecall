@@ -119,6 +119,8 @@ class EmbeddingService:
             (frame_id,),
         )
         conn.commit()
+        # Try to mark as queryable if all stages are complete
+        self._store.try_set_queryable(conn, frame_id)
 
     def mark_failed(
         self,
@@ -150,7 +152,7 @@ class EmbeddingService:
             conn.execute(
                 """
                 UPDATE embedding_tasks
-                SET status = 'failed', error_message = ?, completed_at = ?
+                SET status = 'failed', error_message = ?, failed_at = ?
                 WHERE id = ?
                 """,
                 (error_message, now, task_id),
@@ -162,8 +164,10 @@ class EmbeddingService:
                 """,
                 (frame_id,),
             )
-            logger.warning(
-                f"Embedding task #{task_id} permanently failed after {_MAX_RETRIES} retries"
+            # Mark visibility_status as failed
+            self._store.try_set_failed(conn, frame_id)
+            logger.error(
+                f"Embedding task #{task_id} permanently failed for frame #{frame_id}: {error_message}"
             )
         conn.commit()
 
