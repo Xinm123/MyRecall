@@ -1775,6 +1775,8 @@ class FramesStore:
             "UPDATE frames SET description_status = 'completed' WHERE id = ?",
             (frame_id,),
         )
+        # Try to mark as queryable if all stages are complete
+        self.try_set_queryable(conn, frame_id)
 
     def reschedule_description_task(
         self,
@@ -1813,6 +1815,8 @@ class FramesStore:
             "UPDATE frames SET description_status = 'failed' WHERE id = ?",
             (frame_id,),
         )
+        # Mark visibility_status as failed
+        self.try_set_failed(conn, frame_id)
 
     def enqueue_pending_descriptions(self, conn: sqlite3.Connection) -> int:
         """Enqueue all frames without description_status. Returns count."""
