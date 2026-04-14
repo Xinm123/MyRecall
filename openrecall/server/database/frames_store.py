@@ -487,6 +487,120 @@ class FramesStore:
             )
             return False
 
+    def try_set_queryable(self, conn: sqlite3.Connection, frame_id: int) -> bool:
+        """Set visibility_status='queryable' if all stages are complete.
+
+        Called by each worker after completing their stage.
+        Idempotent - safe to call multiple times.
+
+        Args:
+            conn: Database connection (caller manages transaction)
+            frame_id: Frame ID to update
+
+        Returns:
+            True if frame was marked queryable, False otherwise.
+        """
+        cursor = conn.execute(
+            """
+            UPDATE frames
+            SET visibility_status = 'queryable'
+            WHERE id = ?
+              AND status = 'completed'
+              AND description_status = 'completed'
+              AND embedding_status = 'completed'
+              AND visibility_status = 'pending'
+            """,
+            (frame_id,),
+        )
+        return cursor.rowcount > 0
+
+    def try_set_queryable_standalone(self, frame_id: int) -> bool:
+        """Set visibility_status='queryable' if all stages are complete.
+
+        Standalone version that manages its own database connection.
+        Used by V3ProcessingWorker which doesn't pass connections.
+
+        Args:
+            frame_id: Frame ID to update
+
+        Returns:
+            True if frame was marked queryable, False otherwise.
+        """
+        try:
+            with self._connect() as conn:
+                cursor = conn.execute(
+                    """
+                    UPDATE frames
+                    SET visibility_status = 'queryable'
+                    WHERE id = ?
+                      AND status = 'completed'
+                      AND description_status = 'completed'
+                      AND embedding_status = 'completed'
+                      AND visibility_status = 'pending'
+                    """,
+                    (frame_id,),
+                )
+                return cursor.rowcount > 0
+        except sqlite3.Error as e:
+            logger.error(
+                "try_set_queryable_standalone failed frame_id=%d: %s",
+                frame_id,
+                e,
+            )
+            return False
+
+    def try_set_failed(self, conn: sqlite3.Connection, frame_id: int) -> bool:
+        """Mark frame as failed if any stage failed.
+
+        Args:
+            conn: Database connection (caller manages transaction)
+            frame_id: Frame ID to update
+
+        Returns:
+            True if frame was marked failed, False otherwise.
+        """
+        cursor = conn.execute(
+            """
+            UPDATE frames
+            SET visibility_status = 'failed'
+            WHERE id = ? AND visibility_status = 'pending'
+              AND (status = 'failed' OR description_status = 'failed' OR embedding_status = 'failed')
+            """,
+            (frame_id,),
+        )
+        return cursor.rowcount > 0
+
+    def try_set_failed_standalone(self, frame_id: int) -> bool:
+        """Mark frame as failed if any stage failed.
+
+        Standalone version that manages its own database connection.
+
+        Args:
+            frame_id: Frame ID to update
+
+        Returns:
+            True if frame was marked failed, False otherwise.
+        """
+        try:
+            with self._connect() as conn:
+                cursor = conn.execute(
+                    """
+                    UPDATE frames
+                    SET visibility_status = 'failed'
+                    WHERE id = ? AND visibility_status = 'pending'
+                      AND (status = 'failed' OR description_status = 'failed' OR embedding_status = 'failed')
+                    """,
+                    (frame_id,),
+                )
+                return cursor.rowcount > 0
+        except sqlite3.Error as e:
+            logger.error(
+                "try_set_failed_standalone failed frame_id=%d: %s",
+                frame_id,
+                e,
+            )
+            return False
+
     def get_last_frame_timestamp(self) -> Optional[str]:
         try:
             with self._connect() as conn:
