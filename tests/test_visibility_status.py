@@ -202,3 +202,44 @@ class TestTrySetFailedStandalone:
                 "SELECT visibility_status FROM frames WHERE id = 1"
             ).fetchone()
             assert row["visibility_status"] == "failed"
+
+
+class TestV3ProcessingWorkerIntegration:
+    """Tests for V3ProcessingWorker visibility_status integration."""
+
+    def test_sets_queryable_after_ocr_when_others_complete(self, temp_store):
+        """V3ProcessingWorker should set queryable after OCR if description/embedding done."""
+        with temp_store._connect() as conn:
+            # Simulate a frame where description and embedding are already done
+            # (unlikely in practice, but tests the logic)
+            conn.execute(
+                """
+                INSERT INTO frames (
+                    id, capture_id, timestamp, status, description_status,
+                    embedding_status, visibility_status, app_name, window_name, snapshot_path
+                )
+                VALUES (1, 'test-capture', '2026-04-14T00:00:00Z', 'processing',
+                        'completed', 'completed', 'pending', 'TestApp', 'TestWindow', '/tmp/test.jpg')
+                """
+            )
+
+        # Simulate V3ProcessingWorker completing OCR
+        result = temp_store.try_set_queryable_standalone(1)
+
+        # Since status is still 'processing', should NOT be queryable yet
+        assert result is False
+
+        # Now set status to completed
+        with temp_store._connect() as conn:
+            conn.execute("UPDATE frames SET status = 'completed' WHERE id = 1")
+
+        result = temp_store.try_set_queryable_standalone(1)
+
+        # Now all conditions are met
+        assert result is True
+
+        with temp_store._connect() as conn:
+            row = conn.execute(
+                "SELECT visibility_status FROM frames WHERE id = 1"
+            ).fetchone()
+            assert row["visibility_status"] == "queryable"

@@ -306,6 +306,13 @@ class V3ProcessingWorker:
             )
             return
 
+        # Try to mark as queryable if all stages are complete
+        if self._store.try_set_queryable_standalone(frame_id):
+            logger.debug(
+                "V3ProcessingWorker: frame_id=%d marked as queryable",
+                frame_id,
+            )
+
         logger.info(
             "MRV3 ocr_completed frame_id=%d text_length=%d engine=rapidocr elapsed_ms=%.1f",
             frame_id,
@@ -344,6 +351,8 @@ class V3ProcessingWorker:
                 request_id=request_id,
                 capture_id=capture_id,
             )
+            # Mark visibility_status as failed
+            self._store.try_set_failed_standalone(frame_id)
         except Exception as exc:
             logger.error(
                 "V3ProcessingWorker: mark_failed DB write failed frame_id=%d: %s",
