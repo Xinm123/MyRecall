@@ -104,9 +104,9 @@ class EmbeddingWorker(threading.Thread):
                 conn,
                 frame_id,
                 embedding,
-                timestamp=frame.get("timestamp", ""),
-                app_name=frame.get("app_name", ""),
-                window_name=frame.get("window_name", ""),
+                timestamp=frame.get("timestamp") or "",
+                app_name=frame.get("app_name") or "",
+                window_name=frame.get("window_name") or "",
             )
             self.service.mark_completed(conn, task_id, frame_id)
             logger.info(f"Embedding completed for frame #{frame_id}")
