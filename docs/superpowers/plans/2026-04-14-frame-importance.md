@@ -92,6 +92,7 @@ import sqlite3
 from pathlib import Path
 
 
+@pytest.mark.unit
 class TestFrameImportance:
     """Tests for importance field operations."""
 
@@ -442,7 +443,38 @@ class Message:
 # Conversation, ConversationMeta, PiStatus classes remain unchanged...
 ```
 
-- [ ] **Step 4: 运行测试确认通过**
+- [ ] **Step 4: 确保 add_message 函数正确处理新字段**
+
+修改 `openrecall/client/chat/conversation.py` 中的 `add_message` 函数，确保它正确处理 Message 的新字段：
+
+```python
+def add_message(
+    conversation: Conversation,
+    role: str,
+    content: str,
+    tool_calls: Optional[list] = None
+) -> Message:
+    """Add a message to the conversation and auto-generate title if needed."""
+    msg = Message(
+        role=role,
+        content=content,
+        tool_calls=tool_calls,
+        created_at=_utc_now(),
+    )
+    # Note: id, rated, rating are auto-initialized by Message dataclass
+    conversation.messages.append(msg)
+    conversation.updated_at = _utc_now()
+
+    # Auto-generate title from first user message
+    if not conversation.title and role == "user":
+        conversation.title = content[:50] + ("..." if len(content) > 50 else "")
+
+    return msg
+```
+
+Message 的 `id` 会通过 `default_factory=_gen_uuid` 自动生成，`rated` 和 `rating` 有默认值。
+
+- [ ] **Step 5: 运行测试确认通过**
 
 ```bash
 pytest tests/test_frame_importance.py::TestMessageTypes -v
@@ -450,10 +482,10 @@ pytest tests/test_frame_importance.py::TestMessageTypes -v
 
 Expected: 所有测试通过
 
-- [ ] **Step 5: Commit**
+- [ ] **Step 6: Commit**
 
 ```bash
-git add openrecall/client/chat/types.py tests/test_frame_importance.py
+git add openrecall/client/chat/types.py openrecall/client/chat/conversation.py tests/test_frame_importance.py
 git commit -m "feat(chat): add id/rated/rating fields to Message type"
 ```
 
@@ -945,6 +977,23 @@ class TestImportanceRerank:
         # final_score = 0.008 * (1 + 0.2 * -5) = 0.008 * 0 = 0
         # Frame 1 should be first
         assert reranked[0]["frame_id"] == 1
+
+    def test_apply_importance_rerank_extreme_importance(self):
+        """Test re-ranking with extreme importance values."""
+        from openrecall.server.search.hybrid_engine import apply_importance_rerank
+
+        results = [
+            {"frame_id": 1, "score": 0.008, "importance": 0.0},
+            {"frame_id": 2, "score": 0.008, "importance": 1000000.0},  # Extreme value
+        ]
+
+        reranked = apply_importance_rerank(results)
+
+        # Frame 2 should be first due to high importance
+        # normalized = 1000000 / 1000000 = 1.0
+        # final_score = 0.008 * (1 + 0.2 * 1.0) = 0.0096
+        assert reranked[0]["frame_id"] == 2
+        assert reranked[0]["final_score"] == pytest.approx(0.0096, rel=0.01)
 ```
 
 - [ ] **Step 2: 运行测试确认失败**
@@ -1021,9 +1070,69 @@ def apply_importance_rerank(
 
 - [ ] **Step 5: 确保 get_frames_by_ids 返回 importance**
 
-检查 `openrecall/server/database/frames_store.py` 中的 `get_frames_by_ids` 方法，确保 SELECT 语句包含 `importance` 列。如果没有，添加它。
+修改 `openrecall/server/database/frames_store.py` 中的 `get_frames_by_ids` 方法，确保 SELECT 语句包含 `importance` 列：
 
-- [ ] **Step 6: 运行测试确认通过**
+```python
+def get_frames_by_ids(self, frame_ids: list[int]) -> dict[int, dict]:
+    """Fetch frame data by IDs.
+
+    Args:
+        frame_ids: List of frame IDs to fetch
+
+    Returns:
+        Dict mapping frame_id to frame data dict
+    """
+    if not frame_ids:
+        return {}
+
+    try:
+        with self._connect() as conn:
+            placeholders = ",".join("?" * len(frame_ids))
+            rows = conn.execute(
+                f"""
+                SELECT id, timestamp, app_name, window_name, browser_url,
+                       focused, device_name, full_text, text_source,
+                       embedding_status, importance
+                FROM frames
+                WHERE id IN ({placeholders})
+                """,
+                frame_ids,
+            ).fetchall()
+
+            result = {}
+            for row in rows:
+                result[row["id"]] = dict(row)
+            return result
+    except sqlite3.Error as e:
+        logger.error("get_frames_by_ids failed: %s", e)
+        return {}
+```
+
+- [ ] **Step 6: 在所有搜索模式中应用重排**
+
+修改 `_fts_only_search` 方法，在返回前应用重排：
+
+```python
+def _fts_only_search(
+    self, q: str, limit: int, offset: int, **kwargs
+) -> Tuple[List[Dict[str, Any]], int]:
+    """FTS-only search."""
+    results, total = self._fts_engine.search(q=q, limit=limit, offset=offset, **kwargs)
+    # Apply importance-based re-ranking
+    results = apply_importance_rerank(results)
+    return results, total
+```
+
+修改 `_vector_only_search` 方法，在结果构建后应用重排：
+
+找到 `return results, len(embeddings_with_distance)` 或 `return results, total` 之前添加：
+
+```python
+    # Apply importance-based re-ranking
+    results = apply_importance_rerank(results)
+```
+
+- [ ] **Step 7: 运行测试确认通过**
 
 ```bash
 pytest tests/test_frame_importance.py::TestImportanceRerank -v
@@ -1031,10 +1140,10 @@ pytest tests/test_frame_importance.py::TestImportanceRerank -v
 
 Expected: 所有测试通过
 
-- [ ] **Step 7: Commit**
+- [ ] **Step 8: Commit**
 
 ```bash
-git add openrecall/server/search/hybrid_engine.py tests/test_frame_importance.py
+git add openrecall/server/search/hybrid_engine.py openrecall/server/database/frames_store.py tests/test_frame_importance.py
 git commit -m "feat(search): add importance-based re-ranking with multiplicative boost"
 ```
 
@@ -1204,7 +1313,7 @@ git commit -m "feat(search): add importance-based re-ranking with multiplicative
       },
 ```
 
-- [ ] **Step 4: 确保 messages 加载时包含 rating 状态**
+- [ ] **Step 4: 确保所有消息初始化包含 rating 字段**
 
 修改 `selectConversation` 方法中加载消息的部分，确保消息对象包含 rating 相关字段：
 
@@ -1225,6 +1334,26 @@ git commit -m "feat(search): add importance-based re-ranking with multiplicative
               ratingError: null,
             });
 ```
+
+同时修改 `sendMessage` 方法中创建 `currentAssistantMsg` 的部分，添加 rating 字段：
+
+```javascript
+        this.currentAssistantMsg = {
+          id: this.nextId(),
+          role: 'assistant',
+          rawContent: '',
+          content: '',
+          thinking: '',
+          thinkingExpanded: false,
+          toolCalls: [],
+          rated: false,
+          rating: null,
+          ratingLoading: false,
+          ratingError: null,
+        };
+```
+
+同样修改 `handleSSEEvent` 中添加 user 消息和 error 消息的部分，确保所有消息都有 `rated` 和 `rating` 字段初始化为 `false` 和 `null`。
 
 - [ ] **Step 5: 手动测试**
 

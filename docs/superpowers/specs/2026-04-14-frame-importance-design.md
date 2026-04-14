@@ -145,19 +145,31 @@ def apply_importance_rerank(results: list[dict]) -> list[dict]:
     # 找到最大 importance 用于归一化
     max_importance = max(r.get('importance', 0) for r in results)
     if max_importance <= 0:
-        max_importance = 1  # 避免除零
+        max_importance = 1  # 避免 max=0 时的除零
 
     # 乘法加成
     for r in results:
         normalized = r.get('importance', 0) / max_importance
         # 最高提升 20%
-        r['final_score'] = r['score'] * (1 + 0.2 * normalized)
+        boost = 1 + 0.2 * normalized
+        # 确保 boost 不低于 0（负数 importance 时 score 降为 0）
+        boost = max(0, boost)
+        r['final_score'] = r['score'] * boost
 
     # 按 final_score 降序排列
     results.sort(key=lambda x: x['final_score'], reverse=True)
 
     return results
 ```
+
+### 边界情况处理
+
+| 场景 | 处理方式 |
+|------|----------|
+| 所有 importance = 0 | max_importance 设为 1，所有 frame 的 boost = 1，顺序不变 |
+| 所有 importance < 0 | max_importance 设为 1，负数归一化为更小的负数，boost = max(0, 1 + 负数) = 0，所有 frame 的 final_score = 0 |
+| 混合正负 importance | 正数正常归一化，负数可能使 boost 降为 0 |
+| 极大 importance 值 | 归一化后仍为 1.0，不影响算法稳定性 |
 
 ### 效果示例
 
@@ -187,11 +199,12 @@ def apply_importance_rerank(results: list[dict]) -> list[dict]:
 
 | 文件 | 变更 |
 |------|------|
-| `openrecall/server/database/frames_store.py` | 增加 importance 字段读写 |
-| `openrecall/server/search/hybrid_engine.py` | 增加重排逻辑 |
+| `openrecall/server/database/frames_store.py` | 增加 importance 字段读写方法，更新 get_frames_by_ids 返回 importance |
+| `openrecall/server/search/hybrid_engine.py` | 增加重排逻辑，覆盖所有搜索模式（fts/vector/hybrid） |
 | `openrecall/client/chat/routes.py` | 增加 /chat/api/rate 端点 |
 | `openrecall/client/chat/service.py` | 增加评分处理逻辑 |
-| `openrecall/client/chat/types.py` | Message 增加 rated/rating 字段 |
+| `openrecall/client/chat/types.py` | Message 增加 id/rated/rating 字段 |
+| `openrecall/client/chat/conversation.py` | 确保 add_message 正确处理新字段 |
 | `openrecall/client/web/templates/chat.html` | 增加评分 UI |
 
 ## 测试要点
