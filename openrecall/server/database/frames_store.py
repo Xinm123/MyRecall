@@ -1421,7 +1421,7 @@ class FramesStore:
                                 PARTITION BY app_name ORDER BY timestamp
                             )) - JULIANDAY(timestamp)) * 86400.0 AS gap_sec
                         FROM frames
-                        WHERE status = 'completed'
+                        WHERE visibility_status = 'queryable'
                           AND app_name = ?
                           AND timestamp >= ?
                           AND timestamp <= ?
@@ -1436,7 +1436,7 @@ class FramesStore:
                                 PARTITION BY app_name ORDER BY timestamp
                             )) - JULIANDAY(timestamp)) * 86400.0 AS gap_sec
                         FROM frames
-                        WHERE status = 'completed'
+                        WHERE visibility_status = 'queryable'
                           AND timestamp >= ?
                           AND timestamp <= ?
                           AND app_name IS NOT NULL
@@ -1480,7 +1480,7 @@ class FramesStore:
         end_time: str,
         app_name: Optional[str] = None,
     ) -> int:
-        """Return count of completed frames in time range.
+        """Return count of queryable frames in time range.
 
         Args:
             start_time: ISO8601 start timestamp
@@ -1488,14 +1488,14 @@ class FramesStore:
             app_name: Optional filter by app name
 
         Returns:
-            Count of completed frames
+            Count of queryable frames
         """
         try:
             with self._connect() as conn:
                 sql = """
                     SELECT COUNT(*) AS cnt
                     FROM frames
-                    WHERE status = 'completed'
+                    WHERE visibility_status = 'queryable'
                       AND timestamp >= ?
                       AND timestamp <= ?
                 """
@@ -1517,7 +1517,7 @@ class FramesStore:
         end_time: str,
         app_name: Optional[str] = None,
     ) -> Optional[dict]:
-        """Return min/max timestamps of completed frames in time range.
+        """Return min/max timestamps of queryable frames in time range.
 
         Args:
             start_time: ISO8601 start timestamp
@@ -1532,7 +1532,7 @@ class FramesStore:
                 sql = """
                     SELECT MIN(timestamp) AS start, MAX(timestamp) AS end
                     FROM frames
-                    WHERE status = 'completed'
+                    WHERE visibility_status = 'queryable'
                       AND timestamp >= ?
                       AND timestamp <= ?
                 """
@@ -1566,7 +1566,7 @@ class FramesStore:
             - text: accessibility_text or ocr_text, truncated at MAX_TEXT_LENGTH chars
             - text_source: 'accessibility' | 'ocr' | 'hybrid' | None
             - urls: extracted from text via regex
-            - browser_url, status: frame metadata
+            - browser_url, status, visibility_status: frame metadata
 
         Text is always truncated at MAX_TEXT_LENGTH (5000) chars with "..." suffix.
         """
@@ -1575,7 +1575,7 @@ class FramesStore:
                 row = conn.execute(
                     """
                     SELECT f.id, f.accessibility_text, f.ocr_text, f.text_source,
-                           f.browser_url, f.status,
+                           f.browser_url, f.status, f.visibility_status,
                            f.timestamp, f.app_name, f.window_name
                     FROM frames f
                     WHERE f.id = ?
@@ -1595,6 +1595,7 @@ class FramesStore:
                 text_source = row["text_source"]
                 browser_url = row["browser_url"]
                 status = row["status"]
+                visibility_status = row["visibility_status"]
                 timestamp = row["timestamp"]
                 app_name = row["app_name"]
                 window_name = row["window_name"]
@@ -1621,6 +1622,7 @@ class FramesStore:
                     "urls": urls,
                     "browser_url": browser_url,
                     "status": status,
+                    "visibility_status": visibility_status,
                 }
         except Exception:
             logger.exception(f"Error getting frame context for frame_id={frame_id}")
