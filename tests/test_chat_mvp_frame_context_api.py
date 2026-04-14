@@ -53,6 +53,7 @@ class TestFrameContextAPI:
             "urls": [],
             "browser_url": "https://example.com",
             "status": "completed",
+            "visibility_status": "queryable",
         }
 
         with patch("openrecall.server.api_v1._get_frames_store", return_value=mock_store):
@@ -95,6 +96,7 @@ class TestFrameContextAPI:
             "urls": ["https://ocr-url.com"],
             "browser_url": None,
             "status": "completed",
+            "visibility_status": "queryable",
         }
 
         with patch("openrecall.server.api_v1._get_frames_store", return_value=mock_store):
@@ -118,6 +120,7 @@ class TestFrameContextAPI:
             "urls": [],
             "browser_url": "https://example.com/page",
             "status": "completed",
+            "visibility_status": "queryable",
         }
 
         with patch("openrecall.server.api_v1._get_frames_store", return_value=mock_store):
@@ -140,6 +143,7 @@ class TestFrameContextAPI:
             "urls": [],
             "browser_url": None,
             "status": "completed",
+            "visibility_status": "queryable",
         }
 
         # Configure mock to return description_status=completed
@@ -180,6 +184,7 @@ class TestFrameContextAPI:
             "urls": [],
             "browser_url": None,
             "status": "completed",
+            "visibility_status": "queryable",
         }
 
         # Configure mock to return description_status != completed
@@ -199,4 +204,50 @@ class TestFrameContextAPI:
             body = json.loads(response.data)
             assert body["description"] is None
             assert "description_status" not in body
+
+    def test_frame_context_returns_404_for_non_queryable_frame(self, app_with_context_route, mock_store):
+        """Endpoint returns 404 NOT_READY when frame is not queryable."""
+        mock_store.get_frame_context.return_value = {
+            "frame_id": 1,
+            "timestamp": "2026-03-26T10:00:00Z",
+            "app_name": "Safari",
+            "window_name": "Safari Window",
+            "text": "Test",
+            "text_source": "accessibility",
+            "urls": [],
+            "browser_url": None,
+            "status": "completed",
+            "visibility_status": "pending",  # Not queryable
+        }
+
+        with patch("openrecall.server.api_v1._get_frames_store", return_value=mock_store):
+            client = app_with_context_route.test_client()
+            response = client.get("/v1/frames/1/context")
+
+            assert response.status_code == 404
+            body = json.loads(response.data)
+            assert body["code"] == "NOT_READY"
+
+    def test_frame_context_returns_404_for_null_visibility_status(self, app_with_context_route, mock_store):
+        """Endpoint returns 404 NOT_READY when visibility_status is NULL."""
+        mock_store.get_frame_context.return_value = {
+            "frame_id": 1,
+            "timestamp": "2026-03-26T10:00:00Z",
+            "app_name": "Safari",
+            "window_name": "Safari Window",
+            "text": "Test",
+            "text_source": "accessibility",
+            "urls": [],
+            "browser_url": None,
+            "status": "completed",
+            "visibility_status": None,  # NULL visibility
+        }
+
+        with patch("openrecall.server.api_v1._get_frames_store", return_value=mock_store):
+            client = app_with_context_route.test_client()
+            response = client.get("/v1/frames/1/context")
+
+            assert response.status_code == 404
+            body = json.loads(response.data)
+            assert body["code"] == "NOT_READY"
 

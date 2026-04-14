@@ -688,7 +688,7 @@ def get_frame_context(frame_id: int):
 
     Returns:
         200 JSON — frame context (always includes description, text, urls, text_source)
-        404 NOT_FOUND — frame_id not in DB
+        404 NOT_FOUND — frame_id not in DB or not queryable
     """
     request_id = str(uuid.uuid4())
 
@@ -700,6 +700,15 @@ def get_frame_context(frame_id: int):
         return make_error_response(
             "frame not found",
             "NOT_FOUND",
+            404,
+            request_id=request_id,
+        )
+
+    # Check if frame is queryable
+    if context.get("visibility_status") != "queryable":
+        return make_error_response(
+            "frame not ready for querying",
+            "NOT_READY",
             404,
             request_id=request_id,
         )
@@ -722,6 +731,9 @@ def get_frame_context(frame_id: int):
                     }
     except Exception as e:
         logger.warning(f"Failed to get description for frame {frame_id}: {e}")
+
+    # Remove visibility_status from response (internal field)
+    context.pop("visibility_status", None)
 
     # Insert description at the correct field position (after window_name, before text)
     # Build ordered result dict
