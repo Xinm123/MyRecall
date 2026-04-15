@@ -81,47 +81,6 @@
     border-color: var(--accent-color);
   }
 
-  /* Content type pill filters */
-  .content-type-pills {
-    display: flex;
-    gap: 8px;
-    align-items: center;
-  }
-
-  .pill {
-    padding: 6px 14px;
-    border: 1px solid var(--border-color);
-    border-radius: 16px;
-    font-size: 13px;
-    font-weight: 500;
-    cursor: pointer;
-    background: var(--bg-body);
-    color: var(--text-secondary);
-    transition: all 0.2s ease;
-    display: flex;
-    align-items: center;
-    gap: 4px;
-  }
-
-  .pill:hover {
-    border-color: var(--accent-color);
-    color: var(--accent-color);
-  }
-
-  .pill.active {
-    background: var(--accent-color);
-    color: white;
-    border-color: var(--accent-color);
-  }
-
-  .pill .count {
-    font-size: 11px;
-    font-weight: 400;
-    opacity: 0.7;
-    min-width: 16px;
-    text-align: center;
-  }
-
   /* Spinner Animation */
   @keyframes spin {
     0% { transform: rotate(0deg); }
@@ -163,12 +122,12 @@
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
   }
 
-  /* Card Header V2 - three row layout */
-  .card-header-v2 {
+  /* Card Header V3 - Apple Style Refined Layout (matches index.html) */
+  .card-header-v3 {
     display: flex;
     flex-direction: column;
-    padding: 10px 14px;
-    gap: 4px;
+    padding: 12px 16px;
+    gap: 6px;
     border-bottom: 1px solid var(--border-color);
     background: var(--bg-card);
   }
@@ -176,12 +135,11 @@
   .header-row {
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    min-height: 18px;
+    min-height: 20px;
   }
 
   .context-row {
-    gap: 8px;
+    justify-content: space-between;
   }
 
   .context-left {
@@ -192,28 +150,108 @@
     flex: 1;
   }
 
+  .app-icon {
+    font-size: 14px;
+    width: 20px;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+
   .app-name {
-    font-size: 0.9rem;
+    font-size: 14px;
     font-weight: 600;
     color: var(--text-primary);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    flex-shrink: 1;
+  }
+
+  .trigger-badge {
+    font-size: 10px;
+    font-weight: 500;
+    padding: 2px 8px;
+    border-radius: 10px;
+    text-transform: capitalize;
+    flex-shrink: 0;
+    white-space: nowrap;
+    background: rgba(0, 0, 0, 0.05);
+    color: var(--text-secondary);
+  }
+
+  .trigger-badge[data-trigger="idle"] {
+    background: var(--color-warning-bg, rgba(212, 132, 13, 0.1));
+    color: #D4840D;
+  }
+
+  .trigger-badge[data-trigger="app_switch"] {
+    background: var(--color-primary-bg, rgba(10, 110, 214, 0.1));
+    color: #0A6ED6;
+  }
+
+  .trigger-badge[data-trigger="click"] {
+    background: var(--color-success-bg, rgba(42, 157, 74, 0.1));
+    color: #2A9D4A;
+  }
+
+  .trigger-badge[data-trigger="manual"] {
+    background: rgba(175, 82, 222, 0.1);
+    color: #8E4DB0;
+  }
+
+  .frame-id {
+    font-size: 11px;
+    color: var(--text-tertiary);
+    font-weight: 500;
+    font-family: 'SF Mono', Monaco, Consolas, monospace;
+    flex-shrink: 0;
   }
 
   .window-row {
-    justify-content: flex-start;
+    min-height: 18px;
+    display: flex;
+    align-items: center;
   }
 
   .window-name {
-    font-size: 12px;
-    color: var(--text-secondary);
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-primary);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    flex: 1;
-    line-height: 1.3;
+    line-height: 1.4;
+  }
+
+  .meta-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 16px;
+    margin-top: 2px;
+    padding-top: 6px;
+    border-top: 1px solid rgba(0, 0, 0, 0.04);
+  }
+
+  .meta-row .timestamp,
+  .meta-row .relative-time,
+  .meta-row .device-name {
+    font-size: 11px;
+    color: var(--text-tertiary);
+    white-space: nowrap;
+  }
+
+  .meta-row .timestamp {
+    font-family: 'SF Mono', Monaco, Consolas, monospace;
+    letter-spacing: -0.2px;
+  }
+
+  .meta-row .separator {
+    font-size: 11px;
+    color: var(--text-tertiary);
+    opacity: 0.6;
   }
 
   .time-row {
@@ -222,30 +260,6 @@
     border-top: 1px dashed rgba(0, 0, 0, 0.06);
     justify-content: space-between;
     gap: 8px;
-  }
-
-  .timestamp {
-    font-size: 11px;
-    color: var(--text-tertiary, #8E8E93);
-    font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
-    letter-spacing: -0.3px;
-  }
-
-  .relative-time {
-    font-size: 11px;
-    color: var(--text-tertiary, #8E8E93);
-    font-weight: 500;
-    flex-shrink: 0;
-  }
-
-  /* Device name (optional, for consistency) */
-  .device-name {
-    font-size: 11px;
-    color: var(--text-tertiary, #8E8E93);
-    font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
-    flex-shrink: 0;
-    text-transform: uppercase;
-    letter-spacing: 0.3px;
   }
 
   /* Card Image Wrapper - fixed height */
@@ -515,7 +529,7 @@
     margin-right: 4px;
   }
 
-  /* Reuse existing .pill styles from content-type-pills */
+  /* Search Mode Pills */
   .search-mode-pills .pill {
     padding: 6px 14px;
     border: 1px solid var(--border-color);
@@ -641,12 +655,6 @@
   <span id="semantic-warning-text"></span>
 </div>
 
-<div class="content-type-pills">
-  <button type="button" class="pill active" data-type="all">All</button>
-  <button type="button" class="pill" data-type="ocr">OCR <span class="count">—</span></button>
-  <button type="button" class="pill" data-type="accessibility">AX <span class="count">—</span></button>
-</div>
-
 <div class="results-grid" id="resultsGrid">
   <!-- Results will be populated by JavaScript -->
   <div class="empty-state">
@@ -680,9 +688,6 @@
   let currentResults = [];
   let currentPagination = { limit: 20, offset: 0, total: 0 };
 
-  // Content type filter state
-  let selectedContentType = 'all';
-
   // Search mode state
   let searchMode = 'hybrid';
 
@@ -708,23 +713,8 @@
   const nextPageBtn = document.getElementById('nextPage');
   const pageInfo = document.getElementById('pageInfo');
 
-  // Content type pills
-  const contentTypePills = document.querySelectorAll('.content-type-pills .pill');
-  const ocrCountSpan = document.querySelector('.pill[data-type="ocr"] .count');
-  const axCountSpan = document.querySelector('.pill[data-type="accessibility"] .count');
-
   // Search mode pills
   const searchModePills = document.querySelectorAll('#searchModePills .pill');
-
-  // Initialize content type from URL
-  function initContentTypeFromUrl() {
-    const params = new URLSearchParams(window.location.search);
-    const urlContentType = params.get('content_type');
-    if (urlContentType && ['ocr', 'accessibility', 'all'].includes(urlContentType)) {
-      selectedContentType = urlContentType;
-      updatePillActiveState();
-    }
-  }
 
   // Initialize search mode from URL
   function initSearchModeFromUrl() {
@@ -801,30 +791,6 @@
           setSearchMode(modes[modes.length - 1]);
           searchModePills[searchModePills.length - 1]?.focus();
           break;
-      }
-    });
-  });
-
-  // Update pill active state
-  function updatePillActiveState() {
-    contentTypePills.forEach(pill => {
-      const type = pill.dataset.type;
-      if (type === selectedContentType) {
-        pill.classList.add('active');
-      } else {
-        pill.classList.remove('active');
-      }
-    });
-  }
-
-  // Handle pill click
-  contentTypePills.forEach(pill => {
-    pill.addEventListener('click', () => {
-      const newType = pill.dataset.type;
-      if (newType !== selectedContentType) {
-        selectedContentType = newType;
-        updatePillActiveState();
-        performSearch(0);
       }
     });
   });
@@ -914,11 +880,6 @@
       params.set('mode', searchMode);
     }
 
-    // Add content type filter (default 'all' is omitted)
-    if (selectedContentType !== 'all') {
-      params.set('content_type', selectedContentType);
-    }
-
     // Include text for grid view display
     params.set('include_text', 'true');
 
@@ -926,34 +887,6 @@
     params.set('offset', offset.toString());
 
     return params.toString();
-  }
-
-  // Fetch type counts for current filters
-  async function fetchCounts() {
-    const params = getFormFilterParams();
-
-    const url = `${EDGE_BASE_URL}/v1/search/counts?${params.toString()}`;
-
-    try {
-      const response = await fetch(url);
-      if (!response.ok) {
-        throw new Error(`Counts fetch failed: ${response.status}`);
-      }
-      const data = await response.json();
-
-      // Update count spans
-      if (ocrCountSpan) {
-        ocrCountSpan.textContent = data.counts.ocr;
-      }
-      if (axCountSpan) {
-        axCountSpan.textContent = data.counts.accessibility;
-      }
-    } catch (error) {
-      console.error('Counts fetch error:', error);
-      // Silently leave as '—' on error
-      if (ocrCountSpan) ocrCountSpan.textContent = '—';
-      if (axCountSpan) axCountSpan.textContent = '—';
-    }
   }
 
   // Format relative time
@@ -1051,6 +984,82 @@
     return '';
   }
 
+  // Get app icon based on app name (matches index.html)
+  function getAppIcon(appName) {
+    const icons = {
+      'Safari': '🧭',
+      'Chrome': '🌐',
+      'Google Chrome': '🌐',
+      'Firefox': '🦊',
+      'Mail': '✉️',
+      'Messages': '💬',
+      'Slack': '💬',
+      'Terminal': '⬛',
+      'iTerm': '⬛',
+      'iTerm2': '⬛',
+      'VSCode': '💻',
+      'Visual Studio Code': '💻',
+      'Code': '💻',
+      'Xcode': '🔨',
+      'Finder': '📁',
+      'Notes': '📝',
+      'Calendar': '📅',
+      'Photos': '🖼️',
+      'Music': '🎵',
+      'Spotify': '🎵',
+      'Zoom': '📹',
+      'Teams': '👥',
+      'Notion': '📓',
+      'Obsidian': '💎',
+      'Preview': '👁️',
+      'Numbers': '📊',
+      'Keynote': '📽️',
+      'Pages': '📄',
+      'Word': '📄',
+      'Excel': '📊',
+      'PowerPoint': '📽️',
+      'PyCharm': '🐍',
+      'IntelliJ': '☕',
+      'WebStorm': '🌊',
+      'Sublime Text': '📝',
+      'Atom': '⚛️',
+      'Typora': '📝',
+      'Bear': '🐻',
+      'Drafts': '✏️',
+      'Things': '✅',
+      'Todoist': '✅',
+      'Reminders': '✅',
+      'Arc': '🌀',
+      'Brave': '🦁',
+      'Edge': '🌊',
+      'WeChat': '💬',
+      'Telegram': '✈️',
+      'Discord': '🎮',
+      'Figma': '🎨',
+      'Sketch': '🎨',
+      'Canva': '🎨',
+      'Final Cut Pro': '🎬',
+      'DaVinci Resolve': '🎬',
+      'Blender': '🎨',
+      'Docker': '🐳',
+      'Postman': '📬',
+      'TablePlus': '🗃️',
+      'Sequel Pro': '🗃️',
+      'Database': '🗃️',
+    };
+    if (!appName) return '🖥️';
+    // Direct match
+    if (icons[appName]) return icons[appName];
+    // Partial match
+    const lowerName = appName.toLowerCase();
+    for (const [key, icon] of Object.entries(icons)) {
+      if (lowerName.includes(key.toLowerCase()) || key.toLowerCase().includes(lowerName)) {
+        return icon;
+      }
+    }
+    return '🖥️';
+  }
+
   // Render embedding status badge
   function renderEmbeddingBadge(item) {
     const status = item.embedding_status;
@@ -1108,25 +1117,36 @@
       const relativeTime = formatRelativeTime(item.timestamp);
       const appName = item.app_name || 'Unknown';
       const windowName = item.window_name || '';
+      const trigger = item.capture_trigger || '';
+
+      // Build trigger badge HTML
+      const triggerBadgeHtml = trigger
+        ? `<span class="trigger-badge" data-trigger="${trigger}">${trigger}</span>`
+        : '';
 
       return `
         <article class="memory-card">
-          <div class="card-header-v2">
-            <!-- Row 1: App name + relative time -->
+          <div class="card-header-v3">
+            <!-- Row 1: App + Trigger + Frame ID -->
             <div class="header-row context-row">
               <div class="context-left">
+                <span class="app-icon">${getAppIcon(appName)}</span>
                 <span class="app-name" title="${windowName.replace(/"/g, '&quot;')}">${appName}</span>
+                ${triggerBadgeHtml}
               </div>
-              <span class="relative-time">${relativeTime}</span>
+              <span class="frame-id">No.${frameId}</span>
             </div>
-            <!-- Row 2: Window name -->
+            <!-- Row 2: Window title -->
             <div class="header-row window-row">
-              <span class="window-name">${windowName}</span>
+              <span class="window-name" title="${windowName.replace(/"/g, '&quot;')}">${windowName}</span>
             </div>
-            <!-- Row 3: Timestamp + Device name -->
-            <div class="header-row time-row">
+            <!-- Row 3: Time info -->
+            <div class="header-row meta-row">
               <span class="timestamp">${timestamp}</span>
-              <span class="device-name">${item.device_name || 'monitor_0'}</span>
+              <span class="separator">·</span>
+              <span class="relative-time">${relativeTime}</span>
+              <span class="separator" style="display: ${item.device_name ? 'inline' : 'none'}">·</span>
+              <span class="device-name" style="display: ${item.device_name ? 'inline' : 'none'}">${item.device_name || ''}</span>
             </div>
           </div>
           <div class="card-image-wrapper">
@@ -1187,9 +1207,6 @@
       }
       const result = await response.json();
       renderResults(result.data, result.pagination);
-
-      // Fetch counts after successful search
-      fetchCounts();
     } catch (error) {
       console.error('Search error:', error);
       resultsGrid.innerHTML = `
@@ -1225,8 +1242,7 @@
     }
   });
 
-  // Initialize content type from URL
-  initContentTypeFromUrl();
+  // Initialize search mode from URL
   initSearchModeFromUrl();
 
   // Load initial results if URL has params

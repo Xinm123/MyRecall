@@ -126,10 +126,10 @@ pip install -e ".[test]"    # Include test dependencies
 
 **Components:**
 - **Ingest API**: `POST /v1/ingest` (idempotent)
-- **Worker**: Processing worker (`V3ProcessingWorker` for OCR mode, `DescriptionWorker` for frame descriptions, `EmbeddingWorker` for vector embeddings)
+- **Worker**: Processing worker (`V3ProcessingWorker` for OCR, `DescriptionWorker` for descriptions, `EmbeddingWorker` for vector embeddings)
 - **Database**:
   - `~/.myrecall/server/db/edge.db`: Frames metadata + FTS5 tables (frames_fts, ocr_text_fts, accessibility_fts)
-  - `~/.myrecall/server/fts.db`: Legacy schema (used by old API layer)
+  - `~/.myrecall/server/db/fts.db`: Legacy SQLStore schema (still in use by some server components; legacy `/api/*` endpoints return 410 Gone)
   - `~/.myrecall/server/frames/`: JPEG snapshots
   - `~/.myrecall/server/lancedb/`: Vector embeddings (frame embeddings for semantic search)
 - **Search Engine**: Hybrid search (FTS5 + vector)
@@ -160,12 +160,17 @@ pip install -e ".[test]"    # Include test dependencies
 - text_source ('accessibility'|'ocr'|'hybrid')
 - accessibility_tree_json (full AX tree as JSON)
 - processing_status (pending/processing/completed/failed)
+- description_status (pending/processing/completed/failed)
 - embedding_status (NULL/pending/processing/completed/failed)
+- visibility_status (pending/queryable/failed — combined state of all processing stages)
+- error_message (error details when status='failed')
 - event_ts (capture event timestamp, separate from frame timestamp)
 ```
 
 **FTS5 Tables**:
 - `frames_fts`: Full-text index on full_text + metadata (app_name, window_name, browser_url)
+- `ocr_text_fts`: Full-text index on ocr_text
+- `accessibility_fts`: Full-text index on accessibility_text
 
 **Embedding Tables** (`edge.db`):
 - `embedding_tasks`: Queue for embedding generation with retry logic
@@ -178,7 +183,6 @@ Key decisions embedded in this document:
 - **Hybrid Search**: FTS5 full-text search + LanceDB vector search with RRF fusion
 - **Multimodal Embedding**: qwen3-vl-embedding for true image+text fusion (single embedding per frame)
 
-Architecture baselines: `docs/baselines/` (chat, search)
 
 ## Database Migrations
 
@@ -236,15 +240,23 @@ openrecall/
 │   ├── worker.py    # Legacy ProcessingWorker
 │   ├── database/    # SQLite + migrations
 │   │   ├── frames_store.py  # v3 FramesStore (edge.db)
+│   │   ├── embedding_store.py  # EmbeddingStore (LanceDB wrapper)
 │   │   └── sql.py          # Legacy SQLStore (fts.db)
 │   ├── search/      # Search engines
 │   │   ├── engine.py       # FTS5 search engine
 │   │   └── hybrid_engine.py  # Hybrid (FTS + vector) search
-│   ├── processing/  # V3ProcessingWorker, OCR processor
-│   ├── description/ # DescriptionWorker (frame descriptions)
-│   └── embedding/   # EmbeddingWorker, multimodal providers
-│       ├── providers/  # QwenVL, OpenAI, DashScope providers
-│       └── service.py  # EmbeddingService, LanceDB storage
+│   ├── processing/  # OCR pipeline
+│   │   ├── v3_worker.py    # V3ProcessingWorker (OCR worker)
+│   │   ├── ocr_processor.py  # OCR execution
+│   │   └── idempotency.py  # Duplicate processing prevention
+│   ├── description/ # Frame description pipeline
+│   │   ├── worker.py    # DescriptionWorker
+│   │   ├── service.py  # DescriptionService
+│   │   └── providers/  # Provider implementations (local, dashscope, openai)
+│   └── embedding/   # Vector embedding pipeline
+│       ├── worker.py    # EmbeddingWorker
+│       ├── service.py   # EmbeddingService, LanceDB storage
+│       └── providers/   # Multimodal embedding providers
 └── shared/          # Common utilities
     ├── config.py    # Settings management
     └── models.py    # Data models
@@ -319,6 +331,7 @@ Key settings (see `openrecall/shared/config.py`):
 - `POST /v1/admin/description/backfill`: Trigger description backfill
 - `GET /v1/embedding/tasks/status`: Embedding task queue statistics
 - `POST /v1/admin/embedding/backfill`: Trigger embedding backfill
+- `POST /v1/admin/frames/retry-failed`: Retry all failed frames (reset stages and re-queue)
 
 **Chat API Endpoints** (`/chat/api/*` on Client port 8889):
 - `POST /chat/api/stream`: SSE streaming chat (event: message_update, agent_end)
@@ -412,4 +425,3 @@ The `_ref/screenpipe/` directory contains the screenpipe Rust implementation for
 
 Active implementation plans: `docs/superpowers/plans/`
 Design specifications: `docs/superpowers/specs/`
-Architecture baselines: `docs/baselines/`

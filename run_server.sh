@@ -112,12 +112,9 @@ if [[ "$enable_debug" == "true" ]]; then
   export OPENRECALL_DEBUG=true
 fi
 
-python_bin="${OPENRECALL_PYTHON_BIN:-$(pwd)/.venv/bin/python}"
-if [[ ! -x "$python_bin" ]]; then
-  python_bin="$(command -v python3 || true)"
-fi
-if [[ -z "${python_bin:-}" ]]; then
-  echo "Python not found. Set OPENRECALL_PYTHON_BIN to your venv python." >&2
+# Verify Python is available
+if ! command -v python &> /dev/null; then
+  echo "Error: python not found. Activate your conda/venv environment first." >&2
   exit 1
 fi
 
@@ -127,4 +124,4 @@ if [[ -n "$config_file" ]]; then
   cmd_args+=("--config" "$config_file")
 fi
 
-exec "$python_bin" "${cmd_args[@]}"
+exec python "${cmd_args[@]}"

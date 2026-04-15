@@ -150,9 +150,9 @@ curl "http://localhost:8083/v1/search?q=GitHub+PR&mode=vector&start_time=${START
 
 ### ⚠️  `content_type` Parameter is Deprecated
 
-> The `content_type` parameter (`ocr`, `accessibility`, `all`) is **deprecated** in MyRecall.
-> It is ignored by the API — all searches return merged results from both OCR and
-> accessibility text. Do NOT use this parameter to filter results; it has no effect.
+> **IMPORTANT**: The `content_type` parameter (`ocr`, `accessibility`, `all`) is **deprecated**.
+> Behavior is inconsistent — it is ignored in most cases but may log warnings. Do NOT use this
+> parameter to filter results; it has no reliable effect.
 
 ### Parameters
 
@@ -171,8 +171,9 @@ curl "http://localhost:8083/v1/search?q=GitHub+PR&mode=vector&start_time=${START
 | `include_text` | boolean | No | Include `text` field in response (default: `false`) |
 | `max_text_length` | integer | No | Max characters for `text` field with middle-truncation (default: 1000) |
 
-> **Always include `start_time` and `end_time`**. Unbounded searches will return
-> excessive results and may be slow.
+> **`include_text`**: In `hybrid` mode, text is always truncated to 200 characters regardless of this flag. In `fts` mode, respects `max_text_length`.
+
+> **Always include `start_time` and `end_time`**. Unbounded searches will return excessive results and may be slow.
 
 ### Response Format
 
@@ -228,7 +229,7 @@ curl "http://localhost:8083/v1/search?q=GitHub+PR&mode=vector&start_time=${START
 | `embedding_status` | Vector embedding status: `completed`, `pending`, `failed`, or empty |
 | `description` | AI-generated description object with `narrative`, `summary`, `tags[]`. Null if not generated. |
 | `score` | Unified relevance score (all modes) |
-| `fts_score` | BM25 relevance score (fts/hybrid modes). Negative value, higher (closer to 0) = more relevant. |
+| `fts_score` | FTS5 rank — lower value = better match (1 = best) |
 | `fts_rank` | Position in FTS results (hybrid mode only) |
 | `cosine_score` | Vector cosine similarity 0-1, higher = more similar (vector/hybrid modes) |
 | `hybrid_rank` | Final RRF fused rank (hybrid mode only) |
@@ -393,7 +394,7 @@ User asks a question
 4. **Keep `limit` low** (5-10) initially — expand if needed
 5. **`text_source` tells you quality**: `accessibility` > `ocr`. If results seem poor, they may be from OCR fallback
 6. **`description.narrative` is the gold standard** for understanding activity — use it first, fall back to `text` if `description` is null
-7. **Do NOT use `content_type` parameter** — it is deprecated and ignored
+7. **Do NOT use `content_type` parameter** — it is deprecated and has inconsistent behavior
 8. **Max 2-3 frames per response** — don't overwhelm the context with many frame details
 9. **Frame context text is capped at 5000 chars** — long content will be truncated with "..." suffix
 10. **Use `include_text=true`** only when you need the frame text — default is `false` to reduce response size
