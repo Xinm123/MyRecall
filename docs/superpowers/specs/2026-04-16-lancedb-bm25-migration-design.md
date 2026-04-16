@@ -301,9 +301,9 @@ def _fts_only_search(self, q: str, limit: int, offset: int, **kwargs) -> Tuple[L
 ```python
 def _hybrid_search(self, q: str, fts_weight: float, vector_weight: float,
                    limit: int, offset: int, **kwargs) -> Tuple[List[Dict], int]:
-    from openrecall.server.search.tokenizer import tokenize_text
+    # Tokenizer import is in _fts_only_search; no new import needed here.
 
-    # LanceDB FTS with jieba
+    # LanceDB FTS with jieba (through _fts_only_search)
     fts_results, _ = self._fts_only_search(q, limit=limit * 2, offset=0, **kwargs)
 
     # LanceDB vector (unchanged)

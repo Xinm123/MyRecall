@@ -119,7 +119,7 @@ def test_punctuation_handling():
 ```
 
 Run: `pytest tests/unit/test_tokenizer.py -v`
-Expected: FAIL with "No module named 'openrecall'"
+Expected: FAIL — module `openrecall` not yet importable (since it was just created)
 
 - [ ] **Step 2: Write minimal implementation**
 
@@ -227,7 +227,9 @@ git commit -m "feat(embedding): add tokenized_text and full_text fields to Frame
 
 - [ ] **Step 1: Read current embedding_store.py**
 
-Note the `FrameEmbeddingSchema` class at the top and `save_embedding` method.
+> **Note:** The existing `_init_table()` has schema-mismatch detection that drops and recreates the table if the LanceDB schema differs from the pydantic `FrameEmbeddingSchema`. Since Task 3 updated the schema with `tokenized_text` and `full_text`, the existing LanceDB table will be dropped and recreated on next `EmbeddingStore()` instantiation. This is acceptable per spec constraints (existing data will be deleted).
+
+Run: `cat openrecall/server/database/embedding_store.py`
 
 - [ ] **Step 2: Update FrameEmbeddingSchema with new fields**
 
@@ -297,6 +299,13 @@ Add after `search_with_distance`:
 Run: `pytest tests/ -k "embedding" -v --ignore=tests/integration -x`
 Expected: PASS
 
+> **Optional (performance):** jieba loads its dictionary on first call (~100ms). To avoid this latency spike on the first embedding write, add warmup in `_ensure_fts_index`:
+> ```python
+> import jieba
+> jieba.initialize()  # Pre-load dictionary at startup
+> ```
+> This is optional — jieba auto-initializes on first tokenization, so it's not required for correctness.
+
 - [ ] **Step 7: Commit**
 
 ```bash
@@ -361,7 +370,7 @@ git commit -m "feat(embedding): extend save_embedding with tokenized_text and fu
 
 - [ ] **Step 1: Read current _process_batch method**
 
-Run: `grep -n "save_embedding\|from openrecall" openrecall/server/embedding/worker.py`
+Run: `grep -n "_process_batch\|save_embedding" openrecall/server/embedding/worker.py`
 
 - [ ] **Step 2: Add tokenizer import at module top**
 
@@ -594,4 +603,4 @@ git status
 git log --oneline -10
 ```
 
-Confirm all 8 task commits are present. The implementation is complete.
+Confirm all 9 task commits are present. The implementation is complete.
