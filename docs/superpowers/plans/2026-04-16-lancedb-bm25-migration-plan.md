@@ -166,6 +166,8 @@ git commit -m "feat(search): add jieba tokenizer for Chinese BM25 support"
 
 ## Task 3: Extend LanceDB schema with tokenized_text and full_text
 
+> **Prerequisite for Task 4.** Task 4 mirrors the same fields in `FrameEmbeddingSchema`. Execute Task 3 first.
+
 **Files:**
 - Modify: `openrecall/server/embedding/models.py`
 
@@ -361,9 +363,9 @@ git commit -m "feat(embedding): extend save_embedding with tokenized_text and fu
 
 Run: `grep -n "save_embedding\|from openrecall" openrecall/server/embedding/worker.py`
 
-- [ ] **Step 2: Add tokenizer import and compute tokenized_text**
+- [ ] **Step 2: Add tokenizer import at module top**
 
-Edit the imports at the top of `_process_batch` method (line ~1, after existing imports):
+Edit the top of `openrecall/server/embedding/worker.py`, after existing imports:
 
 ```python
 from openrecall.server.search.tokenizer import tokenize_text
@@ -408,15 +410,26 @@ git commit -m "feat(worker): compute and persist jieba tokenized text"
 **Files:**
 - Modify: `openrecall/server/search/hybrid_engine.py`
 
-- [ ] **Step 1: Read current HybridSearchEngine class**
+- [ ] **Step 1: Remove `_fts_engine` from `__init__` and rewrite `_fts_only_search`**
 
-Run: `grep -n "def _fts_only_search\|def _hybrid_search\|self._fts_engine\|self._embedding_store" openrecall/server/search/hybrid_engine.py`
+Read current `HybridSearchEngine.__init__`:
 
-Note: `_fts_only_search` delegates to `self._fts_engine.search()`, which uses SQLite FTS. This is the key method to rewrite.
+```bash
+grep -n "self._fts_engine\|self._embedding_store\|def __init__" openrecall/server/search/hybrid_engine.py
+```
 
-- [ ] **Step 2: Rewrite _fts_only_search**
+**Edit `__init__`** — remove the `SearchEngine` singleton since it will no longer be used:
 
-Replace the entire `_fts_only_search` method body (lines 99-103) with:
+```python
+class HybridSearchEngine:
+    def __init__(self):
+        from openrecall.server.database.embedding_store import EmbeddingStore
+
+        self._embedding_store = EmbeddingStore()
+        # Note: self._fts_engine removed — FTS now goes through LanceDB
+```
+
+Then replace the entire `_fts_only_search` method body with:
 
 ```python
     def _fts_only_search(
@@ -430,7 +443,7 @@ Replace the entire `_fts_only_search` method body (lines 99-103) with:
 
         # Browse mode (no query): return recent queryable frames
         if not q or q.isspace():
-            return self._get_recent_queryable_frames(frames_store, limit, offset)
+            return self._get_recent_embedded_frames(frames_store.db_path, limit, offset)
 
         # Tokenize query with jieba
         tokenized_q = tokenize_text(q)
@@ -445,18 +458,22 @@ Replace the entire `_fts_only_search` method body (lines 99-103) with:
         results = []
         for r in lance_results[offset:offset + limit]:
             frame = frame_data_map.get(r["frame_id"], {})
+            # Fix: use frame timestamp first; fallback to lance timestamp only if falsy
+            ts = frame.get("timestamp") if frame.get("timestamp") else (r.get("timestamp") or "")
             results.append({
                 "frame_id": r["frame_id"],
                 "score": r.get("_score"),
                 "fts_score": r.get("_score"),
-                "timestamp": frame.get("timestamp", r.get("timestamp", "")),
-                "text": r.get("full_text", "")[:200] if r.get("full_text") else "",
+                "cosine_score": None,        # FTS-only has no vector score
+                "vector_rank": None,          # FTS-only has no vector rank
+                "timestamp": ts,
+                "text": (r.get("full_text") or "")[:200],
                 "text_source": frame.get("text_source", ""),
-                "app_name": frame.get("app_name", r.get("app_name", "")),
-                "window_name": frame.get("window_name", r.get("window_name", "")),
+                "app_name": frame.get("app_name") or r.get("app_name", ""),
+                "window_name": frame.get("window_name") or r.get("window_name", ""),
                 "browser_url": frame.get("browser_url"),
                 "focused": frame.get("focused"),
-                "device_name": frame.get("device_name", "monitor_0"),
+                "device_name": frame.get("device_name") or "monitor_0",
                 "frame_url": f"/v1/frames/{r['frame_id']}",
                 "embedding_status": frame.get("embedding_status", ""),
             })
@@ -464,9 +481,11 @@ Replace the entire `_fts_only_search` method body (lines 99-103) with:
         return results, len(lance_results)
 ```
 
-- [ ] **Step 3: Update _hybrid_search to use new _fts_only_search**
+**Important:** If LanceDB returns an unexpected score column name (not `"_score"`), adjust `r.get("_score")` to match. Verify by inspecting `lance_results[0].keys()` after running.
 
-In `_hybrid_search` (around line 231), replace the FTS search line:
+- [ ] **Step 2: Update `_hybrid_search` to use the new `_fts_only_search`**
+
+In `_hybrid_search` (find the FTS search line), replace:
 
 Old:
 ```python
@@ -480,12 +499,12 @@ New:
 
 The `_fts_only_search` now calls LanceDB FTS with jieba, so `_hybrid_search` automatically benefits.
 
-- [ ] **Step 4: Verify search tests pass**
+- [ ] **Step 3: Verify search tests pass**
 
 Run: `pytest tests/ -k "search" -v --ignore=tests/integration -x`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [ ] **Step 4: Commit**
 
 ```bash
 git add openrecall/server/search/hybrid_engine.py

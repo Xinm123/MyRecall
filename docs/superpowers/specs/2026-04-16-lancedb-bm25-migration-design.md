@@ -142,17 +142,21 @@ class FrameEmbeddingSchema(LanceModel):
 
 #### 3.2 FTS Search Method
 
+> **Note:** LanceDB FTS does not natively support time range or metadata filters via the FTS query itself. Filters on `app_name`, `window_name`, `timestamp` are applied in the Python layer after LanceDB returns results (via `FramesStore.get_frames_by_ids` + metadata check). This is acceptable since LanceDB is fast at initial retrieval and filtering in Python is cheap at result-set size.
+
 ```python
-def search_fts(self, query: str, limit: int = 20, **filters) -> List[dict]:
+def search_fts(self, query: str, limit: int = 20) -> List[dict]:
     """BM25 FTS search via LanceDB.
 
     Args:
         query: Pre-tokenized (jieba) query string
         limit: Max results
-        **filters: Optional filters (app_name, window_name, timestamp range)
 
     Returns:
-        List of matching records with _score (BM25)
+        List of matching records. Each dict contains frame_id and a BM25
+        score in the "_score" key. Note: verify the actual column name by
+        checking returned dict keys — if "_score" is absent, check for
+        "score" or other names in the LanceDB result dict.
     """
     table = self.db.open_table(self.table_name)
     result = (
@@ -239,6 +243,8 @@ self.service.save_embedding(
 
 #### 6.1 New LanceDB FTS Query Path
 
+**Browse mode (empty query)** uses the existing `_get_recent_embedded_frames` method — no new code needed. It already returns recent `queryable` frames from SQLite. **Query mode** is new:
+
 ```python
 def _fts_only_search(self, q: str, limit: int, offset: int, **kwargs) -> Tuple[List[Dict, int]]:
     """FTS-only search via LanceDB with jieba tokenizer."""
@@ -247,9 +253,9 @@ def _fts_only_search(self, q: str, limit: int, offset: int, **kwargs) -> Tuple[L
 
     frames_store = FramesStore()
 
-    # Browse mode (no query)
+    # Browse mode (no query): reuse existing method
     if not q or q.isspace():
-        return self._get_recent_queryable_frames(frames_store, limit, offset)
+        return self._get_recent_embedded_frames(frames_store.db_path, limit, offset)
 
     # Tokenize query with jieba
     tokenized_q = tokenize_text(q)
@@ -262,19 +268,31 @@ def _fts_only_search(self, q: str, limit: int, offset: int, **kwargs) -> Tuple[L
     frame_data_map = frames_store.get_frames_by_ids(frame_ids)
 
     results = []
-    for rank, r in enumerate(lance_results[offset:offset + limit], start=offset + 1):
+    for r in lance_results[offset:offset + limit]:
         frame = frame_data_map.get(r["frame_id"], {})
+        ts = frame.get("timestamp") if frame.get("timestamp") else (r.get("timestamp") or "")
         results.append({
             "frame_id": r["frame_id"],
-            "score": r.get("_score"),       # BM25 score
-            "fts_score": r.get("_score"),   # Alias
-            "timestamp": frame.get("timestamp", r.get("timestamp", "")),
-            "text": r.get("full_text", "")[:200] if r.get("full_text") else "",
-            # ... other fields
+            "score": r.get("_score"),
+            "fts_score": r.get("_score"),
+            "cosine_score": None,       # FTS-only has no vector score
+            "vector_rank": None,        # FTS-only has no vector rank
+            "timestamp": ts,
+            "text": (r.get("full_text") or "")[:200],
+            "text_source": frame.get("text_source", ""),
+            "app_name": frame.get("app_name") or r.get("app_name", ""),
+            "window_name": frame.get("window_name") or r.get("window_name", ""),
+            "browser_url": frame.get("browser_url"),
+            "focused": frame.get("focused"),
+            "device_name": frame.get("device_name") or "monitor_0",
+            "frame_url": f"/v1/frames/{r['frame_id']}",
+            "embedding_status": frame.get("embedding_status", ""),
         })
 
     return results, len(lance_results)
 ```
+
+> **Note:** `timestamp` fallback uses `frame.get("timestamp")` first, then `r.get("timestamp")` only if the frame-level value is falsy. `_get_recent_embedded_frames` handles browse mode; query mode uses this new method.
 
 #### 6.2 Hybrid Search Update
 
@@ -335,6 +353,8 @@ jieba = ">=0.42"
 | `GET /v1/search?q=...` (默认) | mode=hybrid (不变) |
 
 ## Rollout Plan
+
+> **Task dependency:** Task 3 must complete before Task 4. Task 3 adds `tokenized_text`/`full_text` fields to the pydantic `FrameEmbedding` model; Task 4 mirrors these fields in the LanceDB `FrameEmbeddingSchema`. Both tasks modify the same class hierarchy.
 
 ### Phase 1: Implementation
 1. 添加 `jieba` 依赖
