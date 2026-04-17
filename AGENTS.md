@@ -1,6 +1,6 @@
 # AGENTS Guide: MyRecall
 
-This file is for coding agents working in `/Users/pyw/old/MyRecall`.
+This file is for coding agents working in `/Users/pyw/chat/MyRecall`.
 Use it as the operational source of truth for commands and coding conventions.
 
 ## Project Snapshot
@@ -19,16 +19,17 @@ Use the active Python environment first (commonly `conda activate old`).
 # Separate mode (wrapper scripts with env loading)
 
 # Run server (Terminal 1)
-./run_server.sh --debug
+./run_server.sh --mode local --debug
 
 # Run client (Terminal 2)
-./run_client.sh --debug
+./run_client.sh --mode local --debug
 ```
 
 Notes:
-- `run_server.sh` executes `-m openrecall.server` and loads `myrecall_server.env` by default.
-- `run_client.sh` executes `-m openrecall.client` and loads `myrecall_client.env` by default.
-- Both scripts support `--env=/abs/path/to/file.env`.
+- Both scripts support `--mode local` or `--mode remote` to load `*-local.toml` / `*-remote.toml`.
+- Config priority: `--config=/path/to.toml` > `--mode=` > default TOML files > legacy `.env` files.
+- Legacy `.env` files (`myrecall_server.env`, `myrecall_client.env`) are only loaded when no TOML config is found.
+- Both scripts support `--env=/abs/path/to/file.env` for explicit legacy env loading.
 
 ## Test Commands (Pytest)
 
@@ -165,12 +166,12 @@ Event-Driven Capture (P1-S2a+):
 
 Simhash Dedup (P1-S2b+):
 - `OPENRECALL_SIMHASH_DEDUP_ENABLED` — Enable PHash-based dedup (default: true)
-- `OPENRECALL_SIMHASH_DEDUP_THRESHOLD` — Hamming distance threshold (default: 8)
-- `OPENRECALL_SIMHASH_TTL_SECONDS` — TTL for simhash cache entries (default: 300)
-- `OPENRECALL_SIMHASH_CACHE_SIZE_PER_DEVICE` — Hashes cached per device (default: 1)
+- `OPENRECALL_SIMHASH_DEDUP_THRESHOLD` — Hamming distance threshold (default: 10)
+- `OPENRECALL_SIMHASH_TTL_SECONDS` — TTL for simhash cache entries (default: 60)
+- `OPENRECALL_SIMHASH_CACHE_SIZE` — Number of recent PHash values cached per device (default: 1)
 - `OPENRECALL_SIMHASH_ENABLED_FOR_CLICK` — Dedup for click triggers (default: true)
-- `OPENRECALL_SIMHASH_ENABLED_FOR_APP_SWITCH` — Dedup for app_switch triggers (default: true)
-- `OPENRECALL_FORCE_CAPTURE_AFTER_SECONDS` — Force capture after N seconds of skipped frames (default: 600)
+- `OPENRECALL_SIMHASH_ENABLED_FOR_APP_SWITCH` — Dedup for app_switch triggers (default: false)
+- `OPENRECALL_MAX_SKIP_DURATION_SEC` — Force capture after N seconds of skipped frames (default: 30)
 - Note: IDLE triggers always skip simhash (ensures periodic frame capture)
 
 ## Agent Rules from Cursor / Copilot

@@ -1806,9 +1806,14 @@ class FramesStore:
             """
             WITH next_task AS (
                 SELECT id FROM description_tasks
-                WHERE status = 'pending'
-                  AND (next_retry_at IS NULL OR next_retry_at <= strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
-                ORDER BY id
+                WHERE (
+                    status = 'pending'
+                    AND (next_retry_at IS NULL OR next_retry_at <= strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+                ) OR (
+                    status = 'processing'
+                    AND started_at <= strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-5 minutes')
+                )
+                ORDER BY status = 'processing' DESC, id ASC
                 LIMIT 1
             )
             UPDATE description_tasks
@@ -1833,9 +1838,14 @@ class FramesStore:
             """
             WITH next_task AS (
                 SELECT id FROM embedding_tasks
-                WHERE status = 'pending'
-                  AND (next_retry_at IS NULL OR next_retry_at <= strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
-                ORDER BY created_at ASC
+                WHERE (
+                    status = 'pending'
+                    AND (next_retry_at IS NULL OR next_retry_at <= strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+                ) OR (
+                    status = 'processing'
+                    AND started_at <= strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-5 minutes')
+                )
+                ORDER BY status = 'processing' DESC, created_at ASC
                 LIMIT 1
             )
             UPDATE embedding_tasks

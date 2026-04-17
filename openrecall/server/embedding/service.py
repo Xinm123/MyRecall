@@ -17,7 +17,7 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-_RETRY_DELAYS = [60, 300, 900]  # 1min, 5min, 15min
+_RETRY_DELAYS = [10, 30, 60]  # 10s, 30s, 60s
 _MAX_RETRIES = 3
 
 

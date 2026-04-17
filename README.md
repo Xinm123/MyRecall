@@ -60,7 +60,7 @@ MyRecall v3 captures your digital history through automatic screenshots, then us
 
 ### Host (Capture + Upload)
 
-- **Capture**: Event-driven (idle/app_switch/manual/click) with debouncing (1000ms)
+- **Capture**: Event-driven (idle/app_switch/manual/click) with three-layer debouncing (3000ms)
 - **Spool**: Local disk queue (`~/MRC/spool/`) for reliability
 - **Uploader**: Background consumer with idempotent retry
 - **Deduplication**: `capture_id` idempotency + trigger/capture coordination; `content_hash` is reserved for future use
@@ -68,22 +68,21 @@ MyRecall v3 captures your digital history through automatic screenshots, then us
 ### Edge (Processing + API)
 
 - **Ingest**: `POST /v1/ingest` (幂等)
-- **Processing**: OCR-only; 索引时零 AI 增强
+- **Processing**: OCR, AI description generation, vector embedding pipeline
 - **Storage**:
-  - `db/edge.db`: frames, accessibility, ocr_text
+  - `db/edge.db`: frames, embedding_tasks
   - `fts.db`: FTS5 全文索引
   - `frames/`: JPEG snapshots
   - `screenshots/`: Legacy PNG
-- **Search**: FTS + 过滤；Chat 通过 Pi Sidecar
+  - `lancedb/`: Vector embeddings
+- **Search**: Hybrid search (FTS5 + LanceDB via RRF fusion) + FTS-only mode + Vector-only mode
 
 ### Search Pipeline
 
 1. **Query Sanitization**: User queries are sanitized for FTS5 MATCH syntax (token wrapping, operator escaping)
-2. **Search Routing**: v3 mainline uses a single OCR-backed search path (`ocr_text_fts` + `frames_fts`); AX/search dual-path remains deferred to v4
+2. **Search Modes**: Three modes — `fts` (BM25 full-text), `vector` (cosine similarity), `hybrid` (RRF fusion of both)
 3. **Metadata Filtering**: Time range, app_name, window_name, browser_url, focused filters applied via B-tree indexes or FTS
-4. **Sorting & Pagination**: Results ordered by FTS5 rank (when `q` provided) or timestamp DESC; pagination via offset/limit
-
-**Note**: P1 uses pure full-text search (FTS5) without vector embeddings or reranking, in alignment with screenpipe's vision-only design. Vector embeddings are reserved for P2+ experimental use.
+4. **Sorting & Pagination**: Results ordered by relevance rank (when `q` provided) or timestamp DESC; pagination via offset/limit
 
 ## Quick Start
 
@@ -109,28 +108,31 @@ pip install -e .
 
 ```bash
 # Run server (Terminal 1)
-./run_server.sh --debug
+./run_server.sh --mode local --debug
 ```
 
 ```bash
 # Run client (Terminal 2)
-./run_client.sh --debug
+./run_client.sh --mode local --debug
 ```
 
-Open your browser to: http://localhost:8083
+Open your browser to: http://localhost:8889
 
 ## Configuration
 
-Configure via environment variables:
+Configure via environment variables or TOML config files (recommended):
 
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `OPENRECALL_SERVER_DATA_DIR` | `~/MRS` | Edge data directory |
 | `OPENRECALL_CLIENT_DATA_DIR` | `~/MRC` | Host spool directory |
-| `OPENRECALL_PORT` | `8083` | Web server port |
-| `OPENRECALL_CAPTURE_INTERVAL` | `10` | Legacy: screenshot interval (seconds), mapped to `idle_capture_interval_ms` if not set |
+| `OPENRECALL_PORT` | `8083` | Edge API server port |
+| `OPENRECALL_CLIENT_WEB_PORT` | `8889` | Client web UI server port |
+| `OPENRECALL_CLIENT_WEB_ENABLED` | `true` | Enable client web UI server |
+| `OPENRECALL_DEBUG` | `false` | Enable debug logging |
 | `OPENRECALL_AI_PROVIDER` | `local` | AI provider: `local`, `dashscope`, `openai` |
 | `OPENRECALL_DEVICE` | `cpu` | AI inference device: `cpu`, `cuda`, `mps` |
+| `OPENRECALL_CAPTURE_INTERVAL` | `10` | Legacy: screenshot interval (seconds), mapped to `idle_capture_interval_ms` if not set |
 | `OPENRECALL_SIMILARITY_THRESHOLD` | `0.98` | Legacy MSSIM threshold (v3 uses content_hash; retained for compatibility) |
 
 ### Using Cloud AI
@@ -156,14 +158,16 @@ export OPENRECALL_AI_API_BASE=https://api.openai.com/v1
     *.jpg                          # Buffered frames (JPEG)
     *.json                         # Metadata alongside each frame
   screenshots/                     # Optional local copies (if enabled)
+  buffer/                          # Local buffer when server is unavailable
+  cache/                           # Cache directory
 
 ~/MRS/                              # Edge data (OPENRECALL_SERVER_DATA_DIR)
   frames/                          # v3 JPEG snapshots (main storage)
   screenshots/                     # Legacy PNG screenshots (v2 compatibility)
   db/
-    edge.db                        # v3 SQLite (task queue + frames)
+    edge.db                        # v3 SQLite (frames + embedding_tasks)
   fts.db                           # SQLite FTS5 (full-text search)
-  lancedb/                         # Vector embeddings (P2+ experimental, not used in P1)
+  lancedb/                         # Vector embeddings
 ```
 
 ## License
