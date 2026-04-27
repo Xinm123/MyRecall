@@ -19,10 +19,12 @@ MyRecall v3 captures your digital history through automatic screenshots, then us
 
 - **Privacy-First**: All data stays local. No cloud, no internet required. Your screenshots never leave your device.
 - **Full-Text Search**: Fast FTS5-based search with metadata filtering (app, window, browser URL, focused state).
-- **Local AI Processing**: Run OCR and vision understanding entirely on your local machine. Supports multiple AI providers:
+- **Hybrid AI Search**: Combines FTS5 full-text search with LanceDB vector search via RRF fusion. Supports FTS-only, vector-only, and hybrid modes.
+- **AI Processing**: Run OCR and vision understanding locally or via cloud APIs:
   - **Local**: Qwen-VL for vision
-  - **Cloud**: OpenAI, DashScope (Qwen), and other OpenAI-compatible APIs
+  - **Cloud**: OpenAI, DashScope (Qwen), SiliconFlow, and other OpenAI-compatible APIs
 - **Smart Capture**: Event-driven capture (app switches, clicks, idle fallback) with debouncing and content-based deduplication.
+- **Accessibility-First Text Extraction**: Uses macOS AX (accessibility) as primary text source, with OCR fallback.
 - **Cross-Platform**: Works on Windows, macOS, and Linux (P1: macOS-only for event-driven features).
 - **Runtime Control**: Pause/resume recording and AI processing from the web UI without restarting.
 - **Chat with Context**: AI chat grounded in your visual history with proper citations.

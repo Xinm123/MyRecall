@@ -148,24 +148,37 @@ pip install -e ".[test]"    # Include test dependencies
 
 **Frames Table** (`edge.db`):
 ```sql
-- frame_id (TEXT PRIMARY KEY)
-- capture_id (TEXT UNIQUE, idempotency key)
-- timestamp (TEXT ISO8601 UTC with Z) — Raw UTC backup; storage only, not used for query or display
+- id (INTEGER PRIMARY KEY AUTOINCREMENT) — Internal row ID
+- capture_id (TEXT UNIQUE, NOT NULL) — Idempotency key (external UUID)
+- timestamp (TEXT ISO8601 UTC with Z) — Raw UTC capture time; storage only
 - local_timestamp (TEXT, ISO8601 without offset, UTC+8) — Primary query/display timestamp
-- app_name, window_name, browser_url
-- monitor_index, device_id
-- capture_trigger (idle/app_switch/manual/click)
-- accessibility_text (text from AX, if AX-first succeeded)
-- ocr_text (text from OCR fallback)
-- full_text (merged text from accessibility_text + ocr_text, indexed by frames_fts)
-- text_source ('accessibility'|'ocr'|'hybrid')
-- accessibility_tree_json (full AX tree as JSON)
-- processing_status (pending/processing/completed/failed)
-- description_status (pending/processing/completed/failed)
-- embedding_status (NULL/pending/processing/completed/failed)
-- visibility_status (pending/queryable/failed — combined state of all processing stages)
-- error_message (error details when status='failed')
-- event_ts (capture event timestamp, separate from frame timestamp)
+- ingested_at (TEXT ISO8601 UTC with Z) — When frame was received by Edge
+- processed_at (TEXT ISO8601 UTC with Z) — When processing completed
+- event_ts (TEXT ISO8601 UTC with Z) — Capture event timestamp
+- app_name (TEXT) — Active application name
+- window_name (TEXT) — Active window title
+- browser_url (TEXT) — Browser URL (if applicable)
+- focused (BOOLEAN) — Whether the window was focused
+- device_name (TEXT, DEFAULT 'monitor_0') — Capture device identifier
+- capture_trigger (idle/app_switch/manual/click) — What triggered the capture
+- snapshot_path (TEXT) — Path to JPEG file in frames/
+- image_size_bytes (INTEGER) — Size of captured image
+- accessibility_text (TEXT) — Text from macOS AX (if AX-first succeeded)
+- ocr_text (TEXT) — Text from OCR fallback
+- full_text (TEXT) — Merged text from accessibility_text + ocr_text, indexed by frames_fts
+- text_source ('accessibility' | 'ocr') — Which source provided the text
+- accessibility_tree_json (TEXT) — Full AX tree as JSON
+- content_hash (TEXT) — SHA-256 for deduplication
+- simhash (INTEGER) — Text similarity hash for dedup
+- phash (INTEGER) — Perceptual hash for visual dedup
+- status (pending/processing/completed/failed) — Processing pipeline status
+- description_status (pending/processing/completed/failed) — Description generation status
+- embedding_status (NULL/pending/processing/completed/failed) — Embedding generation status
+- visibility_status (pending/queryable/failed) — Combined visibility state
+- error_message (TEXT) — Error details when status='failed'
+- retry_count (INTEGER, DEFAULT 0) — Processing retry counter
+- last_known_app (TEXT) — Last known application name (for timeline)
+- last_known_window (TEXT) — Last known window title (for timeline)
 ```
 
 **FTS5 Tables**:
@@ -257,6 +270,7 @@ openrecall/
 │       ├── worker.py    # EmbeddingWorker
 │       ├── service.py   # EmbeddingService, LanceDB storage
 │       └── providers/   # Multimodal embedding providers
+│           └── siliconflow.py  # SiliconFlow OpenAI-compatible provider
 └── shared/          # Common utilities
     ├── config.py    # Settings management
     └── models.py    # Data models
@@ -267,15 +281,25 @@ openrecall/
 Key settings (see `openrecall/shared/config.py`):
 - `OPENRECALL_SERVER_DATA_DIR`: Edge data directory (default: ~/.myrecall/server)
 - `OPENRECALL_CLIENT_DATA_DIR`: Host spool directory (default: ~/.myrecall/client)
-- `OPENRECALL_PORT`: Edge API server port (default: 8083, API only — web UI disabled)
+- `OPENRECALL_PORT`: Edge API server port (default: 8083, Edge API only)
 - `OPENRECALL_CLIENT_WEB_PORT`: Client web UI port (default: 8889)
-- `OPENRECALL_DEBUG`: Enable debug logging
-- `OPENRECALL_AI_PROVIDER`: AI provider (local/dashscope/openai)
-- `OPENRECALL_DEVICE`: Inference device (cpu/cuda/mps)
+- `OPENRECALL_CLIENT_WEB_ENABLED`: Enable client web UI (default: true)
+- `OPENRECALL_DEBUG`: Enable debug logging (default: true)
+- `OPENRECALL_AI_PROVIDER`: AI provider (default: local, options: local/dashscope/openai)
+- `OPENRECALL_AI_API_KEY` / `OPENRECALL_AI_API_BASE`: Cloud AI credentials
+- `OPENRECALL_DEVICE`: Inference device (default: cpu, options: cpu/cuda/mps)
 - `OPENRECALL_TRIGGER_DEBOUNCE_MS`: Debounce for APP_SWITCH/IDLE/MANUAL events (default: 3000)
 - `OPENRECALL_CLICK_DEBOUNCE_MS`: Debounce for CLICK events (default: 3000)
 - `OPENRECALL_CAPTURE_DEBOUNCE_MS`: Global capture debounce (default: 3000)
 - `OPENRECALL_IDLE_CAPTURE_INTERVAL_MS`: Idle fallback interval (default: 60000)
+- `OPENRECALL_UPLOAD_TIMEOUT`: Client upload timeout in seconds (default: 180)
+- `OPENRECALL_EMBEDDING_PROVIDER`: Embedding provider (default: openai)
+- `OPENRECALL_EMBEDDING_MODEL`: Embedding model name (default: qwen3-vl-embedding)
+- `OPENRECALL_EMBEDDING_API_KEY` / `OPENRECALL_EMBEDDING_API_BASE`: Embedding API credentials
+- `OPENRECALL_DESCRIPTION_ENABLED`: Enable AI description generation (default: true)
+- `OPENRECALL_DESCRIPTION_PROVIDER` / `OPENRECALL_DESCRIPTION_MODEL`: Description provider/model overrides
+- `OPENRECALL_OCR_PROVIDER`: OCR provider (default: rapidocr)
+- `OPENRECALL_PRELOAD_MODELS`: Preload AI models at startup (default: true)
 
 ## Testing Strategy
 
@@ -319,6 +343,7 @@ Key settings (see `openrecall/shared/config.py`):
 - `GET /v1/frames/<frame_id>/ocr-vis`: OCR visualization data
 - `GET /v1/health`: Health check
 - `GET /v1/ingest/queue/status`: Queue status
+- `GET /v1/frames/latest`: Get frames newer than `since` (local timestamp, no Z suffix)
 - `GET /v1/search`: Full-text/vector/hybrid search (default: hybrid mode)
   - Parameters: `q`, `mode` (fts/vector/hybrid), `limit`, `offset`, `start_time`, `end_time`
   - `app_name`, `window_name`, `browser_url`, `focused`, `include_text`, `max_text_length`
