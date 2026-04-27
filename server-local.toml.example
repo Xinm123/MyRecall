@@ -1,5 +1,9 @@
-# OpenRecall Server Configuration — Local Mode
-# Server listens on localhost only (127.0.0.1)
+# OpenRecall Server Configuration — Local Mode (Template)
+#
+# Copy this file to `server-local.toml` and fill in your own values.
+# `server-local.toml` is gitignored to avoid committing secrets.
+#
+# Server listens on localhost only (127.0.0.1) when host is set as below.
 
 # ==============================================================================
 # Server Settings
@@ -39,29 +43,43 @@ model_type = "mobile"
 # ==============================================================================
 # Description Generation (Frame AI Analysis)
 # ==============================================================================
+# Pick ONE of the variants below and uncomment it.
+# Keep `api_key` blank in committed templates — fill it in your own copy only.
 [description]
-#enabled = true
-#provider = "openai"
-#model = "Qwen/Qwen3-VL-8B-Instruct"
-#api_key = "sk-usltbpnjvkrjklolnzinkqctvbcdhqkarjtrlqbyckrubiwn"
-#api_base = "https://api.siliconflow.cn/v1/"
 enabled = true
 provider = "openai"
-model = "Qwen3-VL-8B-Instruct"
-api_key = "EMPTY"
-api_base = "http://10.77.21.189:8090/v1/"
+model = "Qwen/Qwen3-VL-8B-Instruct"
+api_key = ""                                  # e.g. "sk-..." (your own key)
+api_base = "https://api.siliconflow.cn/v1/"
+
+# Alternate: self-hosted Qwen3-VL endpoint
+#enabled = true
+#provider = "openai"
+#model = "Qwen3-VL-8B-Instruct"
+#api_key = "EMPTY"
+#api_base = "http://localhost:8090/v1/"
 
 # ==============================================================================
 # Embedding Settings
 # ==============================================================================
+# Pick ONE of the variants below and uncomment it.
 [embedding]
-enabled = true
-provider = "multimodal"
-model = "qwen3-vl-embedding"
-api_key = ""
-api_base = "http://10.77.21.189:8070/v1"
-dim = 1024
 
+# Self-hosted multimodal embedding (qwen3-vl-embedding)
+#enabled = true
+#provider = "multimodal"
+#model = "qwen3-vl-embedding"
+#api_key = ""
+#api_base = "http://localhost:8070/v1"
+#dim = 1024
+
+# SiliconFlow (OpenAI-compatible multimodal embedding)
+enabled = true
+provider = "siliconflow"
+model = "Qwen/Qwen3-VL-Embedding-8B"
+api_key = ""                                  # e.g. "sk-..." (your own key)
+api_base = "https://api.siliconflow.cn/v1"
+dim = 1024
 
 # ==============================================================================
 # Reranker Settings

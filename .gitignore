@@ -17,3 +17,5 @@ htmlcov
 *.env
 !.env.example
 _ref/
+
+server-local.toml

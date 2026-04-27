@@ -44,7 +44,7 @@ model_type = "mobile"        # Options: mobile, server
 enabled = true                      # Enable description generation
 provider = "openai"                       # Options: local, openai, dashscope (empty = use [ai])
 model = "Qwen/Qwen3-VL-8B-Instruct"                          # Model name (e.g., Qwen3-VL-8B-Instruct)
-api_key = "sk-usltbpnjvkrjklolnzinkqctvbcdhqkarjtrlqbyckrubiwn"                        # API key if required
+api_key = ""                        # API key if required (e.g. "sk-...")
 api_base = "https://api.siliconflow.cn/v1/"                       # Base URL (e.g., http://127.0.0.1:8090/v1)
 
 # ==============================================================================
