@@ -143,7 +143,7 @@ if __name__ == "__main__":
         description="Seed trigger samples for P1-S2a acceptance"
     )
     parser.add_argument(
-        "--db", default=os.path.expanduser("~/MRS/db/edge.db"), help="Path to edge.db"
+        "--db", default=os.path.expanduser("~/.myrecall/server/db/edge.db"), help="Path to edge.db"
     )
     parser.add_argument(
         "--app-switch", type=int, default=50, help="Number of app_switch triggers"

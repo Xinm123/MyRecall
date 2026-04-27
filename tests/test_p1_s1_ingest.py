@@ -254,11 +254,11 @@ def get_queue_status() -> QueueStatus:
 class TestIngestPipeline:
     """Tests for Section 12: Ingest Pipeline Verification."""
 
-    db_path: Path = Path.home() / "MRS" / "db" / "edge.db"
+    db_path: Path = Path.home() / ".myrecall" / "server" / "db" / "edge.db"
 
     @pytest.fixture(autouse=True)
     def setup(self) -> Generator[None, None, None]:
-        self.db_path = Path.home() / "MRS" / "db" / "edge.db"
+        self.db_path = Path.home() / ".myrecall" / "server" / "db" / "edge.db"
         yield
 
     @pytest.mark.integration
@@ -488,7 +488,7 @@ class TestIngestPipeline:
 
         Requires: Running Edge server.
         """
-        db_path = Path.home() / "MRS" / "db" / "edge.db"
+        db_path = Path.home() / ".myrecall" / "server" / "db" / "edge.db"
         conn = sqlite3.connect(str(db_path))
 
         # Get current pending count

@@ -108,7 +108,7 @@ class ClientSettings(TOMLConfig):
             (self.paths_data_dir / "cache").mkdir(parents=True, exist_ok=True)
             (self.paths_data_dir / "spool").mkdir(parents=True, exist_ok=True)
         except PermissionError:
-            self.paths_data_dir = Path(tempfile.gettempdir()) / "MRC"
+            self.paths_data_dir = Path(tempfile.gettempdir()) / ".myrecall" / "client"
             self.paths_buffer_dir = self.paths_data_dir / "buffer"
             self.paths_data_dir.mkdir(parents=True, exist_ok=True)
             self.paths_buffer_dir.mkdir(parents=True, exist_ok=True)

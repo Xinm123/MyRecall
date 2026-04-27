@@ -17,8 +17,8 @@ from .types import Conversation, Message, ConversationMeta
 def _utc_now() -> datetime:
     return datetime.now(timezone.utc)
 
-# Storage path: OPENRECALL_CLIENT_DATA_DIR/chats/ or ~/MRC/chats/
-_CLIENT_DATA_DIR = Path(os.environ.get("OPENRECALL_CLIENT_DATA_DIR", Path.home() / "MRC"))
+# Storage path: OPENRECALL_CLIENT_DATA_DIR/chats/ or ~/.myrecall/client/chats/
+_CLIENT_DATA_DIR = Path(os.environ.get("OPENRECALL_CLIENT_DATA_DIR", Path.home() / ".myrecall" / "client"))
 CHATS_DIR = _CLIENT_DATA_DIR / "chats"
 
 

@@ -103,12 +103,12 @@ class Settings(BaseSettings):
 
     # Split Data Directories
     server_data_dir: Path = Field(
-        default_factory=lambda: Path.home() / "MRS",
+        default_factory=lambda: Path.home() / ".myrecall" / "server",
         alias="OPENRECALL_SERVER_DATA_DIR",
         description="Base directory for server data (DB, Vector Store, Server Screenshots)",
     )
     client_data_dir: Path = Field(
-        default_factory=lambda: Path.home() / "MRC",
+        default_factory=lambda: Path.home() / ".myrecall" / "client",
         alias="OPENRECALL_CLIENT_DATA_DIR",
         description="Base directory for client data (Buffer, Local Screenshots)",
     )
@@ -629,11 +629,11 @@ class Settings(BaseSettings):
             # Fallback for permission errors - maybe just use temp for both?
             # Or log warning. For now, let's just try to fallback base_path logic if it was used,
             # but here we have explicit paths.
-            # If server dir fails, fallback to temp/MRS. If client fails, temp/MRC.
+            # If server dir fails, fallback to temp/.myrecall/server. If client fails, temp/.myrecall/client.
             if not os.access(self.server_data_dir.parent, os.W_OK):
-                self.server_data_dir = Path(tempfile.gettempdir()) / "MRS"
+                self.server_data_dir = Path(tempfile.gettempdir()) / ".myrecall" / "server"
             if not os.access(self.client_data_dir.parent, os.W_OK):
-                self.client_data_dir = Path(tempfile.gettempdir()) / "MRC"
+                self.client_data_dir = Path(tempfile.gettempdir()) / ".myrecall" / "client"
 
             self.ensure_directories()
             self.verify_writable()
@@ -642,7 +642,7 @@ class Settings(BaseSettings):
         return self
 
 
-# Lazy proxy that prevents eager Settings() instantiation (which creates ~/MRC ~/MRS).
+# Lazy proxy that prevents eager Settings() instantiation (which creates ~/.myrecall).
 # Entry points MUST set openrecall.shared.config.settings to the real settings object
 # (ServerSettings.from_toml() or ClientSettings.from_toml()) BEFORE importing modules that
 # use `from openrecall.shared.config import settings`.

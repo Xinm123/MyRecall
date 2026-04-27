@@ -207,7 +207,7 @@ class TestImageFormatContract:
 
         Requires: Running Edge server with at least one ingested frame.
         """
-        db_path = Path.home() / "MRS" / "db" / "edge.db"
+        db_path = Path.home() / ".myrecall" / "server" / "db" / "edge.db"
 
         conn = sqlite3.connect(str(db_path))
         cursor = conn.execute(
@@ -234,7 +234,7 @@ class TestImageFormatContract:
         This test creates test spool files to simulate client output structure,
         then verifies the expected format (.jpg + .json, no new .webp).
         """
-        spool_path = Path.home() / "MRC" / "spool"
+        spool_path = Path.home() / ".myrecall" / "client" / "spool"
         spool_path.mkdir(parents=True, exist_ok=True)
 
         test_jpg = spool_path / "test_capture_001.jpg"

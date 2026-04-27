@@ -134,7 +134,7 @@ class ServerSettings(TOMLConfig):
             (self.paths_data_dir / "screenshots").mkdir(parents=True, exist_ok=True)
             (self.paths_data_dir / "lancedb").mkdir(parents=True, exist_ok=True)
         except PermissionError:
-            self.paths_data_dir = Path(tempfile.gettempdir()) / "MRS"
+            self.paths_data_dir = Path(tempfile.gettempdir()) / ".myrecall" / "server"
             self.paths_cache_dir = self.paths_data_dir / "cache"
             self.paths_data_dir.mkdir(parents=True, exist_ok=True)
             self.paths_cache_dir.mkdir(parents=True, exist_ok=True)
