@@ -25,13 +25,14 @@ def test_db(tmp_path):
             "20260317000001_ocr_text_unique_frame_id.sql",
             "20260321120000_dual_hash_storage.sql",
             "20260324120000_add_frame_description.sql",
+            "20260325120000_consolidate_fts_to_full_text.sql",
+            "20260408120000_description_fields_redesign.sql",
+            "20260409120000_add_frame_embedding.sql",
+            "20260414000000_add_visibility_status.sql",
+            "20260426000000_add_local_timestamp.sql",
         ]:
             mig_sql = Path(f"openrecall/server/database/migrations/{mig}").read_text()
             conn.executescript(mig_sql)
-
-        # Run FTS unification migration
-        fts_sql = Path("openrecall/server/database/migrations/20260325120000_consolidate_fts_to_full_text.sql").read_text()
-        conn.executescript(fts_sql)
 
     return db_path
 
@@ -44,8 +45,8 @@ def test_count_by_type_returns_ocr_and_accessibility_counts(test_db):
     with sqlite3.connect(str(test_db)) as conn:
         # Insert OCR frame with full_text
         conn.execute(
-            """INSERT INTO frames (capture_id, timestamp, app_name, window_name, device_name, text_source, status, ingested_at, full_text)
-               VALUES ('cap-ocr-001', '2024-01-01T00:00:00Z', 'TestApp', 'TestWindow', 'monitor_0', 'ocr', 'completed', '2024-01-01T00:00:00.000Z', 'test ocr content')"""
+            """INSERT INTO frames (capture_id, timestamp, local_timestamp, app_name, window_name, device_name, text_source, status, ingested_at, full_text, visibility_status)
+               VALUES ('cap-ocr-001', '2024-01-01T00:00:00Z', '2024-01-01T00:00:00Z', 'TestApp', 'TestWindow', 'monitor_0', 'ocr', 'completed', '2024-01-01T00:00:00.000Z', 'test ocr content', 'queryable')"""
         )
         frame_id_ocr = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
         # Also insert into ocr_text for completeness (FramesStore may still do this)
@@ -56,8 +57,8 @@ def test_count_by_type_returns_ocr_and_accessibility_counts(test_db):
 
         # Insert accessibility frame with full_text
         conn.execute(
-            """INSERT INTO frames (capture_id, timestamp, app_name, window_name, device_name, text_source, status, ingested_at, full_text)
-               VALUES ('cap-ax-001', '2024-01-01T00:00:01Z', 'TestApp', 'TestWindow', 'monitor_0', 'accessibility', 'completed', '2024-01-01T00:00:01.000Z', 'test accessibility content')"""
+            """INSERT INTO frames (capture_id, timestamp, local_timestamp, app_name, window_name, device_name, text_source, status, ingested_at, full_text, visibility_status)
+               VALUES ('cap-ax-001', '2024-01-01T00:00:01Z', '2024-01-01T00:00:01Z', 'TestApp', 'TestWindow', 'monitor_0', 'accessibility', 'completed', '2024-01-01T00:00:01.000Z', 'test accessibility content', 'queryable')"""
         )
         frame_id_ax = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
         conn.execute(

@@ -151,10 +151,10 @@ class SearchEngine:
             params_list.append(1 if params.focused else 0)
 
         if params.start_time:
-            where_parts.append("frames.timestamp >= ?")
+            where_parts.append("frames.local_timestamp >= ?")
             params_list.append(params.start_time)
         if params.end_time:
-            where_parts.append("frames.timestamp <= ?")
+            where_parts.append("frames.local_timestamp <= ?")
             params_list.append(params.end_time)
 
         return " AND ".join(where_parts), params_list
@@ -180,7 +180,7 @@ class SearchEngine:
         else:
             select_clause = """
                 SELECT frames.id AS frame_id,
-                       frames.timestamp,
+                       frames.local_timestamp AS timestamp,
                        frames.full_text,
                        frames.app_name,
                        frames.window_name,
@@ -208,9 +208,9 @@ class SearchEngine:
             sql_parts.append("GROUP BY frames.id")
 
             if has_text_query:
-                sql_parts.append("ORDER BY frames_fts.rank, frames.timestamp DESC")
+                sql_parts.append("ORDER BY frames_fts.rank, frames.local_timestamp DESC")
             else:
-                sql_parts.append("ORDER BY frames.timestamp DESC")
+                sql_parts.append("ORDER BY frames.local_timestamp DESC")
 
             limit = max(1, params.limit)
             offset = max(0, params.offset)

@@ -172,13 +172,14 @@ def integration_test_db(tmp_path):
             "20260317000001_ocr_text_unique_frame_id.sql",
             "20260321120000_dual_hash_storage.sql",
             "20260324120000_add_frame_description.sql",
+            "20260325120000_consolidate_fts_to_full_text.sql",
+            "20260408120000_description_fields_redesign.sql",
+            "20260409120000_add_frame_embedding.sql",
+            "20260414000000_add_visibility_status.sql",
+            "20260426000000_add_local_timestamp.sql",
         ]:
             mig_sql = Path(f"openrecall/server/database/migrations/{mig}").read_text()
             conn.executescript(mig_sql)
-
-        # Run FTS unification migration
-        fts_sql = Path("openrecall/server/database/migrations/20260325120000_consolidate_fts_to_full_text.sql").read_text()
-        conn.executescript(fts_sql)
 
         conn.commit()
 
@@ -214,9 +215,9 @@ class TestSearchCountsIntegration:
         After FTS unification: full_text is set on frames, triggering frames_ai → frames_fts.
         """
         cursor = conn.execute(
-            """INSERT INTO frames (capture_id, timestamp, app_name, text_source, status, full_text)
-               VALUES (?, ?, ?, 'ocr', 'completed', ?)""",
-            (f"cap-ocr-{timestamp}", timestamp, app_name, text),
+            """INSERT INTO frames (capture_id, timestamp, local_timestamp, app_name, text_source, status, full_text, visibility_status)
+               VALUES (?, ?, ?, ?, 'ocr', 'completed', ?, 'queryable')""",
+            (f"cap-ocr-{timestamp}", timestamp, timestamp, app_name, text),
         )
         return cursor.lastrowid
 
@@ -226,9 +227,9 @@ class TestSearchCountsIntegration:
         After FTS unification: full_text is set on frames, triggering frames_ai → frames_fts.
         """
         cursor = conn.execute(
-            """INSERT INTO frames (capture_id, timestamp, app_name, text_source, status, full_text)
-               VALUES (?, ?, ?, 'accessibility', 'completed', ?)""",
-            (f"cap-ax-{timestamp}", timestamp, app_name, text),
+            """INSERT INTO frames (capture_id, timestamp, local_timestamp, app_name, text_source, status, full_text, visibility_status)
+               VALUES (?, ?, ?, ?, 'accessibility', 'completed', ?, 'queryable')""",
+            (f"cap-ax-{timestamp}", timestamp, timestamp, app_name, text),
         )
         return cursor.lastrowid
 

@@ -82,11 +82,12 @@ def temp_db_with_mixed_frames(tmp_path: Path) -> Path:
     for frame_data in ocr_frames:
         # Insert frame with ocr_text column
         conn.execute("""
-            INSERT INTO frames (capture_id, timestamp, app_name, window_name, browser_url,
-                                focused, device_name, ocr_text, text_source, status, full_text)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'completed', ?)
+            INSERT INTO frames (capture_id, timestamp, local_timestamp, app_name, window_name, browser_url,
+                                focused, device_name, ocr_text, text_source, status, full_text, visibility_status)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'completed', ?, 'queryable')
         """, (
             frame_data["capture_id"],
+            frame_data["timestamp"],
             frame_data["timestamp"],
             frame_data["app_name"],
             frame_data["window_name"],
@@ -154,11 +155,12 @@ def temp_db_with_mixed_frames(tmp_path: Path) -> Path:
     for frame_data in ax_frames:
         # Insert frame with accessibility_text column AND full_text
         conn.execute("""
-            INSERT INTO frames (capture_id, timestamp, app_name, window_name, browser_url,
-                                focused, device_name, accessibility_text, text_source, status, full_text)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'completed', ?)
+            INSERT INTO frames (capture_id, timestamp, local_timestamp, app_name, window_name, browser_url,
+                                focused, device_name, accessibility_text, text_source, status, full_text, visibility_status)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'completed', ?, 'queryable')
         """, (
             frame_data["capture_id"],
+            frame_data["timestamp"],
             frame_data["timestamp"],
             frame_data["app_name"],
             frame_data["window_name"],

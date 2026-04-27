@@ -48,15 +48,14 @@ def temp_db():
             "20260317000001_ocr_text_unique_frame_id.sql",
             "20260321120000_dual_hash_storage.sql",
             "20260324120000_add_frame_description.sql",
+            "20260325120000_consolidate_fts_to_full_text.sql",
+            "20260408120000_description_fields_redesign.sql",
             "20260409120000_add_frame_embedding.sql",
+            "20260414000000_add_visibility_status.sql",
+            "20260426000000_add_local_timestamp.sql",
         ]:
             mig_sql = Path(f"openrecall/server/database/migrations/{mig}").read_text()
             conn.executescript(mig_sql)
-
-        fts_sql = Path(
-            "openrecall/server/database/migrations/20260325120000_consolidate_fts_to_full_text.sql"
-        ).read_text()
-        conn.executescript(fts_sql)
 
         # Insert test frames with full_text populated (post-migration schema)
         test_frames = [
@@ -67,9 +66,9 @@ def temp_db():
 
         for frame_id, capture_id, ts, app, window, focused, full_text in test_frames:
             conn.execute(
-                """INSERT INTO frames (id, capture_id, timestamp, app_name, window_name, focused, status, text_source, full_text)
-                   VALUES (?, ?, ?, ?, ?, ?, 'completed', 'ocr', ?)""",
-                (frame_id, capture_id, ts, app, window, focused, full_text),
+                """INSERT INTO frames (id, capture_id, timestamp, local_timestamp, app_name, window_name, focused, status, text_source, full_text, visibility_status)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, 'completed', 'ocr', ?, 'queryable')""",
+                (frame_id, capture_id, ts, ts, app, window, focused, full_text),
             )
 
         conn.commit()

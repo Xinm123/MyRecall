@@ -76,17 +76,21 @@ def temp_db():
         ).read_text()
         conn.executescript(init_sql)
 
-        # Run embedding migration (adds embedding_status column)
-        embedding_sql = Path(
-            "openrecall/server/database/migrations/20260409120000_add_frame_embedding.sql"
-        ).read_text()
-        conn.executescript(embedding_sql)
-
-        # Run FTS unification migration
-        migration_sql = Path(
-            "openrecall/server/database/migrations/20260325120000_consolidate_fts_to_full_text.sql"
-        ).read_text()
-        conn.executescript(migration_sql)
+        # Run all remaining migrations in order
+        for mig in [
+            "20260310121000_add_event_ts_to_frames.sql",
+            "20260315140000_add_last_known_context_to_frames.sql",
+            "20260317000001_ocr_text_unique_frame_id.sql",
+            "20260321120000_dual_hash_storage.sql",
+            "20260324120000_add_frame_description.sql",
+            "20260325120000_consolidate_fts_to_full_text.sql",
+            "20260408120000_description_fields_redesign.sql",
+            "20260409120000_add_frame_embedding.sql",
+            "20260414000000_add_visibility_status.sql",
+            "20260426000000_add_local_timestamp.sql",
+        ]:
+            mig_sql = Path(f"openrecall/server/database/migrations/{mig}").read_text()
+            conn.executescript(mig_sql)
 
         # Insert test frames with full_text populated (post-migration schema)
         # These mirror the test data from the old fixture, but use full_text
@@ -100,9 +104,9 @@ def temp_db():
 
         for frame_id, capture_id, ts, app, window, url, focused, full_text, text_source in test_frames:
             conn.execute(
-                """INSERT INTO frames (id, capture_id, timestamp, app_name, window_name, browser_url, focused, status, text_source, full_text)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, 'completed', ?, ?)""",
-                (frame_id, capture_id, ts, app, window, url, focused, text_source, full_text),
+                """INSERT INTO frames (id, capture_id, timestamp, local_timestamp, app_name, window_name, browser_url, focused, status, text_source, full_text, visibility_status)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'completed', ?, ?, 'queryable')""",
+                (frame_id, capture_id, ts, ts, app, window, url, focused, text_source, full_text),
             )
 
         conn.commit()
@@ -385,29 +389,33 @@ class TestUnifiedFtsSearch:
         ).read_text()
         conn.executescript(init_sql)
 
-        # Run embedding migration (adds embedding_status column)
-        embedding_sql = Path(
-            "openrecall/server/database/migrations/20260409120000_add_frame_embedding.sql"
-        ).read_text()
-        conn.executescript(embedding_sql)
-
-        # Run FTS unification migration
-        migration_sql = Path(
-            "openrecall/server/database/migrations/20260325120000_consolidate_fts_to_full_text.sql"
-        ).read_text()
-        conn.executescript(migration_sql)
+        # Run all remaining migrations in order
+        for mig in [
+            "20260310121000_add_event_ts_to_frames.sql",
+            "20260315140000_add_last_known_context_to_frames.sql",
+            "20260317000001_ocr_text_unique_frame_id.sql",
+            "20260321120000_dual_hash_storage.sql",
+            "20260324120000_add_frame_description.sql",
+            "20260325120000_consolidate_fts_to_full_text.sql",
+            "20260408120000_description_fields_redesign.sql",
+            "20260409120000_add_frame_embedding.sql",
+            "20260414000000_add_visibility_status.sql",
+            "20260426000000_add_local_timestamp.sql",
+        ]:
+            mig_sql = Path(f"openrecall/server/database/migrations/{mig}").read_text()
+            conn.executescript(mig_sql)
 
         # Insert test frames with full_text
         conn.execute(
             """
-            INSERT INTO frames (capture_id, timestamp, full_text, app_name, window_name, status, text_source)
-            VALUES ('ax-1', '2026-03-25T10:00:00Z', 'Email from alice@example.com about project', 'Mail', 'Inbox', 'completed', 'accessibility')
+            INSERT INTO frames (capture_id, timestamp, local_timestamp, full_text, app_name, window_name, status, text_source, visibility_status)
+            VALUES ('ax-1', '2026-03-25T10:00:00Z', '2026-03-25T10:00:00Z', 'Email from alice@example.com about project', 'Mail', 'Inbox', 'completed', 'accessibility', 'queryable')
             """
         )
         conn.execute(
             """
-            INSERT INTO frames (capture_id, timestamp, full_text, app_name, window_name, status, text_source)
-            VALUES ('ocr-1', '2026-03-25T11:00:00Z', 'Meeting notes from yesterday standup', 'Notes', 'Meeting', 'completed', 'ocr')
+            INSERT INTO frames (capture_id, timestamp, local_timestamp, full_text, app_name, window_name, status, text_source, visibility_status)
+            VALUES ('ocr-1', '2026-03-25T11:00:00Z', '2026-03-25T11:00:00Z', 'Meeting notes from yesterday standup', 'Notes', 'Meeting', 'completed', 'ocr', 'queryable')
             """
         )
         conn.commit()
