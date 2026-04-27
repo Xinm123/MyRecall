@@ -492,6 +492,22 @@
   </main>
   
   <script>
+    // Shared timestamp parser — handles both local-time (no offset) and UTC (with Z/+00:00) strings
+    function parseTimestamp(value) {
+      const raw = String(value).trim();
+      if (!raw) return null;
+      // numeric epoch
+      if (/^\d+(\.\d+)?$/.test(raw)) {
+        return new Date(Number(raw) * 1000);
+      }
+      const base = raw.includes(' ') ? raw.replace(' ', 'T') : raw;
+      // Detect offset/Z at END of string (avoid false positives on date dashes)
+      const hasOffset = /[Zz]$/.test(base) || /[+-]\d{2}:?\d{2}$/.test(base);
+      const withOffset = hasOffset ? base : base + '+08:00';
+      const date = new Date(withOffset);
+      return Number.isNaN(date.getTime()) ? null : date;
+    }
+
     // Client-side control settings API (works even when server is offline)
     const CLIENT_CONTROL_API = '/api/client/control';
 

@@ -889,17 +889,16 @@
     return params.toString();
   }
 
-  // Format relative time
   function formatRelativeTime(ts) {
     if (!ts) return '';
-    const date = new Date(ts);
+    const date = parseTimestamp(ts);
+    if (!date || isNaN(date.getTime())) return '';
     const now = new Date();
     const diffMs = now - date;
     const diffSec = Math.floor(diffMs / 1000);
     const diffMin = Math.floor(diffSec / 60);
     const diffHour = Math.floor(diffMin / 60);
     const diffDay = Math.floor(diffHour / 24);
-
     if (diffSec < 60) return 'Just now';
     if (diffMin < 60) return `${diffMin}m ago`;
     if (diffHour < 24) return `${diffHour}h ago`;
@@ -907,10 +906,10 @@
     return '';
   }
 
-  // Format timestamp for display (YYYY-MM-DD HH:MM:SS)
   function formatTimestamp(ts) {
     if (!ts) return '';
-    const d = new Date(ts);
+    const d = parseTimestamp(ts);
+    if (!d || isNaN(d.getTime())) return ts;
     const pad = (v) => String(v).padStart(2, '0');
     return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
   }
