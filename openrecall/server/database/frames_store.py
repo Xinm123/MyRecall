@@ -72,6 +72,21 @@ def _parse_utc_datetime(value: object) -> Optional[datetime]:
     )
 
 
+# Fixed UTC+8 timezone for local time
+UTC8 = timezone(timedelta(hours=8))
+
+
+def _utc_to_local_timestamp(utc_iso: str) -> str:
+    """Convert UTC ISO8601 string to local (UTC+8) timestamp.
+
+    Returns an ISO8601 string without offset (e.g. '2026-04-26T16:30:00.123').
+    """
+    dt_utc = datetime.fromisoformat(utc_iso.replace("Z", "+00:00"))
+    dt_local = dt_utc.astimezone(UTC8)
+    local_ts = dt_local.strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3]  # millisecond precision
+    return local_ts
+
+
 def _percentile(values: list[float], percentile: float) -> Optional[float]:
     if not values:
         return None
@@ -144,6 +159,7 @@ class FramesStore:
     ) -> tuple[object, ...]:
         raw_timestamp = metadata.get("timestamp") or metadata.get("capture_time")
         timestamp = _to_utc_iso8601(raw_timestamp) or ""
+        local_timestamp = _utc_to_local_timestamp(timestamp) if timestamp else ""
         app_name = (
             metadata.get("app_name")
             or metadata.get("app")
@@ -166,6 +182,7 @@ class FramesStore:
         phash = metadata.get("phash")
         return (
             timestamp,
+            local_timestamp,
             app_name,
             window_name,
             browser_url,
@@ -185,6 +202,7 @@ class FramesStore:
     ) -> tuple[int, bool]:
         (
             timestamp,
+            local_timestamp,
             app_name,
             window_name,
             browser_url,
@@ -215,14 +233,16 @@ class FramesStore:
                 cursor = conn.execute(
                     """
                     INSERT OR IGNORE INTO frames
-                        (capture_id, timestamp, app_name, window_name, browser_url,
+                        (capture_id, timestamp, local_timestamp,
+                         app_name, window_name, browser_url,
                          focused, device_name, capture_trigger, event_ts, snapshot_path,
                          image_size_bytes, status, last_known_app, last_known_window, simhash, phash)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?)
                     """,
                     (
                         capture_id,
                         timestamp,
+                        local_timestamp,
                         app_name,
                         window_name,
                         browser_url,
