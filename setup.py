@@ -28,6 +28,7 @@ install_requires = [
     "python-multipart",
     "rapidocr>=3.0.0",  # v3 API with EngineType, OCRVersion, ModelType enums
     "onnxruntime>=1.16.0",  # Explicit ONNX runtime for RapidOCR v3
+    "pyyaml>=6.0",
 ]
 
 # Define OS-specific dependencies

@@ -7,8 +7,8 @@ default provider/model constants — no model metadata dictionary
 is maintained here.
 """
 
-DEFAULT_PROVIDER = "qianfan"
+DEFAULT_PROVIDER = "kimi-coding"
 """Default LLM provider. Configured via ~/.pi/agent/models.json."""
 
-DEFAULT_MODEL = "glm-5"
-"""Default model ID for qianfan provider (GLM-5)."""
+DEFAULT_MODEL = "kimi-for-coding"
+"""Default model ID for kimi-coding provider (Kimi K2.6)."""

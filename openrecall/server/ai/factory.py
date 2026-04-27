@@ -176,13 +176,14 @@ def get_description_provider() -> "DescriptionProvider":
 def get_multimodal_embedding_provider() -> "MultimodalEmbeddingProvider":
     """Get or create a cached MultimodalEmbeddingProvider instance.
 
-    Supports providers: openai, dashscope, multimodal
+    Supports providers: openai, dashscope, multimodal, siliconflow
     """
     from openrecall.server.embedding.providers import (
         MultimodalEmbeddingProvider,
         OpenAIEmbeddingProvider,
         DashScopeEmbeddingProvider,
         QwenVLEmbeddingProvider,
+        SiliconFlowEmbeddingProvider,
     )
 
     capability = "multimodal_embedding"
@@ -210,6 +211,13 @@ def get_multimodal_embedding_provider() -> "MultimodalEmbeddingProvider":
         )
     elif provider == "multimodal":
         instance = QwenVLEmbeddingProvider(
+            api_key=api_key,
+            model_name=model_name,
+            api_base=api_base,
+            dimension=dimension,
+        )
+    elif provider == "siliconflow":
+        instance = SiliconFlowEmbeddingProvider(
             api_key=api_key,
             model_name=model_name,
             api_base=api_base,

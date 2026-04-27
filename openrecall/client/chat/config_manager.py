@@ -21,22 +21,19 @@ MYRECALL_CONFIG = PI_CONFIG_DIR / "myrecall-config.json"  # User's provider/mode
 # Supported providers for UI
 SUPPORTED_PROVIDERS = [
     {
-        "id": "qianfan",
-        "name": "Baidu Qianfan",
-        "url": "https://console.bce.baidu.com/qianfan/",
-        "api_base": "https://aip.baidubce.com",
+        "id": "kimi-coding",
+        "name": "Kimi Code",
+        "url": "https://www.kimi.com/code",
+        "api_base": "https://api.kimi.com/coding/v1",
         "models": [
-            {"id": "deepseek-v3.2", "name": "DeepSeek V3.2"},
-            {"id": "kimi-k2.5", "name": "Kimi K2.5"},
-            {"id": "glm-5", "name": "GLM-5"},
-            {"id": "minimax-m2.5", "name": "MiniMax M2.5"},
+            {"id": "kimi-for-coding", "name": "Kimi For Coding (K2.6)"},
         ]
     },
     {
-        "id": "kimi-coding",
-        "name": "Kimi (免费)",
+        "id": "moonshot",
+        "name": "Moonshot Platform",
         "url": "https://platform.moonshot.cn/",
-        "api_base": "https://api.moonshot.cn",
+        "api_base": "https://api.moonshot.cn/v1",
         "models": [
             {"id": "moonshot-v1-8k", "name": "Moonshot V1 (8K)"},
             {"id": "moonshot-v1-32k", "name": "Moonshot V1 (32K)"},
@@ -80,9 +77,9 @@ SUPPORTED_PROVIDERS = [
 PROVIDER_ENV_MAP: dict[str, str] = {
     "minimax-cn": "MINIMAX_CN_API_KEY",
     "kimi-coding": "KIMI_API_KEY",
+    "moonshot": "MOONSHOT_API_KEY",
     "anthropic": "ANTHROPIC_API_KEY",
     "openai": "OPENAI_API_KEY",
-    "qianfan": "QIANFAN_API_KEY",
     "custom": "CUSTOM_API_KEY",
 }
 
@@ -140,12 +137,12 @@ def get_api_key(provider: str) -> Optional[str]:
 
 def get_default_provider() -> str:
     """Return default LLM provider name."""
-    return "qianfan"
+    return "kimi-coding"
 
 
 def get_default_model() -> str:
     """Return default LLM model ID."""
-    return "glm-5"
+    return "kimi-for-coding"
 
 
 def get_provider_info(provider_id: str) -> Optional[dict]:

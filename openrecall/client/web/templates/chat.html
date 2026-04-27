@@ -1351,19 +1351,49 @@
 
         if (eventType === 'message_update' || eventType === 'message') {
           const evt = payload.assistantMessageEvent;
-          if (!evt) return;
+          console.log('[chat] message_update event, assistantMessageEvent.type=', evt ? evt.type : 'null');
+          if (!evt) {
+            console.log('[chat] message_update but no assistantMessageEvent');
+            return;
+          }
 
           if (evt.type === 'thinking_start') {
+            console.log('[chat] thinking_start');
             this.currentAssistantMsg.thinking = "";
             this.currentAssistantMsg.thinkingExpanded = false;
           } else if (evt.type === 'thinking_delta') {
             this.currentAssistantMsg.thinking += evt.delta ?? "";
           } else if (evt.type === 'text_delta') {
-            const delta = evt.delta ?? '';
-            if (!delta) return;
+            let delta = evt.delta ?? '';
+            console.log('[chat] text_delta, raw delta=', JSON.stringify(delta), 'hasPartial=', !!evt.partial);
+            if (!delta && evt.partial && Array.isArray(evt.partial.content)) {
+              const textBlock = evt.partial.content.find(c => c.type === 'text');
+              if (textBlock && textBlock.text) {
+                delta = textBlock.text;
+                console.log('[chat] text_delta fallback from partial.content:', JSON.stringify(delta));
+              }
+            }
+            if (!delta) {
+              console.log('[chat] text_delta: empty delta, skipping');
+              return;
+            }
+            if (!this.currentAssistantMsg) {
+              console.error('[chat] text_delta but currentAssistantMsg is null!');
+              return;
+            }
             this.currentAssistantMsg.rawContent += delta;
-            this.currentAssistantMsg.content = marked.parse(this.currentAssistantMsg.rawContent);
+            const parsed = marked.parse(this.currentAssistantMsg.rawContent);
+            console.log('[chat] text_delta applied, rawContent length=', this.currentAssistantMsg.rawContent.length, 'parsed=', parsed.substring(0, 100));
+            this.currentAssistantMsg.content = parsed;
             this.smartScrollToBottom();
+          } else if (evt.type === 'text_start') {
+            console.log('[chat] text_start');
+          } else if (evt.type === 'text_end') {
+            console.log('[chat] text_end');
+          } else if (evt.type === 'thinking_end') {
+            console.log('[chat] thinking_end');
+          } else {
+            console.log('[chat] unhandled assistantMessageEvent type:', evt.type);
           }
         }
 
@@ -1395,12 +1425,15 @@
 
         if (eventType === 'agent_end') {
           // Finalize the streaming message
+          const finalMsg = this.currentAssistantMsg;
+          console.log('[chat] agent_end, final rawContent length=', finalMsg ? finalMsg.rawContent.length : 'null', 'content length=', finalMsg ? finalMsg.content.length : 'null');
           this.messages.push({ ...this.currentAssistantMsg });
           this.currentAssistantMsg = null;
           this.scrollToBottom();
         }
 
         if (eventType === 'error') {
+          console.log('[chat] error event:', payload);
           this.currentAssistantMsg = null;
           this.isStreaming = false;
           const errorHtml = this.renderError(payload);

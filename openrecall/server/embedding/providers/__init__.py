@@ -16,6 +16,9 @@ from openrecall.server.embedding.providers.dashscope import (
 from openrecall.server.embedding.providers.multimodal import (
     QwenVLEmbeddingProvider,
 )
+from openrecall.server.embedding.providers.siliconflow import (
+    SiliconFlowEmbeddingProvider,
+)
 
 __all__ = [
     # Protocol and errors
@@ -29,4 +32,5 @@ __all__ = [
     "OpenAIMultimodalEmbeddingProvider",  # Alias for backwards compat
     "DashScopeEmbeddingProvider",
     "QwenVLEmbeddingProvider",
+    "SiliconFlowEmbeddingProvider",
 ]

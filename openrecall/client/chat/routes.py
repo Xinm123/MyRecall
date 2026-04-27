@@ -174,8 +174,8 @@ def get_config():
 
     Returns:
         {
-            "provider": "qianfan",
-            "model": "glm-5",
+            "provider": "kimi-coding",
+            "model": "kimi-for-coding",
             "has_api_key": true,
             "supported_providers": [...]
         }
@@ -191,9 +191,9 @@ def save_config():
 
     Request:
         {
-            "provider": "qianfan",
+            "provider": "kimi-coding",
             "api_key": "your-api-key",
-            "model": "glm-5",  // optional
+            "model": "kimi-for-coding",  // optional
             "api_base": "http://..."  // for custom provider
         }
 
