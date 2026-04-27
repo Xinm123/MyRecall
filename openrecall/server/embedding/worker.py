@@ -84,7 +84,7 @@ class EmbeddingWorker(threading.Thread):
         task_id, frame_id = task["id"], task["frame_id"]
         logger.debug(f"Processing embedding task #{task_id} for frame #{frame_id}")
 
-        frame = self._store.get_frame_by_id(frame_id, conn)
+        frame = self._store.get_frame_for_embedding(frame_id, conn)
         if frame is None:
             logger.warning(f"Frame #{frame_id} not found, skipping task #{task_id}")
             return

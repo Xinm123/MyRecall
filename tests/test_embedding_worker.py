@@ -28,6 +28,7 @@ class TestEmbeddingWorker:
         conn.executescript("""
             CREATE TABLE frames (
                 id INTEGER PRIMARY KEY,
+                capture_id TEXT,
                 snapshot_path TEXT,
                 full_text TEXT,
                 timestamp TEXT,
@@ -49,8 +50,8 @@ class TestEmbeddingWorker:
             );
         """)
         conn.execute(
-            "INSERT INTO frames (id, snapshot_path, full_text, timestamp) VALUES (?, ?, ?, ?)",
-            (1, str(test_image), "test text", "2026-04-09T12:00:00Z"),
+            "INSERT INTO frames (id, capture_id, snapshot_path, full_text, timestamp) VALUES (?, ?, ?, ?, ?)",
+            (1, "test-capture-1", str(test_image), "test text", "2026-04-09T12:00:00Z"),
         )
         conn.execute("INSERT INTO embedding_tasks (frame_id, status) VALUES (1, 'pending')")
         conn.commit()
@@ -144,9 +145,12 @@ class TestEmbeddingWorker:
         conn.executescript("""
             CREATE TABLE frames (
                 id INTEGER PRIMARY KEY,
+                capture_id TEXT,
                 snapshot_path TEXT,
                 full_text TEXT,
                 timestamp TEXT,
+                app_name TEXT,
+                window_name TEXT,
                 embedding_status TEXT DEFAULT NULL
             );
             CREATE TABLE embedding_tasks (
@@ -163,8 +167,8 @@ class TestEmbeddingWorker:
             );
         """)
         conn.execute(
-            "INSERT INTO frames (id, snapshot_path, full_text, timestamp) VALUES (?, ?, ?, ?)",
-            (1, str(test_image), "test", "2026-04-09T12:00:00Z"),
+            "INSERT INTO frames (id, capture_id, snapshot_path, full_text, timestamp) VALUES (?, ?, ?, ?, ?)",
+            (1, "test-capture-1", str(test_image), "test", "2026-04-09T12:00:00Z"),
         )
         conn.execute("INSERT INTO embedding_tasks (frame_id, status) VALUES (1, 'pending')")
         conn.commit()

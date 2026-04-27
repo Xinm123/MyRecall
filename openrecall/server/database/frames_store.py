@@ -1453,8 +1453,10 @@ class FramesStore:
         self,
         frame_id: int,
         conn: Optional[sqlite3.Connection] = None,
-    ) -> Optional[dict]:
+    ) -> Optional[dict[str, object]]:
         """Get a frame by ID as a dict with all fields.
+
+        Returns local_timestamp as 'timestamp' for API/UI consumption.
 
         Args:
             frame_id: The frame ID
@@ -1463,9 +1465,19 @@ class FramesStore:
         Returns:
             Frame dict or None if not found
         """
-        def _query(c: sqlite3.Connection) -> Optional[dict]:
+        def _query(c: sqlite3.Connection) -> Optional[dict[str, object]]:
             row = c.execute(
-                "SELECT * FROM frames WHERE id = ?",
+                """
+                SELECT id, capture_id, local_timestamp AS timestamp, app_name,
+                       window_name, snapshot_path, status, ingested_at,
+                       last_known_app, last_known_window, text_source,
+                       processed_at, capture_trigger, device_name, error_message,
+                       accessibility_text, ocr_text, full_text, browser_url, focused,
+                       description_status, embedding_status, visibility_status,
+                       event_ts
+                FROM frames
+                WHERE id = ?
+                """,
                 (frame_id,),
             ).fetchone()
             return dict(row) if row else None
@@ -1478,6 +1490,31 @@ class FramesStore:
                 return _query(conn)
         except sqlite3.Error as e:
             logger.error("get_frame_by_id failed frame_id=%d: %s", frame_id, e)
+            return None
+
+    def get_frame_for_embedding(
+        self,
+        frame_id: int,
+        conn: sqlite3.Connection,
+    ) -> Optional[dict[str, object]]:
+        """Return raw frame data with UTC timestamp for LanceDB embedding writes.
+
+        This is an internal API — not for general consumption. The returned dict
+        contains the original `frames.timestamp` (UTC) under the key `"timestamp"`.
+        """
+        try:
+            row = conn.execute(
+                """
+                SELECT id, capture_id, timestamp, app_name, window_name,
+                       snapshot_path, full_text
+                FROM frames
+                WHERE id = ?
+                """,
+                (frame_id,),
+            ).fetchone()
+            return dict(row) if row else None
+        except sqlite3.Error:
+            logger.exception("Error getting frame for embedding %s", frame_id)
             return None
 
     def get_frames_by_ids(
