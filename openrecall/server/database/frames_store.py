@@ -764,7 +764,7 @@ class FramesStore:
             with self._connect() as conn:
                 rows = conn.execute(
                     """
-                    SELECT f.id, f.capture_id, f.timestamp, f.app_name, f.window_name,
+                    SELECT f.id, f.capture_id, f.local_timestamp AS timestamp, f.app_name, f.window_name,
                            f.snapshot_path, f.status, f.ingested_at, f.last_known_app,
                            f.last_known_window, f.text_source, f.processed_at,
                            f.capture_trigger, f.device_name, f.error_message,
@@ -792,7 +792,7 @@ class FramesStore:
                     FROM frames f
                     LEFT JOIN ocr_text o ON f.id = o.frame_id
                     LEFT JOIN frame_descriptions fd ON f.id = fd.frame_id
-                    ORDER BY f.timestamp DESC
+                    ORDER BY f.local_timestamp DESC
                     LIMIT ?
                     """,
                     (normalized_limit,),
@@ -860,10 +860,10 @@ class FramesStore:
             with self._connect() as conn:
                 rows = conn.execute(
                     """
-                    SELECT id, capture_id, timestamp, app_name, window_name,
+                    SELECT id, capture_id, local_timestamp AS timestamp, app_name, window_name,
                            snapshot_path, status, ingested_at, last_known_app, last_known_window
                     FROM frames
-                    ORDER BY timestamp DESC
+                    ORDER BY local_timestamp DESC
                     LIMIT ?
                     """,
                     (normalized_limit,),
@@ -892,10 +892,11 @@ class FramesStore:
         return frames
 
     def get_memories_since(self, timestamp: str) -> list[dict[str, object]]:
-        """Retrieve frames with timestamp greater than given value.
+        """Return frames with local_timestamp > the given timestamp.
 
         Args:
-            timestamp: Filter for frames with timestamp > this value (ISO8601 string or Unix timestamp string).
+            timestamp: Local timestamp string (e.g. "2026-04-26T16:30:00.123")
+                      to filter frames by. Compared against local_timestamp.
 
         Returns:
             List of dicts with frame data.
@@ -906,7 +907,7 @@ class FramesStore:
             with self._connect() as conn:
                 rows = conn.execute(
                     """
-                    SELECT f.id, f.capture_id, f.timestamp, f.app_name, f.window_name,
+                    SELECT f.id, f.capture_id, f.local_timestamp AS timestamp, f.app_name, f.window_name,
                            f.snapshot_path, f.status, f.ingested_at, f.last_known_app,
                            f.last_known_window, f.text_source, f.processed_at,
                            f.capture_trigger, f.device_name, f.error_message,
@@ -915,8 +916,8 @@ class FramesStore:
                            SUBSTR(o.text, 1, 100) AS ocr_text_preview
                     FROM frames f
                     LEFT JOIN ocr_text o ON f.id = o.frame_id
-                    WHERE f.timestamp > ?
-                    ORDER BY f.timestamp DESC
+                    WHERE f.local_timestamp > ?
+                    ORDER BY f.local_timestamp DESC
                     """,
                     (timestamp,),
                 ).fetchall()
