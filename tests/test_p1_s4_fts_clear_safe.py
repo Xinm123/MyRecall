@@ -58,6 +58,8 @@ def temp_db():
             conn.executescript(mig_sql)
 
         # Insert test frames with full_text populated (post-migration schema)
+        # timestamp is UTC (with Z), local_timestamp is local time (UTC+8, no Z)
+        from openrecall.server.database.frames_store import _utc_to_local_timestamp
         test_frames = [
             (1, "capture-001", "2026-03-18T10:00:00Z", "Safari", "Web Browser", True, "Hello world from Safari"),
             (2, "capture-002", "2026-03-18T11:00:00Z", "VSCode", "main.py", True, "def hello(): pass"),
@@ -65,10 +67,11 @@ def temp_db():
         ]
 
         for frame_id, capture_id, ts, app, window, focused, full_text in test_frames:
+            local_ts = _utc_to_local_timestamp(ts)
             conn.execute(
                 """INSERT INTO frames (id, capture_id, timestamp, local_timestamp, app_name, window_name, focused, status, text_source, full_text, visibility_status)
                    VALUES (?, ?, ?, ?, ?, ?, ?, 'completed', 'ocr', ?, 'queryable')""",
-                (frame_id, capture_id, ts, ts, app, window, focused, full_text),
+                (frame_id, capture_id, ts, local_ts, app, window, focused, full_text),
             )
 
         conn.commit()

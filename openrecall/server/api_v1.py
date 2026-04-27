@@ -1478,7 +1478,7 @@ def similar_frames(frame_id: int):
             similar.append({
                 "frame_id": r.frame_id,
                 "similarity": round(similarity, 4),
-                "timestamp": ts,  # local time from SQL alias; UTC fallback for orphan embeddings
+                "timestamp": ts,  # local time from SQL alias; LanceDB UTC fallback for orphan embeddings
                 "app_name": r.app_name,
                 "window_name": r.window_name,
                 "frame_url": f"/v1/frames/{r.frame_id}",

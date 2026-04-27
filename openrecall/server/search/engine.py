@@ -241,8 +241,8 @@ class SearchEngine:
             q: Text query (sanitized via sanitize_fts5_query)
             limit: Max results (no maximum)
             offset: Pagination offset
-            start_time: ISO8601 UTC start timestamp
-            end_time: ISO8601 UTC end timestamp
+            start_time: Local time start timestamp (e.g. "2026-04-26T00:00:00")
+            end_time: Local time end timestamp (e.g. "2026-04-26T23:59:59")
             app_name: Filter by app name (exact match via FTS)
             window_name: Filter by window name (exact match via FTS)
             focused: Filter by focused state

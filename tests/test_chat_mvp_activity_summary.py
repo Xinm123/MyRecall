@@ -68,6 +68,14 @@ def _create_completed_frame_with_accessibility(
         accessibility_truncated=False,
         elements=elements or [],
     )
+    # Set visibility_status='queryable' so frames appear in activity summary queries
+    # (In production this is set by try_set_queryable when all stages complete)
+    with sqlite3.connect(str(store.db_path)) as conn:
+        conn.execute(
+            "UPDATE frames SET visibility_status = 'queryable' WHERE id = ?",
+            (frame_id,)
+        )
+        conn.commit()
     return frame_id
 
 

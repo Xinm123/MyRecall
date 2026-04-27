@@ -322,8 +322,8 @@ class TestSQLPathEdgeCases:
             q="",
             limit=20,
             offset=0,
-            start_time="2026-03-01T00:00:00Z",
-            end_time="2026-03-31T23:59:59Z",
+            start_time="2026-03-01T00:00:00",
+            end_time="2026-03-31T23:59:59",
         )
         sql, sql_params = engine._build_query(params, is_count=False)
 

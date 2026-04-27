@@ -103,9 +103,10 @@ def verify_activity_summary_apps(store: FramesStore) -> bool:
     """Verify get_activity_summary_apps."""
     print("1️⃣  Testing get_activity_summary_apps...")
 
+    # Query params are local time (no Z suffix)
     apps = store.get_activity_summary_apps(
-        start_time="2026-03-21T00:00:00Z",
-        end_time="2026-03-21T23:59:59Z",
+        start_time="2026-03-21T00:00:00",
+        end_time="2026-03-21T23:59:59",
     )
 
     print(f"   Result: {json.dumps(apps, indent=4)}")
@@ -128,8 +129,8 @@ def verify_activity_summary_apps(store: FramesStore) -> bool:
 
     # Test app_name filter
     safari_only = store.get_activity_summary_apps(
-        start_time="2026-03-21T00:00:00Z",
-        end_time="2026-03-21T23:59:59Z",
+        start_time="2026-03-21T00:00:00",
+        end_time="2026-03-21T23:59:59",
         app_name="Safari",
     )
     if safari_only:
@@ -147,8 +148,8 @@ def verify_activity_summary_total_frames(store: FramesStore) -> bool:
     print("3️⃣  Testing get_activity_summary_total_frames...")
 
     total = store.get_activity_summary_total_frames(
-        start_time="2026-03-21T00:00:00Z",
-        end_time="2026-03-21T23:59:59Z",
+        start_time="2026-03-21T00:00:00",
+        end_time="2026-03-21T23:59:59",
     )
 
     print(f"   Total completed frames: {total}")
@@ -166,8 +167,8 @@ def verify_activity_summary_time_range(store: FramesStore) -> bool:
     print("4️⃣  Testing get_activity_summary_time_range...")
 
     time_range = store.get_activity_summary_time_range(
-        start_time="2026-03-21T00:00:00Z",
-        end_time="2026-03-21T23:59:59Z",
+        start_time="2026-03-21T00:00:00",
+        end_time="2026-03-21T23:59:59",
     )
 
     print(f"   Time range: {time_range}")

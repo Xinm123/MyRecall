@@ -94,6 +94,8 @@ def temp_db():
 
         # Insert test frames with full_text populated (post-migration schema)
         # These mirror the test data from the old fixture, but use full_text
+        # timestamp is UTC (with Z), local_timestamp is local time (UTC+8, no Z)
+        from openrecall.server.database.frames_store import _utc_to_local_timestamp
         test_frames = [
             (1, "capture-001", "2026-03-18T10:00:00Z", "Safari", "Web Browser", None, True, "Hello world from Safari", "ocr"),
             (2, "capture-002", "2026-03-18T11:00:00Z", "VSCode", "main.py", None, True, "def hello(): pass # code here", "ocr"),
@@ -103,10 +105,11 @@ def temp_db():
         ]
 
         for frame_id, capture_id, ts, app, window, url, focused, full_text, text_source in test_frames:
+            local_ts = _utc_to_local_timestamp(ts)
             conn.execute(
                 """INSERT INTO frames (id, capture_id, timestamp, local_timestamp, app_name, window_name, browser_url, focused, status, text_source, full_text, visibility_status)
                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'completed', ?, ?, 'queryable')""",
-                (frame_id, capture_id, ts, ts, app, window, url, focused, text_source, full_text),
+                (frame_id, capture_id, ts, local_ts, app, window, url, focused, text_source, full_text),
             )
 
         conn.commit()
@@ -236,11 +239,11 @@ class TestSearchEngineFiltering:
             q="",
             limit=20,
             offset=0,
-            start_time="2026-03-18T11:00:00Z",
-            end_time="2026-03-18T12:30:00Z",
+            start_time="2026-03-18T19:00:00.000",
+            end_time="2026-03-18T20:30:00.000",
         )
 
-        # Should match VSCode (11:00) and Terminal (12:00)
+        # Should match VSCode (UTC 11:00 -> local 19:00) and Terminal (UTC 12:00 -> local 20:00)
         assert total == 2
 
     def test_text_length_filter(self, temp_db):
@@ -406,17 +409,21 @@ class TestUnifiedFtsSearch:
             conn.executescript(mig_sql)
 
         # Insert test frames with full_text
+        # timestamp is UTC (with Z), local_timestamp is local time (UTC+8, no Z)
+        from openrecall.server.database.frames_store import _utc_to_local_timestamp
         conn.execute(
             """
             INSERT INTO frames (capture_id, timestamp, local_timestamp, full_text, app_name, window_name, status, text_source, visibility_status)
-            VALUES ('ax-1', '2026-03-25T10:00:00Z', '2026-03-25T10:00:00Z', 'Email from alice@example.com about project', 'Mail', 'Inbox', 'completed', 'accessibility', 'queryable')
-            """
+            VALUES ('ax-1', '2026-03-25T10:00:00Z', ?, 'Email from alice@example.com about project', 'Mail', 'Inbox', 'completed', 'accessibility', 'queryable')
+            """,
+            (_utc_to_local_timestamp("2026-03-25T10:00:00Z"),)
         )
         conn.execute(
             """
             INSERT INTO frames (capture_id, timestamp, local_timestamp, full_text, app_name, window_name, status, text_source, visibility_status)
-            VALUES ('ocr-1', '2026-03-25T11:00:00Z', '2026-03-25T11:00:00Z', 'Meeting notes from yesterday standup', 'Notes', 'Meeting', 'completed', 'ocr', 'queryable')
-            """
+            VALUES ('ocr-1', '2026-03-25T11:00:00Z', ?, 'Meeting notes from yesterday standup', 'Notes', 'Meeting', 'completed', 'ocr', 'queryable')
+            """,
+            (_utc_to_local_timestamp("2026-03-25T11:00:00Z"),)
         )
         conn.commit()
         conn.close()

@@ -80,11 +80,11 @@ class TestSearchCountsAPI:
         """Test /v1/search/counts passes time range params."""
         with patch("openrecall.server.api_v1._get_search_engine", return_value=mock_search_engine):
             client = app_with_search_counts_route.test_client()
-            client.get("/v1/search/counts?q=test&start_time=2026-03-18T10:00:00Z&end_time=2026-03-18T11:00:00Z")
+            client.get("/v1/search/counts?q=test&start_time=2026-03-18T10:00:00&end_time=2026-03-18T11:00:00")
 
             call_args = mock_search_engine.count_by_type.call_args
-            assert call_args.kwargs.get("start_time") == "2026-03-18T10:00:00Z"
-            assert call_args.kwargs.get("end_time") == "2026-03-18T11:00:00Z"
+            assert call_args.kwargs.get("start_time") == "2026-03-18T10:00:00"
+            assert call_args.kwargs.get("end_time") == "2026-03-18T11:00:00"
 
     def test_search_counts_endpoint_passes_window_name(self, app_with_search_counts_route, mock_search_engine):
         """Test /v1/search/counts passes window_name param."""
@@ -213,11 +213,15 @@ class TestSearchCountsIntegration:
         """Insert a completed OCR frame with full_text and frames_fts.
 
         After FTS unification: full_text is set on frames, triggering frames_ai → frames_fts.
+        timestamp is UTC, local_timestamp is local time (UTC+8).
         """
+        # Compute local_timestamp from UTC timestamp (UTC+8)
+        from openrecall.server.database.frames_store import _utc_to_local_timestamp
+        local_ts = _utc_to_local_timestamp(timestamp)
         cursor = conn.execute(
             """INSERT INTO frames (capture_id, timestamp, local_timestamp, app_name, text_source, status, full_text, visibility_status)
                VALUES (?, ?, ?, ?, 'ocr', 'completed', ?, 'queryable')""",
-            (f"cap-ocr-{timestamp}", timestamp, timestamp, app_name, text),
+            (f"cap-ocr-{timestamp}", timestamp, local_ts, app_name, text),
         )
         return cursor.lastrowid
 
@@ -225,11 +229,14 @@ class TestSearchCountsIntegration:
         """Insert a completed accessibility frame with full_text and frames_fts.
 
         After FTS unification: full_text is set on frames, triggering frames_ai → frames_fts.
+        timestamp is UTC, local_timestamp is local time (UTC+8).
         """
+        from openrecall.server.database.frames_store import _utc_to_local_timestamp
+        local_ts = _utc_to_local_timestamp(timestamp)
         cursor = conn.execute(
             """INSERT INTO frames (capture_id, timestamp, local_timestamp, app_name, text_source, status, full_text, visibility_status)
                VALUES (?, ?, ?, ?, 'accessibility', 'completed', ?, 'queryable')""",
-            (f"cap-ax-{timestamp}", timestamp, timestamp, app_name, text),
+            (f"cap-ax-{timestamp}", timestamp, local_ts, app_name, text),
         )
         return cursor.lastrowid
 

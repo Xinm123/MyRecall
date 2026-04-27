@@ -44,6 +44,15 @@ def _claim_and_complete(store: FramesStore, capture_id: str, timestamp: str, app
         accessibility_truncated=False,
         elements=[],
     )
+    # Set visibility_status='queryable' so frames appear in activity summary queries
+    # (In production this is set by try_set_queryable when all stages complete)
+    import sqlite3
+    with sqlite3.connect(str(store.db_path)) as conn:
+        conn.execute(
+            "UPDATE frames SET visibility_status = 'queryable' WHERE id = ?",
+            (frame_id,)
+        )
+        conn.commit()
     return frame_id
 
 
@@ -60,9 +69,10 @@ class TestAppsScreenpipeMinutes:
         _claim_and_complete(store, "cap-2", "2026-03-20T10:00:02Z", "Safari", "World")
         _claim_and_complete(store, "cap-3", "2026-03-20T10:00:04Z", "Safari", "!")
 
+        # Query params are local time (UTC+8: 10:00 UTC -> 18:00 local)
         apps = store.get_activity_summary_apps(
-            start_time="2026-03-20T09:00:00Z",
-            end_time="2026-03-20T11:00:00Z",
+            start_time="2026-03-20T17:00:00",
+            end_time="2026-03-20T19:00:00",
         )
 
         assert len(apps) == 1
@@ -80,8 +90,8 @@ class TestAppsScreenpipeMinutes:
         _claim_and_complete(store, "cap-2", "2026-03-20T10:06:00Z", "Safari", "Return")
 
         apps = store.get_activity_summary_apps(
-            start_time="2026-03-20T09:00:00Z",
-            end_time="2026-03-20T11:00:00Z",
+            start_time="2026-03-20T17:00:00",
+            end_time="2026-03-20T19:00:00",
         )
 
         assert apps[0]["minutes"] == 0.0
@@ -92,12 +102,13 @@ class TestAppsScreenpipeMinutes:
         _claim_and_complete(store, "cap-2", "2026-03-20T10:30:00Z", "Safari", "Last")
 
         apps = store.get_activity_summary_apps(
-            start_time="2026-03-20T09:00:00Z",
-            end_time="2026-03-20T11:00:00Z",
+            start_time="2026-03-20T17:00:00",
+            end_time="2026-03-20T19:00:00",
         )
 
-        assert apps[0]["first_seen"] == "2026-03-20T10:00:00Z"
-        assert apps[0]["last_seen"] == "2026-03-20T10:30:00Z"
+        # first_seen/last_seen now return local_timestamp (local time, no Z)
+        assert apps[0]["first_seen"] == "2026-03-20T18:00:00.000"
+        assert apps[0]["last_seen"] == "2026-03-20T18:30:00.000"
 
     def test_apps_ordered_by_minutes_desc(self, store: FramesStore):
         """Apps should be ordered by minutes descending, not frame_count."""
@@ -113,8 +124,8 @@ class TestAppsScreenpipeMinutes:
         _claim_and_complete(store, "mail-1", "2026-03-20T10:15:00Z", "Mail", "Mail")
 
         apps = store.get_activity_summary_apps(
-            start_time="2026-03-20T09:00:00Z",
-            end_time="2026-03-20T11:00:00Z",
+            start_time="2026-03-20T17:00:00",
+            end_time="2026-03-20T19:00:00",
         )
 
         assert len(apps) == 2
@@ -128,8 +139,8 @@ class TestAppsScreenpipeMinutes:
         store.claim_frame(capture_id="cap-2", metadata={"timestamp": "2026-03-20T10:01:00Z", "app_name": "Safari"})
 
         apps = store.get_activity_summary_apps(
-            start_time="2026-03-20T09:00:00Z",
-            end_time="2026-03-20T11:00:00Z",
+            start_time="2026-03-20T17:00:00",
+            end_time="2026-03-20T19:00:00",
         )
 
         assert len(apps) == 1
@@ -142,8 +153,8 @@ class TestAppsScreenpipeMinutes:
         _claim_and_complete(store, "cap-3", "2026-03-20T10:15:00Z", "Mail", "MailApp")
 
         apps = store.get_activity_summary_apps(
-            start_time="2026-03-20T09:00:00Z",
-            end_time="2026-03-20T11:00:00Z",
+            start_time="2026-03-20T17:00:00",
+            end_time="2026-03-20T19:00:00",
             app_name="Safari",
         )
 
@@ -156,8 +167,8 @@ class TestAppsScreenpipeMinutes:
         _claim_and_complete(store, "cap-1", "2026-03-20T10:00:00Z", "Safari", "Solo")
 
         apps = store.get_activity_summary_apps(
-            start_time="2026-03-20T09:00:00Z",
-            end_time="2026-03-20T11:00:00Z",
+            start_time="2026-03-20T17:00:00",
+            end_time="2026-03-20T19:00:00",
         )
 
         assert apps[0]["minutes"] == 0.0

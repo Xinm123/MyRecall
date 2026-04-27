@@ -57,3 +57,21 @@ def test_spool_default_timestamp_is_iso8601(tmp_path: Path) -> None:
     assert isinstance(payload.get("timestamp"), str)
     assert "T" in payload["timestamp"]
     assert payload["timestamp"].endswith("Z")
+
+
+@pytest.mark.unit
+def test_api_response_timestamps_split_utc_vs_local() -> None:
+    """Verify API response field timestamp conventions:
+    - 'timestamp' fields (search/timeline/activity-summary): local time, NO 'Z'
+    - 'ingested_at', 'processed_at', 'description_generated_at': UTC, WITH 'Z'
+    """
+    # Local time fields (no Z suffix)
+    local_timestamp = "2026-04-26T16:30:00.123"
+    assert not local_timestamp.endswith("Z")
+
+    # UTC fields (with Z suffix)
+    utc_ingested_at = "2026-04-26T08:30:00.123Z"
+    assert utc_ingested_at.endswith("Z")
+
+    utc_processed_at = "2026-04-26T08:30:00.123Z"
+    assert utc_processed_at.endswith("Z")

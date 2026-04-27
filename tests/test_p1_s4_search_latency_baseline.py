@@ -143,6 +143,7 @@ def perf_db():
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 capture_id TEXT NOT NULL UNIQUE,
                 timestamp TEXT NOT NULL,
+                local_timestamp TEXT,
                 app_name TEXT DEFAULT NULL,
                 window_name TEXT DEFAULT NULL,
                 browser_url TEXT DEFAULT NULL,
@@ -194,6 +195,7 @@ def perf_db():
         # Insert 150 frames for substantial test data
         test_frames = generate_test_frames(150)
 
+        from openrecall.server.database.frames_store import _utc_to_local_timestamp
         for (
             frame_id,
             capture_id,
@@ -204,10 +206,11 @@ def perf_db():
             focused,
             ocr_text,
         ) in test_frames:
+            local_ts = _utc_to_local_timestamp(ts)
             conn.execute(
-                """INSERT INTO frames (id, capture_id, timestamp, app_name, window_name, browser_url, focused, status, text_source)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, 'completed', 'ocr')""",
-                (frame_id, capture_id, ts, app, window, url, focused),
+                """INSERT INTO frames (id, capture_id, timestamp, local_timestamp, app_name, window_name, browser_url, focused, status, text_source)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'completed', 'ocr')""",
+                (frame_id, capture_id, ts, local_ts, app, window, url, focused),
             )
             conn.execute(
                 """INSERT INTO ocr_text (frame_id, text, text_length, ocr_engine)

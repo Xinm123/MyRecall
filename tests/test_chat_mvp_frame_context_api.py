@@ -45,7 +45,7 @@ class TestFrameContextAPI:
         """Endpoint returns frame_id, description, text, urls, text_source."""
         mock_store.get_frame_context.return_value = {
             "frame_id": 1,
-            "timestamp": "2026-03-26T10:00:00Z",
+            "timestamp": "2026-03-26T18:00:00.000",
             "app_name": "Claude Code",
             "window_name": "Claude Code — ~/chat",
             "text": "Hello World",
@@ -65,7 +65,7 @@ class TestFrameContextAPI:
             assert body["frame_id"] == 1
             assert body["text"] == "Hello World"
             assert body["text_source"] == "accessibility"
-            assert body["timestamp"] == "2026-03-26T10:00:00Z"
+            assert body["timestamp"] == "2026-03-26T18:00:00.000"
             assert body["app_name"] == "Claude Code"
             assert body["window_name"] == "Claude Code — ~/chat"
             # nodes and description_status are removed
@@ -135,7 +135,7 @@ class TestFrameContextAPI:
         """Endpoint includes description object when description_status=completed."""
         mock_store.get_frame_context.return_value = {
             "frame_id": 1,
-            "timestamp": "2026-03-26T10:00:00Z",
+            "timestamp": "2026-03-26T18:00:00.000",
             "app_name": "Claude Code",
             "window_name": "Claude Code Window",
             "text": "Test",

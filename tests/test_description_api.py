@@ -40,7 +40,7 @@ class TestDescriptionAPI:
         """Test GET /v1/activity-summary includes descriptions field."""
         flask_app.config["TESTING"] = True
         response = flask_client.get(
-            "/v1/activity-summary?start_time=2026-01-01T00:00:00Z&end_time=2027-01-01T00:00:00Z"
+            "/v1/activity-summary?start_time=2026-01-01T00:00:00&end_time=2027-01-01T00:00:00"
         )
         assert response.status_code == 200
         data = response.get_json()
@@ -70,7 +70,7 @@ class TestDescriptionAPI:
         """Test that /v1/activity-summary returns tags instead of intent."""
         flask_app.config["TESTING"] = True
         response = flask_client.get(
-            "/v1/activity-summary?start_time=2026-01-01T00:00:00Z&end_time=2027-01-01T00:00:00Z"
+            "/v1/activity-summary?start_time=2026-01-01T00:00:00&end_time=2027-01-01T00:00:00"
         )
         assert response.status_code == 200
         data = response.get_json()

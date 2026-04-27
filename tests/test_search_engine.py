@@ -46,7 +46,7 @@ def test_count_by_type_returns_ocr_and_accessibility_counts(test_db):
         # Insert OCR frame with full_text
         conn.execute(
             """INSERT INTO frames (capture_id, timestamp, local_timestamp, app_name, window_name, device_name, text_source, status, ingested_at, full_text, visibility_status)
-               VALUES ('cap-ocr-001', '2024-01-01T00:00:00Z', '2024-01-01T00:00:00Z', 'TestApp', 'TestWindow', 'monitor_0', 'ocr', 'completed', '2024-01-01T00:00:00.000Z', 'test ocr content', 'queryable')"""
+               VALUES ('cap-ocr-001', '2024-01-01T00:00:00Z', '2024-01-01T08:00:00.000', 'TestApp', 'TestWindow', 'monitor_0', 'ocr', 'completed', '2024-01-01T00:00:00.000Z', 'test ocr content', 'queryable')"""
         )
         frame_id_ocr = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
         # Also insert into ocr_text for completeness (FramesStore may still do this)
@@ -58,7 +58,7 @@ def test_count_by_type_returns_ocr_and_accessibility_counts(test_db):
         # Insert accessibility frame with full_text
         conn.execute(
             """INSERT INTO frames (capture_id, timestamp, local_timestamp, app_name, window_name, device_name, text_source, status, ingested_at, full_text, visibility_status)
-               VALUES ('cap-ax-001', '2024-01-01T00:00:01Z', '2024-01-01T00:00:01Z', 'TestApp', 'TestWindow', 'monitor_0', 'accessibility', 'completed', '2024-01-01T00:00:01.000Z', 'test accessibility content', 'queryable')"""
+               VALUES ('cap-ax-001', '2024-01-01T00:00:01Z', '2024-01-01T08:00:01.000', 'TestApp', 'TestWindow', 'monitor_0', 'accessibility', 'completed', '2024-01-01T00:00:01.000Z', 'test accessibility content', 'queryable')"""
         )
         frame_id_ax = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
         conn.execute(

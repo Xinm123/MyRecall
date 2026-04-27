@@ -32,12 +32,13 @@ def temp_db_with_frames():
         conn = sqlite3.connect(str(db_path))
         conn.row_factory = sqlite3.Row
 
-        # Create schema matching production
+        # Create schema matching production (with local_timestamp)
         conn.executescript("""
             CREATE TABLE IF NOT EXISTS frames (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 capture_id TEXT NOT NULL UNIQUE,
                 timestamp TEXT NOT NULL,
+                local_timestamp TEXT,
                 app_name TEXT DEFAULT NULL,
                 window_name TEXT DEFAULT NULL,
                 browser_url TEXT DEFAULT NULL,
@@ -194,6 +195,7 @@ def temp_db_with_frames():
             ),
         ]
 
+        from openrecall.server.database.frames_store import _utc_to_local_timestamp
         for (
             frame_id,
             capture_id,
@@ -204,10 +206,11 @@ def temp_db_with_frames():
             focused,
             ocr_text,
         ) in test_frames:
+            local_ts = _utc_to_local_timestamp(ts)
             conn.execute(
-                """INSERT INTO frames (id, capture_id, timestamp, app_name, window_name, browser_url, focused, status, text_source)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, 'completed', 'ocr')""",
-                (frame_id, capture_id, ts, app, window, url, focused),
+                """INSERT INTO frames (id, capture_id, timestamp, local_timestamp, app_name, window_name, browser_url, focused, status, text_source)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'completed', 'ocr')""",
+                (frame_id, capture_id, ts, local_ts, app, window, url, focused),
             )
             conn.execute(
                 """INSERT INTO ocr_text (frame_id, text, text_length, ocr_engine)
@@ -476,18 +479,18 @@ class TestCitationBacktraceEdgeCases:
             q="",
             limit=20,
             offset=0,
-            start_time="2026-03-18T12:00:00Z",
-            end_time="2026-03-18T16:00:00Z",
+            start_time="2026-03-18T20:00:00.000",
+            end_time="2026-03-19T00:00:00.000",
         )
 
-        # Should match frames 3-8 (12:00 to 16:00 inclusive)
+        # Should match frames at local 20:00 to 00:00+1 (UTC 12:00 to 16:00)
         assert total >= 1, "Expected at least one result in time range"
 
         for r in results:
             frame_id = r.get("frame_id")
             frame = store.get_frame(frame_id)
             assert frame is not None, f"Frame {frame_id} not found"
-            # Verify timestamp is within range (inclusive of endpoints)
+            # Verify local_timestamp is within range (inclusive of endpoints)
             assert (
-                "2026-03-18T12:00:00Z" <= frame.timestamp <= "2026-03-18T16:00:00Z"
-            ), f"Timestamp {frame.timestamp} not in expected range"
+                "2026-03-18T20:00:00" <= frame.local_timestamp <= "2026-03-19T00:00:00"
+            ), f"Local timestamp {frame.local_timestamp} not in expected range"

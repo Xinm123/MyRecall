@@ -39,10 +39,11 @@ def mock_search_engine():
     mock_engine = MagicMock(spec=SearchEngine)
 
     # Default test results
+    # timestamp is local time (from local_timestamp, no Z suffix)
     test_results = [
         {
             "frame_id": 1,
-            "timestamp": "2026-03-18T10:00:00Z",
+            "timestamp": "2026-03-18T18:00:00.000",
             "text": "Hello world from Safari",
             "app_name": "Safari",
             "window_name": "Web Browser",
@@ -71,10 +72,10 @@ class TestTimeRangeFilterMapping:
             return_value=mock_search_engine,
         ):
             client = app_with_search_route.test_client()
-            client.get("/v1/search?q=&mode=fts&start_time=2026-03-18T09:00:00Z&mode=fts")
+            client.get("/v1/search?q=&mode=fts&start_time=2026-03-18T09:00:00&mode=fts")
 
             call_args = mock_search_engine.search.call_args
-            assert call_args.kwargs.get("start_time") == "2026-03-18T09:00:00Z"
+            assert call_args.kwargs.get("start_time") == "2026-03-18T09:00:00"
 
     def test_end_time_passed_to_engine(self, app_with_search_route, mock_search_engine):
         """end_time parameter is passed to search engine."""
@@ -83,10 +84,10 @@ class TestTimeRangeFilterMapping:
             return_value=mock_search_engine,
         ):
             client = app_with_search_route.test_client()
-            client.get("/v1/search?q=&mode=fts&end_time=2026-03-18T17:00:00Z&mode=fts")
+            client.get("/v1/search?q=&mode=fts&end_time=2026-03-18T17:00:00&mode=fts")
 
             call_args = mock_search_engine.search.call_args
-            assert call_args.kwargs.get("end_time") == "2026-03-18T17:00:00Z"
+            assert call_args.kwargs.get("end_time") == "2026-03-18T17:00:00"
 
     def test_both_time_filters_passed(self, app_with_search_route, mock_search_engine):
         """Both start_time and end_time are passed together."""
@@ -96,27 +97,27 @@ class TestTimeRangeFilterMapping:
         ):
             client = app_with_search_route.test_client()
             client.get(
-                "/v1/search?q=&mode=fts&start_time=2026-03-18T09:00:00Z&end_time=2026-03-18T17:00:00Z&mode=fts"
+                "/v1/search?q=&mode=fts&start_time=2026-03-18T09:00:00&end_time=2026-03-18T17:00:00&mode=fts"
             )
 
             call_args = mock_search_engine.search.call_args
-            assert call_args.kwargs.get("start_time") == "2026-03-18T09:00:00Z"
-            assert call_args.kwargs.get("end_time") == "2026-03-18T17:00:00Z"
+            assert call_args.kwargs.get("start_time") == "2026-03-18T09:00:00"
+            assert call_args.kwargs.get("end_time") == "2026-03-18T17:00:00"
 
     def test_time_range_preserves_iso_format(
         self, app_with_search_route, mock_search_engine
     ):
-        """Time range filters preserve ISO 8601 format."""
-        iso_time = "2026-03-18T10:30:45.123Z"
+        """Time range filters preserve local time format."""
+        local_time = "2026-03-18T10:30:45.123"
         with patch(
             "openrecall.server.api_v1._get_search_engine",
             return_value=mock_search_engine,
         ):
             client = app_with_search_route.test_client()
-            client.get(f"/v1/search?q=&mode=fts&start_time={iso_time}")
+            client.get(f"/v1/search?q=&mode=fts&start_time={local_time}")
 
             call_args = mock_search_engine.search.call_args
-            assert call_args.kwargs.get("start_time") == iso_time
+            assert call_args.kwargs.get("start_time") == local_time
 
 
 class TestAppNameFilterMapping:
@@ -314,13 +315,13 @@ class TestCombinedFilterMapping:
         ):
             client = app_with_search_route.test_client()
             client.get(
-                "/v1/search?q=&mode=fts&start_time=2026-03-18T09:00:00Z"
-                "&end_time=2026-03-18T17:00:00Z&app_name=Terminal"
+                "/v1/search?q=&mode=fts&start_time=2026-03-18T09:00:00"
+                "&end_time=2026-03-18T17:00:00&app_name=Terminal"
             )
 
             call_args = mock_search_engine.search.call_args
-            assert call_args.kwargs.get("start_time") == "2026-03-18T09:00:00Z"
-            assert call_args.kwargs.get("end_time") == "2026-03-18T17:00:00Z"
+            assert call_args.kwargs.get("start_time") == "2026-03-18T09:00:00"
+            assert call_args.kwargs.get("end_time") == "2026-03-18T17:00:00"
             assert call_args.kwargs.get("app_name") == "Terminal"
 
     def test_all_filters_together(self, app_with_search_route, mock_search_engine):
@@ -331,16 +332,16 @@ class TestCombinedFilterMapping:
         ):
             client = app_with_search_route.test_client()
             client.get(
-                "/v1/search?q=test&mode=fts&start_time=2026-03-18T09:00:00Z"
-                "&end_time=2026-03-18T17:00:00Z"
+                "/v1/search?q=test&mode=fts&start_time=2026-03-18T09:00:00"
+                "&end_time=2026-03-18T17:00:00"
                 "&app_name=VSCode"
                 "&window_name=main.py"
                 "&focused=true"
             )
 
             call_args = mock_search_engine.search.call_args
-            assert call_args.kwargs.get("start_time") == "2026-03-18T09:00:00Z"
-            assert call_args.kwargs.get("end_time") == "2026-03-18T17:00:00Z"
+            assert call_args.kwargs.get("start_time") == "2026-03-18T09:00:00"
+            assert call_args.kwargs.get("end_time") == "2026-03-18T17:00:00"
             assert call_args.kwargs.get("app_name") == "VSCode"
             assert call_args.kwargs.get("window_name") == "main.py"
             assert call_args.kwargs.get("focused") is True
@@ -372,7 +373,7 @@ class TestCombinedFilterMapping:
             client = app_with_search_route.test_client()
             client.get(
                 "/v1/search?q=error&mode=fts&app_name=Terminal&window_name=bash&focused=false"
-                "&start_time=2026-03-18T00:00:00Z&end_time=2026-03-18T23:59:59Z"
+                "&start_time=2026-03-18T00:00:00&end_time=2026-03-18T23:59:59"
             )
 
             call_args = mock_search_engine.search.call_args
@@ -382,5 +383,5 @@ class TestCombinedFilterMapping:
             assert call_args.kwargs.get("app_name") == "Terminal"
             assert call_args.kwargs.get("window_name") == "bash"
             assert call_args.kwargs.get("focused") is False
-            assert call_args.kwargs.get("start_time") == "2026-03-18T00:00:00Z"
-            assert call_args.kwargs.get("end_time") == "2026-03-18T23:59:59Z"
+            assert call_args.kwargs.get("start_time") == "2026-03-18T00:00:00"
+            assert call_args.kwargs.get("end_time") == "2026-03-18T23:59:59"

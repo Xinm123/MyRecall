@@ -173,11 +173,13 @@ def temp_db_with_frames():
             ),
         ]
 
+        from openrecall.server.database.frames_store import _utc_to_local_timestamp
         for frame_id, capture_id, ts, app, window, focused, full_text, text_source in test_frames:
+            local_ts = _utc_to_local_timestamp(ts)
             conn.execute(
                 """INSERT INTO frames (id, capture_id, timestamp, local_timestamp, app_name, window_name, browser_url, focused, status, text_source, full_text, visibility_status)
                    VALUES (?, ?, ?, ?, ?, ?, NULL, ?, 'completed', ?, ?, 'queryable')""",
-                (frame_id, capture_id, ts, ts, app, window, focused, text_source, full_text),
+                (frame_id, capture_id, ts, local_ts, app, window, focused, text_source, full_text),
             )
 
         conn.commit()
@@ -378,10 +380,10 @@ class TestReferenceFieldCompletenessHardGate:
             q="",
             limit=100,
             offset=0,
-            start_time="2026-03-18T10:00:00Z",
-            end_time="2026-03-18T14:00:00Z",
+            start_time="2026-03-18T18:00:00.000",
+            end_time="2026-03-18T22:00:00.000",
         )
-        # Should match frames at 10:00, 11:00, 12:00, 13:00, 14:00
+        # Should match frames at local 18:00, 19:00, 20:00, 21:00, 22:00 (UTC 10:00-14:00)
         assert total == 5
         self._assert_all_results_have_reference_fields(results, "filter_time_range")
 
@@ -394,9 +396,10 @@ class TestReferenceFieldCompletenessHardGate:
             q="",
             limit=100,
             offset=0,
-            start_time="2026-03-18T15:00:00Z",
+            start_time="2026-03-18T23:00:00.000",
         )
-        assert total == 3  # 15:00, 16:00, 17:00
+        # UTC 15:00, 16:00, 17:00 -> local 23:00, 00:00+1, 01:00+1
+        assert total == 3
         self._assert_all_results_have_reference_fields(results, "filter_start_time")
 
     def test_filter_by_end_time_only(self, temp_db_with_frames):
@@ -408,9 +411,10 @@ class TestReferenceFieldCompletenessHardGate:
             q="",
             limit=100,
             offset=0,
-            end_time="2026-03-18T10:00:00Z",
+            end_time="2026-03-18T18:00:00.000",
         )
-        assert total == 3  # 08:00, 09:00, 10:00
+        # UTC 08:00, 09:00, 10:00 -> local 16:00, 17:00, 18:00
+        assert total == 3
         self._assert_all_results_have_reference_fields(results, "filter_end_time")
 
     # =========================================================================
@@ -446,8 +450,8 @@ class TestReferenceFieldCompletenessHardGate:
             limit=100,
             offset=0,
             app_name="Safari",
-            start_time="2026-03-18T07:00:00Z",
-            end_time="2026-03-18T12:00:00Z",
+            start_time="2026-03-18T15:00:00.000",
+            end_time="2026-03-18T20:00:00.000",
         )
         self._assert_all_results_have_reference_fields(results, "combined_time_app")
 
@@ -462,8 +466,8 @@ class TestReferenceFieldCompletenessHardGate:
             offset=0,
             app_name="Safari",
             focused=True,
-            start_time="2026-03-18T07:00:00Z",
-            end_time="2026-03-18T12:00:00Z",
+            start_time="2026-03-18T15:00:00.000",
+            end_time="2026-03-18T20:00:00.000",
         )
         self._assert_all_results_have_reference_fields(results, "combined_multiple")
 
@@ -579,7 +583,7 @@ class TestReferenceFieldDataIntegrity:
             )
 
     def test_timestamp_is_iso8601_format(self, temp_db_with_frames):
-        """All timestamps are valid ISO8601 UTC format."""
+        """All timestamps are valid ISO8601 local time format (no Z suffix)."""
         db_path, frames_dir = temp_db_with_frames
         engine = SearchEngine(db_path=db_path, frames_dir=frames_dir)
 
@@ -587,11 +591,12 @@ class TestReferenceFieldDataIntegrity:
 
         for result in results:
             timestamp = result.get("timestamp")
-            # ISO8601 format check: YYYY-MM-DDTHH:MM:SSZ
+            # ISO8601 local time format check: YYYY-MM-DDTHH:MM:SS (no Z)
             assert "T" in timestamp, f"Timestamp should contain T: {timestamp}"
-            assert timestamp.endswith("Z"), f"Timestamp should end with Z: {timestamp}"
+            # Local time - no Z suffix
+            assert not timestamp.endswith("Z"), f"Local timestamp should not end with Z: {timestamp}"
             # Basic structure validation
-            parts = timestamp.replace("Z", "").split("T")
+            parts = timestamp.split("T")
             assert len(parts) == 2, (
                 f"Timestamp should have date and time parts: {timestamp}"
             )
@@ -624,7 +629,7 @@ class TestReferenceFieldDataIntegrity:
         )
 
     def test_reference_fields_match_database(self, temp_db_with_frames):
-        """Reference fields in results match database values."""
+        """Reference fields in results match database local_timestamp values."""
         db_path, frames_dir = temp_db_with_frames
         engine = SearchEngine(db_path=db_path, frames_dir=frames_dir)
 
@@ -632,15 +637,16 @@ class TestReferenceFieldDataIntegrity:
         results, _ = engine.search(q="", limit=100, offset=0)
 
         # Query database directly for comparison
+        # Search returns local_timestamp aliased as timestamp
         conn = sqlite3.connect(str(db_path))
         conn.row_factory = sqlite3.Row
         db_rows = conn.execute(
-            """SELECT id, timestamp FROM frames ORDER BY timestamp DESC"""
+            """SELECT id, local_timestamp FROM frames ORDER BY local_timestamp DESC"""
         ).fetchall()
         conn.close()
 
-        # Build expected map
-        expected = {row["id"]: row["timestamp"] for row in db_rows}
+        # Build expected map (local_timestamp is what search returns)
+        expected = {row["id"]: row["local_timestamp"] for row in db_rows}
 
         # Verify each result matches
         for result in results:

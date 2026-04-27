@@ -36,10 +36,11 @@ def mock_search_engine():
     mock_engine = MagicMock(spec=SearchEngine)
 
     # Flat structure results (no content wrapper)
+    # timestamp is local time (from local_timestamp, no Z suffix)
     test_results = [
         {
             "frame_id": 1,
-            "timestamp": "2026-03-18T10:00:00Z",
+            "timestamp": "2026-03-18T18:00:00.000",
             "text": "Hello world from Safari",
             "text_source": "ocr",
             "app_name": "Safari",

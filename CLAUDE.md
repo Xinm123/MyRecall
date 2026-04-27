@@ -150,7 +150,8 @@ pip install -e ".[test]"    # Include test dependencies
 ```sql
 - frame_id (TEXT PRIMARY KEY)
 - capture_id (TEXT UNIQUE, idempotency key)
-- timestamp (TEXT ISO8601 UTC)
+- timestamp (TEXT ISO8601 UTC with Z) — Raw UTC backup; storage only, not used for query or display
+- local_timestamp (TEXT, ISO8601 without offset, UTC+8) — Primary query/display timestamp
 - app_name, window_name, browser_url
 - monitor_index, device_id
 - capture_trigger (idle/app_switch/manual/click)

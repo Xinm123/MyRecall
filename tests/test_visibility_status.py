@@ -315,7 +315,7 @@ class TestActivitySummaryFiltersByVisibilityStatus:
 
         total = temp_store.get_activity_summary_total_frames(
             start_time="2026-04-14T08:00:00.000",
-            end_time="2026-04-14T23:59:59Z",
+            end_time="2026-04-14T23:59:59",
         )
 
         assert total == 1
