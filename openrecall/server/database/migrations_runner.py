@@ -36,12 +36,13 @@ def verify_schema_integrity(conn: sqlite3.Connection) -> None:
     required_index_names = {
         "idx_frames_timestamp",
         "idx_frames_status",
+        "idx_frames_local_timestamp",
         "idx_chat_session",
     }
     existing_indexes = {
         result[0]
         for result in conn.execute(
-            "SELECT name FROM sqlite_master WHERE type='index' AND name IN ('idx_frames_timestamp', 'idx_frames_status', 'idx_chat_session')"
+            "SELECT name FROM sqlite_master WHERE type='index' AND name IN ('idx_frames_timestamp', 'idx_frames_status', 'idx_frames_local_timestamp', 'idx_chat_session')"
         )
     }
     missing_indexes = sorted(required_index_names - existing_indexes)

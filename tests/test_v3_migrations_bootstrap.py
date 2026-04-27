@@ -572,3 +572,29 @@ class TestVisibilityStatusMigration:
         assert row["visibility_status"] == "failed"
 
         conn.close()
+
+
+def test_migration_20260426000000_adds_local_timestamp(tmp_path: Path) -> None:
+    """Verify local_timestamp migration adds column and index."""
+    from openrecall.server.database.migrations_runner import run_migrations
+
+    migrations_dir = Path("openrecall/server/database/migrations")
+    db_path = tmp_path / "edge.db"
+    conn = sqlite3.connect(str(db_path))
+    run_migrations(conn, migrations_dir)
+
+    # Verify column exists
+    columns = {
+        row[1] for row in conn.execute("PRAGMA table_info(frames)")
+    }
+    assert "local_timestamp" in columns
+
+    # Verify index exists
+    indexes = {
+        row[0] for row in conn.execute(
+            "SELECT name FROM sqlite_master WHERE type='index' AND tbl_name='frames'"
+        )
+    }
+    assert "idx_frames_local_timestamp" in indexes
+
+    conn.close()
