@@ -128,8 +128,8 @@ pip install -e ".[test]"    # Include test dependencies
 - **Ingest API**: `POST /v1/ingest` (idempotent)
 - **Worker**: Processing worker (`V3ProcessingWorker` for OCR, `DescriptionWorker` for descriptions, `EmbeddingWorker` for vector embeddings)
 - **Database**:
-  - `~/.myrecall/server/db/edge.db`: Frames metadata + FTS5 tables (frames_fts, ocr_text_fts, accessibility_fts)
-  - `~/.myrecall/server/db/fts.db`: Legacy SQLStore schema (still in use by some server components; legacy `/api/*` endpoints return 410 Gone)
+  - `~/.myrecall/server/db/edge.db`: Frames metadata + FTS5 table (frames_fts)
+  - `~/.myrecall/server/fts.db`: Legacy SQLStore schema (still in use by some server components; legacy `/api/*` endpoints return 410 Gone)
   - `~/.myrecall/server/frames/`: JPEG snapshots
   - `~/.myrecall/server/lancedb/`: Vector embeddings (frame embeddings for semantic search)
 - **Search Engine**: Hybrid search (FTS5 + vector)
@@ -170,8 +170,7 @@ pip install -e ".[test]"    # Include test dependencies
 
 **FTS5 Tables**:
 - `frames_fts`: Full-text index on full_text + metadata (app_name, window_name, browser_url)
-- `ocr_text_fts`: Full-text index on ocr_text
-- `accessibility_fts`: Full-text index on accessibility_text
+- `ocr_text_fts` / `accessibility_fts`: **Deprecated** — dropped by 2026-03-25 FTS unification migration
 
 **Embedding Tables** (`edge.db`):
 - `embedding_tasks`: Queue for embedding generation with retry logic

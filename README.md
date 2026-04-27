@@ -36,7 +36,7 @@ MyRecall v3 captures your digital history through automatic screenshots, then us
 │                                                                      │
 │  ┌──────────────┐                              ┌──────────────┐     │
 │  │     Host     │                              │      Edge     │     │
-│  │   (~/MRC)    │                              │   (~/MRS)    │     │
+│  │   (~/.myrecall/client)    │                              │   (~/.myrecall/server)    │     │
 │  │              │                              │              │     │
 │  │  ┌────────┐  │      ┌──────────────┐      │  ┌────────┐  │     │
 │  │  │Capture │──│────▶│    Spool      │─────▶│─▶│  Ingest│  │     │
@@ -61,7 +61,7 @@ MyRecall v3 captures your digital history through automatic screenshots, then us
 ### Host (Capture + Upload)
 
 - **Capture**: Event-driven (idle/app_switch/manual/click) with three-layer debouncing (3000ms)
-- **Spool**: Local disk queue (`~/MRC/spool/`) for reliability
+- **Spool**: Local disk queue (`~/.myrecall/client/spool/`) for reliability
 - **Uploader**: Background consumer with idempotent retry
 - **Deduplication**: `capture_id` idempotency + trigger/capture coordination; `content_hash` is reserved for future use
 
@@ -83,6 +83,15 @@ MyRecall v3 captures your digital history through automatic screenshots, then us
 2. **Search Modes**: Three modes — `fts` (BM25 full-text), `vector` (cosine similarity), `hybrid` (RRF fusion of both)
 3. **Metadata Filtering**: Time range, app_name, window_name, browser_url, focused filters applied via B-tree indexes or FTS
 4. **Sorting & Pagination**: Results ordered by relevance rank (when `q` provided) or timestamp DESC; pagination via offset/limit
+
+### Chat & AI Assistant
+
+The client web UI includes an AI chat interface grounded in your visual history:
+
+- **Grounded Responses**: Answers cite actual screenshot frames via OCR text and AI-generated descriptions
+- **Streaming**: Real-time SSE streaming for responsive chat experience
+- **Session Management**: Multi-turn conversations with history, reset, and per-conversation context
+- **Provider Flexibility**: Configurable LLM provider, model, and API key via web UI settings or TOML config
 
 ## Quick Start
 
@@ -124,8 +133,8 @@ Configure via environment variables or TOML config files (recommended):
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `OPENRECALL_SERVER_DATA_DIR` | `~/MRS` | Edge data directory |
-| `OPENRECALL_CLIENT_DATA_DIR` | `~/MRC` | Host spool directory |
+| `OPENRECALL_SERVER_DATA_DIR` | `~/.myrecall/server` | Edge data directory |
+| `OPENRECALL_CLIENT_DATA_DIR` | `~/.myrecall/client` | Host spool directory |
 | `OPENRECALL_PORT` | `8083` | Edge API server port |
 | `OPENRECALL_CLIENT_WEB_PORT` | `8889` | Client web UI server port |
 | `OPENRECALL_CLIENT_WEB_ENABLED` | `true` | Enable client web UI server |
@@ -134,6 +143,32 @@ Configure via environment variables or TOML config files (recommended):
 | `OPENRECALL_DEVICE` | `cpu` | AI inference device: `cpu`, `cuda`, `mps` |
 | `OPENRECALL_CAPTURE_INTERVAL` | `10` | Legacy: screenshot interval (seconds), mapped to `idle_capture_interval_ms` if not set |
 | `OPENRECALL_SIMILARITY_THRESHOLD` | `0.98` | Legacy MSSIM threshold (v3 uses content_hash; retained for compatibility) |
+
+### TOML Configuration (Recommended)
+
+Create `server-local.toml` and `client-local.toml` in the project root (or `~/.myrecall/`). Example `server-local.toml`:
+
+```toml
+[server]
+host = "127.0.0.1"
+port = 8083
+
+[paths]
+data_dir = "~/.myrecall/server"
+
+[description]
+enabled = true
+provider = "openai"
+model = "Qwen/Qwen3-VL-8B-Instruct"
+api_key = ""          # fill in your own API key
+api_base = "https://api.siliconflow.cn/v1/"
+```
+
+Run with `./run_server.sh --mode local` to auto-load `server-local.toml`, or pass `--config=/path/to/config.toml` explicitly.
+
+### Timezone Note
+
+MyRecall currently operates in **UTC+8 (Asia/Shanghai)** timezone for all display and query timestamps. The `local_timestamp` column in the database stores timestamps in this timezone without an offset suffix. Cross-timezone support is on the roadmap.
 
 ### Using Cloud AI
 
@@ -153,7 +188,7 @@ export OPENRECALL_AI_API_BASE=https://api.openai.com/v1
 ## Data Storage
 
 ```
-~/MRC/                              # Host spool (OPENRECALL_CLIENT_DATA_DIR)
+~/.myrecall/client/                              # Host spool (OPENRECALL_CLIENT_DATA_DIR)
   spool/                            # Queued screenshots awaiting upload
     *.jpg                          # Buffered frames (JPEG)
     *.json                         # Metadata alongside each frame
@@ -161,7 +196,7 @@ export OPENRECALL_AI_API_BASE=https://api.openai.com/v1
   buffer/                          # Local buffer when server is unavailable
   cache/                           # Cache directory
 
-~/MRS/                              # Edge data (OPENRECALL_SERVER_DATA_DIR)
+~/.myrecall/server/                              # Edge data (OPENRECALL_SERVER_DATA_DIR)
   frames/                          # v3 JPEG snapshots (main storage)
   screenshots/                     # Legacy PNG screenshots (v2 compatibility)
   db/
