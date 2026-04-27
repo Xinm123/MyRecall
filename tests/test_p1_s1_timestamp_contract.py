@@ -26,20 +26,24 @@ def test_to_utc_iso8601_converts_decimal_unix_string() -> None:
 
 
 @pytest.mark.unit
-def test_frames_store_last_frame_timestamp_normalized(tmp_path: Path) -> None:
+def test_frames_store_last_frame_timestamp_returns_local(tmp_path: Path) -> None:
     db_path = tmp_path / "edge.db"
     with sqlite3.connect(str(db_path)) as conn:
         conn.execute(
-            "CREATE TABLE frames (id INTEGER PRIMARY KEY, timestamp TIMESTAMP NOT NULL)"
+            "CREATE TABLE frames (id INTEGER PRIMARY KEY, timestamp TEXT, local_timestamp TEXT)"
         )
-        conn.execute("INSERT INTO frames (timestamp) VALUES (?)", (1741434245,))
+        conn.execute(
+            "INSERT INTO frames (timestamp, local_timestamp) VALUES (?, ?)",
+            ("2026-03-20T10:00:00Z", "2026-03-20T18:00:00.000"),
+        )
         conn.commit()
 
     store = FramesStore(db_path=db_path)
     ts = store.get_last_frame_timestamp()
     assert ts is not None
     assert "T" in ts
-    assert ts.endswith("Z")
+    # Returns local_timestamp, not UTC
+    assert ts == "2026-03-20T18:00:00.000"
 
 
 @pytest.mark.unit

@@ -728,10 +728,10 @@ class FramesStore:
     def get_last_frame_timestamp(self) -> Optional[str]:
         try:
             with self._connect() as conn:
-                row = conn.execute("SELECT MAX(timestamp) AS ts FROM frames").fetchone()
+                row = conn.execute("SELECT MAX(local_timestamp) AS ts FROM frames").fetchone()
                 if row is None:
                     return None
-                return _to_utc_iso8601(row["ts"])
+                return row["ts"] if row["ts"] else None
         except sqlite3.Error as e:
             logger.error("get_last_frame_timestamp failed: %s", e)
             return None
@@ -1538,7 +1538,15 @@ class FramesStore:
         def _query(c: sqlite3.Connection) -> dict[int, dict]:
             placeholders = ",".join("?" * len(frame_ids))
             rows = c.execute(
-                f"SELECT * FROM frames WHERE id IN ({placeholders})",
+                f"""
+                SELECT
+                    id, capture_id, local_timestamp AS timestamp,
+                    app_name, window_name, browser_url, focused,
+                    device_name, snapshot_path, full_text, text_source,
+                    accessibility_text, ocr_text, status,
+                    description_status, embedding_status, visibility_status
+                FROM frames WHERE id IN ({placeholders})
+                """,
                 frame_ids,
             ).fetchall()
             return {row["id"]: dict(row) for row in rows}
@@ -1586,29 +1594,29 @@ class FramesStore:
                     inner_sql = """
                         SELECT
                             app_name,
-                            timestamp AS ts,
-                            (JULIANDAY(LEAD(timestamp) OVER (
-                                PARTITION BY app_name ORDER BY timestamp
-                            )) - JULIANDAY(timestamp)) * 86400.0 AS gap_sec
+                            local_timestamp AS ts,
+                            (JULIANDAY(LEAD(local_timestamp) OVER (
+                                PARTITION BY app_name ORDER BY local_timestamp
+                            )) - JULIANDAY(local_timestamp)) * 86400.0 AS gap_sec
                         FROM frames
                         WHERE visibility_status = 'queryable'
                           AND app_name = ?
-                          AND timestamp >= ?
-                          AND timestamp <= ?
+                          AND local_timestamp >= ?
+                          AND local_timestamp <= ?
                     """
                     params = [app_name, start_time, end_time]
                 else:
                     inner_sql = """
                         SELECT
                             app_name,
-                            timestamp AS ts,
-                            (JULIANDAY(LEAD(timestamp) OVER (
-                                PARTITION BY app_name ORDER BY timestamp
-                            )) - JULIANDAY(timestamp)) * 86400.0 AS gap_sec
+                            local_timestamp AS ts,
+                            (JULIANDAY(LEAD(local_timestamp) OVER (
+                                PARTITION BY app_name ORDER BY local_timestamp
+                            )) - JULIANDAY(local_timestamp)) * 86400.0 AS gap_sec
                         FROM frames
                         WHERE visibility_status = 'queryable'
-                          AND timestamp >= ?
-                          AND timestamp <= ?
+                          AND local_timestamp >= ?
+                          AND local_timestamp <= ?
                           AND app_name IS NOT NULL
                           AND app_name != ''
                     """
@@ -1666,8 +1674,8 @@ class FramesStore:
                     SELECT COUNT(*) AS cnt
                     FROM frames
                     WHERE visibility_status = 'queryable'
-                      AND timestamp >= ?
-                      AND timestamp <= ?
+                      AND local_timestamp >= ?
+                      AND local_timestamp <= ?
                 """
                 params: list = [start_time, end_time]
 
@@ -1700,11 +1708,11 @@ class FramesStore:
         try:
             with self._connect() as conn:
                 sql = """
-                    SELECT MIN(timestamp) AS start, MAX(timestamp) AS end
+                    SELECT MIN(local_timestamp) AS start, MAX(local_timestamp) AS end
                     FROM frames
                     WHERE visibility_status = 'queryable'
-                      AND timestamp >= ?
-                      AND timestamp <= ?
+                      AND local_timestamp >= ?
+                      AND local_timestamp <= ?
                 """
                 params: list = [start_time, end_time]
 
@@ -1746,7 +1754,7 @@ class FramesStore:
                     """
                     SELECT f.id, f.accessibility_text, f.ocr_text, f.text_source,
                            f.browser_url, f.status, f.visibility_status,
-                           f.timestamp, f.app_name, f.window_name
+                           f.local_timestamp AS timestamp, f.app_name, f.window_name
                     FROM frames f
                     WHERE f.id = ?
                     """,
@@ -2136,12 +2144,12 @@ class FramesStore:
         """
         cursor = conn.execute(
             """
-            SELECT fd.frame_id, f.timestamp, fd.summary, fd.tags_json
+            SELECT fd.frame_id, f.local_timestamp AS timestamp, fd.summary, fd.tags_json
             FROM frame_descriptions fd
             JOIN frames f ON f.id = fd.frame_id
-            WHERE f.timestamp BETWEEN ? AND ?
+            WHERE f.local_timestamp BETWEEN ? AND ?
               AND fd.summary IS NOT NULL
-            ORDER BY f.timestamp DESC
+            ORDER BY f.local_timestamp DESC
             LIMIT ?
             """,
             (time_start, time_end, limit),

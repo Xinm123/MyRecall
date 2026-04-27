@@ -12,7 +12,7 @@ from pathlib import Path
 
 import pytest
 
-from openrecall.server.database.frames_store import FramesStore
+from openrecall.server.database.frames_store import FramesStore, _utc_to_local_timestamp
 from openrecall.server.database.migrations_runner import run_migrations
 
 
@@ -348,7 +348,7 @@ class TestGetFrameContextMetadataFields:
     def test_get_frame_context_includes_timestamp(
         self, store: FramesStore
     ):
-        """Frame context should include timestamp from frames table."""
+        """Frame context should include local_timestamp from frames table."""
         frame_id = _create_completed_frame_with_accessibility(
             store, "cap-ts", "2026-03-26T14:32:05Z", "Safari", "Test text"
         )
@@ -356,7 +356,8 @@ class TestGetFrameContextMetadataFields:
         context = store.get_frame_context(frame_id)
 
         assert context is not None
-        assert context["timestamp"] == "2026-03-26T14:32:05Z"
+        # Returns local_timestamp (UTC+8)
+        assert context["timestamp"] == _utc_to_local_timestamp("2026-03-26T14:32:05Z")
 
     def test_get_frame_context_includes_app_name(
         self, store: FramesStore
