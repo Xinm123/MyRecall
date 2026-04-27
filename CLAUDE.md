@@ -1,452 +1,208 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+Guidance for Claude Code (claude.ai/code) when working in this repository.
 
 ## Project Overview
 
-MyRecall v3 is a privacy-first alternative to proprietary digital memory solutions (Windows Recall, Rewind.ai). It captures digital history through automatic screenshots and makes them searchable via natural language queries.
+MyRecall v3 is a privacy-first digital memory alternative to Windows Recall / Rewind.ai. It captures screenshots automatically and makes them searchable via natural language.
 
 **Core Principles:**
-- **Edge-Centric Architecture**: Host (capture) and Edge (processing) are separate processes
-- **Vision + OCR + Accessibility**: Uses macOS AX (accessibility) for text extraction with OCR as fallback
-- **AX-first**: Client collects accessibility data first; if AX succeeds → `text_source='accessibility'`, else OCR fallback → `text_source='ocr'`
-- **Privacy-First**: All data stays local, no cloud required
-- **FTS5 Search**: Full-text search with metadata filtering
+- **Edge-Centric**: Host (capture) and Edge (processing/search) are separate processes
+- **AX-first**: Client collects macOS accessibility text first; if AX succeeds → `text_source='accessibility'`, else OCR fallback → `text_source='ocr'`
+- **Hybrid Search**: FTS5 full-text + LanceDB vector search with RRF fusion
+- **Privacy-First**: All data stays local by default
+- **UTC+8**: `local_timestamp` is the primary query/display dimension (ISO8601 without offset)
 
-**Reference Implementation:**
-- `_ref/screenpipe/` contains the screenpipe Rust implementation (reference for architectural decisions)
+**Reference:** `_ref/screenpipe/` contains the upstream Rust implementation for architectural comparison.
 
-## Commands
-
-### Running the Application
-
-**Two separate processes:**
+## Quick Start
 
 ```bash
-# Server (Edge) - Terminal 1
+# Terminal 1 — Edge (processing + API)
 ./run_server.sh --mode local --debug
 
-# Client (Host) - Terminal 2
+# Terminal 2 — Host (capture + web UI)
 ./run_client.sh --mode local --debug
 
-# For deployed mode (client local, server on edge 10.77.3.162):
-./run_client.sh --mode remote --debug
+# Open http://localhost:8889
 ```
 
-Open browser: http://localhost:8889
-
-**Configuration:**
-
-Use `--mode local` (client + server on same machine) or `--mode remote` (client connects to remote edge):
-
-| Mode | Script | Config File | Client Connects To |
-|------|--------|-------------|-------------------|
-| `local` | `--mode local` | `client-local.toml` / `server-local.toml` | `localhost:8083` |
-| `remote` | `--mode remote` | `client-remote.toml` | `10.77.3.162:8083` |
-
-All config files are TOML-based (`*.toml`). Legacy `.env` files still work via `--env=` flag.
-Explicit `--config=/path/to/config.toml` takes precedence over `--mode`.
-
-### Testing
-
-```bash
-# Run all default tests (unit + integration, excludes e2e/perf/security/model/manual)
-pytest
-
-# Run specific test categories
-pytest -m unit           # Unit tests (no external dependencies)
-pytest -m integration    # Integration tests (requires running Edge server)
-pytest -m e2e           # End-to-end tests
-pytest -m perf          # Performance benchmarks
-pytest -m security      # Security tests
-pytest -m model         # Tests requiring AI models
-
-# Run specific test file
-pytest tests/test_p1_s1_ingest.py -v
-
-# Run with coverage
-pytest --cov=openrecall --cov-report=term-missing
-```
-
-**Note:** Integration tests require a running Edge server: `./run_server.sh --mode local --debug`
-
-### Installation
+**Configuration:** TOML files (`server-local.toml`, `client-local.toml`, `client-remote.toml`). `--config=/path` takes precedence over `--mode`. All settings are in `openrecall/shared/config.py`.
 
 ```bash
 pip install -e .
-pip install -e ".[test]"    # Include test dependencies
+pip install -e ".[test]"
 ```
 
 ## Architecture
 
-### Host (Client) - `openrecall.client`
+### Host (Client) — `openrecall.client`
 
-**Responsibility:** Capture + Spool + Upload + Web UI Server (port 8889)
+Responsibility: Capture + Spool + Upload + Web UI (port 8889)
 
-**Components:**
-- **Recorder**: Event-driven screenshot capture
-  - Triggers: `idle`, `app_switch`, `manual`, `click`
-  - Debounce: Three-layer hot-reloadable debouncing (click/trigger/capture — AtomicInt ctypes, update_interval_ms())
-  - Idle fallback: `idle_capture_interval_ms=60000ms` (chunked 5s sleep for hot-reload)
-  - Config listener thread: watches SQLite runtime config → calls debouncer update_interval_ms()
-  - Dedup: runtime_config.get_dedup_*() getters for all dedup settings (SQLite > TOML priority)
-- **runtime_config**: Hot-reload config layer — SQLite-backed getters + threading.Event wait/notify
-- **events/atomic.py**: AtomicInt (ctypes.c_int64) — lock-free interval reads for CGEventTap threads
-- **Spool**: Disk queue for reliability (`~/.myrecall/client/spool/`)
-  - Format: JPEG (`.jpg`/`.jpeg`) + JSON metadata
-  - Atomic writes, idempotent retry
-- **Uploader**: Background consumer, posts to Edge `/v1/ingest`
-- **Web Server**: Flask app on port 8889 serving Jinja2 templates; browser JS fetches API from Edge (port 8083) via CORS
+| Component | File | Key Detail |
+|-----------|------|------------|
+| Recorder | `recorder.py` | Event-driven capture (idle/app_switch/manual/click); three-layer debounce (click/trigger/capture) via `AtomicInt` ctypes; idle fallback 60s |
+| runtime_config | `runtime_config.py` | Hot-reload SQLite-backed config; SQLite > TOML priority; `threading.Event` wait/notify |
+| Spool | `spool.py` | Disk queue `~/.myrecall/client/spool/`; JPEG + JSON; atomic writes |
+| Uploader | `uploader.py` | Background consumer → Edge `POST /v1/ingest` |
+| Web Server | `web/app.py` | Flask on 8889; Jinja2 templates; JS calls Edge API (port 8083) via CORS |
+| Chat | `chat/` | Pi agent process; SSE streaming; grounded in visual history |
 
-**Web Routes (served by Client on port 8889):**
-- `/` (Grid), `/search`, `/timeline` — Jinja2 templates
-- `/chat` — Chat interface with AI assistant
-- `/settings` — Runtime settings management
-- `/vendor/*` — Alpine.js static assets
-- `/screenshots/*` — Proxy to Edge `/v1/frames/` (for legacy fallback)
+Web routes: `/` (Grid), `/search`, `/timeline`, `/chat`, `/settings`.
+Chat API routes: `/chat/api/*` — see `openrecall/client/chat/routes.py` for all endpoints.
 
-**Chat API (served by Client at `/chat/api/*`):**
-- `POST /chat/api/stream` — SSE streaming chat response
-- `GET /chat/api/conversations` — List conversations
-- `POST /chat/api/conversations` — Create conversation
-- `GET /chat/api/conversations/<id>` — Get conversation
-- `DELETE /chat/api/conversations/<id>` — Delete conversation
-- `POST /chat/api/new-session` — Reset Pi session
-- `GET /chat/api/pi-status` — Get Pi process status
-- `GET /chat/api/config` — Get LLM config
-- `POST /chat/api/config` — Save API key and model selection
+**Entry:** `python -m openrecall.client`
 
-**Web Server:** Flask app in `openrecall/client/web/app.py` serving templates from `openrecall/client/web/templates/`
+### Edge (Server) — `openrecall.server`
 
-**Entry Point:** `python -m openrecall.client`
+Responsibility: Processing + API + Search (pure API, no Web UI)
 
-### Edge (Server) - `openrecall.server`
+| Component | File | Key Detail |
+|-----------|------|------------|
+| Ingest API | `api_v1.py` | `POST /v1/ingest`; idempotent via `capture_id` |
+| OCR Worker | `processing/v3_worker.py` | `V3ProcessingWorker`; AX-first, OCR fallback |
+| Description Worker | `description/worker.py` | `DescriptionWorker`; AI-generated frame descriptions |
+| Embedding Worker | `embedding/worker.py` | `EmbeddingWorker`; LanceDB + qwen3-vl-embedding |
+| Search | `search/engine.py` + `search/hybrid_engine.py` | FTS5 (`frames_fts`) + vector (LanceDB) with RRF fusion |
+| Frames Store | `database/frames_store.py` | Primary SQLite interface for `edge.db` |
 
-**Responsibility:** Processing + API + Search (pure API, no Web UI)
+**Data dirs:**
+- `~/.myrecall/server/db/edge.db` — frames, embedding_tasks, frames_fts
+- `~/.myrecall/server/fts.db` — Legacy SQLStore (some components still use)
+- `~/.myrecall/server/frames/` — JPEG snapshots
+- `~/.myrecall/server/lancedb/` — Vector embeddings
 
-**Components:**
-- **Ingest API**: `POST /v1/ingest` (idempotent)
-- **Worker**: Processing worker (`V3ProcessingWorker` for OCR, `DescriptionWorker` for descriptions, `EmbeddingWorker` for vector embeddings)
-- **Database**:
-  - `~/.myrecall/server/db/edge.db`: Frames metadata + FTS5 table (frames_fts)
-  - `~/.myrecall/server/fts.db`: Legacy SQLStore schema (still in use by some server components; legacy `/api/*` endpoints return 410 Gone)
-  - `~/.myrecall/server/frames/`: JPEG snapshots
-  - `~/.myrecall/server/lancedb/`: Vector embeddings (frame embeddings for semantic search)
-- **Search Engine**: Hybrid search (FTS5 + vector)
-  - FTS5 filters: time range, app_name, window_name, browser_url, focused
-  - Vector search via LanceDB with qwen3-vl-embedding (multimodal fusion)
-  - Hybrid mode (default) with RRF (Reciprocal Rank Fusion)
-  - Modes: `hybrid` (default), `fts`, `vector`
-  - `content_type` parameter is deprecated — all searches return merged results
-- **CORS Middleware**: Echo-back `Origin` header for cross-origin browser requests from Client web UI
-
-**API Routes:** `/v1/*`, `/api/*` — all responses include `Access-Control-Allow-Origin: <browser-origin>`
-
-**Entry Point:** `python -m openrecall.server`
+**Entry:** `python -m openrecall.server`
 
 ### Key Data Structures
 
 **Frames Table** (`edge.db`):
 ```sql
-- id (INTEGER PRIMARY KEY AUTOINCREMENT) — Internal row ID
-- capture_id (TEXT UNIQUE, NOT NULL) — Idempotency key (external UUID)
-- timestamp (TEXT ISO8601 UTC with Z) — Raw UTC capture time; storage only
-- local_timestamp (TEXT, ISO8601 without offset, UTC+8) — Primary query/display timestamp
-- ingested_at (TEXT ISO8601 UTC with Z) — When frame was received by Edge
-- processed_at (TEXT ISO8601 UTC with Z) — When processing completed
-- event_ts (TEXT ISO8601 UTC with Z) — Capture event timestamp
-- app_name (TEXT) — Active application name
-- window_name (TEXT) — Active window title
-- browser_url (TEXT) — Browser URL (if applicable)
-- focused (BOOLEAN) — Whether the window was focused
-- device_name (TEXT, DEFAULT 'monitor_0') — Capture device identifier
-- capture_trigger (idle/app_switch/manual/click) — What triggered the capture
-- snapshot_path (TEXT) — Path to JPEG file in frames/
-- image_size_bytes (INTEGER) — Size of captured image
-- accessibility_text (TEXT) — Text from macOS AX (if AX-first succeeded)
-- ocr_text (TEXT) — Text from OCR fallback
-- full_text (TEXT) — Merged text from accessibility_text + ocr_text, indexed by frames_fts
-- text_source ('accessibility' | 'ocr') — Which source provided the text
-- accessibility_tree_json (TEXT) — Full AX tree as JSON
-- content_hash (TEXT) — SHA-256 for deduplication
-- simhash (INTEGER) — Text similarity hash for dedup
-- phash (INTEGER) — Perceptual hash for visual dedup
-- status (pending/processing/completed/failed) — Processing pipeline status
-- description_status (pending/processing/completed/failed) — Description generation status
-- embedding_status (NULL/pending/processing/completed/failed) — Embedding generation status
-- visibility_status (pending/queryable/failed) — Combined visibility state
-- error_message (TEXT) — Error details when status='failed'
-- retry_count (INTEGER, DEFAULT 0) — Processing retry counter
-- last_known_app (TEXT) — Last known application name (for timeline)
-- last_known_window (TEXT) — Last known window title (for timeline)
+id              INTEGER PRIMARY KEY AUTOINCREMENT
+capture_id      TEXT UNIQUE NOT NULL          -- idempotency key
+timestamp       TEXT ISO8601 UTC+Z            -- raw UTC (storage only)
+local_timestamp TEXT ISO8601 no-offset UTC+8  -- primary query/display time
+ingested_at     TEXT ISO8601 UTC+Z
+processed_at    TEXT ISO8601 UTC+Z
+event_ts        TEXT ISO8601 UTC+Z
+app_name        TEXT
+window_name     TEXT
+browser_url     TEXT
+focused         BOOLEAN
+device_name     TEXT DEFAULT 'monitor_0'
+capture_trigger TEXT                          -- idle/app_switch/manual/click
+snapshot_path   TEXT                          -- JPEG path in frames/
+image_size_bytes INTEGER
+accessibility_text TEXT                       -- AX text (AX-first)
+ocr_text        TEXT                          -- OCR fallback
+full_text       TEXT                          -- merged, indexed by frames_fts
+text_source     TEXT                          -- 'accessibility' | 'ocr'
+accessibility_tree_json TEXT
+content_hash    TEXT                          -- SHA-256
+simhash         INTEGER                       -- text dedup
+phash           INTEGER                       -- visual dedup
+status          TEXT                          -- pending/processing/completed/failed
+description_status TEXT
+embedding_status TEXT                         -- NULL/pending/processing/completed/failed
+visibility_status TEXT DEFAULT 'pending'      -- pending/queryable/failed
+error_message   TEXT
+retry_count     INTEGER DEFAULT 0
+last_known_app  TEXT
+last_known_window TEXT
 ```
 
-**FTS5 Tables**:
-- `frames_fts`: Full-text index on full_text + metadata (app_name, window_name, browser_url)
-- `ocr_text_fts` / `accessibility_fts`: **Deprecated** — dropped by 2026-03-25 FTS unification migration
+**FTS5:** Single `frames_fts` on `full_text` + metadata. `ocr_text_fts` / `accessibility_fts` were dropped by 2026-03-25 migration.
 
-**Embedding Tables** (`edge.db`):
-- `embedding_tasks`: Queue for embedding generation with retry logic
+**Key Architecture Decisions:**
+- Host captures/uploads, Edge processes/indexes/searches
+- AX-first text extraction; both AX and OCR text preserved independently
+- FTS5 + LanceDB vector search with RRF fusion (`hybrid` default)
+- qwen3-vl-embedding for multimodal image+text fusion (single embedding per frame)
+- `content_type` parameter is deprecated — all searches return merged results
 
-## Key Architecture Decisions
+## How to Develop
 
-Key decisions embedded in this document:
-- **Edge-Centric**: Host captures/uploads, Edge processes/indexes/searches
-- **Vision + AX + OCR**: AX-first text extraction with OCR fallback; both indexed separately
-- **Hybrid Search**: FTS5 full-text search + LanceDB vector search with RRF fusion
-- **Multimodal Embedding**: qwen3-vl-embedding for true image+text fusion (single embedding per frame)
+### Add a Database Field
 
+1. Migration: `openrecall/server/database/migrations/YYYYMMDDHHMMSS_description.sql`
+2. Update `FramesStore` in `openrecall/server/database/frames_store.py`
+3. Update API in `openrecall/server/api_v1.py`
+4. Update tests: `tests/test_p1_s1_frames.py`
+5. Run: `pytest tests/test_v3_migrations_bootstrap.py`
 
-## Database Migrations
+### Add a Hot-Reloadable Setting
 
-Migrations are in `openrecall/server/database/migrations/`:
-- Run automatically on server startup
-- Use SQLite with FTS5 extensions
-- Timestamped migration files: `YYYYMMDDHHMMSS_description.sql`
+1. Default in `ClientSettingsStore.DEFAULTS` (`openrecall/client/database/settings_store.py`)
+2. Validator in `openrecall/client/web/routes/settings.py` validators dict
+3. Getter in `openrecall/client/runtime_config.py` (SQLite > TOML)
+4. `notify_config_changed()` after save in settings routes
+5. Consumer calls getter on each cycle
+6. Test: `tests/test_runtime_config.py`
 
-**To add a migration:**
-1. Create file: `20260316120000_description.sql`
-2. Write SQL (forward migration only)
-3. Test with: `pytest tests/test_v3_migrations_bootstrap.py`
+### Add a Capture Trigger
 
-## Development Workflow
+1. Update `CaptureTrigger` enum in `openrecall/client/events/base.py`
+2. Add detection in `openrecall/client/events/`
+3. Update `openrecall/client/recorder.py`
+4. Test: `tests/test_p1_s2a_trigger_coverage.py`
+5. Update: `scripts/acceptance/p1_s2a_local.sh`
 
-### Adding New Features
+### Debug Upload Issues
 
-1. **Check current plans**: `docs/superpowers/plans/` for active implementation plans
-2. **Read specs**: `docs/superpowers/specs/` for design specifications
-3. **Write tests first**: Follow TDD (minimum 80% coverage)
-4. **Update docs**: If changing API contracts or architecture
+1. Check spool: `ls ~/.myrecall/client/spool/`
+2. Check uploader logs: `[Uploader]` entries
+3. Verify Edge: `curl http://localhost:8083/v1/health`
+4. Check queue: `curl http://localhost:8083/v1/ingest/queue/status`
+
+## Reference
 
 ### Code Structure
 
 ```
 openrecall/
-├── client/           # Host process
-│   ├── __main__.py  # Entry point
-│   ├── events/      # Event capture (macOS CGEventTap)
-│   │   ├── atomic.py  # AtomicInt (ctypes.c_int64) for lock-free hot-reload
-│   ├── recorder.py  # Screenshot capture + AX collection
-│   ├── runtime_config.py  # Hot-reload SQLite getters + wait/notify
-│   ├── spool.py     # Disk queue
-│   ├── uploader.py  # Edge upload consumer
-│   ├── hash_utils.py  # Frame deduplication (hash)
-│   ├── accessibility/  # macOS AX (accessibility) text extraction
-│   │   ├── service.py  # AX collection entrypoint
-│   │   ├── macos.py    # macOS AX API bindings
-│   │   ├── policy.py   # AX vs OCR decision logic
-│   │   └── types.py    # AccessibilityDecision types
-│   ├── chat/        # Chat module (AI assistant)
-│   │   ├── routes.py   # Chat API endpoints
-│   │   ├── service.py  # ChatService, Pi RPC
-│   │   ├── config_manager.py  # LLM provider config
-│   │   └── skills/     # Chat skills (myrecall-search)
-│   └── web/         # Flask web UI (port 8889)
-│       ├── app.py
-│       ├── routes/     # Settings routes
-│       └── templates/
-├── server/          # Edge process
-│   ├── __main__.py  # Entry point
-│   ├── app.py       # Flask app
-│   ├── api.py       # Legacy API (410 Gone)
-│   ├── api_v1.py    # v1 API endpoints (/v1/*)
-│   ├── worker.py    # Legacy ProcessingWorker
-│   ├── database/    # SQLite + migrations
-│   │   ├── frames_store.py  # v3 FramesStore (edge.db)
-│   │   ├── embedding_store.py  # EmbeddingStore (LanceDB wrapper)
-│   │   └── sql.py          # Legacy SQLStore (fts.db)
-│   ├── search/      # Search engines
-│   │   ├── engine.py       # FTS5 search engine
-│   │   └── hybrid_engine.py  # Hybrid (FTS + vector) search
-│   ├── processing/  # OCR pipeline
-│   │   ├── v3_worker.py    # V3ProcessingWorker (OCR worker)
-│   │   ├── ocr_processor.py  # OCR execution
-│   │   └── idempotency.py  # Duplicate processing prevention
-│   ├── description/ # Frame description pipeline
-│   │   ├── worker.py    # DescriptionWorker
-│   │   ├── service.py  # DescriptionService
-│   │   └── providers/  # Provider implementations (local, dashscope, openai)
-│   └── embedding/   # Vector embedding pipeline
-│       ├── worker.py    # EmbeddingWorker
-│       ├── service.py   # EmbeddingService, LanceDB storage
-│       └── providers/   # Multimodal embedding providers
-│           └── siliconflow.py  # SiliconFlow OpenAI-compatible provider
-└── shared/          # Common utilities
-    ├── config.py    # Settings management
-    └── models.py    # Data models
+├── client/            # Host process
+│   ├── events/        # macOS CGEventTap capture
+│   ├── recorder.py    # Screenshot + AX collection
+│   ├── runtime_config.py  # Hot-reload SQLite config
+│   ├── spool.py       # Disk queue
+│   ├── uploader.py    # Edge upload
+│   ├── accessibility/ # macOS AX text extraction
+│   ├── chat/          # AI assistant (Pi agent)
+│   └── web/           # Flask web UI (port 8889)
+├── server/            # Edge process
+│   ├── api_v1.py      # v1 API endpoints
+│   ├── database/      # SQLite + migrations
+│   │   ├── frames_store.py
+│   │   ├── embedding_store.py
+│   │   └── migrations/
+│   ├── search/        # FTS5 + hybrid search
+│   ├── processing/    # OCR pipeline
+│   ├── description/   # AI description generation
+│   └── embedding/     # Vector embedding pipeline
+└── shared/            # Settings, models
 ```
+
+### Testing
+
+```bash
+pytest                  # unit + integration (default)
+pytest -m unit         # no external deps
+pytest -m integration  # requires running Edge server
+pytest -m e2e          # end-to-end
+pytest -m model        # requires AI models
+```
+
+Markers: `unit`, `integration`, `e2e`, `perf`, `security`, `model`, `manual`, `search`.
+
+### API Endpoints
+
+All v1 endpoints defined in `openrecall/server/api_v1.py`. Chat endpoints in `openrecall/client/chat/routes.py`. Legacy `/api/*` returns 410 Gone.
 
 ### Environment Variables
 
-Key settings (see `openrecall/shared/config.py`):
-- `OPENRECALL_SERVER_DATA_DIR`: Edge data directory (default: ~/.myrecall/server)
-- `OPENRECALL_CLIENT_DATA_DIR`: Host spool directory (default: ~/.myrecall/client)
-- `OPENRECALL_PORT`: Edge API server port (default: 8083, Edge API only)
-- `OPENRECALL_CLIENT_WEB_PORT`: Client web UI port (default: 8889)
-- `OPENRECALL_CLIENT_WEB_ENABLED`: Enable client web UI (default: true)
-- `OPENRECALL_DEBUG`: Enable debug logging (default: true)
-- `OPENRECALL_AI_PROVIDER`: AI provider (default: local, options: local/dashscope/openai)
-- `OPENRECALL_AI_API_KEY` / `OPENRECALL_AI_API_BASE`: Cloud AI credentials
-- `OPENRECALL_DEVICE`: Inference device (default: cpu, options: cpu/cuda/mps)
-- `OPENRECALL_TRIGGER_DEBOUNCE_MS`: Debounce for APP_SWITCH/IDLE/MANUAL events (default: 3000)
-- `OPENRECALL_CLICK_DEBOUNCE_MS`: Debounce for CLICK events (default: 3000)
-- `OPENRECALL_CAPTURE_DEBOUNCE_MS`: Global capture debounce (default: 3000)
-- `OPENRECALL_IDLE_CAPTURE_INTERVAL_MS`: Idle fallback interval (default: 60000)
-- `OPENRECALL_UPLOAD_TIMEOUT`: Client upload timeout in seconds (default: 180)
-- `OPENRECALL_EMBEDDING_PROVIDER`: Embedding provider (default: openai)
-- `OPENRECALL_EMBEDDING_MODEL`: Embedding model name (default: qwen3-vl-embedding)
-- `OPENRECALL_EMBEDDING_API_KEY` / `OPENRECALL_EMBEDDING_API_BASE`: Embedding API credentials
-- `OPENRECALL_DESCRIPTION_ENABLED`: Enable AI description generation (default: true)
-- `OPENRECALL_DESCRIPTION_PROVIDER` / `OPENRECALL_DESCRIPTION_MODEL`: Description provider/model overrides
-- `OPENRECALL_OCR_PROVIDER`: OCR provider (default: rapidocr)
-- `OPENRECALL_PRELOAD_MODELS`: Preload AI models at startup (default: true)
+All env vars and defaults defined in `openrecall/shared/config.py`. Key ones: `OPENRECALL_SERVER_DATA_DIR`, `OPENRECALL_CLIENT_DATA_DIR`, `OPENRECALL_PORT`, `OPENRECALL_DEBUG`, `OPENRECALL_AI_PROVIDER`, `OPENRECALL_DEVICE`.
 
-## Testing Strategy
+### Image Format
 
-**Test Markers** (see `pytest.ini`):
-- `unit`: Unit tests, no external dependencies
-- `integration`: Requires running Edge server
-- `e2e`: End-to-end system tests
-- `perf`: Performance benchmarks
-- `security`: Security tests
-- `model`: Tests requiring AI models/large downloads
-- `manual`: Manual test scripts
-- `search`: Search engine tests
-
-**Test Organization:**
-- `tests/` - Active tests
-- `tests/archive/` - Deprecated/archived tests
-- `scripts/acceptance/` - Acceptance test scripts
-
-**Running Tests:**
-- Default: `pytest` runs unit + integration, excludes heavy tests
-- Integration tests need: `./run_server.sh --mode local --debug` in separate terminal
-- See `tests/README.md` for detailed guide
-
-## Image Format Contract
-
-**P1 Contract (v3):**
-- **Capture**: JPEG format (`.jpg`/`.jpeg`)
-- **Ingest API**: Accepts `image/jpeg`
-- **Frame Storage**: JPEG in `~/.myrecall/server/frames/`
-- **Frame API**: Returns `image/jpeg`
-- **Legacy Support**: Reads `.webp` only for draining old spool
-
-## API Contracts
-
-**v1 API Endpoints** (`/v1/*`):
-- `POST /v1/ingest`: Upload frame (idempotent, supports AX-canonical payload)
-- `GET /v1/frames/<frame_id>`: Retrieve frame JPEG
-- `GET /v1/frames/<frame_id>/context`: Frame context for chat grounding
-- `GET /v1/frames/<frame_id>/similar`: Find similar frames via vector search
-- `POST /v1/frames/<frame_id>/embedding`: Manually trigger embedding generation
-- `GET /v1/frames/<frame_id>/ocr-vis`: OCR visualization data
-- `GET /v1/health`: Health check
-- `GET /v1/ingest/queue/status`: Queue status
-- `GET /v1/frames/latest`: Get frames newer than `since` (local timestamp, no Z suffix)
-- `GET /v1/search`: Full-text/vector/hybrid search (default: hybrid mode)
-  - Parameters: `q`, `mode` (fts/vector/hybrid), `limit`, `offset`, `start_time`, `end_time`
-  - `app_name`, `window_name`, `browser_url`, `focused`, `include_text`, `max_text_length`
-- `GET /v1/search/counts`: Get result counts by content type
-- `GET /v1/search/keyword`: Keyword extraction for query
-- `GET /v1/timeline`: Timeline data for UI
-- `GET /v1/activity-summary`: Broad overview of screen activity (apps, descriptions)
-- `POST /v1/frames/<frame_id>/description`: Manually trigger description generation
-- `GET /v1/description/tasks/status`: Description task queue statistics
-- `POST /v1/admin/description/backfill`: Trigger description backfill
-- `GET /v1/embedding/tasks/status`: Embedding task queue statistics
-- `POST /v1/admin/embedding/backfill`: Trigger embedding backfill
-- `POST /v1/admin/frames/retry-failed`: Retry all failed frames (reset stages and re-queue)
-
-**Chat API Endpoints** (`/chat/api/*` on Client port 8889):
-- `POST /chat/api/stream`: SSE streaming chat (event: message_update, agent_end)
-- `GET /chat/api/conversations`: List all conversations
-- `POST /chat/api/conversations`: Create new conversation
-- `GET /chat/api/conversations/<id>`: Get conversation by ID
-- `DELETE /chat/api/conversations/<id>`: Delete conversation
-- `POST /chat/api/new-session`: Reset Pi session (clear context)
-- `GET /chat/api/pi-status`: Get Pi process status
-- `POST /chat/api/pi-restart`: Restart Pi process
-- `GET /chat/api/config`: Get LLM configuration (provider, model, has_api_key)
-- `POST /chat/api/config`: Save API key and model selection
-
-**Legacy API** (`/api/*`):
-- Deprecated, returns 410 Gone for all endpoints
-- All functionality migrated to `/v1/*`
-
-> **Note**: The `content_type` parameter for `/v1/search` is deprecated. All searches return merged results from both OCR and accessibility text.
-
-## Performance Characteristics
-
-**Capture Frequency:**
-- Minimum capture interval controlled by three-layer debounce
-- Layer 1 (click): `click_debounce_ms` (default 3000ms)
-- Layer 2 (trigger): `trigger_debounce_ms` (default 3000ms) for APP_SWITCH/IDLE/MANUAL
-- Layer 3 (capture): `capture_debounce_ms` (default 3000ms) global gate
-- Idle fallback: `idle_capture_interval_ms` (default 60000ms)
-
-**Search:**
-- **Hybrid search (default)**: Combines FTS5 + vector search via RRF fusion
-- **FTS5 mode**: BM25 full-text search with metadata filters
-- **Vector mode**: LanceDB similarity search with qwen3-vl-embedding
-- B-tree indexes on metadata (app, window, timestamp)
-- P95 latency target: < 200ms for typical queries
-
-**Queue Processing:**
-- Processing order: FIFO (oldest first) — deterministic chronological processing
-- Trigger queue: bounded `queue.Queue` with capacity `trigger_queue_capacity` (default 1000)
-- Backpressure protection via queue overflow handling
-
-## Common Patterns
-
-### Adding a New Database Field
-
-1. Create migration: `openrecall/server/database/migrations/YYYYMMDDHHMMSS_add_field.sql`
-2. Update `FramesStore` class in `openrecall/server/database/frames_store.py`
-3. Update API contracts in `openrecall/server/api_v1.py`
-4. Update tests in `tests/test_p1_s1_frames.py`
-5. Run migrations test: `pytest tests/test_v3_migrations_bootstrap.py`
-
-### Adding a New Hot-Reloadable Setting
-
-1. Add default to `ClientSettingsStore.DEFAULTS` in `openrecall/client/database/settings_store.py`
-2. Add validator in `openrecall/client/web/routes/settings.py` validators dict
-3. Add getter in `openrecall/client/runtime_config.py` (SQLite > TOML priority)
-4. Add `notify_config_changed()` call in `openrecall/client/web/routes/settings.py` after save
-5. Consumer (recorder/hash_utils) calls getter on each use cycle
-6. Add unit test in `tests/test_runtime_config.py`
-
-### Adding a New Capture Trigger
-
-1. Update `CaptureTrigger` enum in `openrecall/client/events/base.py`
-2. Add event detection in `openrecall/client/events/`
-3. Update recorder logic in `openrecall/client/recorder.py`
-4. Add tests in `tests/test_p1_s2a_trigger_coverage.py`
-5. Update acceptance script: `scripts/acceptance/p1_s2a_local.sh`
-
-### Debugging Upload Issues
-
-1. Check spool directory: `ls ~/.myrecall/client/spool/`
-2. Check uploader logs: Look for `[Uploader]` entries
-3. Verify Edge server running: `curl http://localhost:8083/v1/health`
-4. Check queue status: `curl http://localhost:8083/v1/ingest/queue/status`
-
-## Reference: screenpipe
-
-The `_ref/screenpipe/` directory contains the screenpipe Rust implementation for reference:
-
-**Key Differences:**
-- MyRecall: Python, split into Host/Edge processes
-- screenpipe: Rust, single-process local
-- Both: Vision-only, FTS-based search
-
-**When Consulting screenpipe:**
-- Check architecture patterns (e.g., event-driven capture)
-- Validate design decisions (e.g., FTS-first search)
-- Compare performance characteristics
-- Look for edge cases in cross-platform support
-
-## Current Development Phase
-
-Active implementation plans: `docs/superpowers/plans/`
-Design specifications: `docs/superpowers/specs/`
+Capture/Ingest/Storage/API all use JPEG (`.jpg`/`.jpeg`). Legacy `.webp` support exists only for draining old spool.
