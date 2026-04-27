@@ -10,50 +10,39 @@ Local REST API at `http://localhost:8083`. Base URL for all endpoints below.
 > **IMPORTANT — Port**: MyRecall runs on port **8083**, not 3030 (screenpipe uses 3030).
 
 > **Timezone**: The user's local timezone context is injected at the start of every message.
-> Use the values from that header to convert local time expressions to UTC.
+> All timestamps are in **local time (UTC+8)**. Use local time directly in all API calls.
 >
 > **Injected context format** (appears at the top of every message):
 > ```
-> Date: 2026-04-02
-> Timezone: CST (UTC+08:00)
-> Local midnight today (UTC): 2026-04-01T16:00:00Z
-> Local midnight yesterday (UTC): 2026-03-31T16:00:00Z
-> Now (UTC): 2026-04-02T08:30:00Z
+> Date: 2026-04-26
+> Local time now: 2026-04-26T16:30:00
 > ```
-> Extract `Local midnight today (UTC)`, `Local midnight yesterday (UTC)`, and `Now (UTC)`
-> directly from the injected header — do not compute them yourself.
+> Use `Date` and `Local time now` directly from the injected header.
 
 ---
 
 ## Time Formatting Strategy
 
-Use the timezone context injected at the start of each message to convert local time
-expressions to UTC before calling the API.
+All timestamps are in **local time (UTC+8)**. The injected header shows the current local time.
+Use local time directly in all API calls — no conversion needed.
 
 | Expression | Meaning | How to compute |
 |------------|---------|----------------|
-| `today` | Since midnight LOCAL time | Use `Local midnight today (UTC)` from context above |
-| `yesterday` | Yesterday's LOCAL full day | `Local midnight yesterday (UTC)` to `Local midnight today (UTC) - 1s` |
-| `recent` | Last 30 minutes | Current UTC time - 30 minutes |
-| `1h ago` | One hour ago | Current UTC time - 1 hour |
-| `2d ago` | Two days ago | Current UTC time - 2 days |
-| `now` | Current moment | Use `Now (UTC)` from context above |
-
-**Conversion workflow:**
-1. Parse the user's time expression
-2. Run `date -u +%Y-%m-%dT%H:%M:%SZ -d "<relative expression>"` to get start_time
-3. Run `date -u +%Y-%m-%dT%H:%M:%SZ` for end_time (usually `now`)
-4. Pass both as `start_time` and `end_time` query parameters
+| `today` | Since midnight local time | `Date` from header + `T00:00:00` |
+| `yesterday` | Yesterday's full day | `Date` from header, minus 1 day |
+| `recent` | Last 30 minutes | `Local time now` - 30 minutes |
+| `1h ago` | One hour ago | `Local time now` - 1 hour |
+| `2d ago` | Two days ago | `Local time now` - 2 days |
+| `now` | Current moment | `Local time now` from header |
 
 **Example — user asks "what was I doing today?":**
 ```bash
-# The injected header contains:
-#   Local midnight today (UTC): 2026-04-01T16:00:00Z
-#   Local midnight yesterday (UTC): 2026-03-31T16:00:00Z
-#   Now (UTC): 2026-04-02T08:30:00Z
-# Extract these values from the injected header above — do not compute.
-START="$LOCAL_MIDNIGHT_TODAY_UTC"   # from injected header
-END="$NOW_UTC"                       # from injected header
+# Injected header:
+#   Date: 2026-04-26
+#   Local time now: 2026-04-26T16:30:00
+#
+START="2026-04-26T00:00:00"
+END="2026-04-26T16:30:00"
 curl "http://localhost:8083/v1/activity-summary?start_time=${START}&end_time=${END}"
 ```
 
@@ -83,8 +72,11 @@ head -c 5120 /tmp/myrecall_result.json   # Truncate to ~5KB if too large
 **Purpose**: Broad overview of screen activity. Best starting point for almost every question.
 
 ```bash
-START=$(date -u +%Y-%m-%dT00:00:00Z)   # today midnight
-END=$(date -u +%Y-%m-%dT%H:%M:%SZ)      # now
+# Use local time directly from the injected header
+# Date: 2026-04-26
+# Local time now: 2026-04-26T16:30:00
+START="2026-04-26T00:00:00"
+END="2026-04-26T16:30:00"
 curl "http://localhost:8083/v1/activity-summary?start_time=${START}&end_time=${END}"
 ```
 
@@ -92,8 +84,8 @@ curl "http://localhost:8083/v1/activity-summary?start_time=${START}&end_time=${E
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `start_time` | ISO 8601 | **Yes** | Start of time range (e.g. `2026-03-25T00:00:00Z`) |
-| `end_time` | ISO 8601 | **Yes** | End of time range (e.g. `2026-03-25T12:00:00Z`) |
+| `start_time` | ISO 8601 local | **Yes** | Start of time range (e.g. `2026-04-26T00:00:00`) |
+| `end_time` | ISO 8601 local | **Yes** | End of time range (e.g. `2026-04-26T16:30:00`) |
 | `app_name` | string | No | Filter by specific app name |
 | `max_descriptions` | integer | No | Max AI frame descriptions to return. No default — all available descriptions returned if unspecified. Max 1000. |
 
@@ -102,14 +94,14 @@ curl "http://localhost:8083/v1/activity-summary?start_time=${START}&end_time=${E
 ```json
 {
   "apps": [
-    {"name": "Safari", "frame_count": 10, "minutes": 0.33, "first_seen": "2026-03-25T10:00:00Z", "last_seen": "2026-03-25T10:05:00Z"},
-    {"name": "VSCode", "frame_count": 5, "minutes": 0.17, "first_seen": "2026-03-25T09:30:00Z", "last_seen": "2026-03-25T10:02:00Z"}
+    {"name": "Safari", "frame_count": 10, "minutes": 0.33, "first_seen": "2026-04-26T10:00:00", "last_seen": "2026-04-26T10:05:00"},
+    {"name": "VSCode", "frame_count": 5, "minutes": 0.17, "first_seen": "2026-04-26T09:30:00", "last_seen": "2026-04-26T10:02:00"}
   ],
   "audio_summary": {"segment_count": 0, "speakers": []},
   "total_frames": 15,
-  "time_range": {"start": "2026-03-25T00:00:00Z", "end": "2026-03-25T12:00:00Z"},
+  "time_range": {"start": "2026-04-26T00:00:00", "end": "2026-04-26T16:30:00"},
   "descriptions": [
-    {"frame_id": 42, "timestamp": "2026-03-25T10:00:00Z", "summary": "GitHub PR review", "tags": ["code_review", "github", "pr_123"]}
+    {"frame_id": 42, "timestamp": "2026-04-26T10:00:00", "summary": "GitHub PR review", "tags": ["code_review", "github", "pr_123"]}
   ]
 }
 ```
@@ -137,8 +129,9 @@ curl "http://localhost:8083/v1/activity-summary?start_time=${START}&end_time=${E
 
 ```bash
 # Search for "GitHub PR" in the last 2 hours (default: hybrid mode)
-START=$(date -u +%Y-%m-%dT%H:%M:%SZ -d "2 hours ago")
-END=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+# Use local time directly from the injected header
+START="2026-04-26T14:30:00"
+END="2026-04-26T16:30:00"
 curl "http://localhost:8083/v1/search?q=GitHub+PR&start_time=${START}&end_time=${END}&limit=10"
 
 # FTS-only search (faster, keyword-based)
@@ -162,8 +155,8 @@ curl "http://localhost:8083/v1/search?q=GitHub+PR&mode=vector&start_time=${START
 | `mode` | string | No | Search mode: `fts`, `vector`, `hybrid` (default: `hybrid`) |
 | `limit` | integer | No | Max results (default: 20, no max limit) |
 | `offset` | integer | No | Pagination offset (default: 0) |
-| `start_time` | ISO 8601 | Recommended | Start of time range |
-| `end_time` | ISO 8601 | Recommended | End of time range |
+| `start_time` | ISO 8601 local | Recommended | Start of time range (local time, e.g. `2026-04-26T08:00:00`) |
+| `end_time` | ISO 8601 local | Recommended | End of time range (local time, e.g. `2026-04-26T23:59:59`) |
 | `app_name` | string | No | Filter by exact app name |
 | `window_name` | string | No | Filter by window title |
 | `browser_url` | string | No | Filter by browser URL substring |
@@ -182,7 +175,7 @@ curl "http://localhost:8083/v1/search?q=GitHub+PR&mode=vector&start_time=${START
   "data": [
     {
       "frame_id": 42,
-      "timestamp": "2026-03-25T10:30:00Z",
+      "timestamp": "2026-04-26T10:30:00",
       "text_source": "accessibility",
       "app_name": "Safari",
       "window_name": "Pull Request #123 — GitHub",
@@ -217,7 +210,7 @@ curl "http://localhost:8083/v1/search?q=GitHub+PR&mode=vector&start_time=${START
 | Field | Description |
 |-------|-------------|
 | `frame_id` | Unique frame ID — use with `/frames/{id}/context` for details |
-| `timestamp` | ISO8601 UTC capture time |
+| `timestamp` | ISO8601 local capture time |
 | `text_source` | Either `accessibility` (from AX tree) or `ocr` (from OCR fallback) |
 | `text` | Screen text (only included when `include_text=true`, truncated to `max_text_length`) |
 | `app_name` | Application name at capture time |
@@ -283,7 +276,7 @@ curl "http://localhost:8083/v1/frames/42/context"
 ```json
 {
   "frame_id": 42,
-  "timestamp": "2026-03-25T10:30:00Z",
+  "timestamp": "2026-04-26T10:30:00",
   "app_name": "Claude Code",
   "window_name": "Claude Code — ~/chat/MyRecall",
   "description": {
@@ -305,7 +298,7 @@ curl "http://localhost:8083/v1/frames/42/context"
 
 | Field | Description |
 |-------|-------------|
-| `timestamp` | ISO8601 UTC capture time of the frame |
+| `timestamp` | ISO8601 local capture time of the frame |
 | `app_name` | Application name at capture time (e.g. "Claude Code", "Chrome") |
 | `window_name` | Window title at capture time |
 | `description` | **MyRecall unique feature**. AI-generated description with `narrative`, `summary`, and `tags`. Returns `null` if not yet generated. |

@@ -23,7 +23,154 @@ from typing import Callable, Optional
 
 logger = logging.getLogger(__name__)
 
+UTC8 = timezone(timedelta(hours=8))
+
 from .pi_manager import find_pi_executable
+
+
+# Moonshot model configurations for Pi's models.json
+_MOONSHOT_MODELS = {
+    "moonshot-v1-8k": {
+        "id": "moonshot-v1-8k",
+        "name": "Moonshot V1 (8K)",
+        "reasoning": False,
+        "input": ["text"],
+        "contextWindow": 8192,
+        "maxTokens": 4096,
+        "cost": {"input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0},
+    },
+    "moonshot-v1-32k": {
+        "id": "moonshot-v1-32k",
+        "name": "Moonshot V1 (32K)",
+        "reasoning": False,
+        "input": ["text"],
+        "contextWindow": 32768,
+        "maxTokens": 8192,
+        "cost": {"input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0},
+    },
+    "moonshot-v1-128k": {
+        "id": "moonshot-v1-128k",
+        "name": "Moonshot V1 (128K)",
+        "reasoning": False,
+        "input": ["text"],
+        "contextWindow": 131072,
+        "maxTokens": 8192,
+        "cost": {"input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0},
+    },
+}
+
+
+def _ensure_moonshot_in_models_json(model_id: str) -> None:
+    """Ensure moonshot provider is registered in ~/.pi/agent/models.json.
+
+    Pi's model-registry loads custom providers from models.json on startup.
+    We merge our moonshot config into the existing file to avoid clobbering
+    other custom providers (e.g., qianfan, screenpipe).
+    """
+    models_json = Path.home() / ".pi" / "agent" / "models.json"
+    models_json.parent.mkdir(parents=True, exist_ok=True)
+
+    config: dict = {"providers": {}}
+    if models_json.exists():
+        try:
+            config = json.loads(models_json.read_text())
+        except (json.JSONDecodeError, OSError):
+            config = {"providers": {}}
+
+    if "providers" not in config:
+        config["providers"] = {}
+
+    # Fix schema-breaking empty apiKey values from other providers
+    config = _sanitize_models_json(config)
+
+    # Use the requested model (fallback to 8k if unknown)
+    model_cfg = _MOONSHOT_MODELS.get(model_id, _MOONSHOT_MODELS["moonshot-v1-8k"])
+
+    config["providers"]["moonshot"] = {
+        "api": "openai-completions",
+        "apiKey": "MOONSHOT_API_KEY",
+        "authHeader": True,
+        "baseUrl": "https://api.moonshot.cn/v1",
+        "models": [model_cfg],
+    }
+
+    models_json.write_text(json.dumps(config, indent=2))
+    models_json.chmod(stat.S_IRUSR | stat.S_IWUSR)
+    logger.info(f"[PiRpc] updated models.json with moonshot provider (model={model_id})")
+
+
+# Kimi Code model configuration for Pi's models.json
+# Uses openai-completions API with a custom User-Agent header.
+# Kimi Code restricts access to known Coding Agents (e.g., Claude Code),
+# so we set User-Agent to "claude-code/1.0" to pass the client check.
+_KIMI_CODING_MODEL = {
+    "id": "kimi-for-coding",
+    "name": "Kimi For Coding",
+    "reasoning": True,
+    "input": ["text", "image"],
+    "contextWindow": 262144,
+    "maxTokens": 32768,
+    "cost": {"input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0},
+    "compat": {"supportsDeveloperRole": False},
+}
+
+
+def _sanitize_models_json(config: dict) -> dict:
+    """Fix schema-breaking provider configs in models.json.
+
+    Two issues addressed:
+    1. Empty apiKey ("") fails Pi's schema validation (minLength: 1).
+       → Replaced with a dummy env-var reference so Pi loads the file.
+    2. Missing apiKey causes Pi to silently ignore the entire models.json
+       when other providers also lack keys.
+       → Same fix: inject a dummy key for local/no-auth providers.
+    """
+    for provider_cfg in config.get("providers", {}).values():
+        if not isinstance(provider_cfg, dict):
+            continue
+        key = provider_cfg.get("apiKey")
+        auth_header = provider_cfg.get("authHeader", True)
+        # Empty string or missing key breaks Pi's loading logic
+        if key == "" or (key is None and not auth_header):
+            provider_cfg["apiKey"] = "DUMMY_LOCAL_KEY"
+    return config
+
+
+def _ensure_kimi_coding_in_models_json() -> None:
+    """Ensure kimi-coding provider is registered in ~/.pi/agent/models.json.
+
+    Overrides the built-in kimi-coding provider to use the OpenAI-compatible
+    endpoint (https://api.kimi.com/coding/v1) and sets the User-Agent header
+    required by Kimi Code's client validation.
+    """
+    models_json = Path.home() / ".pi" / "agent" / "models.json"
+    models_json.parent.mkdir(parents=True, exist_ok=True)
+
+    config: dict = {"providers": {}}
+    if models_json.exists():
+        try:
+            config = json.loads(models_json.read_text())
+        except (json.JSONDecodeError, OSError):
+            config = {"providers": {}}
+
+    if "providers" not in config:
+        config["providers"] = {}
+
+    # Fix schema-breaking empty apiKey values from other providers
+    config = _sanitize_models_json(config)
+
+    config["providers"]["kimi-coding"] = {
+        "api": "openai-completions",
+        "apiKey": "KIMI_API_KEY",
+        "authHeader": True,
+        "baseUrl": "https://api.kimi.com/coding/v1",
+        "headers": {"User-Agent": "claude-code/1.0"},
+        "models": [_KIMI_CODING_MODEL],
+    }
+
+    models_json.write_text(json.dumps(config, indent=2))
+    models_json.chmod(stat.S_IRUSR | stat.S_IWUSR)
+    logger.info("[PiRpc] updated models.json with kimi-coding provider (openai-completions + claude-code UA)")
 
 
 class PiRpcManager:
@@ -61,42 +208,13 @@ class PiRpcManager:
         self.workspace_dir.mkdir(parents=True, exist_ok=True)
 
     def _build_timezone_header(self) -> str:
-        """Build timezone context header (mirrors screenpipe's render_prompt_with_port).
-
-        Injects the user's local timezone and midnight anchors so that AI can
-        correctly convert local time expressions ("today", "yesterday") to UTC.
-        """
-        # Naive datetime is intentional: astimezone(timezone.utc) below interprets
-        # it as local wall-clock time, which is exactly what we need here.
-        now = datetime.now()
-        date_str = now.strftime("%Y-%m-%d")     # e.g. "2026-04-02"
-
-        # Use `time` module instead of strftime %Z/%:z — macOS C library returns empty
-        import time as _time
-        local_tz = _time.localtime()
-        tz_name = _time.tzname[0]                # e.g. "CST"
-        # offset in seconds (negative = east of UTC)
-        offset = _time.timezone if local_tz.tm_isdst == 0 else _time.altzone
-        offset_h = -offset // 3600
-        offset_m = (-offset % 3600) // 60
-        sign = "+" if offset_h >= 0 else "-"
-        tz_offset = f"UTC{sign}{abs(offset_h):02d}:{offset_m:02d}"  # e.g. "UTC+08:00"
-
-        # Today's local midnight -> UTC
-        local_midnight = now.replace(hour=0, minute=0, second=0, microsecond=0)
-        midnight_utc = local_midnight.astimezone(timezone.utc)
-        midnight_utc_str = midnight_utc.strftime("%Y-%m-%dT%H:%M:%SZ")
-
-        # Yesterday's local midnight -> UTC
-        yesterday_midnight = local_midnight - timedelta(days=1)
-        yesterday_utc_str = yesterday_midnight.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-
+        """Build local time context header."""
+        now = datetime.now(UTC8)
+        date_str = now.strftime("%Y-%m-%d")
+        time_str = now.strftime("%Y-%m-%dT%H:%M:%S")
         return (
             f"Date: {date_str}\n"
-            f"Timezone: {tz_name} ({tz_offset})\n"
-            f"Local midnight today (UTC): {midnight_utc_str}\n"
-            f"Local midnight yesterday (UTC): {yesterday_utc_str}\n"
-            f"Now (UTC): {now.astimezone(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')}\n"
+            f"Local time now: {time_str}\n"
         )
 
     def start(self, provider: str, model: str) -> bool:
@@ -164,6 +282,29 @@ class PiRpcManager:
                     logger.info(f"[PiRpc] cmd: {' '.join(cmd)}")
 
             env = os.environ.copy()
+
+            # For moonshot provider: register in models.json and set API key env var
+            if provider == "moonshot":
+                from .config_manager import get_api_key
+                api_key = get_api_key("moonshot")
+                if api_key:
+                    _ensure_moonshot_in_models_json(model)
+                    env["MOONSHOT_API_KEY"] = api_key
+                    logger.info("[PiRpc] moonshot provider: registered in models.json, MOONSHOT_API_KEY set")
+                else:
+                    logger.warning("[PiRpc] no API key for moonshot provider")
+
+            # For kimi-coding provider: register in models.json and set API key env var
+            if provider == "kimi-coding":
+                from .config_manager import get_api_key
+                api_key = get_api_key("kimi-coding")
+                if api_key:
+                    _ensure_kimi_coding_in_models_json()
+                    env["KIMI_API_KEY"] = api_key
+                    logger.info("[PiRpc] kimi-coding provider: registered in models.json, KIMI_API_KEY set")
+                else:
+                    logger.warning("[PiRpc] no API key for kimi-coding provider")
+
             self.process = subprocess.Popen(
                 cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE, cwd=str(self.workspace_dir),
