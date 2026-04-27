@@ -137,18 +137,23 @@ class HybridSearchEngine:
         results = []
         for emb, distance in embeddings_with_distance[offset : offset + limit]:
             frame_id = emb.frame_id
-            frame = frame_data_map.get(frame_id, {})
-            # Convert cosine distance to cosine similarity (cosine_sim = 1 - cosine_dist)
+            frame = frame_data_map.get(frame_id)
+            if frame is None:
+                logger.warning(
+                    "Orphan embedding: frame_id=%d in LanceDB but missing from SQLite",
+                    frame_id,
+                )
+                continue
             cosine_score = 1.0 - float(distance)
             results.append({
                 "frame_id": frame_id,
                 "score": cosine_score,
                 "cosine_score": cosine_score,
-                "timestamp": frame.get("timestamp", emb.timestamp),
+                "timestamp": frame["timestamp"],  # local time from get_frames_by_ids
                 "text": frame.get("full_text", "")[:200] if frame.get("full_text") else "",
                 "text_source": frame.get("text_source", "ocr"),
-                "app_name": frame.get("app_name", emb.app_name),
-                "window_name": frame.get("window_name", emb.window_name),
+                "app_name": frame.get("app_name", ""),
+                "window_name": frame.get("window_name", ""),
                 "browser_url": frame.get("browser_url"),
                 "focused": frame.get("focused"),
                 "device_name": frame.get("device_name", "monitor_0"),
@@ -180,12 +185,12 @@ class HybridSearchEngine:
             # Get recent frames with embeddings
             rows = conn.execute(
                 """
-                SELECT id as frame_id, timestamp, full_text, text_source,
-                       app_name, window_name, browser_url, focused,
-                       device_name, file_path, embedding_status
+                SELECT frames.id as frame_id, frames.local_timestamp AS timestamp, frames.full_text, frames.text_source,
+                       frames.app_name, frames.window_name, frames.browser_url, frames.focused,
+                       frames.device_name, frames.snapshot_path, frames.embedding_status
                 FROM frames
                 WHERE visibility_status = 'queryable'
-                ORDER BY timestamp DESC
+                ORDER BY local_timestamp DESC
                 LIMIT ? OFFSET ?
                 """,
                 (limit, offset),
@@ -193,7 +198,7 @@ class HybridSearchEngine:
 
             results = []
             for row in rows:
-                ts = row["timestamp"]
+                ts = row["timestamp"]  # aliased from local_timestamp
                 results.append({
                     "frame_id": row["frame_id"],
                     "score": None,
@@ -273,7 +278,13 @@ class HybridSearchEngine:
 
         results = []
         for hybrid_rank, frame_id in enumerate(frame_ids, start=offset + 1):
-            frame = frame_data_map.get(frame_id, {})
+            frame = frame_data_map.get(frame_id)
+            if frame is None:
+                logger.warning(
+                    "Orphan embedding: frame_id=%d in LanceDB but missing from SQLite",
+                    frame_id,
+                )
+                continue
             results.append({
                 "frame_id": frame_id,
                 "score": scores.get(frame_id, 0.0),
@@ -282,7 +293,7 @@ class HybridSearchEngine:
                 "vector_rank": vector_ranks.get(frame_id),  # Rank in vector search results
                 "fts_score": fts_bm25_scores.get(frame_id),  # BM25 score from FTS results
                 "fts_rank": fts_ranks.get(frame_id),  # Rank in FTS search results
-                "timestamp": frame.get("timestamp", ""),
+                "timestamp": frame["timestamp"],  # local time from get_frames_by_ids
                 "text": frame.get("full_text", "")[:200] if frame.get("full_text") else "",
                 "text_source": frame.get("text_source", "ocr"),
                 "app_name": frame.get("app_name", ""),
