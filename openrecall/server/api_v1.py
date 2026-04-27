@@ -73,6 +73,33 @@ def _parse_utc_timestamp(raw_value: str | None) -> datetime | None:
     return parsed.astimezone(timezone.utc)
 
 
+def _parse_time_filter(raw_value: str | None) -> str | None:
+    """Parse a local time string into normalized local_timestamp format.
+
+    Accepts:
+        - "2026-04-26" -> "2026-04-26T00:00:00"
+        - "2026-04-26T08:30" -> "2026-04-26T08:30:00"
+        - "2026-04-26T08:30:00" -> unchanged
+        - "2026-04-26 08:30:00" -> "2026-04-26T08:30:00"
+    """
+    if raw_value is None:
+        return None
+
+    normalized = raw_value.strip().replace(" ", "T")
+    if not normalized:
+        return None
+
+    # "2026-04-26" -> append time
+    if "T" not in normalized and len(normalized) == 10:
+        normalized = f"{normalized}T00:00:00"
+
+    # "2026-04-26T08:30" -> append seconds
+    if normalized.count(":") == 1:
+        normalized = f"{normalized}:00"
+
+    return normalized
+
+
 # ---------------------------------------------------------------------------
 # Error response helper
 # ---------------------------------------------------------------------------
@@ -816,8 +843,8 @@ def health():
 
     Response fields (subset of screenpipe HealthCheckResponse):
         status              — "ok" | "degraded"  (P1-S1: never "error")
-        last_frame_timestamp    — ISO8601 string | null
-        last_frame_ingested_at  — ISO8601 string | null
+        last_frame_timestamp    — Local time (UTC+8) ISO8601 string | null
+        last_frame_ingested_at  — UTC ISO8601 string with Z | null
         frame_status        — "ok" | "stale"
         message             — human-readable description
         queue               — { pending, processing, failed }
@@ -934,8 +961,8 @@ def search():
         content_type: "ocr", "accessibility", or "all" (default: "all")
         limit: Max results (default 20, no maximum)
         offset: Pagination offset (default 0)
-        start_time: ISO8601 UTC start timestamp
-        end_time: ISO8601 UTC end timestamp
+        start_time: Local time start timestamp (e.g. "2026-04-26T00:00:00")
+        end_time: Local time end timestamp (e.g. "2026-04-26T23:59:59")
         app_name: Filter by app name (exact match via FTS)
         window_name: Filter by window name (exact match via FTS)
         browser_url: Filter by browser URL
@@ -991,14 +1018,9 @@ def search():
         max_text_length = 1000
     max_text_length = max(1, max_text_length)
 
-    # Parse time range
-    start_time = request.args.get("start_time")
-    if start_time:
-        start_time = start_time.strip() or None
-
-    end_time = request.args.get("end_time")
-    if end_time:
-        end_time = end_time.strip() or None
+    # Parse time range (local time)
+    start_time = _parse_time_filter(request.args.get("start_time"))
+    end_time = _parse_time_filter(request.args.get("end_time"))
 
     # Parse metadata filters
     app_name = request.args.get("app_name")
@@ -1125,8 +1147,8 @@ def search_counts():
 
     Query Parameters:
         q: Text query
-        start_time: ISO8601 UTC start timestamp
-        end_time: ISO8601 UTC end timestamp
+        start_time: Local time start timestamp (e.g. "2026-04-26T00:00:00")
+        end_time: Local time end timestamp (e.g. "2026-04-26T23:59:59")
         app_name: Filter by app name
         window_name: Filter by window name
         browser_url: Filter by browser URL
@@ -1138,14 +1160,9 @@ def search_counts():
     # Parse query parameters (same as search endpoint)
     q = request.args.get("q", "").strip()
 
-    # Parse time range
-    start_time = request.args.get("start_time")
-    if start_time:
-        start_time = start_time.strip() or None
-
-    end_time = request.args.get("end_time")
-    if end_time:
-        end_time = end_time.strip() or None
+    # Parse time range (local time)
+    start_time = _parse_time_filter(request.args.get("start_time"))
+    end_time = _parse_time_filter(request.args.get("end_time"))
 
     # Parse metadata filters
     app_name = request.args.get("app_name")
@@ -1242,8 +1259,8 @@ def activity_summary():
     """Return activity overview for chat agents.
 
     Query Parameters:
-        start_time (str): Required. ISO8601 start timestamp.
-        end_time (str): Required. ISO8601 end timestamp.
+        start_time (str): Required. Local time start timestamp (e.g. "2026-04-26T00:00:00").
+        end_time (str): Required. Local time end timestamp (e.g. "2026-04-26T23:59:59").
         app_name (str): Optional. Filter by app name.
         max_descriptions (int): Optional. Maximum descriptions to return.
             No default — all available descriptions within the time range
@@ -1256,9 +1273,11 @@ def activity_summary():
     """
     request_id = str(uuid.uuid4())
 
-    # Parse required parameters
-    start_time = request.args.get("start_time", "").strip()
-    end_time = request.args.get("end_time", "").strip()
+    # Parse required parameters (local time)
+    start_time_raw = request.args.get("start_time", "").strip()
+    end_time_raw = request.args.get("end_time", "").strip()
+    start_time = _parse_time_filter(start_time_raw) or start_time_raw
+    end_time = _parse_time_filter(end_time_raw) or end_time_raw
 
     if not start_time or not end_time:
         return make_error_response(
@@ -1446,13 +1465,20 @@ def similar_frames(frame_id: int):
 
     # Filter out the query frame itself
     similar = []
+    frames_store = _get_frames_store()
     for r, distance in results_with_distance:
         if r.frame_id != frame_id:
+            with frames_store._connect() as conn:
+                row = conn.execute(
+                    "SELECT local_timestamp AS timestamp FROM frames WHERE id = ?",
+                    (r.frame_id,),
+                ).fetchone()
+            ts = row["timestamp"] if row else r.timestamp
             similarity = max(0.0, 1.0 - float(distance))
             similar.append({
                 "frame_id": r.frame_id,
                 "similarity": round(similarity, 4),
-                "timestamp": r.timestamp,
+                "timestamp": ts,  # local time from SQL alias; UTC fallback for orphan embeddings
                 "app_name": r.app_name,
                 "window_name": r.window_name,
                 "frame_url": f"/v1/frames/{r.frame_id}",
@@ -1512,6 +1538,22 @@ def create_frame_embedding(frame_id: int):
         "status": "queued",
         "request_id": request_id,
     }), 202
+
+
+@v1_bp.route("/frames/latest", methods=["GET"])
+def frames_latest():
+    """Return frames newer than a given local timestamp.
+
+    Query Parameters:
+        since (str): Local timestamp (e.g. "2026-04-26T16:30:00.123")
+
+    Returns:
+        JSON list of frame objects with local timestamps.
+    """
+    since_str = request.args.get("since", "1970-01-01T00:00:00")
+    store = _get_frames_store()
+    memories = store.get_memories_since(since_str)
+    return jsonify(memories), 200
 
 
 @v1_bp.route("/admin/embedding/backfill", methods=["POST"])
