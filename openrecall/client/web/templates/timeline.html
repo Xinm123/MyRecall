@@ -434,15 +434,34 @@
 <script>
   function timelineView() {
     return {
+      // Data
       frames: [],
       currentIndex: 0,
+      currentDate: '',
+      datesWithData: new Set(),
+
+      // Calendar
+      calendarOpen: false,
+      calendarYear: 0,
+      calendarMonth: 0,
+
+      // Playback
+      isPlaying: false,
+      playbackSpeed: 1,
+      playbackTimer: null,
+      BASE_INTERVAL: 1000,
+
+      // UI
       loading: true,
+
+      // Timers
+      refreshTimer: null,
+
+      // ---- Computed ----
 
       get currentFrame() {
         if (this.frames.length === 0) return null;
-        // frames are newest-first; slider shows oldest on left
-        const reversed = this.frames.length - 1 - this.currentIndex;
-        return this.frames[reversed];
+        return this.frames[this.currentIndex];
       },
 
       get formattedTime() {
@@ -461,18 +480,163 @@
         return `${y}-${mo}-${d} ${h}:${mi}:${s}`;
       },
 
-      async init() {
+      // ---- Date Helpers (match index.html) ----
+
+      _formatDateStr(date) {
+        const y = date.getFullYear();
+        const m = String(date.getMonth() + 1).padStart(2, '0');
+        const d = String(date.getDate()).padStart(2, '0');
+        return `${y}-${m}-${d}`;
+      },
+
+      _utc8Now() {
+        const now = new Date();
+        now.setMinutes(now.getMinutes() + now.getTimezoneOffset() + 480);
+        return now;
+      },
+
+      isToday(dateStr) {
+        return dateStr === this._formatDateStr(this._utc8Now());
+      },
+
+      // ---- Data Loading ----
+
+      async loadDay(date) {
+        this.loading = true;
         try {
-          const resp = await fetch(`${EDGE_BASE_URL}/v1/timeline?limit=5000`);
-          if (resp.ok) {
-            this.frames = await resp.json();
-            this.currentIndex = this.frames.length - 1;
+          const res = await fetch(`${EDGE_BASE_URL}/api/memories/by-day?date=${date}`);
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          const data = await res.json();
+          if (Array.isArray(data)) {
+            // Sort ascending (oldest first) for timeline playback
+            this.frames = data.sort((a, b) => {
+              const ta = parseTimestamp(a.timestamp)?.getTime() || 0;
+              const tb = parseTimestamp(b.timestamp)?.getTime() || 0;
+              return ta - tb;
+            });
+          } else {
+            this.frames = [];
           }
+          this.currentIndex = 0;
         } catch (e) {
-          console.error('Failed to load timeline:', e);
+          console.error('Failed to load day:', e);
+          this.frames = [];
+          this.currentIndex = 0;
         } finally {
           this.loading = false;
         }
+      },
+
+      // ---- Day Navigation ----
+
+      prevDay() {
+        this.stopPlayback();
+        const [y, m, d] = this.currentDate.split('-').map(Number);
+        const date = new Date(y, m - 1, d);
+        date.setDate(date.getDate() - 1);
+        this.currentDate = this._formatDateStr(date);
+        this.calendarYear = date.getFullYear();
+        this.calendarMonth = date.getMonth();
+        this.loadDay(this.currentDate);
+      },
+
+      nextDay() {
+        this.stopPlayback();
+        const [y, m, d] = this.currentDate.split('-').map(Number);
+        const date = new Date(y, m - 1, d);
+        date.setDate(date.getDate() + 1);
+        this.currentDate = this._formatDateStr(date);
+        this.calendarYear = date.getFullYear();
+        this.calendarMonth = date.getMonth();
+        this.loadDay(this.currentDate);
+      },
+
+      goToday() {
+        this.stopPlayback();
+        const now = this._utc8Now();
+        this.currentDate = this._formatDateStr(now);
+        this.calendarYear = now.getFullYear();
+        this.calendarMonth = now.getMonth();
+        this.loadDay(this.currentDate);
+      },
+
+      selectDate(date) {
+        this.stopPlayback();
+        this.currentDate = date;
+        const [y, m] = date.split('-').map(Number);
+        this.calendarYear = y;
+        this.calendarMonth = m - 1;
+        this.calendarOpen = false;
+        this.loadDay(date);
+      },
+
+      // ---- Calendar (Task 4 overrides) ----
+
+      async loadCalendarDates() {},
+      toggleCalendar() {},
+      prevMonth() {},
+      nextMonth() {},
+      calendarDays() { return []; },
+      hasData(date) { return false; },
+
+      // ---- Real-Time Refresh (Task 5 overrides) ----
+
+      refreshDay() {},
+
+      // ---- Playback (Task 6 overrides) ----
+
+      onSliderInput() {},
+      togglePlayback() {},
+      startPlayback() {},
+      stopPlayback() {},
+      cycleSpeed() {},
+
+      // ---- Initialization ----
+
+      async init() {
+        const now = this._utc8Now();
+        this.currentDate = this._formatDateStr(now);
+        this.calendarYear = now.getFullYear();
+        this.calendarMonth = now.getMonth();
+        await this.loadDay(this.currentDate);
+
+        // Real-time refresh: every 5 seconds check for new frames
+        this.refreshTimer = setInterval(() => {
+          this.refreshDay();
+        }, 5000);
+
+        // Keyboard navigation
+        this._keydownHandler = (e) => {
+          if (e.key === 'ArrowLeft') {
+            e.preventDefault();
+            this.stopPlayback();
+            if (this.currentIndex > 0) this.currentIndex -= 1;
+          }
+          if (e.key === 'ArrowRight') {
+            e.preventDefault();
+            this.stopPlayback();
+            if (this.currentIndex < this.frames.length - 1) this.currentIndex += 1;
+          }
+          if (e.key === ' ') {
+            e.preventDefault();
+            this.togglePlayback();
+          }
+        };
+        window.addEventListener('keydown', this._keydownHandler);
+
+        // Cleanup on page leave
+        this._beforeUnloadHandler = () => {
+          this.stopPlayback();
+          if (this.refreshTimer) {
+            clearInterval(this.refreshTimer);
+            this.refreshTimer = null;
+          }
+          if (this._keydownHandler) {
+            window.removeEventListener('keydown', this._keydownHandler);
+            this._keydownHandler = null;
+          }
+        };
+        window.addEventListener('beforeunload', this._beforeUnloadHandler);
       }
     };
   }
