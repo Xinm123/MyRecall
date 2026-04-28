@@ -351,7 +351,7 @@
         <span style="font-size: 10px; opacity: 0.6;">&#9660;</span>
       </button>
       <!-- Calendar Popover -->
-      <div x-show="calendarOpen" class="calendar-popover" x-cloak style="animation: calendarPopoverIn 0.2s ease-out forwards;">
+      <div x-show="calendarOpen" class="calendar-popover" x-cloak>
         <div class="calendar-header">
           <button type="button" class="calendar-nav" @click="prevMonth()">&#8249;</button>
           <span class="calendar-title" x-text="`${calendarYear}&#24180;${calendarMonth + 1}&#26376;`"></span>
