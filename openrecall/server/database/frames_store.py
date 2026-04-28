@@ -940,6 +940,31 @@ class FramesStore:
             logger.error("get_frames_by_day failed: %s", e)
         return frames
 
+    def get_dates_with_data(self, month: str) -> list[str]:
+        """Return dates in a month that have at least one frame.
+
+        Args:
+            month: Month string in YYYY-MM format.
+
+        Returns:
+            List of date strings in YYYY-MM-DD format, sorted ascending.
+        """
+        try:
+            with self._connect() as conn:
+                rows = conn.execute(
+                    """
+                    SELECT DISTINCT DATE(local_timestamp) AS date
+                    FROM frames
+                    WHERE DATE(local_timestamp) LIKE ?
+                    ORDER BY date
+                    """,
+                    (f"{month}-%",),
+                ).fetchall()
+                return [row["date"] for row in rows]
+        except sqlite3.Error as e:
+            logger.error("get_dates_with_data failed: %s", e)
+            return []
+
     def get_timeline_frames(self, limit: int = 5000) -> list[dict[str, object]]:
         """Retrieve frames for timeline view.
 

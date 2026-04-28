@@ -234,3 +234,29 @@ def test_get_frames_by_day_empty(test_store):
     """get_frames_by_day returns empty list for date with no frames."""
     result = test_store.get_frames_by_day("1999-01-01")
     assert result == []
+
+
+def test_get_dates_with_data(test_store):
+    """get_dates_with_data returns dates that have frames in a month."""
+    frame_id, _ = test_store.claim_frame(
+        capture_id="test-cap-dates",
+        metadata={
+            "timestamp": "2026-04-28T02:00:00.000Z",
+            "app_name": "TestApp",
+            "capture_trigger": "idle",
+        },
+    )
+    with test_store._connect() as conn:
+        conn.execute(
+            "UPDATE frames SET snapshot_path = ? WHERE id = ?",
+            ("/tmp/test.jpg", frame_id),
+        )
+        conn.commit()
+    result = test_store.get_dates_with_data("2026-04")
+    assert "2026-04-28" in result
+
+
+def test_get_dates_with_data_empty_month(test_store):
+    """get_dates_with_data returns empty list for month with no frames."""
+    result = test_store.get_dates_with_data("1999-01")
+    assert result == []
