@@ -211,6 +211,35 @@ def memories_recent():
         return jsonify({"status": "error", "message": str(e)}), 500
 
 
+@api_bp.route("/memories/by-day", methods=["GET"])
+def memories_by_day():
+    """Retrieve all frames for a specific day.
+
+    Query Params:
+        date: Date in YYYY-MM-DD format (local_timestamp).
+
+    Returns:
+        JSON list of frame dicts (same format as /api/memories/recent).
+    """
+    import re
+
+    date_str = (request.args.get("date") or "").strip()
+    if not date_str:
+        return jsonify({"status": "error", "message": "Query parameter 'date' is required"}), 400
+    if not re.match(r"^\d{4}-\d{2}-\d{2}$", date_str):
+        return (
+            jsonify({"status": "error", "message": "Query parameter 'date' must be in YYYY-MM-DD format"}),
+            400,
+        )
+
+    try:
+        memories = frames_store.get_frames_by_day(date=date_str)
+        return jsonify(memories), 200
+    except Exception as e:
+        logger.exception("Error fetching frames by day")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
 @api_bp.route("/queue/status", methods=["GET"])
 def queue_status():
     """Get current processing queue status (debug endpoint).
