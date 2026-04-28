@@ -415,7 +415,8 @@
       <input type="range" class="slider" id="discreteSlider"
         x-model.number="currentIndex"
         :min="0" :max="frames.length - 1" step="1"
-        :disabled="frames.length <= 1">
+        :disabled="frames.length <= 1"
+        @input="onSliderInput()">
       <div class="slider-value">
         <span x-text="formattedTime"></span>
         <span class="frame-counter" x-show="frames.length > 0" x-text="`(${currentIndex + 1} / ${frames.length})`"></span>
@@ -676,13 +677,56 @@
         }
       },
 
-      // ---- Playback (Task 6 overrides) ----
+      // ---- Playback ----
 
-      onSliderInput() {},
-      togglePlayback() {},
-      startPlayback() {},
-      stopPlayback() {},
-      cycleSpeed() {},
+      onSliderInput() {
+        // User manually dragged the slider — stop playback
+        this.stopPlayback();
+      },
+
+      togglePlayback() {
+        if (this.isPlaying) {
+          this.stopPlayback();
+        } else {
+          this.startPlayback();
+        }
+      },
+
+      startPlayback() {
+        if (this.frames.length <= 1) return;
+        if (this.currentIndex >= this.frames.length - 1) {
+          // Already at the end — restart from beginning
+          this.currentIndex = 0;
+        }
+        this.isPlaying = true;
+        const interval = this.BASE_INTERVAL / this.playbackSpeed;
+        this.playbackTimer = setInterval(() => {
+          if (this.currentIndex >= this.frames.length - 1) {
+            this.stopPlayback();
+            return;
+          }
+          this.currentIndex += 1;
+        }, interval);
+      },
+
+      stopPlayback() {
+        this.isPlaying = false;
+        if (this.playbackTimer) {
+          clearInterval(this.playbackTimer);
+          this.playbackTimer = null;
+        }
+      },
+
+      cycleSpeed() {
+        const speeds = [1, 2, 5, 10];
+        const idx = speeds.indexOf(this.playbackSpeed);
+        this.playbackSpeed = speeds[(idx + 1) % speeds.length];
+        // If playing, restart with new speed
+        if (this.isPlaying) {
+          this.stopPlayback();
+          this.startPlayback();
+        }
+      },
 
       // ---- Initialization ----
 
