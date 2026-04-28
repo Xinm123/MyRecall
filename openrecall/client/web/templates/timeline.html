@@ -338,24 +338,88 @@
 {% endblock %}
 
 {% block content %}
-<div x-data="timelineView()" x-init="init()" x-cloak>
-  <!-- Loading state -->
-  <div x-show="loading" class="timeline-loading">
-    Loading timeline...
+<div x-data="timelineView()" x-init="await init()" x-cloak>
+  <!-- Loading Indicator -->
+  <div x-show="loading" class="loading-bar" x-cloak></div>
+
+  <!-- Date Navigation Toolbar -->
+  <div class="date-nav-toolbar" style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px;">
+    <button type="button" class="today-btn" @click="goToday()" :disabled="isToday(currentDate)">
+      Today
+    </button>
+    <button type="button" class="toolbar-nav-btn" @click="prevDay()" title="Previous day">
+      &#8249;
+    </button>
+    <div @click.away="calendarOpen = false" style="position: relative;">
+      <button type="button" class="date-picker-btn" @click="toggleCalendar()">
+        <span>&#128197;</span>
+        <span x-text="currentDate"></span>
+        <span style="font-size: 10px; opacity: 0.6;">&#9660;</span>
+      </button>
+      <!-- Calendar Popover -->
+      <div x-show="calendarOpen" class="calendar-popover" x-cloak style="animation: calendarPopoverIn 0.2s ease-out forwards;">
+        <div class="calendar-header">
+          <button type="button" class="calendar-nav" @click="prevMonth()">&#8249;</button>
+          <span class="calendar-title" x-text="`${calendarYear}&#24180;${calendarMonth + 1}&#26376;`"></span>
+          <button type="button" class="calendar-nav" @click="nextMonth()">&#8250;</button>
+        </div>
+        <div class="calendar-weekdays">
+          <span>&#26085;</span><span>&#19968;</span><span>&#20108;</span><span>&#19977;</span><span>&#22235;</span><span>&#20116;</span><span>&#20845;</span>
+        </div>
+        <div class="calendar-days">
+          <template x-for="day in calendarDays()" :key="day.date || `${calendarYear}-${calendarMonth}-${day.day}`">
+            <button
+              type="button"
+              class="calendar-day"
+              :class="{
+                'is-other-month': day.isOtherMonth,
+                'is-selected': day.date === currentDate,
+                'is-today': day.date && isToday(day.date),
+                'has-data': day.date && hasData(day.date)
+              }"
+              :disabled="!day.date"
+              @click="day.date && selectDate(day.date)"
+              x-text="day.day"
+            ></button>
+          </template>
+        </div>
+      </div>
+    </div>
+    <button type="button" class="toolbar-nav-btn" @click="nextDay()" title="Next day">
+      &#8250;
+    </button>
+
+    <!-- Playback Controls -->
+    <div class="playback-controls">
+      <button
+        type="button"
+        class="play-btn"
+        @click="togglePlayback()"
+        :disabled="frames.length <= 1"
+        x-text="isPlaying ? '&#9646;&#9646;' : '&#9654;'"
+        :title="isPlaying ? 'Pause' : 'Play'"
+      ></button>
+      <button type="button" class="speed-btn" @click="cycleSpeed()" :disabled="frames.length <= 1" x-text="playbackSpeed + 'x'" title="Playback speed"></button>
+    </div>
   </div>
 
   <!-- No data -->
   <div x-show="!loading && frames.length === 0" class="alert" role="alert">
-    Nothing recorded yet, wait a few seconds.
+    No captures on <span x-text="currentDate"></span>.<br>
+    <span style="font-size: 13px; color: var(--text-secondary);">Select another date to browse history.</span>
   </div>
 
   <!-- Timeline -->
   <div x-show="!loading && frames.length > 0">
     <div class="slider-container">
       <input type="range" class="slider" id="discreteSlider"
-        x-model="currentIndex"
-        :min="0" :max="frames.length - 1" step="1">
-      <div class="slider-value" x-text="formattedTime"></div>
+        x-model.number="currentIndex"
+        :min="0" :max="frames.length - 1" step="1"
+        :disabled="frames.length <= 1">
+      <div class="slider-value">
+        <span x-text="formattedTime"></span>
+        <span class="frame-counter" x-show="frames.length > 0" x-text="`(${currentIndex + 1} / ${frames.length})`"></span>
+      </div>
     </div>
     <div class="image-container">
       <img id="timestampImage"
