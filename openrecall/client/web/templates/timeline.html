@@ -28,6 +28,18 @@
     margin-top: 6px;
     font-size: 1.2em;
     color: var(--text-primary);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 86%;
+    gap: 12px;
+  }
+
+  .slider-info {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
   }
 
   .image-container {
@@ -279,7 +291,7 @@
     display: flex;
     align-items: center;
     gap: 8px;
-    margin-left: auto;
+    flex-shrink: 0;
   }
 
   .play-btn {
@@ -311,7 +323,7 @@
   .speed-btn {
     font-size: 12px;
     font-weight: 600;
-    padding: 4px 10px;
+    padding: 4px 8px;
     border-radius: 6px;
     border: 1px solid var(--border-color);
     background: var(--bg-card);
@@ -319,7 +331,11 @@
     cursor: pointer;
     font-family: var(--font-stack);
     transition: all 0.2s;
-    min-width: 40px;
+    min-width: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
   }
 
   .speed-btn:hover:not(:disabled) {
@@ -330,6 +346,51 @@
   .speed-btn:disabled {
     opacity: 0.4;
     cursor: not-allowed;
+  }
+
+  .speed-dropdown {
+    position: absolute;
+    top: 38px;
+    right: 0;
+    min-width: 56px;
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+    padding: 4px;
+    z-index: 1001;
+    animation: speedDropdownIn 0.15s ease-out forwards;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  @keyframes speedDropdownIn {
+    from { opacity: 0; transform: translateY(-4px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .speed-option {
+    font-size: 12px;
+    font-weight: 500;
+    padding: 6px 10px;
+    border-radius: 6px;
+    border: none;
+    background: transparent;
+    color: var(--text-primary);
+    cursor: pointer;
+    text-align: center;
+    transition: all 0.15s;
+    font-family: var(--font-stack);
+  }
+
+  .speed-option:hover {
+    background: rgba(0, 122, 255, 0.08);
+  }
+
+  .speed-option.is-active {
+    background: var(--accent-color);
+    color: white;
   }
 
   .frame-counter {
@@ -400,19 +461,6 @@
     <button type="button" class="toolbar-nav-btn" @click="nextDay()" title="Next day" aria-label="Next day">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
     </button>
-
-    <!-- Playback Controls -->
-    <div class="playback-controls">
-      <button
-        type="button"
-        class="play-btn"
-        @click="togglePlayback()"
-        :disabled="loading || frames.length <= 1"
-        x-text="isPlaying ? '&#9646;&#9646;' : '&#9654;'"
-        :title="isPlaying ? 'Pause' : 'Play'"
-      ></button>
-      <button type="button" class="speed-btn" @click="cycleSpeed()" :disabled="loading || frames.length <= 1" x-text="playbackSpeed + 'x'" title="Playback speed"></button>
-    </div>
   </div>
 
   <!-- No data -->
@@ -430,8 +478,61 @@
         :disabled="loading || frames.length <= 1"
         @input="onSliderInput()">
       <div class="slider-value">
-        <span x-text="formattedTime"></span>
-        <span class="frame-counter" x-show="frames.length > 0" x-text="`(${currentIndex + 1} / ${frames.length})`"></span>
+        <div class="slider-info">
+          <span x-text="formattedTime"></span>
+          <span class="frame-counter" x-show="frames.length > 0" x-text="`(${currentIndex + 1} / ${frames.length})`"></span>
+        </div>
+        <div class="playback-controls">
+          <button
+            type="button"
+            class="play-btn"
+            @click="togglePlayback()"
+            :disabled="loading || frames.length <= 1"
+            x-text="isPlaying ? '\u25a0\u25a0' : '\u25b6'"
+            :title="isPlaying ? 'Pause' : 'Play'"
+          ></button>
+          <div style="position: relative;">
+            <button
+              type="button"
+              class="speed-btn"
+              @click="speedDropdownOpen = !speedDropdownOpen"
+              :disabled="loading || frames.length <= 1"
+              x-text="playbackSpeed + 'x \u25bc'"
+              title="Playback speed"
+            ></button>
+            <div
+              x-show="speedDropdownOpen"
+              class="speed-dropdown"
+              x-cloak
+              @click.away="speedDropdownOpen = false"
+            >
+              <button
+                type="button"
+                class="speed-option"
+                :class="{ 'is-active': playbackSpeed === 1 }"
+                @click="selectSpeed(1)"
+              >1x</button>
+              <button
+                type="button"
+                class="speed-option"
+                :class="{ 'is-active': playbackSpeed === 2 }"
+                @click="selectSpeed(2)"
+              >2x</button>
+              <button
+                type="button"
+                class="speed-option"
+                :class="{ 'is-active': playbackSpeed === 5 }"
+                @click="selectSpeed(5)"
+              >5x</button>
+              <button
+                type="button"
+                class="speed-option"
+                :class="{ 'is-active': playbackSpeed === 10 }"
+                @click="selectSpeed(10)"
+              >10x</button>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
     <div class="image-container">
@@ -463,6 +564,7 @@
       playbackSpeed: 1,
       playbackTimer: null,
       BASE_INTERVAL: 1000,
+      speedDropdownOpen: false,
 
       // UI
       loading: true,
@@ -730,11 +832,9 @@
         }
       },
 
-      cycleSpeed() {
-        const speeds = [1, 2, 5, 10];
-        const idx = speeds.indexOf(this.playbackSpeed);
-        this.playbackSpeed = speeds[(idx + 1) % speeds.length];
-        // If playing, restart with new speed
+      selectSpeed(speed) {
+        this.playbackSpeed = speed;
+        this.speedDropdownOpen = false;
         if (this.isPlaying) {
           this.stopPlayback();
           this.startPlayback();
