@@ -637,9 +637,44 @@
         return this.datesWithData.has(date);
       },
 
-      // ---- Real-Time Refresh (Task 5 overrides) ----
+      // ---- Real-Time Refresh ----
 
-      refreshDay() {},
+      async refreshDay() {
+        if (!this.isToday(this.currentDate)) return;
+        try {
+          const res = await fetch(`${EDGE_BASE_URL}/api/memories/by-day?date=${this.currentDate}`);
+          if (!res.ok) return;
+          const fresh = await res.json();
+          if (!Array.isArray(fresh)) return;
+
+          // Sort ascending (oldest first)
+          fresh.sort((a, b) => {
+            const ta = parseTimestamp(a.timestamp)?.getTime() || 0;
+            const tb = parseTimestamp(b.timestamp)?.getTime() || 0;
+            return ta - tb;
+          });
+
+          // Update existing frames by ID
+          const freshById = new Map(fresh.map(e => [e.id, e]));
+          for (let i = 0; i < this.frames.length; i++) {
+            const frame = this.frames[i];
+            if (!frame?.id) continue;
+            const updated = freshById.get(frame.id);
+            if (updated) {
+              this.frames[i] = updated;
+              freshById.delete(frame.id);
+            }
+          }
+
+          // Append new frames to end
+          const newFrames = Array.from(freshById.values());
+          if (newFrames.length > 0) {
+            this.frames.push(...newFrames);
+          }
+        } catch (_e) {
+          // Silent fail
+        }
+      },
 
       // ---- Playback (Task 6 overrides) ----
 
