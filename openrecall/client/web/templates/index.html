@@ -2,17 +2,6 @@
 
 {% block title %}MyRecall{% endblock %}
 
-{% block toolbar_center %}
-<div class="form-group">
-  <label for="start_time">Start Time</label>
-  <input type="datetime-local" id="start_time" name="start_time">
-</div>
-<div class="form-group">
-  <label for="end_time">End Time</label>
-  <input type="datetime-local" id="end_time" name="end_time">
-</div>
-{% endblock %}
-
 {% block extra_head %}
 <style>
   /* Soft color system variables */
@@ -69,6 +58,257 @@
   .form-group input:focus {
     outline: none;
     border-color: var(--accent-color);
+  }
+
+  /* =============================================
+     Day Header + Date Navigation
+     ============================================= */
+
+  .day-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 0;
+    margin-bottom: 8px;
+    border-bottom: 1px solid var(--border-color);
+  }
+
+  .day-title {
+    font-size: 20px;
+    font-weight: 600;
+    color: var(--text-primary);
+    letter-spacing: -0.3px;
+  }
+
+  .day-stats {
+    display: flex;
+    gap: 16px;
+    align-items: center;
+  }
+
+  .day-stat {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    color: var(--text-secondary);
+  }
+
+  .day-stat-value {
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-family: 'SF Mono', Monaco, Consolas, monospace;
+  }
+
+  .day-stat.completed .day-stat-value {
+    background: var(--color-success-bg);
+    color: #2A9D4A;
+  }
+
+  .day-stat.pending .day-stat-value {
+    background: var(--color-warning-bg);
+    color: #D4840D;
+  }
+
+  .day-stat.failed .day-stat-value {
+    background: rgba(255, 59, 48, 0.1);
+    color: #FF3B30;
+  }
+
+  /* Date Navigation Toolbar */
+  .date-nav-toolbar {
+    position: relative;
+  }
+
+  .today-btn {
+    font-size: 13px;
+    font-weight: 500;
+    padding: 6px 14px;
+    border-radius: 6px;
+    border: 1px solid var(--border-color);
+    background: var(--bg-card);
+    color: var(--text-primary);
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .today-btn:hover:not(:disabled) {
+    background: var(--accent-color);
+    color: white;
+    border-color: var(--accent-color);
+  }
+
+  .toolbar-nav-btn {
+    width: 32px;
+    height: 32px;
+    border-radius: 6px;
+    border: 1px solid var(--border-color);
+    background: var(--bg-card);
+    color: var(--text-primary);
+    font-size: 18px;
+    line-height: 1;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+    padding-bottom: 2px;
+  }
+
+  .toolbar-nav-btn:hover {
+    background: var(--icon-hover);
+    border-color: var(--accent-color);
+    color: var(--accent-color);
+  }
+
+  .date-picker-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 14px;
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+    background: var(--bg-card);
+    color: var(--text-primary);
+    font-size: 14px;
+    font-weight: 500;
+    font-family: var(--font-stack);
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .date-picker-btn:hover {
+    border-color: var(--accent-color);
+    background: rgba(0, 122, 255, 0.05);
+  }
+
+  /* Calendar Popover */
+  .calendar-popover {
+    position: absolute;
+    top: 44px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 280px;
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
+    padding: 16px;
+    z-index: 1002;
+    animation: popoverIn 0.2s ease-out forwards;
+  }
+
+  .calendar-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+  }
+
+  .calendar-nav {
+    width: 28px;
+    height: 28px;
+    border-radius: 6px;
+    border: none;
+    background: transparent;
+    color: var(--text-secondary);
+    font-size: 16px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+  }
+
+  .calendar-nav:hover {
+    background: var(--icon-hover);
+    color: var(--text-primary);
+  }
+
+  .calendar-title {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text-primary);
+  }
+
+  .calendar-weekdays {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 2px;
+    margin-bottom: 4px;
+  }
+
+  .calendar-weekdays span {
+    text-align: center;
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--text-tertiary);
+    padding: 4px;
+  }
+
+  .calendar-days {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 2px;
+  }
+
+  .calendar-day {
+    aspect-ratio: 1;
+    border: none;
+    border-radius: 8px;
+    background: transparent;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-primary);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    transition: all 0.15s;
+  }
+
+  .calendar-day:hover:not(:disabled) {
+    background: rgba(0, 122, 255, 0.1);
+  }
+
+  .calendar-day.is-other-month {
+    color: var(--text-tertiary);
+    opacity: 0.5;
+  }
+
+  .calendar-day.is-selected {
+    background: var(--accent-color);
+    color: white;
+  }
+
+  .calendar-day.is-today:not(.is-selected) {
+    border: 1.5px solid var(--accent-color);
+    color: var(--accent-color);
+  }
+
+  .calendar-day.has-data::after {
+    content: '';
+    position: absolute;
+    bottom: 3px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background: var(--accent-color);
+  }
+
+  .calendar-day:disabled {
+    cursor: default;
+    opacity: 0.2;
+  }
+
+  @keyframes popoverIn {
+    from { opacity: 0; transform: translateX(-50%) translateY(-8px); }
+    to { opacity: 1; transform: translateX(-50%) translateY(0); }
   }
 
   /* Spinner Animation */
@@ -1276,38 +1516,91 @@
 {% endblock %}
 
 {% block content %}
-<div x-data="memoryGrid()" x-init="init()" x-cloak>
+<div x-data="memoryGrid()" x-init="await init()" x-cloak>
+  <!-- Date Navigation Toolbar -->
+  <div class="date-nav-toolbar" style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px;">
+    <button type="button" class="toolbar-nav-btn today-btn" @click="goToday()" :disabled="isToday(currentDate)">
+      Today
+    </button>
+    <button type="button" class="toolbar-nav-btn" @click="prevDay()" title="Previous day">
+      ‹
+    </button>
+    <!-- Calendar wrapper: click.away on the parent so clicking the button does NOT close -->
+    <div @click.away="calendarOpen = false" style="position: relative;">
+      <button type="button" class="date-picker-btn" @click="toggleCalendar()">
+        <span>📅</span>
+        <span x-text="currentDate"></span>
+        <span style="font-size: 10px; opacity: 0.6;">▼</span>
+      </button>
+      <!-- Calendar Popover -->
+      <div x-show="calendarOpen" class="calendar-popover" x-cloak>
+        <div class="calendar-header">
+          <button type="button" class="calendar-nav" @click="prevMonth()">‹</button>
+          <span class="calendar-title" x-text="`${calendarYear}年${calendarMonth + 1}月`"></span>
+          <button type="button" class="calendar-nav" @click="nextMonth()">›</button>
+        </div>
+        <div class="calendar-weekdays">
+          <span>日</span><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span>
+        </div>
+        <div class="calendar-days">
+          <template x-for="day in calendarDays()" :key="day.date || `${calendarYear}-${calendarMonth}-${day.day}`">
+            <button
+              type="button"
+              class="calendar-day"
+              :class="{
+                'is-other-month': day.isOtherMonth,
+                'is-selected': day.date === currentDate,
+                'is-today': day.date && isToday(day.date),
+                'has-data': day.date && hasData(day.date)
+              }"
+              :disabled="!day.date"
+              @click="day.date && selectDate(day.date)"
+              x-text="day.day"
+            ></button>
+          </template>
+        </div>
+      </div>
+    </div>
+    <button type="button" class="toolbar-nav-btn" @click="nextDay()" title="Next day">
+      ›
+    </button>
+  </div>
+
+  <!-- Day Header -->
+  <div class="day-header">
+    <h2 class="day-title" x-text="formatDateDisplay(currentDate)"></h2>
+    <div class="day-stats">
+      <div class="day-stat completed">
+        <span>Completed</span>
+        <span class="day-stat-value" x-text="stats().completed"></span>
+      </div>
+      <div class="day-stat pending">
+        <span>Pending</span>
+        <span class="day-stat-value" x-text="stats().pending"></span>
+      </div>
+      <div class="day-stat failed">
+        <span>Failed</span>
+        <span class="day-stat-value" x-text="stats().failed"></span>
+      </div>
+      <button
+        type="button"
+        class="retry-failed-btn"
+        x-show="stats().failed > 0"
+        @click="retryFailed()"
+        :disabled="retrying"
+      >
+        <template x-if="!retrying">
+          <span>↻ Retry Failed</span>
+        </template>
+        <template x-if="retrying">
+          <span><span class="spinner"></span> Retrying...</span>
+        </template>
+      </button>
+    </div>
+  </div>
+
   <template x-if="entries.length > 0">
     <div>
-      <div class="stats-bar">
-        <div class="stat-item" data-status="completed">
-          <span>Completed</span>
-          <span class="stat-value" x-text="stats().completed"></span>
-        </div>
-        <div class="stat-item" data-status="pending">
-          <span>Pending</span>
-          <span class="stat-value" x-text="stats().pending"></span>
-        </div>
-        <div class="stat-item" data-status="failed">
-          <span>Failed</span>
-          <span class="stat-value" x-text="stats().failed"></span>
-        </div>
-        <button
-          type="button"
-          class="retry-failed-btn"
-          x-show="stats().failed > 0"
-          @click="retryFailed()"
-          :disabled="retrying"
-        >
-          <template x-if="!retrying">
-            <span>↻ Retry Failed</span>
-          </template>
-          <template x-if="retrying">
-            <span><span class="spinner"></span> Retrying...</span>
-          </template>
-        </button>
-      </div>
-
       <div class="memory-grid">
         <template x-for="(entry, i) in entries" :key="entry.id ?? (entry.timestamp + '-' + i)">
           <article class="memory-card" :data-frame-status="entry.status ? entry.status.toLowerCase() : 'pending'">
@@ -1690,7 +1983,8 @@
 
   <template x-if="entries.length === 0">
     <div class="empty-state">
-      Nothing recorded yet, wait a few seconds.
+      <div>No captures on <span x-text="currentDate"></span>.</div>
+      <div style="font-size: 13px; color: var(--text-tertiary); margin-top: 8px;">Select another date to browse history.</div>
     </div>
   </template>
 </div>
