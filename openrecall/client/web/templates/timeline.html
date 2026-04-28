@@ -570,14 +570,72 @@
         this.loadDay(date);
       },
 
-      // ---- Calendar (Task 4 overrides) ----
+      // ---- Calendar ----
 
-      async loadCalendarDates() {},
-      toggleCalendar() {},
-      prevMonth() {},
-      nextMonth() {},
-      calendarDays() { return []; },
-      hasData(date) { return false; },
+      async loadCalendarDates() {
+        const monthStr = `${this.calendarYear}-${String(this.calendarMonth + 1).padStart(2, '0')}`;
+        try {
+          const res = await fetch(`${EDGE_BASE_URL}/api/memories/dates?month=${monthStr}`);
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          const data = await res.json();
+          this.datesWithData = new Set(data.dates || []);
+        } catch (e) {
+          console.error('Failed to load calendar dates:', e);
+        }
+      },
+
+      toggleCalendar() {
+        this.calendarOpen = !this.calendarOpen;
+        if (this.calendarOpen) {
+          this.loadCalendarDates();
+        }
+      },
+
+      prevMonth() {
+        this.calendarMonth -= 1;
+        if (this.calendarMonth < 0) {
+          this.calendarMonth = 11;
+          this.calendarYear -= 1;
+        }
+        this.loadCalendarDates();
+      },
+
+      nextMonth() {
+        this.calendarMonth += 1;
+        if (this.calendarMonth > 11) {
+          this.calendarMonth = 0;
+          this.calendarYear += 1;
+        }
+        this.loadCalendarDates();
+      },
+
+      calendarDays() {
+        const firstDay = new Date(this.calendarYear, this.calendarMonth, 1);
+        const lastDay = new Date(this.calendarYear, this.calendarMonth + 1, 0);
+        const startOffset = firstDay.getDay();
+        const days = [];
+
+        const prevMonthLastDay = new Date(this.calendarYear, this.calendarMonth, 0).getDate();
+        for (let i = startOffset - 1; i >= 0; i--) {
+          days.push({ date: null, day: prevMonthLastDay - i, isOtherMonth: true });
+        }
+
+        for (let i = 1; i <= lastDay.getDate(); i++) {
+          const dateStr = `${this.calendarYear}-${String(this.calendarMonth + 1).padStart(2, '0')}-${String(i).padStart(2, '0')}`;
+          days.push({ date: dateStr, day: i, isOtherMonth: false });
+        }
+
+        const remaining = 42 - days.length;
+        for (let i = 1; i <= remaining; i++) {
+          days.push({ date: null, day: i, isOtherMonth: true });
+        }
+
+        return days;
+      },
+
+      hasData(date) {
+        return this.datesWithData.has(date);
+      },
 
       // ---- Real-Time Refresh (Task 5 overrides) ----
 
