@@ -1994,12 +1994,17 @@
 <script>
   function memoryGrid() {
     return {
-      entries: window.initialEntries || [],
+      entries: [],
       config: window.initialConfig || { show_ai_description: false },
+      currentDate: '',
+      datesWithData: new Set(),
+      calendarOpen: false,
+      calendarYear: 0,
+      calendarMonth: 0,
       lastCheckMs: 0,
       selectedIndex: null,
-      modalTab: 'image',  // Modal 默认显示图片 Tab
-      retrying: false,  // Retry button loading state
+      modalTab: 'image',
+      retrying: false,
 
       syncLastCheckFromEntries(list) {
         let maxMs = this.lastCheckMs;
@@ -2348,20 +2353,186 @@
         return '○';
       },
 
+      // ---- Date Navigation (new) ----
+
+      _formatDateStr(date) {
+        const y = date.getFullYear();
+        const m = String(date.getMonth() + 1).padStart(2, '0');
+        const d = String(date.getDate()).padStart(2, '0');
+        return `${y}-${m}-${d}`;
+      },
+
+      // Return current time as if in UTC+8, regardless of browser timezone.
+      _utc8Now() {
+        const now = new Date();
+        now.setMinutes(now.getMinutes() + now.getTimezoneOffset() + 480);
+        return now;
+      },
+
+      async loadDay(date) {
+        try {
+          const res = await fetch(`${EDGE_BASE_URL}/api/memories/by-day?date=${date}`);
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          const data = await res.json();
+          if (Array.isArray(data)) {
+            this.entries = data;
+            this.syncLastCheckFromEntries(data);
+          }
+        } catch (e) {
+          console.error('Failed to load day:', e);
+        }
+      },
+
+      prevDay() {
+        const [y, m, d] = this.currentDate.split('-').map(Number);
+        const date = new Date(y, m - 1, d);
+        date.setDate(date.getDate() - 1);
+        this.currentDate = this._formatDateStr(date);
+        this.loadDay(this.currentDate);
+      },
+
+      nextDay() {
+        const [y, m, d] = this.currentDate.split('-').map(Number);
+        const date = new Date(y, m - 1, d);
+        date.setDate(date.getDate() + 1);
+        this.currentDate = this._formatDateStr(date);
+        this.loadDay(this.currentDate);
+      },
+
+      goToday() {
+        const now = this._utc8Now();
+        this.currentDate = this._formatDateStr(now);
+        this.calendarYear = now.getFullYear();
+        this.calendarMonth = now.getMonth();
+        this.loadDay(this.currentDate);
+      },
+
+      isToday(date) {
+        return date === this._formatDateStr(this._utc8Now());
+      },
+
+      formatDateDisplay(date) {
+        const [y, m, day] = date.split('-').map(Number);
+        const d = new Date(y, m - 1, day);
+        const weekdays = ['日', '一', '二', '三', '四', '五', '六'];
+        return `${y}年${m}月${day}日（星期${weekdays[d.getDay()]}）`;
+      },
+
+      // ---- Calendar (new) ----
+
+      async loadCalendarDates() {
+        const monthStr = `${this.calendarYear}-${String(this.calendarMonth + 1).padStart(2, '0')}`;
+        try {
+          const res = await fetch(`${EDGE_BASE_URL}/api/memories/dates?month=${monthStr}`);
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          const data = await res.json();
+          this.datesWithData = new Set(data.dates || []);
+        } catch (e) {
+          console.error('Failed to load calendar dates:', e);
+        }
+      },
+
+      toggleCalendar() {
+        this.calendarOpen = !this.calendarOpen;
+        if (this.calendarOpen) {
+          this.loadCalendarDates();
+        }
+      },
+
+      selectDate(date) {
+        this.currentDate = date;
+        this.calendarOpen = false;
+        this.loadDay(date);
+      },
+
+      prevMonth() {
+        this.calendarMonth -= 1;
+        if (this.calendarMonth < 0) {
+          this.calendarMonth = 11;
+          this.calendarYear -= 1;
+        }
+        this.loadCalendarDates();
+      },
+
+      nextMonth() {
+        this.calendarMonth += 1;
+        if (this.calendarMonth > 11) {
+          this.calendarMonth = 0;
+          this.calendarYear += 1;
+        }
+        this.loadCalendarDates();
+      },
+
+      calendarDays() {
+        const firstDay = new Date(this.calendarYear, this.calendarMonth, 1);
+        const lastDay = new Date(this.calendarYear, this.calendarMonth + 1, 0);
+        const startOffset = firstDay.getDay();
+        const days = [];
+
+        const prevMonthLastDay = new Date(this.calendarYear, this.calendarMonth, 0).getDate();
+        for (let i = startOffset - 1; i >= 0; i--) {
+          days.push({ date: null, day: prevMonthLastDay - i, isOtherMonth: true });
+        }
+
+        for (let i = 1; i <= lastDay.getDate(); i++) {
+          const dateStr = `${this.calendarYear}-${String(this.calendarMonth + 1).padStart(2, '0')}-${String(i).padStart(2, '0')}`;
+          days.push({ date: dateStr, day: i, isOtherMonth: false });
+        }
+
+        const remaining = 42 - days.length;
+        for (let i = 1; i <= remaining; i++) {
+          days.push({ date: null, day: i, isOtherMonth: true });
+        }
+
+        return days;
+      },
+
+      hasData(date) {
+        return this.datesWithData.has(date);
+      },
+
+      async refreshCurrentDay() {
+        if (!this.isToday(this.currentDate)) return;
+        try {
+          const res = await fetch(`${EDGE_BASE_URL}/api/memories/by-day?date=${this.currentDate}`);
+          if (!res.ok) return;
+          const fresh = await res.json();
+          if (!Array.isArray(fresh)) return;
+          const freshById = new Map(fresh.map(e => [e.id, e]));
+          for (let i = 0; i < this.entries.length; i++) {
+            const entry = this.entries[i];
+            if (!entry?.id) continue;
+            const updated = freshById.get(entry.id);
+            if (updated) {
+              this.entries[i] = updated;
+            }
+          }
+          const existingIds = new Set(this.entries.map(e => e.id).filter(Boolean));
+          const newItems = fresh.filter(e => e.id && !existingIds.has(e.id));
+          if (newItems.length > 0) {
+            this.entries.unshift(...newItems);
+            this.syncLastCheckFromEntries(newItems);
+          }
+        } catch (_e) {
+          // Silent fail
+        }
+      },
+
       get selectedEntry() {
         if (this.selectedIndex === null) return null;
         return this.entries[this.selectedIndex] || null;
       },
 
-      init() {
-        this.syncLastCheckFromEntries(this.entries);
+      async init() {
+        const now = this._utc8Now();
+        this.currentDate = this._formatDateStr(now);
+        this.calendarYear = now.getFullYear();
+        this.calendarMonth = now.getMonth();
 
-        // 立即获取数据，避免 5 秒延迟
-        this.refreshRecent();
+        await this.loadDay(this.currentDate);
 
         window.addEventListener("openrecall-config-changed", () => {
-          this.refreshRecent();
-          setTimeout(() => this.refreshRecent(), 500);
+          this.loadDay(this.currentDate);
         });
 
         window.addEventListener("keydown", (e) => {
@@ -2373,7 +2544,7 @@
 
         setInterval(() => {
           this.checkNew();
-          this.refreshRecent();
+          this.refreshCurrentDay();
         }, 5000);
       },
 
@@ -2388,6 +2559,8 @@
       },
 
       async checkNew() {
+        if (!this.isToday(this.currentDate)) return;
+
         try {
           const sinceIso = this.lastCheckMs > 0
             ? this.formatLocalSince(this.lastCheckMs)
@@ -2416,51 +2589,6 @@
         }
       },
 
-      async refreshRecent() {
-        try {
-          const res = await fetch(`${EDGE_BASE_URL}/api/memories/recent?limit=500`);
-          if (!res.ok) return;
-          const recent = await res.json();
-          if (!Array.isArray(recent) || recent.length === 0) return;
-
-          const indexById = new Map();
-          for (let i = 0; i < this.entries.length; i += 1) {
-            const id = this.entries[i]?.id;
-            if (id === undefined || id === null) continue;
-            indexById.set(id, i);
-          }
-
-          const toPrepend = [];
-          for (const entry of recent) {
-            const id = entry?.id;
-            if (id === undefined || id === null) continue;
-            const idx = indexById.get(id);
-            if (idx === undefined) {
-              toPrepend.push(entry);
-              continue;
-            }
-
-            const existing = this.entries[idx];
-            this.entries[idx] = { ...existing, ...entry };
-          }
-
-          if (toPrepend.length > 0) {
-            const existingIds = new Set(indexById.keys());
-            const unique = toPrepend.filter((e) => !existingIds.has(e.id));
-            if (unique.length > 0) {
-              if (this.selectedIndex !== null) {
-                this.selectedIndex += unique.length;
-              }
-              this.entries.unshift(...unique);
-            }
-          }
-
-          this.syncLastCheckFromEntries(recent);
-        } catch (_e) {
-          return;
-        }
-      },
-
       async retryFailed() {
         if (this.retrying) return;
 
@@ -2473,7 +2601,7 @@
             const data = await res.json();
             console.log('Retry triggered:', data);
             // Refresh the grid to show updated statuses
-            await this.refreshRecent();
+            await this.loadDay(this.currentDate);
           } else {
             console.error('Retry failed:', res.status);
           }
