@@ -2397,7 +2397,12 @@
           const data = await res.json();
           if (Array.isArray(data)) {
             this.entries = data;
-            this.syncLastCheckFromEntries(data);
+            if (data.length > 0) {
+              this.syncLastCheckFromEntries(data);
+            } else {
+              // Prevent checkNew() from fetching all history when current day is empty
+              this.lastCheckMs = Date.now();
+            }
           }
         } catch (e) {
           console.error('Failed to load day:', e);
