@@ -325,7 +325,12 @@ function timelineView() {
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
         if (Array.isArray(data)) {
-          this.frames = data;
+          // Sort ascending (oldest first) for timeline playback
+          this.frames = data.sort((a, b) => {
+            const ta = parseTimestamp(a.timestamp)?.getTime() || 0;
+            const tb = parseTimestamp(b.timestamp)?.getTime() || 0;
+            return ta - tb;
+          });
           this.currentIndex = 0;
         }
       } catch (e) {
@@ -512,12 +517,76 @@ git commit -m "feat(timeline): add calendar interaction logic"
 
 ---
 
-## Task 5: Implement Playback Controls
+## Task 5: Add Real-Time Refresh
 
 **Files:**
 - Modify: `openrecall/client/web/templates/timeline.html`
 
-Add playback methods to `timelineView()`. Insert after `hasData()` and before `init()`:
+Add `refreshDay()` method to `timelineView()`. Insert after `hasData()` and before the playback methods:
+
+```javascript
+// ---- Real-Time Refresh ----
+
+async refreshDay() {
+  if (!this.isToday(this.currentDate)) return;
+  try {
+    const res = await fetch(`${EDGE_BASE_URL}/api/memories/by-day?date=${this.currentDate}`);
+    if (!res.ok) return;
+    const fresh = await res.json();
+    if (!Array.isArray(fresh)) return;
+
+    // Sort ascending (oldest first)
+    fresh.sort((a, b) => {
+      const ta = parseTimestamp(a.timestamp)?.getTime() || 0;
+      const tb = parseTimestamp(b.timestamp)?.getTime() || 0;
+      return ta - tb;
+    });
+
+    // Update existing frames by ID
+    const freshById = new Map(fresh.map(e => [e.id, e]));
+    for (let i = 0; i < this.frames.length; i++) {
+      const frame = this.frames[i];
+      if (!frame?.id) continue;
+      const updated = freshById.get(frame.id);
+      if (updated) {
+        this.frames[i] = updated;
+        freshById.delete(frame.id);
+      }
+    }
+
+    // Append new frames to end
+    const newFrames = Array.from(freshById.values());
+    if (newFrames.length > 0) {
+      this.frames.push(...newFrames);
+    }
+  } catch (_e) {
+    // Silent fail
+  }
+},
+```
+
+- [ ] **Step 1: Add `refreshDay()` method to timelineView()**
+
+- [ ] **Step 2: Verify template compiles**
+
+Run: `python -c "from openrecall.client.web.app import app; print('OK')"`
+Expected: `OK`
+
+- [ ] **Step 3: Commit**
+
+```bash
+git add openrecall/client/web/templates/timeline.html
+git commit -m "feat(timeline): add real-time day refresh"
+```
+
+---
+
+## Task 6: Implement Playback Controls
+
+**Files:**
+- Modify: `openrecall/client/web/templates/timeline.html`
+
+Add playback methods to `timelineView()`. Insert after `refreshDay()` and before `init()`:
 
 ```javascript
 // ---- Playback ----
@@ -583,6 +652,11 @@ async init() {
 
   await this.loadDay(this.currentDate);
 
+  // Real-time refresh: every 5 seconds check for new frames
+  setInterval(() => {
+    this.refreshDay();
+  }, 5000);
+
   // Keyboard navigation
   window.addEventListener('keydown', (e) => {
     if (e.key === 'ArrowLeft') {
@@ -605,7 +679,7 @@ async init() {
 
 - [ ] **Step 1: Add playback methods to timelineView()**
 
-- [ ] **Step 2: Update init() with keyboard support**
+- [ ] **Step 2: Update init() with keyboard support and refresh timer**
 
 - [ ] **Step 3: Verify template compiles**
 
@@ -624,6 +698,8 @@ With client running, open `http://localhost:8889/timeline`:
 6. Press ← → → moves frame by frame, pauses playback
 7. Drag slider → pauses playback
 8. Let it play to last frame → auto-stops
+9. On "today", wait 5s after new capture → frame count increases (real-time refresh)
+10. Switch to past day → wait 5s → no refresh occurs
 
 - [ ] **Step 5: Commit**
 
@@ -634,7 +710,7 @@ git commit -m "feat(timeline): add playback controls with keyboard support"
 
 ---
 
-## Task 6: Polish and Final Verification
+## Task 7: Polish and Final Verification
 
 **Files:**
 - Modify: `openrecall/client/web/templates/timeline.html`
@@ -693,7 +769,9 @@ With client running, verify all of these on `http://localhost:8889/timeline`:
 | 18 | Spacebar toggles playback | Play/pause |
 | 19 | Switching days stops playback | Play stops, new day loads |
 | 20 | Empty day shows message | "No captures on..." |
-| 21 | Responsive layout | No horizontal scroll on mobile |
+| 21 | Real-time refresh (today only) | New frames auto-append while on today |
+| 22 | Real-time refresh (other day) | No refresh when viewing past day |
+| 23 | Responsive layout | No horizontal scroll on mobile |
 
 - [ ] **Step 3: Commit final polish**
 
@@ -711,13 +789,14 @@ git commit -m "feat(timeline): add cleanup and finalize playback controls"
 | 日历导航栏（Today/‹/›/日期选择器） | Task 2 | ✅ |
 | 日历弹出（月份导航、有数据标记、选中态） | Task 2, 4 | ✅ |
 | 复用 Grid CSS 样式 | Task 1 | ✅ |
-| 按天加载数据 `/api/memories/by-day` | Task 3 | ✅ |
-| 播放/暂停按钮 | Task 2, 5 | ✅ |
-| 倍速切换（1x/2x/5x/10x） | Task 2, 5 | ✅ |
-| 滑块自动跟随播放 | Task 5 | ✅ |
-| 播放到达最后一帧自动停止 | Task 5 | ✅ |
-| 拖动滑块自动暂停 | Task 5 | ✅ |
-| 键盘支持（← → 空格） | Task 5 | ✅ |
+| 按天加载数据 `/api/memories/by-day`（升序排序） | Task 3 | ✅ |
+| 播放/暂停按钮 | Task 2, 6 | ✅ |
+| 倍速切换（1x/2x/5x/10x） | Task 2, 6 | ✅ |
+| 滑块自动跟随播放 | Task 6 | ✅ |
+| 播放到达最后一帧自动停止 | Task 6 | ✅ |
+| 拖动滑块自动暂停 | Task 6 | ✅ |
+| 键盘支持（← → 空格） | Task 6 | ✅ |
+| 实时刷新（每 5 秒） | Task 5 | ✅ |
 | 空状态显示 | Task 2 | ✅ |
 | UTC+8 时区处理 | Task 3 | ✅ |
 | 无需后端改动 | — | ✅ |
