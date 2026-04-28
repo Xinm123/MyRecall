@@ -154,13 +154,12 @@
   }
 
   .calendar-nav {
-    width: 28px;
-    height: 28px;
-    border-radius: 6px;
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
     border: none;
     background: transparent;
-    color: var(--text-secondary);
-    font-size: 16px;
+    color: var(--text-tertiary);
     cursor: pointer;
     display: flex;
     align-items: center;
@@ -169,8 +168,12 @@
   }
 
   .calendar-nav:hover {
-    background: var(--icon-hover);
-    color: var(--text-primary);
+    background: rgba(0, 122, 255, 0.06);
+    color: var(--accent-color);
+  }
+
+  .calendar-nav svg {
+    display: block;
   }
 
   .calendar-title {
@@ -363,9 +366,13 @@
       <!-- Calendar Popover -->
       <div x-show="calendarOpen" class="calendar-popover" x-cloak>
         <div class="calendar-header">
-          <button type="button" class="calendar-nav" @click="prevMonth()">&#8249;</button>
+          <button type="button" class="calendar-nav" @click="prevMonth()" aria-label="Previous month">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+          </button>
           <span class="calendar-title" x-text="`${calendarYear}&#24180;${calendarMonth + 1}&#26376;`"></span>
-          <button type="button" class="calendar-nav" @click="nextMonth()">&#8250;</button>
+          <button type="button" class="calendar-nav" @click="nextMonth()" aria-label="Next month">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+          </button>
         </div>
         <div class="calendar-weekdays">
           <span>&#26085;</span><span>&#19968;</span><span>&#20108;</span><span>&#19977;</span><span>&#22235;</span><span>&#20116;</span><span>&#20845;</span>

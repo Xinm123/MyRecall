@@ -209,13 +209,12 @@
   }
 
   .calendar-nav {
-    width: 28px;
-    height: 28px;
-    border-radius: 6px;
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
     border: none;
     background: transparent;
-    color: var(--text-secondary);
-    font-size: 16px;
+    color: var(--text-tertiary);
     cursor: pointer;
     display: flex;
     align-items: center;
@@ -224,8 +223,12 @@
   }
 
   .calendar-nav:hover {
-    background: var(--icon-hover);
-    color: var(--text-primary);
+    background: rgba(0, 122, 255, 0.06);
+    color: var(--accent-color);
+  }
+
+  .calendar-nav svg {
+    display: block;
   }
 
   .calendar-title {
@@ -1551,9 +1554,13 @@
       <!-- Calendar Popover -->
       <div x-show="calendarOpen" class="calendar-popover" x-cloak>
         <div class="calendar-header">
-          <button type="button" class="calendar-nav" @click="prevMonth()">‹</button>
+          <button type="button" class="calendar-nav" @click="prevMonth()" aria-label="Previous month">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+          </button>
           <span class="calendar-title" x-text="`${calendarYear}年${calendarMonth + 1}月`"></span>
-          <button type="button" class="calendar-nav" @click="nextMonth()">›</button>
+          <button type="button" class="calendar-nav" @click="nextMonth()" aria-label="Next month">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+          </button>
         </div>
         <div class="calendar-weekdays">
           <span>日</span><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span>
@@ -2577,13 +2584,12 @@
       },
 
       formatLocalSince(ms) {
-        const d = new Date(ms);
-        // Convert to UTC+8 wall clock components
-        const utc = d.getTime() + d.getTimezoneOffset() * 60000;
-        const local = new Date(utc + 8 * 3600 * 1000);
+        // ms is a UTC timestamp; add 8h to get the UTC+8 wall-clock Date,
+        // then read its UTC components to avoid double-applying browser offset.
+        const d = new Date(ms + 8 * 60 * 60 * 1000);
         const pad = (v) => String(v).padStart(2, '0');
-        return `${local.getUTCFullYear()}-${pad(local.getUTCMonth() + 1)}-${pad(local.getUTCDate())}T`
-             + `${pad(local.getUTCHours())}:${pad(local.getUTCMinutes())}:${pad(local.getUTCSeconds())}.${String(local.getUTCMilliseconds()).padStart(3, '0')}`;
+        return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}T`
+             + `${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}:${pad(d.getUTCSeconds())}.${String(d.getUTCMilliseconds()).padStart(3, '0')}`;
       },
 
       async checkNew() {
