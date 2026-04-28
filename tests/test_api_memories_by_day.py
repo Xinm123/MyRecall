@@ -36,3 +36,21 @@ def test_memories_dates_returns_dates(flask_client):
     data = resp.get_json()
     assert "dates" in data
     assert isinstance(data["dates"], list)
+    for d in data["dates"]:
+        assert isinstance(d, str)
+        assert len(d) == 10
+        assert d.count("-") == 2
+
+
+def test_memories_by_day_valid_date(flask_client):
+    """Returns 200 and list of properly structured frames for valid date."""
+    resp = flask_client.get("/api/memories/by-day?date=2026-04-28")
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert isinstance(data, list)
+    for item in data:
+        assert "frame_id" in item
+        assert "timestamp" in item
+        assert "visibility_status" in item
+        assert "status" in item
+        assert "app_name" in item

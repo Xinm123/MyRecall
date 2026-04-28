@@ -888,7 +888,7 @@ class FramesStore:
                     FROM frames f
                     LEFT JOIN ocr_text o ON f.id = o.frame_id
                     LEFT JOIN frame_descriptions fd ON f.id = fd.frame_id
-                    WHERE DATE(f.local_timestamp) = ?
+                    WHERE DATE(f.local_timestamp) = ? AND f.snapshot_path IS NOT NULL
                     ORDER BY f.local_timestamp DESC
                     """,
                     (date,),
@@ -955,10 +955,10 @@ class FramesStore:
                     """
                     SELECT DISTINCT DATE(local_timestamp) AS date
                     FROM frames
-                    WHERE DATE(local_timestamp) LIKE ?
+                    WHERE local_timestamp >= ? AND local_timestamp < ?
                     ORDER BY date
                     """,
-                    (f"{month}-%",),
+                    (f"{month}-01", f"{int(month[:4]) + (1 if month[5:] == '12' else 0)}-{str(int(month[5:]) % 12 + 1).zfill(2)}-01"),
                 ).fetchall()
                 return [row["date"] for row in rows]
         except sqlite3.Error as e:

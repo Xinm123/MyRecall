@@ -7,6 +7,7 @@ Provides HTTP endpoints for client-server communication:
 
 import json
 import logging
+import re
 import time
 import uuid
 from pathlib import Path
@@ -221,8 +222,6 @@ def memories_by_day():
     Returns:
         JSON list of frame dicts (same format as /api/memories/recent).
     """
-    import re
-
     date_str = (request.args.get("date") or "").strip()
     if not date_str:
         return jsonify({"status": "error", "message": "Query parameter 'date' is required"}), 400
@@ -250,8 +249,6 @@ def memories_dates():
     Returns:
         JSON {"dates": ["YYYY-MM-DD", ...]}.
     """
-    import re
-
     month_str = (request.args.get("month") or "").strip()
     if not month_str:
         return jsonify({"status": "error", "message": "Query parameter 'month' is required"}), 400
