@@ -240,6 +240,35 @@ def memories_by_day():
         return jsonify({"status": "error", "message": str(e)}), 500
 
 
+@api_bp.route("/memories/dates", methods=["GET"])
+def memories_dates():
+    """Return dates in a month that have frame captures.
+
+    Query Params:
+        month: Month in YYYY-MM format.
+
+    Returns:
+        JSON {"dates": ["YYYY-MM-DD", ...]}.
+    """
+    import re
+
+    month_str = (request.args.get("month") or "").strip()
+    if not month_str:
+        return jsonify({"status": "error", "message": "Query parameter 'month' is required"}), 400
+    if not re.match(r"^\d{4}-\d{2}$", month_str):
+        return (
+            jsonify({"status": "error", "message": "Query parameter 'month' must be in YYYY-MM format"}),
+            400,
+        )
+
+    try:
+        dates = frames_store.get_dates_with_data(month=month_str)
+        return jsonify({"dates": dates}), 200
+    except Exception as e:
+        logger.exception("Error fetching dates with data")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
 @api_bp.route("/queue/status", methods=["GET"])
 def queue_status():
     """Get current processing queue status (debug endpoint).
