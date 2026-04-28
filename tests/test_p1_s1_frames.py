@@ -204,3 +204,33 @@ def test_query_by_local_timestamp(test_store):
     assert "App2" in app_names
     assert "App3" in app_names
     assert "App1" not in app_names
+
+
+def test_get_frames_by_day(test_store):
+    """get_frames_by_day returns frames for a specific date."""
+    frame_id, _ = test_store.claim_frame(
+        capture_id="test-cap-day",
+        metadata={
+            "timestamp": "2026-04-28T02:00:00.000Z",
+            "app_name": "TestApp",
+            "capture_trigger": "idle",
+        },
+    )
+    with test_store._connect() as conn:
+        conn.execute(
+            "UPDATE frames SET snapshot_path = ?, status = 'completed' WHERE id = ?",
+            ("/tmp/test.jpg", frame_id),
+        )
+        conn.commit()
+    result = test_store.get_frames_by_day("2026-04-28")
+    assert len(result) >= 1
+    assert result[0]["frame_id"] == frame_id
+    # All expected fields present
+    assert "app_name" in result[0]
+    assert "visibility_status" in result[0]
+
+
+def test_get_frames_by_day_empty(test_store):
+    """get_frames_by_day returns empty list for date with no frames."""
+    result = test_store.get_frames_by_day("1999-01-01")
+    assert result == []

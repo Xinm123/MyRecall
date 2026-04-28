@@ -844,6 +844,102 @@ class FramesStore:
             logger.error("get_recent_memories failed: %s", e)
         return memories
 
+    def get_frames_by_day(self, date: str) -> list[dict[str, object]]:
+        """Retrieve all frames for a specific day.
+
+        Args:
+            date: Date string in YYYY-MM-DD format.
+
+        Returns:
+            List of dicts with frame data formatted for UI consumption.
+            Includes OCR-related fields via LEFT JOIN (P1-S3).
+        """
+        frames = []
+
+        try:
+            with self._connect() as conn:
+                rows = conn.execute(
+                    """
+                    SELECT f.id, f.capture_id, f.local_timestamp AS timestamp, f.app_name, f.window_name,
+                           f.snapshot_path, f.status, f.ingested_at, f.last_known_app,
+                           f.last_known_window, f.text_source, f.processed_at,
+                           f.capture_trigger, f.device_name, f.error_message,
+                           f.accessibility_text, f.ocr_text, f.browser_url, f.focused,
+                           f.description_status, f.embedding_status, f.visibility_status,
+                           LENGTH(f.accessibility_text) as accessibility_text_length,
+                           LENGTH(f.ocr_text) as ocr_text_length,
+                           o.text_length, o.ocr_engine,
+                           CASE
+                             WHEN f.text_source = 'accessibility' THEN SUBSTR(f.accessibility_text, 1, 100)
+                             WHEN f.text_source = 'ocr' THEN SUBSTR(f.ocr_text, 1, 100)
+                             ELSE NULL
+                           END AS text_preview,
+                           CASE
+                             WHEN f.text_source = 'accessibility' THEN LENGTH(f.accessibility_text)
+                             WHEN f.text_source = 'ocr' THEN LENGTH(f.ocr_text)
+                             ELSE 0
+                           END AS text_length_computed,
+                           fd.narrative, fd.summary,
+                           CASE
+                             WHEN fd.narrative IS NOT NULL OR fd.summary IS NOT NULL
+                               THEN LENGTH(COALESCE(fd.narrative, '') || ' ' || COALESCE(fd.summary, ''))
+                             ELSE 0
+                           END AS description_length
+                    FROM frames f
+                    LEFT JOIN ocr_text o ON f.id = o.frame_id
+                    LEFT JOIN frame_descriptions fd ON f.id = fd.frame_id
+                    WHERE DATE(f.local_timestamp) = ?
+                    ORDER BY f.local_timestamp DESC
+                    """,
+                    (date,),
+                ).fetchall()
+
+                for row in rows:
+                    ts = row["timestamp"]
+                    frames.append(
+                        {
+                            "id": row["id"],
+                            "frame_id": row["id"],
+                            "capture_id": row["capture_id"],
+                            "timestamp": ts,
+                            "app": row["app_name"] or "",
+                            "title": row["window_name"] or "",
+                            "status": (row["status"] or "pending").upper(),
+                            "filename": f"{ts}.jpg",
+                            "app_name": row["app_name"] or "",
+                            "window_title": row["window_name"] or "",
+                            "last_known_app": row["last_known_app"] or "",
+                            "last_known_window": row["last_known_window"] or "",
+                            # Text source and content
+                            "text_source": row["text_source"] or "",
+                            "text_length": row["text_length_computed"] or 0,
+                            "accessibility_text": row["accessibility_text"] or "",
+                            "ocr_text": row["ocr_text"] or "",
+                            "text_preview": row["text_preview"] or "",
+                            "ocr_engine": row["ocr_engine"] or "",
+                            # Additional metadata
+                            "browser_url": row["browser_url"] or "",
+                            "focused": bool(row["focused"]) if row["focused"] is not None else False,
+                            "processed_at": row["processed_at"] or "",
+                            "capture_trigger": row["capture_trigger"] or "",
+                            "device_name": row["device_name"] or "",
+                            "error_message": row["error_message"] or "",
+                            # Description status (P1-S3+)
+                            "description_status": row["description_status"] or "",
+                            "description_text": (row["narrative"] if row["narrative"] else row["summary"]) or "",
+                            "description_length": row["description_length"] or 0,
+                            # Embedding status and text lengths (Task 8)
+                            "embedding_status": row["embedding_status"] or "",
+                            "accessibility_text_length": row["accessibility_text_length"] or 0,
+                            "ocr_text_length": row["ocr_text_length"] or 0,
+                            # Visibility status (combined OCR + description + embedding)
+                            "visibility_status": row["visibility_status"] or "pending",
+                        }
+                    )
+        except sqlite3.Error as e:
+            logger.error("get_frames_by_day failed: %s", e)
+        return frames
+
     def get_timeline_frames(self, limit: int = 5000) -> list[dict[str, object]]:
         """Retrieve frames for timeline view.
 
