@@ -30,16 +30,16 @@
     color: var(--text-primary);
     display: flex;
     align-items: center;
-    justify-content: space-between;
+    justify-content: center;
+    position: relative;
     width: 86%;
-    gap: 12px;
+    min-height: 32px;
   }
 
   .slider-info {
     display: flex;
     align-items: center;
     gap: 8px;
-    flex-shrink: 0;
   }
 
   .image-container {
@@ -291,7 +291,10 @@
     display: flex;
     align-items: center;
     gap: 8px;
-    flex-shrink: 0;
+    position: absolute;
+    right: 0;
+    top: 50%;
+    transform: translateY(-50%);
   }
 
   .play-btn {
