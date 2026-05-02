@@ -150,7 +150,7 @@ class HybridSearchEngine:
                 "score": cosine_score,
                 "cosine_score": cosine_score,
                 "timestamp": frame["timestamp"],  # local time from get_frames_by_ids
-                "text": frame.get("full_text", "")[:200] if frame.get("full_text") else "",
+                "text": frame.get("full_text", "") or "",
                 "text_source": frame.get("text_source", "ocr"),
                 "app_name": frame.get("app_name", ""),
                 "window_name": frame.get("window_name", ""),
@@ -294,7 +294,7 @@ class HybridSearchEngine:
                 "fts_score": fts_bm25_scores.get(frame_id),  # BM25 score from FTS results
                 "fts_rank": fts_ranks.get(frame_id),  # Rank in FTS search results
                 "timestamp": frame["timestamp"],  # local time from get_frames_by_ids
-                "text": frame.get("full_text", "")[:200] if frame.get("full_text") else "",
+                "text": frame.get("full_text", "") or "",
                 "text_source": frame.get("text_source", "ocr"),
                 "app_name": frame.get("app_name", ""),
                 "window_name": frame.get("window_name", ""),

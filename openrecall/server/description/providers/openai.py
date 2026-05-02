@@ -8,6 +8,7 @@ from pathlib import Path
 import requests
 
 from openrecall.server.description.models import FrameDescription, FrameContext
+from openrecall.server.description.prompts import build_description_prompt, PROMPT_VERSION
 from openrecall.server.description.providers.base import (
     DescriptionProvider,
     DescriptionProviderRequestError,
@@ -17,23 +18,6 @@ from openrecall.server.ai.providers import _normalize_api_base
 from openrecall.shared.config import settings
 
 logger = logging.getLogger(__name__)
-
-_PROMPT_TEXT = (
-    'Output a strictly valid JSON object:\n'
-    '{"narrative": "detailed description (max 2048 chars)", '
-    '"summary": "one sentence (max 256 chars)", '
-    '"tags": ["keyword1", "keyword2", ...]}  // 3-8 lowercase keywords'
-)
-
-# Add example output
-_EXAMPLE_OUTPUT = '''
-Example output:
-{
-  "narrative": "User is browsing GitHub repository page showing README content with project description and installation instructions.",
-  "summary": "Browsing GitHub repository README",
-  "tags": ["github", "repository", "readme", "browsing", "documentation"]
-}
-'''
 
 
 class OpenAIDescriptionProvider(DescriptionProvider):
@@ -57,29 +41,17 @@ class OpenAIDescriptionProvider(DescriptionProvider):
         image_bytes = path.read_bytes()
         encoded = base64.b64encode(image_bytes).decode("ascii")
 
-        ctx_parts = []
-        if context.app_name:
-            ctx_parts.append(f"App: {context.app_name}")
-        if context.window_name:
-            ctx_parts.append(f"Window: {context.window_name}")
-        if context.browser_url:
-            ctx_parts.append(f"URL: {context.browser_url}")
-        ctx_str = " | ".join(ctx_parts) if ctx_parts else "unknown"
-
         url = f"{self.api_base}/chat/completions"
         headers = {"Content-Type": "application/json"}
         if self.api_key:
             headers["Authorization"] = f"Bearer {self.api_key}"
 
-        prompt_content = (
-            f"Analyze this screenshot. App context: {ctx_str}.\n"
-            f"{_PROMPT_TEXT}\n"
-            f"{_EXAMPLE_OUTPUT}\n"
-            "IMPORTANT: Output only valid JSON. No markdown, no explanation."
-        )
+        prompt_content = build_description_prompt()
 
         payload = {
             "model": self.model_name,
+            "temperature": 0.2,
+            "max_tokens": 512,
             "messages": [
                 {
                     "role": "user",
@@ -125,11 +97,11 @@ class OpenAIDescriptionProvider(DescriptionProvider):
                 original_summary = parsed.get("summary", "")
                 tags = parsed.get("tags", [])
 
-                narrative = original_narrative[:1024]
+                narrative = original_narrative[:2048]
                 summary = original_summary[:256]
 
-                if len(original_narrative) > 1024:
-                    logger.warning(f"Narrative truncated from {len(original_narrative)} to 1024 chars")
+                if len(original_narrative) > 2048:
+                    logger.warning(f"Narrative truncated from {len(original_narrative)} to 2048 chars")
                 if len(original_summary) > 256:
                     logger.warning(f"Summary truncated from {len(original_summary)} to 256 chars")
 
@@ -141,7 +113,7 @@ class OpenAIDescriptionProvider(DescriptionProvider):
                 else:
                     tags = []
 
-                logger.info(f"Description generated in {elapsed:.2f}s: {len(narrative)} chars, {len(tags)} tags")
+                logger.info(f"[PromptVersion:{PROMPT_VERSION}] Description generated in {elapsed:.2f}s: {len(narrative)} chars, {len(tags)} tags")
                 return FrameDescription(
                     narrative=narrative,
                     summary=summary,
@@ -151,11 +123,11 @@ class OpenAIDescriptionProvider(DescriptionProvider):
             pass
 
         logger.warning(f"Failed to parse JSON from OpenAIDescriptionProvider. Raw: {raw[:100]}...")
-        fallback_narrative = raw[:1024]
+        fallback_narrative = raw[:2048]
         fallback_summary = raw[:256]
-        if len(raw) > 1024:
-            logger.warning(f"Fallback narrative truncated from {len(raw)} to 1024 chars")
-        logger.info(f"Description generated (fallback) in {elapsed:.2f}s: {len(fallback_narrative)} chars")
+        if len(raw) > 2048:
+            logger.warning(f"Fallback narrative truncated from {len(raw)} to 2048 chars")
+        logger.info(f"[PromptVersion:{PROMPT_VERSION}] Description generated (fallback) in {elapsed:.2f}s: {len(fallback_narrative)} chars")
         return FrameDescription(
             narrative=fallback_narrative,
             summary=fallback_summary,

@@ -2540,6 +2540,10 @@
             if (!entry?.id) continue;
             const updated = freshById.get(entry.id);
             if (updated) {
+              // Preserve description object fetched from /v1/frames/{id}/context
+              if (entry.description) {
+                updated.description = entry.description;
+              }
               this.entries[i] = updated;
             }
           }

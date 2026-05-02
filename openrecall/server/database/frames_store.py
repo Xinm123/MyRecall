@@ -1862,12 +1862,12 @@ class FramesStore:
 
         Returns:
             - frame_id, timestamp, app_name, window_name: frame metadata
-            - text: accessibility_text or ocr_text, truncated at MAX_TEXT_LENGTH chars
+            - text: accessibility_text or ocr_text, middle-truncated at MAX_TEXT_LENGTH chars
             - text_source: 'accessibility' | 'ocr' | 'hybrid' | None
             - urls: extracted from text via regex
             - browser_url, status, visibility_status: frame metadata
 
-        Text is always truncated at MAX_TEXT_LENGTH (5000) chars with "..." suffix.
+        Text is always middle-truncated at MAX_TEXT_LENGTH (5000) chars when exceeding the limit.
         """
         try:
             with self._connect() as conn:
@@ -1906,10 +1906,12 @@ class FramesStore:
                     if url not in urls:
                         urls.append(url)
 
-                # Apply fixed text truncation at MAX_TEXT_LENGTH
+                # Apply fixed text truncation at MAX_TEXT_LENGTH with middle-truncation
                 result_text = text
                 if len(result_text) > self.MAX_TEXT_LENGTH:
-                    result_text = result_text[:self.MAX_TEXT_LENGTH] + "..."
+                    half = self.MAX_TEXT_LENGTH // 2
+                    removed = len(result_text) - self.MAX_TEXT_LENGTH
+                    result_text = result_text[:half] + f"...{removed} chars..." + result_text[-half:]
 
                 return {
                     "frame_id": frame_id_val,

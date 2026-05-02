@@ -743,12 +743,14 @@ def get_frame_context(frame_id: int):
 
     # Add description if completed
     description = None
+    description_status = None
     try:
         with store._connect() as conn:
             row = conn.execute(
                 "SELECT description_status FROM frames WHERE id = ?",
                 (frame_id,),
             ).fetchone()
+            description_status = row["description_status"] if row else None
             if row and row["description_status"] == "completed":
                 desc_row = store.get_frame_description(conn, frame_id)
                 if desc_row:
@@ -756,6 +758,8 @@ def get_frame_context(frame_id: int):
                         "narrative": desc_row["narrative"],
                         "summary": desc_row["summary"],
                         "tags": desc_row["tags"],
+                        "model": desc_row["model"],
+                        "generated_at": desc_row["generated_at"],
                     }
     except Exception as e:
         logger.warning(f"Failed to get description for frame {frame_id}: {e}")
@@ -771,6 +775,7 @@ def get_frame_context(frame_id: int):
         "app_name": context["app_name"],
         "window_name": context["window_name"],
         "description": description,
+        "description_status": description_status,
         "text": context["text"],
         "text_source": context["text_source"],
         "urls": context["urls"],
@@ -968,7 +973,7 @@ def search():
         browser_url: Filter by browser URL
         focused: Filter by focused state (true/false)
         include_text: Include text field in response (default: false)
-        max_text_length: Maximum text length when include_text=true (default: 1000)
+        max_text_length: Maximum text length when include_text=true (default: 200)
 
     Returns:
         JSON response with flat frame objects (no content wrapper, no type/tags/file_path).
@@ -1011,11 +1016,11 @@ def search():
     include_text_str = request.args.get("include_text", "false").strip().lower()
     include_text = include_text_str in ("true", "1", "yes")
 
-    # Parse max_text_length (default 1000)
+    # Parse max_text_length (default 200)
     try:
-        max_text_length = int(request.args.get("max_text_length", 1000))
+        max_text_length = int(request.args.get("max_text_length", 200))
     except (ValueError, TypeError):
-        max_text_length = 1000
+        max_text_length = 200
     max_text_length = max(1, max_text_length)
 
     # Parse time range (local time)

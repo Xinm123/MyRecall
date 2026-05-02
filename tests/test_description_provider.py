@@ -101,21 +101,23 @@ class TestOpenAIDescriptionProvider:
 
     def test_prompt_contains_new_fields(self):
         """Verify prompt contains new fields (narrative, summary, tags)."""
-        from openrecall.server.description.providers.openai import _PROMPT_TEXT, _EXAMPLE_OUTPUT
+        from openrecall.server.description.prompts import build_description_prompt
+
+        prompt_text = build_description_prompt()
 
         # Verify prompt contains new fields
-        assert "tags" in _PROMPT_TEXT
-        assert "narrative" in _PROMPT_TEXT
-        assert "summary" in _PROMPT_TEXT
+        assert "tags" in prompt_text
+        assert "narrative" in prompt_text
+        assert "summary" in prompt_text
 
-        # Verify example output contains new fields
-        assert "tags" in _EXAMPLE_OUTPUT
-        assert "narrative" in _EXAMPLE_OUTPUT
-        assert "summary" in _EXAMPLE_OUTPUT
+        # Verify example output contains new fields (embedded in prompt)
+        assert "\"narrative\"" in prompt_text
+        assert "\"summary\"" in prompt_text
+        assert "\"tags\"" in prompt_text
 
         # Verify old fields are NOT in prompt
-        assert "entities" not in _PROMPT_TEXT
-        assert "intent" not in _PROMPT_TEXT
+        assert "entities" not in prompt_text
+        assert '"intent"' not in prompt_text
 
 
 class TestDashScopeDescriptionProvider:
@@ -140,20 +142,13 @@ class TestLocalDescriptionProvider:
     @pytest.mark.unit
     def test_local_provider_builds_messages_with_new_prompt(self):
         """Test Local provider builds messages with new prompt format."""
-        from openrecall.server.description.providers.local import _build_messages
-        from openrecall.server.description.models import FrameContext
+        from openrecall.server.description.prompts import build_description_prompt
 
-        context = FrameContext(
-            app_name="Chrome",
-            window_name="GitHub",
-            browser_url="https://github.com"
-        )
-        messages = _build_messages(context)
+        prompt_text = build_description_prompt()
 
         # Check prompt contains new format keywords
-        prompt_text = messages[0]["content"][1]["text"]
         assert "tags" in prompt_text
         assert "entities" not in prompt_text
-        assert "intent" not in prompt_text
-        assert "1024" in prompt_text
-        assert "256" in prompt_text
+        assert '"intent"' not in prompt_text
+        assert "100-150 words" in prompt_text
+        assert "20-30 words" in prompt_text

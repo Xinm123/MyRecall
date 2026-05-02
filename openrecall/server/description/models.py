@@ -11,7 +11,7 @@ class FrameDescription(BaseModel):
 
     narrative: str = Field(
         ...,
-        max_length=1024,
+        max_length=2048,
         description="Detailed natural language description of screen content and user activity",
     )
     summary: str = Field(

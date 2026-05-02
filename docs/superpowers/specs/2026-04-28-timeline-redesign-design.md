@@ -82,8 +82,8 @@ Grid 页面（`/`）已通过近期重构实现了以天为粒度的日历导航
 - 用于在日历上标记有数据的日期（`.has-data` 蓝色圆点）
 
 **实时刷新（仅今天）：**
-- 每 5 秒调用 `GET /v1/frames/latest?since={timestamp}`
-- 有新帧时追加到 `frames` 末尾
+- 每 5 秒调用 `GET /api/memories/by-day?date={currentDate}` 重新加载当天数据
+- 与现有帧对比：更新已有帧（如有状态变化），追加新帧到末尾
 - 不在"今天"时不刷新
 
 **首次加载：**
@@ -139,6 +139,9 @@ function timelineView() {
 
     // UI
     loading: true,
+
+    // 定时器
+    refreshTimer: null,
   };
 }
 ```
@@ -149,7 +152,7 @@ function timelineView() {
 |------|----------|
 | `index.html` Grid | 日历 CSS 样式、日历交互逻辑、日期导航、`_utc8Now()`、`_formatDateStr()` |
 | `layout.html` | `parseTimestamp()` 全局函数 |
-| Edge API | `/api/memories/by-day`、`/api/memories/dates`、`/v1/frames/latest` |
+| Edge API | `/api/memories/by-day`、`/api/memories/dates` |
 
 ## 无需后端改动
 

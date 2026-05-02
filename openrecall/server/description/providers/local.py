@@ -11,6 +11,7 @@ import torch
 from transformers import AutoProcessor, Qwen3VLForConditionalGeneration
 
 from openrecall.server.description.models import FrameDescription, FrameContext
+from openrecall.server.description.prompts import build_description_prompt, PROMPT_VERSION
 from openrecall.server.description.providers.base import (
     DescriptionProvider,
     DescriptionProviderRequestError,
@@ -20,43 +21,7 @@ from openrecall.shared.config import settings
 
 logger = logging.getLogger(__name__)
 
-_MAX_NEW_TOKENS = 256
-
-
-def _build_messages(context: FrameContext) -> list[dict[str, Any]]:
-    """Build messages for the vision model with context injection."""
-    app_context = ""
-    if context.app_name:
-        app_context = f"App: {context.app_name}"
-    if context.window_name:
-        app_context += f" | Window: {context.window_name}"
-    if context.browser_url:
-        app_context += f" | URL: {context.browser_url}"
-
-    prompt_text = (
-        f"Analyze this screenshot. App context: {app_context or 'unknown'}. "
-        f"Output a strictly valid JSON object:\n"
-        f'{{"narrative": "detailed description (max 2048 chars)", '
-        f'"summary": "one sentence (max 256 chars)", '
-        f'"tags": ["keyword1", "keyword2", ...]}}  // 3-8 lowercase keywords\n\n'
-        f'Example output:\n'
-        f'{{\n'
-        f'  "narrative": "User is browsing GitHub repository page showing README content.",\n'
-        f'  "summary": "Browsing GitHub repository README",\n'
-        f'  "tags": ["github", "repository", "readme", "browsing", "documentation"]\n'
-        f'}}\n\n'
-        f'IMPORTANT: Output only valid JSON. No markdown, no explanation.'
-    )
-
-    return [
-        {
-            "role": "user",
-            "content": [
-                {"type": "image", "image": None},
-                {"type": "text", "text": prompt_text},
-            ],
-        }
-    ]
+_MAX_NEW_TOKENS = 384
 
 
 class LocalDescriptionProvider(DescriptionProvider):
@@ -110,8 +75,16 @@ class LocalDescriptionProvider(DescriptionProvider):
         if settings.device == "cpu":
             image = self._resize_if_needed(image)
 
-        messages = _build_messages(context)
-        messages[0]["content"][0]["image"] = image
+        prompt_text = build_description_prompt()
+        messages = [
+            {
+                "role": "user",
+                "content": [
+                    {"type": "image", "image": image},
+                    {"type": "text", "text": prompt_text},
+                ],
+            }
+        ]
 
         text = self.processor.apply_chat_template(
             messages,
@@ -154,11 +127,11 @@ class LocalDescriptionProvider(DescriptionProvider):
                 original_summary = data.get("summary", "")
                 tags = data.get("tags", [])
 
-                narrative = original_narrative[:1024]
+                narrative = original_narrative[:2048]
                 summary = original_summary[:256]
 
-                if len(original_narrative) > 1024:
-                    logger.warning(f"Narrative truncated from {len(original_narrative)} to 1024 chars")
+                if len(original_narrative) > 2048:
+                    logger.warning(f"Narrative truncated from {len(original_narrative)} to 2048 chars")
                 if len(original_summary) > 256:
                     logger.warning(f"Summary truncated from {len(original_summary)} to 256 chars")
 
@@ -170,7 +143,7 @@ class LocalDescriptionProvider(DescriptionProvider):
                 else:
                     tags = []
 
-                logger.info(f"Description generated in {elapsed:.2f}s: {len(narrative)} chars, {len(tags)} tags")
+                logger.info(f"[PromptVersion:{PROMPT_VERSION}] Description generated in {elapsed:.2f}s: {len(narrative)} chars, {len(tags)} tags")
                 return FrameDescription(
                     narrative=narrative,
                     summary=summary,
@@ -180,11 +153,11 @@ class LocalDescriptionProvider(DescriptionProvider):
             pass
 
         logger.warning(f"Failed to parse JSON from LocalDescriptionProvider. Raw: {raw[:100]}...")
-        fallback_narrative = raw[:1024]
+        fallback_narrative = raw[:2048]
         fallback_summary = raw[:256]
-        if len(raw) > 1024:
-            logger.warning(f"Fallback narrative truncated from {len(raw)} to 1024 chars")
-        logger.info(f"Description generated (fallback) in {elapsed:.2f}s: {len(fallback_narrative)} chars")
+        if len(raw) > 2048:
+            logger.warning(f"Fallback narrative truncated from {len(raw)} to 2048 chars")
+        logger.info(f"[PromptVersion:{PROMPT_VERSION}] Description generated (fallback) in {elapsed:.2f}s: {len(fallback_narrative)} chars")
         return FrameDescription(
             narrative=fallback_narrative,
             summary=fallback_summary,

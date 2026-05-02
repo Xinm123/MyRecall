@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any
 
 from openrecall.server.description.models import FrameDescription, FrameContext
+from openrecall.server.description.prompts import build_description_prompt, PROMPT_VERSION
 from openrecall.server.description.providers.base import (
     DescriptionProvider,
     DescriptionProviderRequestError,
@@ -14,24 +15,6 @@ from openrecall.server.description.providers.base import (
 )
 
 logger = logging.getLogger(__name__)
-
-
-def _build_prompt(ctx_str: str) -> str:
-    """Build prompt with new format."""
-    return (
-        f"Analyze this screenshot. App context: {ctx_str}.\n"
-        f"Output a strictly valid JSON object:\n"
-        f'{{"narrative": "detailed description (max 2048 chars)", '
-        f'"summary": "one sentence (max 256 chars)", '
-        f'"tags": ["keyword1", "keyword2", ...]}}  // 3-8 lowercase keywords\n\n'
-        f'Example output:\n'
-        f'{{\n'
-        f'  "narrative": "User is browsing GitHub repository page showing README content.",\n'
-        f'  "summary": "Browsing GitHub repository README",\n'
-        f'  "tags": ["github", "repository", "readme", "browsing", "documentation"]\n'
-        f'}}\n\n'
-        f'IMPORTANT: Output only valid JSON. No markdown, no explanation.'
-    )
 
 
 class DashScopeDescriptionProvider(DescriptionProvider):
@@ -55,16 +38,7 @@ class DashScopeDescriptionProvider(DescriptionProvider):
         if not path.is_file():
             raise DescriptionProviderRequestError(f"Image not found: {image_path}")
 
-        ctx_parts = []
-        if context.app_name:
-            ctx_parts.append(f"App: {context.app_name}")
-        if context.window_name:
-            ctx_parts.append(f"Window: {context.window_name}")
-        if context.browser_url:
-            ctx_parts.append(f"URL: {context.browser_url}")
-        ctx_str = " | ".join(ctx_parts) if ctx_parts else "unknown"
-
-        prompt_text = _build_prompt(ctx_str)
+        prompt_text = build_description_prompt()
 
         messages: list[dict[str, Any]] = [
             {
@@ -120,11 +94,11 @@ class DashScopeDescriptionProvider(DescriptionProvider):
                 original_summary = parsed.get("summary", "")
                 tags = parsed.get("tags", [])
 
-                narrative = original_narrative[:1024]
+                narrative = original_narrative[:2048]
                 summary = original_summary[:256]
 
-                if len(original_narrative) > 1024:
-                    logger.warning(f"Narrative truncated from {len(original_narrative)} to 1024 chars")
+                if len(original_narrative) > 2048:
+                    logger.warning(f"Narrative truncated from {len(original_narrative)} to 2048 chars")
                 if len(original_summary) > 256:
                     logger.warning(f"Summary truncated from {len(original_summary)} to 256 chars")
 
@@ -136,7 +110,7 @@ class DashScopeDescriptionProvider(DescriptionProvider):
                 else:
                     tags = []
 
-                logger.info(f"Description generated in {elapsed:.2f}s: {len(narrative)} chars, {len(tags)} tags")
+                logger.info(f"[PromptVersion:{PROMPT_VERSION}] Description generated in {elapsed:.2f}s: {len(narrative)} chars, {len(tags)} tags")
                 return FrameDescription(
                     narrative=narrative,
                     summary=summary,
@@ -146,11 +120,11 @@ class DashScopeDescriptionProvider(DescriptionProvider):
             pass
 
         logger.warning(f"Failed to parse JSON from DashScope. Raw: {raw_text[:100]}...")
-        fallback_narrative = raw_text[:1024]
+        fallback_narrative = raw_text[:2048]
         fallback_summary = raw_text[:256]
-        if len(raw_text) > 1024:
-            logger.warning(f"Fallback narrative truncated from {len(raw_text)} to 1024 chars")
-        logger.info(f"Description generated (fallback) in {elapsed:.2f}s: {len(fallback_narrative)} chars")
+        if len(raw_text) > 2048:
+            logger.warning(f"Fallback narrative truncated from {len(raw_text)} to 2048 chars")
+        logger.info(f"[PromptVersion:{PROMPT_VERSION}] Description generated (fallback) in {elapsed:.2f}s: {len(fallback_narrative)} chars")
         return FrameDescription(
             narrative=fallback_narrative,
             summary=fallback_summary,

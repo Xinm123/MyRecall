@@ -138,7 +138,7 @@
 | `browser_url` | `string` | — | Filter by browser URL |
 | `focused` | `boolean` | — | Filter by focus state |
 | `include_text` | `boolean` | `false` | Include `text` field in response |
-| `max_text_length` | `int` | `1000` | Max characters for `text` field (middle-truncated) |
+| `max_text_length` | `int` | `200` | Max characters for `text` field (middle-truncated) |
 | `content_type` | `string` | `"all"` | **Deprecated** — ignored. All searches return merged results. |
 
 ### Response Fields

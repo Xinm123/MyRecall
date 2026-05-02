@@ -27,29 +27,32 @@
 
 Copy calendar-related CSS classes from `index.html` into `timeline.html`'s `<style>` block. The styles needed are:
 
-- `.date-nav-toolbar` (with inline `display: flex; align-items: center; gap: 8px; margin-bottom: 12px;`)
+- `.date-nav-toolbar` (`position: relative` only — flex layout is inline in Task 2 HTML)
 - `.today-btn`
-- `.toolbar-nav-btn` (timeline-specific override)
+- `.toolbar-nav-btn`
 - `.date-picker-btn`
-- `.calendar-popover`
+- `.calendar-popover` (update `animation` to use `calendarPopoverIn` — see note below)
 - `.calendar-header`
 - `.calendar-nav`
-- `.calendar-title`
 - `.calendar-weekdays`
 - `.calendar-days`
 - `.calendar-day` (with `.is-other-month`, `.is-selected`, `.is-today`, `.has-data` variants)
-- `@keyframes popoverIn`
+- `@keyframes calendarPopoverIn` (renamed from `popoverIn` to avoid conflict with `layout.html`)
 - `.loading-bar`
 - `@keyframes loadingShimmer`
-- `.day-header`
-- `.day-title`
-- `.day-stats`
-- `.day-stat`
-- `.day-stat-value`
+- `[x-cloak]` (from index.html end of style block)
+
+> **Note:** `.calendar-title` has no CSS rules in `index.html` (it's used only in HTML markup), so skip it. When copying `.calendar-popover` from `index.html`, change its `animation` property from `popoverIn` to `calendarPopoverIn`.
+
+Also add `:root { --text-tertiary: #8E8E93; }` (needed for `.calendar-weekdays span` color; defined in `index.html`'s `:root` but not inherited by `timeline.html`).
 
 Also add playback control styles:
 
 ```css
+:root {
+  --text-tertiary: #8E8E93;
+}
+
 .playback-controls {
   display: flex;
   align-items: center;
@@ -97,9 +100,14 @@ Also add playback control styles:
   min-width: 40px;
 }
 
-.speed-btn:hover {
+.speed-btn:hover:not(:disabled) {
   border-color: var(--accent-color);
   color: var(--accent-color);
+}
+
+.speed-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
 }
 
 .frame-counter {
@@ -142,7 +150,7 @@ Replace the content block (`{% block content %}`) with the new day-centric layou
   <div x-show="loading" class="loading-bar" x-cloak></div>
 
   <!-- Date Navigation Toolbar -->
-  <div class="date-nav-toolbar">
+  <div class="date-nav-toolbar" style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px;">
     <button type="button" class="today-btn" @click="goToday()" :disabled="isToday(currentDate)">
       Today
     </button>
@@ -156,7 +164,7 @@ Replace the content block (`{% block content %}`) with the new day-centric layou
         <span style="font-size: 10px; opacity: 0.6;">&#9660;</span>
       </button>
       <!-- Calendar Popover -->
-      <div x-show="calendarOpen" class="calendar-popover" x-cloak>
+      <div x-show="calendarOpen" class="calendar-popover" x-cloak style="animation: calendarPopoverIn 0.2s ease-out forwards;">
         <div class="calendar-header">
           <button type="button" class="calendar-nav" @click="prevMonth()">&#8249;</button>
           <span class="calendar-title" x-text="`${calendarYear}&#24180;${calendarMonth + 1}&#26376;`"></span>
@@ -198,8 +206,7 @@ Replace the content block (`{% block content %}`) with the new day-centric layou
         x-text="isPlaying ? '&#9646;&#9646;' : '&#9654;'"
         :title="isPlaying ? 'Pause' : 'Play'"
       ></button>
-      <button type="button" class="speed-btn" @click="cycleSpeed()" x-text="playbackSpeed + 'x'" title="Playback speed"></button>
-      <span class="frame-counter" x-show="frames.length > 0" x-text="`${currentIndex + 1} / ${frames.length}`"></span>
+      <button type="button" class="speed-btn" @click="cycleSpeed()" :disabled="frames.length <= 1" x-text="playbackSpeed + 'x'" title="Playback speed"></button>
     </div>
   </div>
 
@@ -215,8 +222,11 @@ Replace the content block (`{% block content %}`) with the new day-centric layou
       <input type="range" class="slider" id="discreteSlider"
         x-model.number="currentIndex"
         :min="0" :max="frames.length - 1" step="1"
-        @input="onSliderInput()">
-      <div class="slider-value" x-text="formattedTime"></div>
+        :disabled="frames.length <= 1">
+      <div class="slider-value">
+        <span x-text="formattedTime"></span>
+        <span class="frame-counter" x-show="frames.length > 0" x-text="`(${currentIndex + 1} / ${frames.length})`"></span>
+      </div>
     </div>
     <div class="image-container">
       <img id="timestampImage"
@@ -274,6 +284,9 @@ function timelineView() {
     // UI
     loading: true,
 
+    // Timers
+    refreshTimer: null,
+
     // ---- Computed ----
 
     get currentFrame() {
@@ -284,7 +297,7 @@ function timelineView() {
     get formattedTime() {
       const frame = this.currentFrame;
       if (!frame) return '';
-      const ts = frame.local_timestamp || frame.timestamp;
+      const ts = frame.timestamp;
       if (!ts) return 'Invalid timestamp';
       const date = parseTimestamp(ts);
       if (!date || isNaN(date.getTime())) return 'Invalid timestamp';
@@ -331,8 +344,10 @@ function timelineView() {
             const tb = parseTimestamp(b.timestamp)?.getTime() || 0;
             return ta - tb;
           });
-          this.currentIndex = 0;
+        } else {
+          this.frames = [];
         }
+        this.currentIndex = 0;
       } catch (e) {
         console.error('Failed to load day:', e);
         this.frames = [];
@@ -350,6 +365,8 @@ function timelineView() {
       const date = new Date(y, m - 1, d);
       date.setDate(date.getDate() - 1);
       this.currentDate = this._formatDateStr(date);
+      this.calendarYear = date.getFullYear();
+      this.calendarMonth = date.getMonth();
       this.loadDay(this.currentDate);
     },
 
@@ -359,6 +376,8 @@ function timelineView() {
       const date = new Date(y, m - 1, d);
       date.setDate(date.getDate() + 1);
       this.currentDate = this._formatDateStr(date);
+      this.calendarYear = date.getFullYear();
+      this.calendarMonth = date.getMonth();
       this.loadDay(this.currentDate);
     },
 
@@ -374,11 +393,21 @@ function timelineView() {
     selectDate(date) {
       this.stopPlayback();
       this.currentDate = date;
+      const [y, m] = date.split('-').map(Number);
+      this.calendarYear = y;
+      this.calendarMonth = m - 1;
       this.calendarOpen = false;
       this.loadDay(date);
     },
 
-    // ---- Initialization ----
+    // ---- Stubs (overridden in later tasks) ----
+
+    stopPlayback() {},
+    togglePlayback() {},
+    cycleSpeed() {},
+    refreshDay() {},
+
+    // ---- Initialization (base — extended in Task 6) ----
 
     async init() {
       const now = this._utc8Now();
@@ -386,6 +415,44 @@ function timelineView() {
       this.calendarYear = now.getFullYear();
       this.calendarMonth = now.getMonth();
       await this.loadDay(this.currentDate);
+
+      // Real-time refresh: every 5 seconds check for new frames
+      this.refreshTimer = setInterval(() => {
+        this.refreshDay();
+      }, 5000);
+
+      // Keyboard navigation
+      this._keydownHandler = (e) => {
+        if (e.key === 'ArrowLeft') {
+          e.preventDefault();
+          this.stopPlayback();
+          if (this.currentIndex > 0) this.currentIndex -= 1;
+        }
+        if (e.key === 'ArrowRight') {
+          e.preventDefault();
+          this.stopPlayback();
+          if (this.currentIndex < this.frames.length - 1) this.currentIndex += 1;
+        }
+        if (e.key === ' ') {
+          e.preventDefault();
+          this.togglePlayback();
+        }
+      };
+      window.addEventListener('keydown', this._keydownHandler);
+
+      // Cleanup on page leave
+      this._beforeUnloadHandler = () => {
+        this.stopPlayback();
+        if (this.refreshTimer) {
+          clearInterval(this.refreshTimer);
+          this.refreshTimer = null;
+        }
+        if (this._keydownHandler) {
+          window.removeEventListener('keydown', this._keydownHandler);
+          this._keydownHandler = null;
+        }
+      };
+      window.addEventListener('beforeunload', this._beforeUnloadHandler);
     }
   };
 }
@@ -641,45 +708,21 @@ cycleSpeed() {
 },
 ```
 
-Also update `init()` to add keyboard support and auto-refresh. Replace the `init()` method with:
+Also add `@input="onSliderInput()"` to the slider input in the HTML (it was omitted in Task 2 because the method didn't exist yet):
 
-```javascript
-async init() {
-  const now = this._utc8Now();
-  this.currentDate = this._formatDateStr(now);
-  this.calendarYear = now.getFullYear();
-  this.calendarMonth = now.getMonth();
-
-  await this.loadDay(this.currentDate);
-
-  // Real-time refresh: every 5 seconds check for new frames
-  setInterval(() => {
-    this.refreshDay();
-  }, 5000);
-
-  // Keyboard navigation
-  window.addEventListener('keydown', (e) => {
-    if (e.key === 'ArrowLeft') {
-      e.preventDefault();
-      this.stopPlayback();
-      if (this.currentIndex > 0) this.currentIndex -= 1;
-    }
-    if (e.key === 'ArrowRight') {
-      e.preventDefault();
-      this.stopPlayback();
-      if (this.currentIndex < this.frames.length - 1) this.currentIndex += 1;
-    }
-    if (e.key === ' ') {
-      e.preventDefault();
-      this.togglePlayback();
-    }
-  });
-}
+```html
+<input type="range" class="slider" id="discreteSlider"
+  x-model.number="currentIndex"
+  :min="0" :max="frames.length - 1" step="1"
+  :disabled="frames.length <= 1"
+  @input="onSliderInput()">
 ```
 
 - [ ] **Step 1: Add playback methods to timelineView()**
 
-- [ ] **Step 2: Update init() with keyboard support and refresh timer**
+- [ ] **Step 2: Replace the slider `<input>` in Task 2's HTML with the version below**
+
+The Task 2 slider is missing both `:disabled` and `@input`. Replace the entire `<input>` element in the existing HTML with:
 
 - [ ] **Step 3: Verify template compiles**
 
@@ -717,33 +760,25 @@ git commit -m "feat(timeline): add playback controls with keyboard support"
 
 ### 6.1 Remove unused legacy CSS
 
-The old `timeline.html` had styles for `.slider-container`, `.slider`, `.slider-value`, `.image-container`, `.alert`, `.timeline-loading`. Some of these are still used but may need adjustment. Verify:
+Delete the `.timeline-loading` rule from the `<style>` block — it is no longer referenced (replaced by `.loading-bar` in Task 2). The remaining styles (`.slider-container`, `.slider`, `.slider-value`, `.image-container`, `.alert`) are still used by the new layout. Visually verify:
 
 - `.slider-container` padding/margin still looks good with the new nav bar above
 - `.slider-value` font size and positioning is clear
 - `.image-container` max-height works well (`calc(72vh)`)
 
-No code changes needed unless visual inspection reveals issues.
+### 6.2 Verify timer cleanup on page leave
 
-### 6.2 Add cleanup on page leave
+Timer cleanup is already implemented in Task 3's `init()`:
+- `stopPlayback()` clears `playbackTimer`
+- `beforeunload` handler clears both `playbackTimer` and `refreshTimer`
 
-In `init()`, add cleanup for the playback timer when the component is destroyed. Since Alpine.js `x-init` doesn't have a direct `destroy` hook for the whole component in this version, we rely on page navigation to clear timers. Add this safeguard in `stopPlayback()` (already done) and consider adding `beforeunload`:
-
-```javascript
-window.addEventListener('beforeunload', () => {
-  this.stopPlayback();
-});
-```
-
-Insert inside `init()` after the keyboard listener.
+Verify in browser DevTools that navigating away from `/timeline` does not leave dangling intervals.
 
 ### 6.3 Ensure `html[data-current-view="timeline"]` CSS applies
 
 The `layout.html` has `html[data-current-view="timeline"] a[href="/timeline"]` styling for active nav icon. Verify the Timeline icon is highlighted when on `/timeline`. This should already work (no change needed).
 
-- [ ] **Step 1: Add beforeunload cleanup**
-
-- [ ] **Step 2: Final browser verification checklist**
+- [ ] **Step 1: Final browser verification checklist**
 
 With client running, verify all of these on `http://localhost:8889/timeline`:
 
@@ -757,7 +792,7 @@ With client running, verify all of these on `http://localhost:8889/timeline`:
 | 6 | Calendar month navigation works | Month/year updates |
 | 7 | Dates with data have blue dot | `.has-data::after` visible |
 | 8 | Selecting date loads that day | Frames update |
-| 9 | Slider range matches frame count | 0 to N-1 |
+| 9 | Slider range matches frame index range | 0 to frames.length - 1 |
 | 10 | Slider shows formatted timestamp | YYYY-MM-DD HH:MM:SS |
 | 11 | Image loads for current frame | Screenshot visible |
 | 12 | Play button starts playback | Images auto-advance |
@@ -772,8 +807,10 @@ With client running, verify all of these on `http://localhost:8889/timeline`:
 | 21 | Real-time refresh (today only) | New frames auto-append while on today |
 | 22 | Real-time refresh (other day) | No refresh when viewing past day |
 | 23 | Responsive layout | No horizontal scroll on mobile |
+| 24 | Single-frame day | Slider and play button both disabled |
+| 25 | Loading state | `loading-bar` visible while data loads |
 
-- [ ] **Step 3: Commit final polish**
+- [ ] **Step 2: Commit final polish**
 
 ```bash
 git add openrecall/client/web/templates/timeline.html
@@ -792,7 +829,7 @@ git commit -m "feat(timeline): add cleanup and finalize playback controls"
 | 按天加载数据 `/api/memories/by-day`（升序排序） | Task 3 | ✅ |
 | 播放/暂停按钮 | Task 2, 6 | ✅ |
 | 倍速切换（1x/2x/5x/10x） | Task 2, 6 | ✅ |
-| 滑块自动跟随播放 | Task 6 | ✅ |
+| 滑块自动跟随播放 | Task 2 | ✅ |
 | 播放到达最后一帧自动停止 | Task 6 | ✅ |
 | 拖动滑块自动暂停 | Task 6 | ✅ |
 | 键盘支持（← → 空格） | Task 6 | ✅ |

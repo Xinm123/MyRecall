@@ -1,0 +1,123 @@
+{
+  "cases": [
+    {
+      "id": "T1",
+      "prompt": "What was I doing today?",
+      "expected": {
+        "primary_endpoint": "/v1/activity-summary",
+        "required_params": ["start_time", "end_time"],
+        "forbidden_endpoints": ["/v1/search"],
+        "notes": "Broad question should start with activity-summary, not search"
+      }
+    },
+    {
+      "id": "T2",
+      "prompt": "Which apps did I use yesterday?",
+      "expected": {
+        "primary_endpoint": "/v1/activity-summary",
+        "required_params": ["start_time", "end_time"],
+        "forbidden_endpoints": ["/v1/search"],
+        "notes": "App list comes from summary, not search"
+      }
+    },
+    {
+      "id": "T3",
+      "prompt": "Find the PR I was reviewing",
+      "expected": {
+        "primary_endpoint": "/v1/search",
+        "required_params": ["q", "start_time", "end_time"],
+        "forbidden_endpoints": [],
+        "notes": "Specific keyword query should go directly to search, NOT activity-summary first"
+      }
+    },
+    {
+      "id": "T4",
+      "prompt": "Did I see anything about AI?",
+      "expected": {
+        "primary_endpoint": "/v1/search",
+        "required_params": ["q", "start_time", "end_time"],
+        "forbidden_endpoints": [],
+        "notes": "Specific keyword 'AI' should go directly to search"
+      }
+    },
+    {
+      "id": "T5",
+      "prompt": "Did I open GitHub today?",
+      "expected": {
+        "primary_endpoints": ["/v1/activity-summary", "/v1/search"],
+        "required_params": ["start_time", "end_time"],
+        "forbidden_endpoints": [],
+        "notes": "Composite strategy: summary first, then search with app_name filter if needed. Either single summary OR summary+search is acceptable"
+      }
+    },
+    {
+      "id": "T6",
+      "prompt": "What was I doing in frame 42?",
+      "expected": {
+        "primary_endpoint": "/v1/frames/42/context",
+        "required_params": [],
+        "forbidden_endpoints": ["/v1/search", "/v1/activity-summary"],
+        "notes": "Specific frame ID → direct context endpoint"
+      }
+    },
+    {
+      "id": "T7",
+      "prompt": "What did I code in VSCode?",
+      "expected": {
+        "primary_endpoint": "/v1/search",
+        "required_params": ["start_time", "end_time", "app_name"],
+        "forbidden_endpoints": [],
+        "notes": "Should use app_name=VSCode filter"
+      }
+    },
+    {
+      "id": "T8",
+      "prompt": "How long did I spend on Safari?",
+      "expected": {
+        "primary_endpoint": "/v1/activity-summary",
+        "required_params": ["start_time", "end_time"],
+        "forbidden_endpoints": ["/v1/search"],
+        "notes": "Time spent comes from summary apps array"
+      }
+    },
+    {
+      "id": "T9",
+      "prompt": "Show me a screenshot",
+      "expected": {
+        "acceptable_endpoints": ["/v1/search", "/v1/activity-summary"],
+        "forbidden_endpoints": [],
+        "notes": "No frame ID provided. Agent should either search first OR ask user for frame ID. Calling /frames/{id} without id is wrong"
+      }
+    },
+    {
+      "id": "T10",
+      "prompt": "Show me frame 42",
+      "expected": {
+        "primary_endpoint": "/v1/frames/42",
+        "required_params": [],
+        "forbidden_endpoints": ["/v1/search"],
+        "notes": "Frame ID provided → direct call"
+      }
+    },
+    {
+      "id": "T11",
+      "prompt": "Summarize my day",
+      "expected": {
+        "primary_endpoint": "/v1/activity-summary",
+        "required_params": ["start_time", "end_time"],
+        "forbidden_endpoints": ["/v1/search"],
+        "notes": "Anti-pattern: should NOT paginate through search results"
+      }
+    },
+    {
+      "id": "T12",
+      "prompt": "Did I see anything about React in the last hour?",
+      "expected": {
+        "primary_endpoint": "/v1/search",
+        "required_params": ["q", "start_time", "end_time"],
+        "forbidden_endpoints": ["/v1/activity-summary"],
+        "notes": "Specific keyword + time range → direct search"
+      }
+    }
+  ]
+}

@@ -183,3 +183,51 @@ class TestActivitySummaryAPI:
         mock.get_recent_descriptions.assert_called_once()
         call_args = mock.get_recent_descriptions.call_args
         assert call_args[1]["limit"] == 1000, "limit should default to 1000 when max_descriptions not specified"
+
+    def test_max_descriptions_parameter_is_parsed(self, app_with_activity_summary_route):
+        """max_descriptions parameter is passed through to the store."""
+        mock = MagicMock()
+        mock.get_activity_summary_apps.return_value = []
+        mock.get_activity_summary_total_frames.return_value = 0
+        mock.get_activity_summary_time_range.return_value = None
+        mock._connect.return_value.__enter__.return_value = MagicMock()
+        mock.get_recent_descriptions.return_value = []
+
+        with patch("openrecall.server.api_v1._get_frames_store", return_value=mock):
+            client = app_with_activity_summary_route.test_client()
+            response = client.get(
+                "/v1/activity-summary",
+                query_string={
+                    "start_time": "2026-03-20T09:00:00",
+                    "end_time": "2026-03-20T11:00:00",
+                    "max_descriptions": "5",
+                },
+            )
+        assert response.status_code == 200
+        mock.get_recent_descriptions.assert_called_once()
+        call_args = mock.get_recent_descriptions.call_args
+        assert call_args[1]["limit"] == 5
+
+    def test_max_descriptions_capped_at_1000(self, app_with_activity_summary_route):
+        """max_descriptions > 1000 is clamped to 1000."""
+        mock = MagicMock()
+        mock.get_activity_summary_apps.return_value = []
+        mock.get_activity_summary_total_frames.return_value = 0
+        mock.get_activity_summary_time_range.return_value = None
+        mock._connect.return_value.__enter__.return_value = MagicMock()
+        mock.get_recent_descriptions.return_value = []
+
+        with patch("openrecall.server.api_v1._get_frames_store", return_value=mock):
+            client = app_with_activity_summary_route.test_client()
+            response = client.get(
+                "/v1/activity-summary",
+                query_string={
+                    "start_time": "2026-03-20T09:00:00",
+                    "end_time": "2026-03-20T11:00:00",
+                    "max_descriptions": "99999",
+                },
+            )
+        assert response.status_code == 200
+        mock.get_recent_descriptions.assert_called_once()
+        call_args = mock.get_recent_descriptions.call_args
+        assert call_args[1]["limit"] == 1000

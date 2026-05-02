@@ -318,7 +318,7 @@ class TestGetFrameContext:
         assert "https://direct-url.com" in context["urls"]
 
     def test_get_frame_context_truncates_text_at_5000_chars(self, store: FramesStore):
-        """Text should be truncated at 5000 chars with '...' suffix."""
+        """Text should be middle-truncated at 5000 chars when exceeding the limit."""
         # Exactly 5000 chars — no truncation
         text_5000 = "X" * 5000
         elements = [{"role": "AXStaticText", "text": text_5000, "depth": 0}]
@@ -330,7 +330,7 @@ class TestGetFrameContext:
         assert len(context["text"]) == 5000
         assert not context["text"].endswith("...")
 
-        # 5001 chars — truncated to 5000 + "..."
+        # 5001 chars — middle-truncated: [:2500] + "...1 chars..." + [-2500:]
         text_5001 = "Y" * 5001
         elements2 = [{"role": "AXStaticText", "text": text_5001, "depth": 0}]
         frame_id2 = _create_completed_frame_with_accessibility(
@@ -338,8 +338,11 @@ class TestGetFrameContext:
         )
         context2 = store.get_frame_context(frame_id2)
         assert context2 is not None
-        assert len(context2["text"]) == 5003  # 5000 + "..."
-        assert context2["text"].endswith("...")
+        # 2500 + "...1 chars..." (13) + 2500 = 5013
+        assert len(context2["text"]) == 5013
+        assert context2["text"].startswith("Y" * 2500)
+        assert context2["text"].endswith("Y" * 2500)
+        assert "...1 chars..." in context2["text"]
 
 
 class TestGetFrameContextMetadataFields:

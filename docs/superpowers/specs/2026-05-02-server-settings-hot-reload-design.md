@@ -41,6 +41,7 @@ When a user wants to switch the description model from `gpt-4o` to `qwen-vl-max`
 - Authentication / authorization on settings endpoints (deployment is assumed to be in a trusted network; users requiring stricter security should add a reverse proxy)
 - Per-task cancellation granularity inside `DescriptionService` (worker-level cancellation is sufficient)
 - Other server settings (OCR, reranker, processing tunables, debug, ports, paths) — they remain TOML-only
+- **`description.enabled` toggle** — the existing `description_enabled` TOML field stays TOML-only this iteration. Hot-reloading it would require coordinating worker shutdown, which expands scope; the user can still flip the master `ai_processing_enabled` toggle (already hot-reloadable via `RuntimeSettings`) for the same effect.
 - Multi-server federation
 - Audit log of settings changes (logs are sufficient)
 
@@ -129,7 +130,13 @@ class ServerSettingsStore:
     def __init__(self, db_path: pathlib.Path) -> None: ...
     def get(self, key: str, default: str | None = None) -> str | None: ...
     def set(self, key: str, value: str) -> None: ...
+    def set_many(self, items: dict[str, str]) -> None: ...   # atomic SQLite transaction
     def delete(self, key: str) -> None: ...
+    def apply_changes(
+        self,
+        deletes: list[str],
+        sets: dict[str, str],
+    ) -> None: ...   # atomic: deletes + upserts in ONE transaction
     def get_all(self) -> dict[str, str]: ...
     def reset_to_defaults(self) -> None: ...
 ```
@@ -197,7 +204,19 @@ def invalidate(capability: str | None = None) -> None:
             _instances.pop(capability, None)
 ```
 
-Cache reads/writes inside `get_*_provider()` should also be guarded by `_lock` to prevent the rare race where one thread is rebuilding while another invalidates. (The dict ops are individually atomic under the GIL, but the read-then-build sequence is not.)
+Cache reads/writes inside `get_*_provider()` use **double-checked locking** — fast path is lock-free, slow path (miss → build) is guarded by `_lock`:
+
+```python
+def get_description_provider():
+    # Fast path: lock-free read
+    if 'description' in _instances:
+        return _instances['description']
+    # Slow path: build under lock
+    with _lock:
+        if 'description' not in _instances:
+            _instances['description'] = _build_provider()
+        return _instances['description']
+```
 
 Replace direct `settings.description_*` reads in `get_description_provider()` with `runtime_config.get_description_*()` calls. The function body otherwise stays the same — caching, branching by provider, etc.
 
@@ -217,7 +236,7 @@ def bump_ai_processing_version(self) -> int:
     return new_version
 ```
 
-Existing callers in `api.py:467,473` (toggle on/off) continue to use `runtime_settings.ai_processing_version += 1`; we do not refactor them in this iteration. The new helper is used only by the new `/v1/settings/description` POST and reset endpoints.
+Existing callers in `api.py:467,473` (toggle on/off) **should also migrate** to `bump_ai_processing_version()` so that `notify_change()` is never accidentally omitted. This is a one-line refactor in each call site and is included in this iteration. The new helper is used by all version-bump paths: toggle on/off, settings POST, and settings reset.
 
 ### `openrecall/server/description/worker.py` (PATCHED)
 
@@ -262,6 +281,8 @@ description_request_timeout=data.get("description.request_timeout", 120),  # NEW
 
 The new TOML key is `description.request_timeout` (under `[description]` section).
 
+**Deprecation note:** `ai_request_timeout` is superseded by `description_request_timeout` for the description pipeline. Other AI operations (e.g. embedding) still use `ai_request_timeout` until a future iteration addresses them.
+
 ### `openrecall/server/description/providers/openai.py` (PATCHED — small change)
 
 Replace `timeout=settings.ai_request_timeout` (line 71) with `timeout=get_description_request_timeout()` (read at request time, not construction). This makes timeout changes take effect on the very next request without waiting for service rebuild.
@@ -279,17 +300,22 @@ Routes mounted on existing `v1_bp` blueprint:
 
 API layer owns mask logic (`api_key` → `api_key_masked` in responses).
 
-### `openrecall/server/app.py` (PATCHED — startup wiring)
+### `openrecall/server/__main__.py` (PATCHED — startup wiring)
 
-A single new line inserted in startup, before workers are launched:
+A single new line inserted in `main()` after `ensure_v3_schema()` and before the `processing_mode` branch (which dispatches to `_start_noop_mode` / `_start_ocr_mode` / `init_background_worker`, any of which may start a `DescriptionWorker`):
 
 ```python
-init_runtime_config(data_dir, toml_settings)   # NEW — must come before start_workers()
-# factory.py now reads via runtime_config; no further app-level wiring needed
-start_workers(...)                              # existing
+ensure_v3_schema()
+init_runtime_config(settings.paths_data_dir, settings)   # NEW — must come before any worker dispatch
+processing_mode = settings.processing_mode.strip().lower()
+# ... existing branch into noop / ocr / legacy modes ...
 ```
 
+Note: `settings` in `__main__.py` is a `ServerSettings` instance (constructed via `ServerSettings.from_toml()` and aliased onto `openrecall.shared.config.settings` at module-load time). This is the correct type to pass — `init_runtime_config()` reads `description_*` attributes off it.
+
 Existing initialization of `RuntimeSettings` (feature toggles like `recording_enabled`, `ai_processing_enabled`) is unchanged.
+
+`openrecall/server/app.py` is NOT modified by this iteration; it already provides the `Flask` app, blueprint registration, and CORS middleware (`@app.after_request add_cors_headers`) used by the new `/v1/settings/*` routes.
 
 ### `openrecall/client/web/templates/settings.html` (PATCHED)
 
@@ -334,7 +360,7 @@ Client → GET /v1/settings/description
 Mask rule:
 - `""` → `""`
 - length < 8 → `"***"`
-- length ≥ 8 → `"<first2>***<last2>"` (e.g. `sk-***12`)
+- length ≥ 8 → `"<first3>***<last4>"` (e.g. `sk-1234567890XX12` → `sk-***XX12`)
 
 ### 3. POST update + hot-swap
 
@@ -344,19 +370,19 @@ Client → POST /v1/settings/description
   Server:
     1. validate(payload)
     2. effective_before = runtime_config.get_effective_description_settings()
-    3. transaction: apply per-field, no early return
+    3. compute deletes & sets, then apply atomically:
+         deletes = []
+         sets = {}
          for k,v in payload:
            if v is None:
              if store.get(k) is not None:
-               store.delete(k)                       ← null = explicit clear
-           elif v == "" and k == "api_key":
-             pass                                     ← empty key = preserve
+               deletes.append(k)                     ← null = explicit clear
            elif effective_before[k] == v:
              pass                                     ← already-effective: no-op
                                                        (avoids flipping source toml→sqlite)
            else:
-             store.set(k, v)
-       commit
+             sets[k] = v
+         store.apply_changes(deletes, sets)           ← atomic: ONE transaction
     4. effective_after = runtime_config.get_effective_description_settings()
     5. if any value field differs between effective_before and effective_after:
          # (compare values only — source map is excluded)
@@ -382,13 +408,16 @@ Client → POST /v1/settings/description/test
   Server:
     1. validate(payload)
     2. construct provider instance directly from payload (NOT cached)
-    3. probe per provider:
+    3. probe per provider — all three use the same OpenAI-compat `GET {api_base}/models`
+       pattern. This avoids token-charge probes and unifies error handling:
          openai      → GET {api_base}/models with `Authorization: Bearer <api_key>`
+                       Default base: `https://api.openai.com/v1`
                        Success = HTTP 200; payload not parsed beyond status
-         dashscope   → SDK `chat.completions.create(model=<model>, messages=[{role:"user",content:"ping"}], max_tokens=1)`
-                       Note: this consumes 1 token of quota per probe.
-                       Considered acceptable for an explicitly user-triggered "Test Connection".
+         dashscope   → GET {api_base}/models with `Authorization: Bearer <api_key>`
+                       Default base: `https://dashscope.aliyuncs.com/compatible-mode/v1`
+                       Success = HTTP 200
          local       → GET {api_base}/models  (OpenAI-compat /v1/models endpoint)
+                       Default base: `http://localhost:11434/v1`
                        Success = HTTP 200
        absolute timeout = min(payload.timeout, 30)
     4. Do NOT write to SQLite. Do NOT invalidate factory.
@@ -404,9 +433,7 @@ Note: probe failures return HTTP 200 with `ok:false`. Only payload validation fa
 Client → POST /v1/settings/description/reset
   Server:
     effective_before = runtime_config.get_effective_description_settings()
-    for k in [...5 description.* keys]:
-      if store.get(k) is not None:
-        store.delete(k)
+    store.reset_to_defaults()       ← deletes all description.* SQLite rows in ONE transaction
     effective_after = runtime_config.get_effective_description_settings()
     if any value field differs between effective_before and effective_after:
       # (compare values only — source map is excluded; switching from `sqlite` to `toml`
@@ -469,7 +496,7 @@ Mixed data is acceptable: the same hand-off occurs when a user restarts the serv
 |---|---|---|---|---|
 | `provider` | preserve | reject (400) | delete (revert to TOML) | upsert |
 | `model` | preserve | reject (400) | delete | upsert |
-| `api_key` | preserve | preserve (no-op) | delete | upsert |
+| `api_key` | preserve | reject (400) | delete | upsert |
 | `api_base` | preserve | upsert (empty allowed) | delete | upsert |
 | `request_timeout` | preserve | reject (400) | delete | upsert |
 
@@ -489,7 +516,12 @@ Mixed data is acceptable: the same hand-off occurs when a user restarts the serv
 
 **Response 400:**
 ```json
-{ "error": "invalid_request", "message": "...", "details": { "provider": "must be one of: local, dashscope, openai" } }
+{
+  "error": "Invalid provider value",
+  "code": "invalid_request",
+  "request_id": "<uuid v4>",
+  "details": { "provider": "must be one of: local, dashscope, openai" }
+}
 ```
 
 **Response 500:** SQLite write failure or other unexpected error. Settings remain unchanged on the server (transactional rollback).
@@ -500,12 +532,14 @@ Mixed data is acceptable: the same hand-off occurs when a user restarts the serv
 
 Test-specific field semantics (different from update):
 
-| Field | Missing or `""` | Validated value |
-|---|---|---|
-| `api_key` | use current effective value (from `runtime_config`) | use payload value |
-| other fields | use payload value if present; else 400 | use payload value |
+| Field | Missing | Empty string `""` | Validated value |
+|---|---|---|---|
+| `api_key` | use current effective value | use current effective value | use payload value |
+| other fields | use current effective value | reject (400) | use payload value |
 
-This lets the user "test connectivity with the saved key + a tweaked api_base" without re-entering the key.
+This lets the user "test connectivity with the saved key + a tweaked api_base" without re-entering the key, and lets the user probe the current saved configuration with no payload at all (`POST {}`).
+
+The test endpoint shares `_validate_settings_payload` with the update endpoint but passes `allow_empty_api_key=True` so empty `api_key` falls through to the saved value instead of being rejected.
 
 **Response 200 (success):** `{ "ok": true, "latency_ms": 423, "detail": "openai: model 'gpt-4o' reachable" }`
 
@@ -521,11 +555,18 @@ This lets the user "test connectivity with the saved key + a tweaked api_base" w
 
 ### Error response format
 
+All error responses follow the existing `make_error_response()` helper in `openrecall/server/api_v1.py`:
+
 ```json
-{ "error": "<code>", "message": "<human-readable>", "details": { ... } }
+{
+  "error": "<human-readable message>",
+  "code": "<machine-readable code>",
+  "request_id": "<uuid v4>",
+  "details": { ... }
+}
 ```
 
-Codes used:
+`details` is optional and merged via `**extra`. Codes used:
 - `invalid_request` (400) — validation failure
 - `internal_error` (500) — unexpected exception
 
@@ -580,7 +621,10 @@ Codes used:
 - POST contains only dirty fields:
   ```js
   for (const k of Object.keys(this.form)) {
-    if (this.form[k] !== this.pristine[k]) payload[k] = this.form[k];
+    // Normalize types before comparison: request_timeout may be int from API vs string in form
+    const a = String(this.form[k]);
+    const b = String(this.pristine[k]);
+    if (a !== b) payload[k] = this.form[k];
   }
   if (!this.apiKeyEditing) delete payload.api_key;
   ```
@@ -605,8 +649,9 @@ Codes used:
 - Changing Provider does NOT auto-clear Model / API Key / API Base
 - Placeholders update:
   - `openai` → model `gpt-4o`, base `https://api.openai.com/v1`
-  - `dashscope` → model `qwen-vl-max`, base `https://dashscope.aliyuncs.com/...`
+  - `dashscope` → model `qwen-vl-max`, base `https://dashscope.aliyuncs.com/compatible-mode/v1`
   - `local` → model `qwen-vl-7b`, base `http://localhost:11434/v1`
+- **Provider–model/base mismatch detection:** When the user changes provider and the current Model or API Base value matches the *previous* provider's default placeholder, the UI auto-updates that field to the new provider's default. This prevents accidentally sending `gpt-4o` to DashScope or pointing OpenAI at the Ollama URL. If a field has been manually edited (does not match any provider's default), it is left untouched — the user is responsible for correcting it. Model and API Base are evaluated independently using the same rule.
 
 ### Unsaved-Changes Guard
 
@@ -673,7 +718,7 @@ Absolute timeout 30 seconds regardless of `payload.request_timeout`. Probe runs 
 - Reset → GET returns TOML
 - `api_key: null` → SQLite row deleted, mask becomes ""
 - `api_key` missing → preserved
-- `api_key: ""` → preserved (NOT cleared)
+- `api_key: ""` → reject (400), same as other fields
 
 ---
 
@@ -719,37 +764,36 @@ Absolute timeout 30 seconds regardless of `payload.request_timeout`. Probe runs 
 
 GET:
 1. Default GET (no SQLite, TOML matches `DEFAULTS`) returns hardcoded defaults; api_key_masked=""; source=`default` for every field
-2. SQLite override → returns SQLite values, source=sqlite
-3. TOML override (TOML != DEFAULTS) → source=toml
-4. Mixed → mixed sources
+2. SQLite override → returns SQLite values, source=`sqlite` (verified after a POST that writes the override)
+3. TOML override (TOML != DEFAULTS) → source=`toml`
 
 POST update:
-5. Partial POST updates only listed fields
-6. Full POST updates all
-7. Provider not in enum → 400 + details
-8. Timeout out of range → 400
-9. api_base not http(s) → 400
-10. `api_key: null` → SQLite row deleted
-11. `api_key: ""` → preserved
-12. Missing `api_key` key → preserved
-13. POST then GET returns updated values (masked)
-14. POST bumps `runtime_settings.ai_processing_version` **only when state actually changes**
-15. POST clears `factory._instances['description']` **only when state actually changes**
-16. Empty `{}` body POST → 200, no version bump, no factory invalidate
-17. POST with all values equal to current effective → 200, no version bump
+4. Partial POST updates only listed fields
+5. Full POST updates all fields in one call
+6. Provider not in enum → 400 + `details.provider`
+7. Timeout out of range → 400 + `details.request_timeout`
+8. api_base not http(s) → 400 + `details.api_base`
+9. `api_key: null` → SQLite row deleted, mask becomes ""
+10. `api_key: ""` → 400 rejected (consistent with all fields)
+11. Missing `api_key` field → preserved (POST other fields, then GET still shows old masked key)
+12. POST then GET returns updated values (with api_key masked)
+13. POST bumps `runtime_settings.ai_processing_version` **only when state actually changes**
+14. POST clears `factory._instances['description']` **only when state actually changes**
+15. Empty `{}` body POST → 200, no version bump, no factory invalidate
+16. POST with all values equal to current effective → 200, no version bump
+17. Unknown keys in payload silently ignored (no 400, no log spam)
+18. SQLite write failure → 500 + form preserved (mocked failure)
 
 POST test:
-18. Successful probe → ok:true + latency_ms
-19. 401 → ok:false + error (HTTP still 200)
-20. Network timeout → ok:false + error (HTTP still 200)
-21. Test does NOT write to SQLite; subsequent GET unchanged
-22. Test with empty api_key → backend uses runtime_config effective value
-23. Test with missing api_key field → backend uses runtime_config effective value (same as empty)
+19. Successful probe → 200 with `ok:true` + `latency_ms` + `detail` (mocked HTTP 200)
+20. Provider returns 401 → 200 with `ok:false` + `error` (HTTP still 200; mocked HTTP 401)
+21. Network timeout → 200 with `ok:false` + `error` (mocked timeout)
+22. Test does NOT write to SQLite; subsequent GET unchanged
+23. Test with empty or missing `api_key` → backend uses runtime_config effective value for the probe
 
 POST reset:
-24. Reset deletes all `description.*` rows
-25. After reset, GET returns TOML (or hardcoded default)
-26. Reset bumps version **only if effective values changed** (no-op if all SQLite rows already matched TOML)
+24. Reset deletes all `description.*` SQLite rows; subsequent GET reflects TOML/defaults with source=`toml`/`default`
+25. Reset bumps version **only if effective values changed** (no-op if all SQLite rows already matched TOML)
 
 ### Worker (`tests/test_description_worker_hot_reload.py`)
 
@@ -761,15 +805,24 @@ POST reset:
 
 ### Mocking Strategy
 
-- HTTP probes mocked via `responses` library
+- HTTP probes mocked via `responses` library (or `requests_mock` if already a project dep)
 - Provider classes use fakes for tests
 - `factory._instances` cleared in fixture teardown
+- `runtime_settings.ai_processing_version` saved at fixture setup and restored at teardown — the global is shared across tests, so leak protection is mandatory
+- `runtime_config._settings_store` and `_toml_settings` reset to `None` in fixture teardown (module-level singletons)
 - TOML settings: per-test temporary `ServerSettings` instance
 
 ### Existing Tests Affected
 
-Re-run and adapt as needed:
-- `tests/test_description_provider.py` — factory now reads `runtime_config`, may need stub
+The factory now reads via `runtime_config` rather than `settings.description_*`. Tests that
+construct providers via the factory must initialize `runtime_config` first; tests that
+construct providers directly (e.g. `OpenAIDescriptionProvider(api_key=...)`) are unaffected
+except for the `timeout=settings.ai_request_timeout` line that becomes
+`get_description_request_timeout()` — those tests need either a fixture that calls
+`init_runtime_config(tmp_path, ServerSettings(...))` or a monkeypatch on
+`get_description_request_timeout`. Affected files:
+
+- `tests/test_description_provider.py` — add fixture (concrete patch in plan Task 5)
 - `tests/test_description_models.py` — same
 - `tests/test_chat_mvp_*.py` — smoke pass
 
@@ -802,7 +855,7 @@ Re-run and adapt as needed:
 | Embedding scope? | Out of scope (vector dim mismatch with existing LanceDB rows). |
 | DB file? | Independent `~/.myrecall/server/db/settings.db`, not mixed with `edge.db`. |
 | Client→Server transport? | Direct CORS call from client UI to `<edge_base_url>/v1/...`; no client-side proxy. |
-| Field-level explicit clear? | `api_key: null` = explicit delete; missing key or `""` = preserve. |
+| Field-level explicit clear? | `api_key: null` = explicit delete; missing key = preserve; `""` = reject (400), consistent with all fields. |
 | Source tag display? | Only `[overridden]` chip on sqlite-sourced fields; hover for full source. |
 | POST shape? | Dirty-only (frontend computes diff from `pristine`). |
 

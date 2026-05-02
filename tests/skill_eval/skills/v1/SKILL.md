@@ -220,7 +220,7 @@ curl "http://localhost:8083/v1/search?q=GitHub+PR&mode=vector&start_time=${START
 | `device_name` | Monitor/device name |
 | `frame_url` | API path to fetch frame image |
 | `embedding_status` | Vector embedding status: `""` (not queued), `pending`, `completed`, or `failed` |
-| `description` | AI-generated description object with `narrative`, `summary`, `tags[]`. Omitted if `description_status` is not `completed`. |
+| `description` | AI-generated description object with `narrative`, `summary`, `tags[]`. Null if not generated. |
 | `score` | Unified relevance score (all modes) |
 | `fts_score` | FTS5 BM25 score — typically negative, more negative = better match |
 | `fts_rank` | Position in FTS results (hybrid mode only) |

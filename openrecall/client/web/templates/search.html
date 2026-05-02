@@ -620,6 +620,15 @@
       <option value="false">No</option>
     </select>
   </div>
+  <div class="form-group">
+    <label for="limit">Per Page</label>
+    <select id="limit" name="limit">
+      <option value="10">10</option>
+      <option value="20" selected>20</option>
+      <option value="40">40</option>
+      <option value="80">80</option>
+    </select>
+  </div>
   <button type="submit" class="btn-search">Search</button>
 </form>
 
@@ -724,6 +733,19 @@
       searchMode = urlMode;
     }
     updateSearchModePillState();
+  }
+
+  // Initialize limit from URL
+  function initLimitFromUrl() {
+    const params = new URLSearchParams(window.location.search);
+    const urlLimit = params.get('limit');
+    const limitSelect = document.getElementById('limit');
+    if (urlLimit && limitSelect) {
+      const validLimits = ['10', '20', '40', '80'];
+      if (validLimits.includes(urlLimit)) {
+        limitSelect.value = urlLimit;
+      }
+    }
   }
 
   // Set search mode
@@ -883,7 +905,9 @@
     // Include text for grid view display
     params.set('include_text', 'true');
 
-    params.set('limit', '20');
+    const limitSelect = document.getElementById('limit');
+    const limitValue = limitSelect ? limitSelect.value : '20';
+    params.set('limit', limitValue);
     params.set('offset', offset.toString());
 
     return params.toString();
@@ -1159,7 +1183,7 @@
           </div>
           <div class="card-footer">
             <div class="score-display">${renderScoreInfo(item, idx, pagination)}${renderEmbeddingBadge(item)}</div>
-            <div class="result-position">#${idx + 1} / ${pagination.total}</div>
+            <div class="result-position">#${pagination.offset + idx + 1} / ${pagination.total}</div>
           </div>
         </article>
       `;
@@ -1241,8 +1265,9 @@
     }
   });
 
-  // Initialize search mode from URL
+  // Initialize search mode and limit from URL
   initSearchModeFromUrl();
+  initLimitFromUrl();
 
   // Load initial results if URL has params
   if (window.location.search) {

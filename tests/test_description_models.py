@@ -6,15 +6,15 @@ from openrecall.server.description.models import FrameDescription, FrameContext
 @pytest.mark.unit
 def test_frame_description_new_fields():
     """Test FrameDescription accepts narrative, summary, tags."""
-    # Create a narrative that is within 1024 characters (54 chars * 18 = 972)
-    narrative = ("This is a detailed description of the screen content. " * 18).rstrip()
-    assert len(narrative) <= 1024
+    # Create a narrative that is within 2048 characters (54 chars * 37 = 1998)
+    narrative = ("This is a detailed description of the screen content. " * 37).rstrip()
+    assert len(narrative) <= 2048
     desc = FrameDescription(
         narrative=narrative,
         summary="Brief summary of activity",
         tags=["github", "coding", "browsing"]
     )
-    assert len(desc.narrative) <= 1024
+    assert len(desc.narrative) <= 2048
     assert len(desc.summary) <= 256
     assert 0 <= len(desc.tags) <= 10
 
@@ -125,8 +125,8 @@ def test_frame_description_to_db_dict():
 
 @pytest.mark.unit
 def test_frame_description_narrative_max_length():
-    """Test narrative max length is 1024."""
-    long_narrative = "x" * 1025
+    """Test narrative max length is 2048."""
+    long_narrative = "x" * 2049
     with pytest.raises(ValidationError):
         FrameDescription(
             narrative=long_narrative,
