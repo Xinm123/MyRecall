@@ -67,8 +67,9 @@ When a user wants to switch the description model from `gpt-4o` to `qwen-vl-max`
                                                       │  ai/factory.py (PATCHED)                   │
                                                       │   └─ invalidate(capability)                │
                                                       │                                            │
-                                                      │  config_runtime.RuntimeSettings (existing) │
-                                                      │   └─ bump_ai_processing_version()          │
+                                                      │  config_runtime.RuntimeSettings (PATCHED)  │
+                                                      │   └─ bump_ai_processing_version() (NEW)    │
+                                                      │       atomically increments + notify_change│
                                                       │                                            │
                                                       │  description/worker.py (PATCHED)           │
                                                       │   └─ batch loop checks version,            │
@@ -97,11 +98,12 @@ POST /v1/settings/description
   → 200
 
 (asynchronously, on next worker batch)
-DescriptionWorker._loop():
-  if current_version != last_version:
-    self._service = None       ← force lazy rebuild
-    last_version = current_version
-  service = self._get_service()  ← rebuilt from runtime_config getters
+DescriptionWorker._process_batch():
+  current_version = runtime_settings.ai_processing_version
+  if current_version != self._last_processing_version:
+    self._service = None              ← force lazy rebuild
+    self._last_processing_version = current_version
+  ...self.service... (property triggers rebuild → factory → runtime_config)
 ```
 
 In-flight task: completes with old provider. Next batch builds with new provider.
@@ -121,7 +123,7 @@ class ServerSettingsStore:
         "description.model":            "",
         "description.api_key":          "",
         "description.api_base":         "",
-        "description.request_timeout":  "60",
+        "description.request_timeout":  "120",
     }
 
     def __init__(self, db_path: pathlib.Path) -> None: ...
@@ -132,10 +134,10 @@ class ServerSettingsStore:
     def reset_to_defaults(self) -> None: ...
 ```
 
-- Schema: `server_settings(key TEXT PRIMARY KEY, value TEXT NOT NULL, updated_at TEXT)`
+- Schema: `server_settings(key TEXT PRIMARY KEY, value TEXT NOT NULL, updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)`
 - DB path: `paths_data_dir / "db" / "settings.db"` (independent file, not mixed with `edge.db`)
 - All values stored as TEXT; callers handle type coercion
-- `_ensure_defaults()` uses `INSERT OR IGNORE` (NOT upsert) so deleted rows fall through to TOML on next read
+- **Defaults are NOT pre-inserted.** `DEFAULTS` is a code-level fallback used by `runtime_config` when a row is absent in SQLite *and* TOML doesn't override the key. Keeping the SQLite table sparse is what gives the source-tag mechanism three distinct states (`sqlite` / `toml` / `default`) and makes Reset semantically meaningful.
 - Single-process write, SQLite WAL mode, no explicit row-level locking (SQLite serializes writes)
 
 ### `openrecall/server/runtime_config.py` (NEW)
@@ -158,21 +160,34 @@ def get_description_api_base() -> str: ...
 def get_description_request_timeout() -> int: ...
 
 def get_effective_description_settings() -> dict:
-    """Returns 5 effective fields with source tags. api_key NOT masked here."""
+    """Returns 5 effective fields with per-field source tags. api_key NOT masked here."""
     return {
         "provider": <effective>, "model": ..., "api_key": ...,
         "api_base": ..., "request_timeout": ...,
-        "_sources": {"provider": "sqlite|toml|default", ...},
+        "source": {"provider": "sqlite|toml|default", ...},  # one tag per field
     }
 ```
+
+**Source determination rule** (per-field):
+
+1. If a non-NULL row exists in `server_settings` for the key → `source = "sqlite"`
+2. Else if the TOML value differs from the hard-coded `ServerSettingsStore.DEFAULTS[key]` → `source = "toml"`
+3. Else → `source = "default"`
+
+This requires comparing the TOML value against `DEFAULTS` (string-coerced). The two value sets must therefore be kept in lock-step: any change to a default value should be applied in both `ServerSettings` (TOML schema) and `ServerSettingsStore.DEFAULTS`. A unit test asserts equality between the two on import (see Testing § Unit `test_server_runtime_config.py` #6).
 
 Masking is the responsibility of the API layer, not `runtime_config`.
 
 ### `openrecall/server/ai/factory.py` (PATCHED)
 
-Add a module-level invalidator:
+The current module has a global `_instances: Dict[str, object] = {}` cache (line 27) but **no lock**. Introduce a module-level lock and an invalidator:
 
 ```python
+import threading
+
+_instances: Dict[str, object] = {}
+_lock = threading.Lock()                       # NEW
+
 def invalidate(capability: str | None = None) -> None:
     """Clear cached provider instance(s). None = clear all."""
     with _lock:
@@ -182,26 +197,76 @@ def invalidate(capability: str | None = None) -> None:
             _instances.pop(capability, None)
 ```
 
+Cache reads/writes inside `get_*_provider()` should also be guarded by `_lock` to prevent the rare race where one thread is rebuilding while another invalidates. (The dict ops are individually atomic under the GIL, but the read-then-build sequence is not.)
+
 Replace direct `settings.description_*` reads in `get_description_provider()` with `runtime_config.get_description_*()` calls. The function body otherwise stays the same — caching, branching by provider, etc.
+
+### `openrecall/server/config_runtime.py` (PATCHED — small addition)
+
+Add one method to the existing `RuntimeSettings` class so the API and reset paths have a single, locked, atomic call site:
+
+```python
+def bump_ai_processing_version(self) -> int:
+    """Atomically increment ai_processing_version and notify waiters.
+    Returns the new version. Used to signal that AI provider config changed.
+    """
+    with self._lock:
+        self.ai_processing_version += 1
+        new_version = self.ai_processing_version
+    self.notify_change()
+    return new_version
+```
+
+Existing callers in `api.py:467,473` (toggle on/off) continue to use `runtime_settings.ai_processing_version += 1`; we do not refactor them in this iteration. The new helper is used only by the new `/v1/settings/description` POST and reset endpoints.
 
 ### `openrecall/server/description/worker.py` (PATCHED)
 
-`DescriptionWorker._loop()` adds a version-check guard at the top of each batch:
+The current worker has a `service: DescriptionService` lazy-init property (line 31, 35-39) and a `run()` loop that calls `_process_batch(conn)` per cycle. The hot-reload guard goes at the top of `_process_batch`, before any work:
 
 ```python
-def _loop(self):
-    last_version = self._read_processing_version()
-    while not self._stop_event.is_set():
-        current = self._read_processing_version()
-        if current != last_version:
-            self._service = None
-            last_version = current
-        # ... existing batch logic ...
+def __init__(self, ...):
+    ...
+    self._last_processing_version: int = -1   # NEW; -1 forces first-batch alignment
+
+def _process_batch(self, conn):
+    from openrecall.server.config_runtime import runtime_settings   # existing import
+    current_version = runtime_settings.ai_processing_version
+    if current_version != self._last_processing_version:
+        if self._service is not None:
+            logger.info(
+                f"DescriptionWorker rebuilding service (version "
+                f"{self._last_processing_version} → {current_version})"
+            )
+        self._service = None                  # next `self.service` access rebuilds
+        self._last_processing_version = current_version
+    # ... existing batch logic (queue stats, claim_description_task, ...)
 ```
 
-`_read_processing_version()` is a one-liner that reads `runtime_settings.ai_processing_version`. The mechanism already exists at `config_runtime.py:75`.
+`self.service` accessor (line 36-39) already lazy-rebuilds when `_service` is None. The new `DescriptionService` it constructs has its own `_provider` cache that calls `factory.get_description_provider()`, which now reads from `runtime_config` and is no longer pinned to a stale instance because `factory.invalidate('description')` cleared the entry.
 
 If `factory.get_description_provider()` raises (e.g. invalid config) on rebuild, log error, mark current task as `description_status='failed'`, **do not exit the worker**. Subsequent batches retry; user-facing symptom is a growing description backlog, which is observable in the UI.
+
+### `openrecall/server/config_server.py` (PATCHED — small addition)
+
+Currently `ServerSettings` has `description_provider`, `description_model`, `description_api_key`, `description_api_base` fields but **no** `description_request_timeout`. The OpenAI description provider uses `settings.ai_request_timeout` at `description/providers/openai.py:71`.
+
+This iteration adds:
+
+```python
+# in ServerSettings dataclass
+description_request_timeout: int = 120  # NEW
+
+# in from_dict()
+description_request_timeout=data.get("description.request_timeout", 120),  # NEW
+```
+
+The new TOML key is `description.request_timeout` (under `[description]` section).
+
+### `openrecall/server/description/providers/openai.py` (PATCHED — small change)
+
+Replace `timeout=settings.ai_request_timeout` (line 71) with `timeout=get_description_request_timeout()` (read at request time, not construction). This makes timeout changes take effect on the very next request without waiting for service rebuild.
+
+DashScope and Local providers do not currently expose a timeout — leave them unchanged in this iteration. Their effective timeout is bounded by SDK defaults; the spec field is mostly meaningful for OpenAI in v1.
 
 ### `openrecall/server/api_v1.py` (PATCHED — adds 4 routes)
 
@@ -216,12 +281,15 @@ API layer owns mask logic (`api_key` → `api_key_masked` in responses).
 
 ### `openrecall/server/app.py` (PATCHED — startup wiring)
 
-```
-init_runtime_config(data_dir, toml_settings)   # NEW
-# factory.py now uses runtime_config getters internally; no app-level wiring needed
-runtime_settings.set_..._enabled(...)          # existing
+A single new line inserted in startup, before workers are launched:
+
+```python
+init_runtime_config(data_dir, toml_settings)   # NEW — must come before start_workers()
+# factory.py now reads via runtime_config; no further app-level wiring needed
 start_workers(...)                              # existing
 ```
+
+Existing initialization of `RuntimeSettings` (feature toggles like `recording_enabled`, `ai_processing_enabled`) is unchanged.
 
 ### `openrecall/client/web/templates/settings.html` (PATCHED)
 
@@ -249,7 +317,7 @@ app.py main():
   ├─ load_toml_settings() → ServerSettings instance
   ├─ init_runtime_config(data_dir, toml_settings)
   │    └─ ServerSettingsStore(data_dir/db/settings.db).__init__()
-  │         └─ create table if not exists, INSERT OR IGNORE defaults
+  │         └─ create table if not exists  (no defaults pre-inserted)
   └─ start workers (DescriptionWorker reads ai_processing_version on first batch)
 ```
 
@@ -258,8 +326,8 @@ app.py main():
 ```
 Client → GET /v1/settings/description
   Server:
-    runtime_config.get_effective_description_settings() → {provider, model, api_key, api_base, request_timeout, _sources}
-    mask api_key → api_key_masked
+    runtime_config.get_effective_description_settings() → {provider, model, api_key, api_base, request_timeout, source}
+    mask api_key → api_key_masked (api_key dropped from response)
   ← 200 { provider, model, api_key_masked, api_base, request_timeout, source: {...} }
 ```
 
@@ -275,21 +343,35 @@ Client → POST /v1/settings/description
    body: { ...only dirty fields..., api_key: <new>|null|missing }
   Server:
     1. validate(payload)
-    2. transaction:
+    2. effective_before = runtime_config.get_effective_description_settings()
+    3. transaction: apply per-field, no early return
          for k,v in payload:
-           if v is None: store.delete(k)        ← null = explicit clear
-           elif v == "" and k == "api_key": pass ← empty key = preserve
-           else: store.set(k, v)
+           if v is None:
+             if store.get(k) is not None:
+               store.delete(k)                       ← null = explicit clear
+           elif v == "" and k == "api_key":
+             pass                                     ← empty key = preserve
+           elif effective_before[k] == v:
+             pass                                     ← already-effective: no-op
+                                                       (avoids flipping source toml→sqlite)
+           else:
+             store.set(k, v)
        commit
-    3. factory.invalidate('description')
-    4. runtime_settings.bump_ai_processing_version()
-    5. read fresh effective + mask
+    4. effective_after = runtime_config.get_effective_description_settings()
+    5. if any value field differs between effective_before and effective_after:
+         # (compare values only — source map is excluded)
+         factory.invalidate('description')
+         runtime_settings.bump_ai_processing_version()
+       (else: skip — no functional change, no need to disturb workers)
+    6. mask api_key, return effective_after
   ← 200 { ...updated effective + masked... }
 
 (async, next worker batch)
-DescriptionWorker:
-  current_version != last_version → self._service = None
-  next service access → factory.get_description_provider() → reads runtime_config → builds with new values
+DescriptionWorker._process_batch():
+  current_version != self._last_processing_version → self._service = None
+  next self.service access → DescriptionService.__init__()._provider==None
+                          → factory.get_description_provider()
+                          → reads runtime_config → builds with new values
 ```
 
 ### 4. POST test (probe without writing)
@@ -301,9 +383,13 @@ Client → POST /v1/settings/description/test
     1. validate(payload)
     2. construct provider instance directly from payload (NOT cached)
     3. probe per provider:
-         openai      → GET {api_base}/models with Bearer
-         dashscope   → SDK chat.completions.create(messages=[{role:user,content:"ping"}], max_tokens=1)
-         local       → GET {api_base}/health (or /v1/models)
+         openai      → GET {api_base}/models with `Authorization: Bearer <api_key>`
+                       Success = HTTP 200; payload not parsed beyond status
+         dashscope   → SDK `chat.completions.create(model=<model>, messages=[{role:"user",content:"ping"}], max_tokens=1)`
+                       Note: this consumes 1 token of quota per probe.
+                       Considered acceptable for an explicitly user-triggered "Test Connection".
+         local       → GET {api_base}/models  (OpenAI-compat /v1/models endpoint)
+                       Success = HTTP 200
        absolute timeout = min(payload.timeout, 30)
     4. Do NOT write to SQLite. Do NOT invalidate factory.
   ← 200 { ok: true,  latency_ms: 423, detail: "..." }
@@ -317,10 +403,17 @@ Note: probe failures return HTTP 200 with `ok:false`. Only payload validation fa
 ```
 Client → POST /v1/settings/description/reset
   Server:
-    for k in [...5 keys]: store.delete(k)
-    factory.invalidate('description')
-    runtime_settings.bump_ai_processing_version()
-  ← 200 { ...effective (now reflects TOML)... }
+    effective_before = runtime_config.get_effective_description_settings()
+    for k in [...5 description.* keys]:
+      if store.get(k) is not None:
+        store.delete(k)
+    effective_after = runtime_config.get_effective_description_settings()
+    if any value field differs between effective_before and effective_after:
+      # (compare values only — source map is excluded; switching from `sqlite` to `toml`
+      #  with the same value should NOT trigger a worker rebuild)
+      factory.invalidate('description')
+      runtime_settings.bump_ai_processing_version()
+  ← 200 { ...effective_after (now reflects TOML)... }
 ```
 
 ### 6. Cancellation Granularity
@@ -390,6 +483,8 @@ Mixed data is acceptable: the same hand-off occurs when a user restarts the serv
 | `api_base` | empty, or matches `^https?://`, length ≤ 512 |
 | `request_timeout` | integer 1–600 |
 
+**Unknown keys** in the request body are **ignored silently** (logged at DEBUG, not WARN). This matches the client settings endpoint's lenient behavior and lets older clients send extra fields without breaking forward-compat.
+
 **Response 200:** same shape as GET, reflecting updated effective state.
 
 **Response 400:**
@@ -401,7 +496,16 @@ Mixed data is acceptable: the same hand-off occurs when a user restarts the serv
 
 ### `POST /v1/settings/description/test`
 
-**Request body:** full payload (provider, model, api_key, api_base, request_timeout). Empty `api_key` → backend uses current effective value.
+**Request body:** full payload (provider, model, api_key, api_base, request_timeout).
+
+Test-specific field semantics (different from update):
+
+| Field | Missing or `""` | Validated value |
+|---|---|---|
+| `api_key` | use current effective value (from `runtime_config`) | use payload value |
+| other fields | use payload value if present; else 400 | use payload value |
+
+This lets the user "test connectivity with the saved key + a tweaked api_base" without re-entering the key.
 
 **Response 200 (success):** `{ "ok": true, "latency_ms": 423, "detail": "openai: model 'gpt-4o' reachable" }`
 
@@ -560,7 +664,8 @@ Absolute timeout 30 seconds regardless of `payload.request_timeout`. Probe runs 
 
 ### Edge-Cases Test Checklist
 
-- Empty body POST → 200 no-op
+- Empty body POST → 200 no-op, **no version bump** (no actual changes)
+- POST where every field equals current effective value → 200, **no version bump**
 - Body contains unknown keys → ignored (consistent with client behavior)
 - Concurrent POSTs from multiple clients → SQLite serializes; last write wins per field
 - Worker mid-batch when settings change → next batch swaps
@@ -585,22 +690,23 @@ Absolute timeout 30 seconds regardless of `payload.request_timeout`. Probe runs 
 
 ### Unit (`tests/test_server_settings_store.py`)
 
-1. Init creates table; `INSERT OR IGNORE` defaults
+1. Init creates table; **does not** pre-insert default rows (table starts empty on first run)
 2. `set/get` round-trip
 3. Two `set` calls on same key: last wins
 4. `delete` then `get` returns None
-5. `get_all` returns all keys (defaults included where unset)
-6. `reset_to_defaults` deletes SQLite rows; `get_all` then returns hardcoded defaults
+5. `get_all` returns only keys that have rows in SQLite (empty dict on fresh init)
+6. `reset_to_defaults` deletes all `description.*` SQLite rows; `get_all` returns `{}` afterwards
 7. Non-existent parent dir → auto-created
 8. Non-string value coerced to string
 
 ### Unit (`tests/test_server_runtime_config.py`)
 
-1. SQLite has value → getter returns SQLite
-2. SQLite empty, TOML has value → getter returns TOML
-3. Both empty → getter returns hardcoded default
-4. `get_effective_description_settings()` returns 5 fields + `_sources`
+1. SQLite has value → getter returns SQLite, source=`sqlite`
+2. SQLite empty, TOML has value differing from `DEFAULTS` → getter returns TOML, source=`toml`
+3. SQLite empty, TOML value equals `DEFAULTS` → getter returns the value, source=`default`
+4. `get_effective_description_settings()` returns 5 fields + `source` map
 5. `init_runtime_config` is idempotent
+6. Consistency: every key in `ServerSettingsStore.DEFAULTS` has a matching default in `ServerSettings` (string-coerced equal). Guards against drift between the two default sets.
 
 ### Unit (`tests/test_server_settings_mask.py`)
 
@@ -612,9 +718,9 @@ Absolute timeout 30 seconds regardless of `payload.request_timeout`. Probe runs 
 ### Integration (`tests/test_server_settings_api.py`)
 
 GET:
-1. Default GET returns hardcoded defaults; api_key_masked=""
+1. Default GET (no SQLite, TOML matches `DEFAULTS`) returns hardcoded defaults; api_key_masked=""; source=`default` for every field
 2. SQLite override → returns SQLite values, source=sqlite
-3. TOML override → source=toml
+3. TOML override (TOML != DEFAULTS) → source=toml
 4. Mixed → mixed sources
 
 POST update:
@@ -627,27 +733,30 @@ POST update:
 11. `api_key: ""` → preserved
 12. Missing `api_key` key → preserved
 13. POST then GET returns updated values (masked)
-14. POST bumps `runtime_settings.ai_processing_version`
-15. POST clears `factory._instances['description']`
+14. POST bumps `runtime_settings.ai_processing_version` **only when state actually changes**
+15. POST clears `factory._instances['description']` **only when state actually changes**
+16. Empty `{}` body POST → 200, no version bump, no factory invalidate
+17. POST with all values equal to current effective → 200, no version bump
 
 POST test:
-16. Successful probe → ok:true + latency_ms
-17. 401 → ok:false + error (HTTP still 200)
-18. Network timeout → ok:false + error (HTTP still 200)
-19. Test does NOT write to SQLite; subsequent GET unchanged
-20. Test with empty api_key → backend uses runtime_config effective value
+18. Successful probe → ok:true + latency_ms
+19. 401 → ok:false + error (HTTP still 200)
+20. Network timeout → ok:false + error (HTTP still 200)
+21. Test does NOT write to SQLite; subsequent GET unchanged
+22. Test with empty api_key → backend uses runtime_config effective value
+23. Test with missing api_key field → backend uses runtime_config effective value (same as empty)
 
 POST reset:
-21. Reset deletes all `description.*` rows
-22. After reset, GET returns TOML (or hardcoded default)
-23. Reset bumps version
+24. Reset deletes all `description.*` rows
+25. After reset, GET returns TOML (or hardcoded default)
+26. Reset bumps version **only if effective values changed** (no-op if all SQLite rows already matched TOML)
 
 ### Worker (`tests/test_description_worker_hot_reload.py`)
 
 1. Init: `_service` is None, version captured
 2. First batch instantiates `_service`; version unchanged
 3. External `bump_ai_processing_version()` → next batch sets `_service = None`
-4. `_get_service()` calls `factory.get_description_provider()` again
+4. After `_service` is reset, accessing `self.service` (lazy property) calls `factory.get_description_provider()` again
 5. After `factory.invalidate('description')`, returned instance is not the previous one (`is not`)
 
 ### Mocking Strategy
