@@ -82,19 +82,9 @@
 
 - [ ] **Step 1: Insert prev/next buttons inside .image-container**
 
-  Add two `<button>` elements inside `.image-container`, between the delete button and the `<img>` tag:
+  In `timeline.html`, find the existing `.image-container` div (around line 693). After the existing delete button (`class="delete-btn"`) and before the `<img>` tag, insert two new buttons:
 
   ```html
-  <div class="image-container">
-    <!-- Delete button (existing, untouched) -->
-    <button
-      type="button"
-      class="delete-btn"
-      title="Delete frame"
-      @click.stop="promptDelete()"
-      x-show="currentFrame"
-    >🗑️</button>
-
     <!-- Previous frame button -->
     <button
       type="button"
@@ -120,12 +110,9 @@
     >
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
     </button>
-
-    <img id="timestampImage"
-      :src="currentFrame ? `${EDGE_BASE_URL}/v1/frames/${currentFrame.frame_id}` : ''"
-      alt="Screenshot">
-  </div>
   ```
+
+  **Do NOT modify** the existing delete button or `<img>` tag.
 
 - [ ] **Step 2: Verify template parses correctly**
 
@@ -142,9 +129,17 @@
 
 - [ ] **Step 1: Add goPrev() and goNext() methods**
 
-  Insert these methods inside the `timelineView()` object, after the `stopPlayback()` method (around line 1033):
+  In the `timelineView()` returned object, locate `stopPlayback()` (around line 1027). Add a comma after its closing `},` then insert the two new methods:
 
   ```javascript
+  stopPlayback() {
+    this.isPlaying = false;
+    if (this.playbackTimer) {
+      clearInterval(this.playbackTimer);
+      this.playbackTimer = null;
+    }
+  },          // ← ensure comma here
+
   goPrev() {
     this.stopPlayback();
     if (this.currentIndex > 0) {
@@ -157,8 +152,10 @@
     if (this.currentIndex < this.frames.length - 1) {
       this.currentIndex += 1;
     }
-  },
+  },          // ← add comma here; next method follows
   ```
+
+  **Critical:** Each method in a JS object literal must be followed by a comma, including the last one if more methods follow. Verify that `goNext()` ends with `,` and the next existing method (`selectSpeed`) begins immediately after.
 
 - [ ] **Step 2: Verify the methods are reachable**
 
@@ -194,6 +191,7 @@
   - [ ] During playback, clicking either arrow stops playback AND navigates
   - [ ] After deleting the last frame, Next arrow disappears automatically
   - [ ] After deleting frame 0 with only 2 frames total, Prev arrow disappears
+  - [ ] After deleting a middle frame, both Prev and Next remain visible
 
 - [ ] **Step 5: Verify visual appearance**
 
@@ -237,3 +235,5 @@
 **Placeholder scan:** No TBD, TODO, or vague steps. All code is provided. No "implement later" references.
 
 **Type consistency:** `currentIndex` and `frames` are the same properties used throughout the existing template. `stopPlayback()` is the existing method called by keyboard handler and slider input.
+
+**Frontend testing:** No existing JavaScript test infrastructure in this project. This frontend-only change relies on manual verification (Task 4).
