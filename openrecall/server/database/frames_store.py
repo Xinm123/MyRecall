@@ -343,6 +343,55 @@ class FramesStore:
                 e,
             )
 
+    def delete_frame(self, frame_id: int) -> tuple[bool, Optional[str]]:
+        """Delete a frame and all associated data.
+
+        Deletes the frame row from `frames` plus all child rows in:
+        ocr_text, accessibility, elements, frame_descriptions,
+        description_tasks, embedding_tasks. The frames_fts virtual
+        table is cleaned automatically by the frames_ad trigger.
+
+        LanceDB embedding and disk JPEG cleanup are the caller's
+        responsibility (they run outside the SQLite transaction).
+
+        Args:
+            frame_id: The frame ID to delete.
+
+        Returns:
+            (success, snapshot_path_or_none)
+            snapshot_path is returned so the caller can delete the
+            JPEG file from disk. None if frame not found.
+        """
+        try:
+            with self._connect() as conn:
+                # Read snapshot_path before deleting
+                row = conn.execute(
+                    "SELECT snapshot_path FROM frames WHERE id = ?",
+                    (frame_id,),
+                ).fetchone()
+                if row is None:
+                    return False, None
+                snapshot_path = row["snapshot_path"]
+
+                # Delete child tables first (SQLite foreign keys not enforced)
+                conn.execute("DELETE FROM ocr_text WHERE frame_id = ?", (frame_id,))
+                conn.execute("DELETE FROM accessibility WHERE frame_id = ?", (frame_id,))
+                conn.execute("DELETE FROM elements WHERE frame_id = ?", (frame_id,))
+                conn.execute("DELETE FROM frame_descriptions WHERE frame_id = ?", (frame_id,))
+                conn.execute("DELETE FROM description_tasks WHERE frame_id = ?", (frame_id,))
+                conn.execute("DELETE FROM embedding_tasks WHERE frame_id = ?", (frame_id,))
+
+                # Delete the frame (frames_fts trigger handles FTS cleanup)
+                conn.execute("DELETE FROM frames WHERE id = ?", (frame_id,))
+                conn.commit()
+
+                logger.info("delete_frame: frame_id=%d deleted", frame_id)
+                return True, snapshot_path
+
+        except sqlite3.Error as e:
+            logger.error("delete_frame failed frame_id=%d: %s", frame_id, e)
+            raise
+
     def get_frame(self, frame_id: int) -> Optional[Frame]:
         try:
             with self._connect() as conn:

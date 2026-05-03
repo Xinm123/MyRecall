@@ -206,6 +206,80 @@ def test_query_by_local_timestamp(test_store):
     assert "App1" not in app_names
 
 
+def test_delete_frame_removes_all_data(test_store):
+    """Verify delete_frame removes frame and all associated child rows."""
+    # Create a frame
+    metadata = {
+        "timestamp": "2026-04-25T20:00:00.000Z",
+        "app_name": "TestApp",
+        "capture_trigger": "idle",
+    }
+    frame_id, is_new = test_store.claim_frame(
+        capture_id="test-delete-frame",
+        metadata=metadata,
+    )
+    assert is_new is True
+
+    # Finalize with a fake snapshot path
+    test_store.finalize_claimed_frame(
+        frame_id=frame_id,
+        capture_id="test-delete-frame",
+        snapshot_path="/fake/path/test.jpg",
+    )
+
+    # Insert child rows manually to verify cascade cleanup
+    with test_store._connect() as conn:
+        conn.execute(
+            "INSERT INTO ocr_text (frame_id, text, text_length, ocr_engine) VALUES (?, 'hello', 5, 'test')",
+            (frame_id,),
+        )
+        conn.execute(
+            "INSERT INTO accessibility (frame_id, timestamp, app_name, window_name, text_content, text_length) VALUES (?, ?, 'App', 'Win', 'text', 4)",
+            (frame_id, "2026-04-25T20:00:00.000Z"),
+        )
+        conn.execute(
+            "INSERT INTO elements (frame_id, source, role, text, depth, sort_order) VALUES (?, 'accessibility', 'button', 'Click', 0, 0)",
+            (frame_id,),
+        )
+        conn.execute(
+            "INSERT INTO frame_descriptions (frame_id, narrative, summary, tags_json) VALUES (?, 'narrative', 'summary', '[]')",
+            (frame_id,),
+        )
+        conn.execute(
+            "INSERT INTO description_tasks (frame_id, status) VALUES (?, 'completed')",
+            (frame_id,),
+        )
+        conn.execute(
+            "INSERT INTO embedding_tasks (frame_id, status) VALUES (?, 'completed')",
+            (frame_id,),
+        )
+        conn.commit()
+
+    # Delete the frame
+    success, snapshot_path = test_store.delete_frame(frame_id)
+    assert success is True
+    assert snapshot_path == "/fake/path/test.jpg"
+
+    # Verify frame and all associated rows are gone (query DB directly)
+    with test_store._connect() as conn:
+        assert conn.execute("SELECT 1 FROM frames WHERE id = ?", (frame_id,)).fetchone() is None
+        assert conn.execute("SELECT 1 FROM ocr_text WHERE frame_id = ?", (frame_id,)).fetchone() is None
+        assert conn.execute("SELECT 1 FROM accessibility WHERE frame_id = ?", (frame_id,)).fetchone() is None
+        assert conn.execute("SELECT 1 FROM elements WHERE frame_id = ?", (frame_id,)).fetchone() is None
+        assert conn.execute("SELECT 1 FROM frame_descriptions WHERE frame_id = ?", (frame_id,)).fetchone() is None
+        assert conn.execute("SELECT 1 FROM description_tasks WHERE frame_id = ?", (frame_id,)).fetchone() is None
+        assert conn.execute("SELECT 1 FROM embedding_tasks WHERE frame_id = ?", (frame_id,)).fetchone() is None
+        # Verify FTS5 is also cleaned (trigger should handle this)
+        assert conn.execute("SELECT 1 FROM frames_fts WHERE id = ?", (frame_id,)).fetchone() is None
+
+
+def test_delete_frame_nonexistent_returns_false(test_store):
+    """Verify delete_frame returns False for non-existent frame."""
+    success, snapshot_path = test_store.delete_frame(999999)
+    assert success is False
+    assert snapshot_path is None
+
+
 def test_get_frames_by_day(test_store):
     """get_frames_by_day returns frames for a specific date."""
     frame_id, _ = test_store.claim_frame(
