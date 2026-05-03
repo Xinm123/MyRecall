@@ -18,6 +18,7 @@ SSOT: docs/v3/spec.md §4.7, §4.8.1, §4.9; docs/v3/http_contract_ledger.md
 
 import json
 import logging
+import sqlite3
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
@@ -703,6 +704,85 @@ def get_frame(frame_id: int):
         )
 
     return send_file(str(path), mimetype="image/jpeg")
+
+
+# ---------------------------------------------------------------------------
+# DELETE /v1/frames/<frame_id>
+# ---------------------------------------------------------------------------
+
+
+@v1_bp.route("/frames/<int:frame_id>", methods=["DELETE"])
+def delete_frame(frame_id: int):
+    """Permanently delete a frame and all associated data.
+
+    Returns:
+        200 JSON       — {"deleted": true, "frame_id": ..., "request_id": ...}
+        404 NOT_FOUND  — Frame not found
+        500 INTERNAL_ERROR — SQLite transaction failure
+    """
+    request_id = str(uuid.uuid4())
+    store = _get_frames_store()
+
+    try:
+        success, snapshot_path = store.delete_frame(frame_id)
+    except sqlite3.Error as exc:
+        logger.exception("delete_frame: DB error frame_id=%d: %s", frame_id, exc)
+        return make_error_response(
+            "Failed to delete frame",
+            "INTERNAL_ERROR",
+            500,
+            request_id=request_id,
+        )
+
+    if not success:
+        return make_error_response(
+            "frame not found",
+            "NOT_FOUND",
+            404,
+            request_id=request_id,
+        )
+
+    # Post-transaction: delete LanceDB embedding (non-blocking)
+    try:
+        from openrecall.server.database.embedding_store import EmbeddingStore
+        embedding_store = EmbeddingStore()
+        embedding_store.delete_by_frame_id(frame_id)
+    except Exception as exc:
+        logger.warning(
+            "delete_frame: LanceDB cleanup failed frame_id=%d: %s",
+            frame_id,
+            exc,
+        )
+
+    # Post-transaction: delete disk JPEG (non-blocking)
+    if snapshot_path:
+        try:
+            path = Path(snapshot_path)
+            if path.exists():
+                path.unlink()
+                logger.debug(
+                    "delete_frame: removed snapshot frame_id=%d path=%s",
+                    frame_id,
+                    snapshot_path,
+                )
+        except OSError as exc:
+            logger.warning(
+                "delete_frame: disk cleanup failed frame_id=%d path=%s: %s",
+                frame_id,
+                snapshot_path,
+                exc,
+            )
+
+    logger.info(
+        "delete_frame: 200 OK frame_id=%d request_id=%s",
+        frame_id,
+        request_id,
+    )
+    return jsonify({
+        "deleted": True,
+        "frame_id": frame_id,
+        "request_id": request_id,
+    })
 
 
 # ---------------------------------------------------------------------------

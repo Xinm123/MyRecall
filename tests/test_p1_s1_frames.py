@@ -148,6 +148,48 @@ class TestFrameReading:
                     shutil.move(str(backup_path), str(path))
 
 
+class TestFrameDeletion:
+    """Integration tests for DELETE /v1/frames/:frame_id."""
+
+    @pytest.mark.integration
+    def test_delete_frame_success(self):
+        """Verify DELETE /v1/frames/:frame_id removes a frame."""
+        conn = sqlite3.connect(str(settings.db_path))
+        cursor = conn.execute(
+            "SELECT id FROM frames WHERE snapshot_path IS NOT NULL LIMIT 1"
+        )
+        row = cursor.fetchone()
+        conn.close()
+
+        if not row:
+            pytest.skip("No existing frames to test deletion")
+
+        frame_id = row[0]
+
+        resp = requests.delete(f"{API_V1}/frames/{frame_id}", timeout=5)
+        assert resp.status_code == 200
+
+        data = resp.json()
+        assert data["deleted"] is True
+        assert data["frame_id"] == frame_id
+        assert "request_id" in data
+
+        # Verify frame is gone
+        conn = sqlite3.connect(str(settings.db_path))
+        cursor = conn.execute("SELECT 1 FROM frames WHERE id = ?", (frame_id,))
+        assert cursor.fetchone() is None
+        conn.close()
+
+    @pytest.mark.integration
+    def test_delete_nonexistent_frame_returns_404(self):
+        """Verify DELETE for non-existent frame returns 404."""
+        resp = requests.delete(f"{API_V1}/frames/999999999", timeout=5)
+        assert resp.status_code == 404
+
+        data = resp.json()
+        assert data["code"] == "NOT_FOUND"
+
+
 def test_frame_local_timestamp_computed_from_utc(test_store):
     """Verify local_timestamp is computed correctly from UTC."""
     utc_ts = "2026-04-25T20:00:00.000Z"
