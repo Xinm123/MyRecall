@@ -416,6 +416,38 @@
     justify-content: center;
   }
 
+  /* Delete button on card image */
+  .card-image-wrapper .delete-btn {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    border: none;
+    background: rgba(0, 0, 0, 0.4);
+    color: white;
+    font-size: 16px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transition: all 0.2s ease;
+    z-index: 10;
+    padding: 0;
+    line-height: 1;
+  }
+
+  .card-image-wrapper:hover .delete-btn {
+    opacity: 1;
+  }
+
+  .card-image-wrapper .delete-btn:hover {
+    background: #FF3B30;
+    transform: scale(1.1);
+  }
+
   .card-image {
     width: 100%;
     height: 100%;
@@ -1513,6 +1545,127 @@
     padding: 10px 12px;
   }
 }
+
+  /* Delete confirm dialog */
+  .delete-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 2000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .delete-dialog {
+    width: 360px;
+    background: var(--bg-card);
+    border-radius: 16px;
+    padding: 32px 28px;
+    text-align: center;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  }
+
+  .delete-dialog-icon {
+    font-size: 40px;
+    margin-bottom: 16px;
+  }
+
+  .delete-dialog h3 {
+    margin: 0 0 8px 0;
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--text-primary);
+  }
+
+  .delete-dialog p {
+    margin: 0 0 24px 0;
+    font-size: 14px;
+    color: var(--text-secondary);
+    line-height: 1.5;
+  }
+
+  .delete-dialog-actions {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+  }
+
+  .btn-cancel {
+    padding: 10px 20px;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    background: var(--bg-card);
+    color: var(--text-primary);
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-family: var(--font-stack);
+  }
+
+  .btn-cancel:hover {
+    background: var(--bg-body);
+  }
+
+  .btn-delete-confirm {
+    padding: 10px 20px;
+    border: none;
+    border-radius: 8px;
+    background: #FF3B30;
+    color: white;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-family: var(--font-stack);
+    min-width: 80px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+  }
+
+  .btn-delete-confirm:hover:not(:disabled) {
+    background: #E6352B;
+  }
+
+  .btn-delete-confirm:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+
+  /* Toast notification */
+  .toast {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    padding: 12px 20px;
+    background: #333;
+    color: white;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 500;
+    z-index: 3000;
+    animation: toastIn 0.3s ease-out;
+  }
+
+  .toast.toast-out {
+    animation: toastOut 0.3s ease-in forwards;
+  }
+
+  @keyframes toastIn {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  @keyframes toastOut {
+    from { opacity: 1; transform: translateY(0); }
+    to { opacity: 0; transform: translateY(20px); }
+  }
 </style>
 
 <script id="initialEntriesData" type="application/json">{{ entries | tojson | safe }}</script>
@@ -1675,6 +1828,12 @@
             </div>
 
             <div class="card-image-wrapper">
+              <button
+                type="button"
+                class="delete-btn"
+                title="Delete frame"
+                @click.stop="promptDelete(entry, i)"
+              >🗑️</button>
               <img
                 :src="imageSrc(entry)"
                 alt="Screenshot"
@@ -2014,6 +2173,40 @@
       <div style="font-size: 13px; color: var(--text-tertiary); margin-top: 8px;">Select another date to browse history.</div>
     </div>
   </template>
+
+  <!-- Delete Confirm Dialog -->
+  <div
+    x-show="deleteConfirmOpen"
+    class="delete-overlay"
+    @click.self="deleteConfirmOpen = false"
+    @keydown.escape.window="deleteConfirmOpen = false"
+    x-cloak
+  >
+    <div class="delete-dialog">
+      <div class="delete-dialog-icon">🗑️</div>
+      <h3>Delete this frame?</h3>
+      <p>This will permanently remove the screenshot, OCR text, description, and search index.</p>
+      <div class="delete-dialog-actions">
+        <button type="button" class="btn-cancel" @click="deleteConfirmOpen = false">Cancel</button>
+        <button
+          type="button"
+          class="btn-delete-confirm"
+          @click="confirmDelete()"
+          :disabled="deleting"
+        >
+          <template x-if="!deleting">
+            <span>Delete</span>
+          </template>
+          <template x-if="deleting">
+            <span><span class="spinner" style="width: 12px; height: 12px; border-width: 2px;"></span> Deleting...</span>
+          </template>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast -->
+  <div x-show="toastMessage" x-text="toastMessage" class="toast" :class="{ 'toast-out': toastFading }" x-cloak></div>
 </div>
 {% endblock %}
 
@@ -2033,6 +2226,80 @@
       modalTab: 'image',
       retrying: false,
       loading: false,
+      deleteConfirmOpen: false,
+      frameToDelete: null,
+      frameToDeleteIndex: null,
+      deleting: false,
+      toastMessage: '',
+      toastFading: false,
+
+      // ---- Frame Deletion ----
+
+      promptDelete(entry, index) {
+        this.frameToDelete = entry;
+        this.frameToDeleteIndex = index;
+        this.deleteConfirmOpen = true;
+      },
+
+      async confirmDelete() {
+        if (!this.frameToDelete) return;
+        const entry = this.frameToDelete;
+        const index = this.frameToDeleteIndex;
+
+        this.deleting = true;
+        try {
+          const res = await fetch(`${EDGE_BASE_URL}/v1/frames/${entry.frame_id}`, {
+            method: 'DELETE'
+          });
+
+          if (res.ok) {
+            // Remove from entries array
+            this.entries.splice(index, 1);
+
+            // Adjust modal selection if needed
+            if (this.selectedIndex !== null) {
+              if (this.entries.length === 0) {
+                this.selectedIndex = null;
+              } else if (this.selectedIndex === index) {
+                // splice slid next element into this index; keep it unless
+                // we deleted the last item, in which case wrap to first
+                if (this.selectedIndex >= this.entries.length) {
+                  this.selectedIndex = 0;
+                }
+                // Reuse openAt to handle description tab refresh
+                this.openAt(this.selectedIndex);
+              } else if (this.selectedIndex > index) {
+                this.selectedIndex -= 1;
+              }
+            }
+
+            this.showToast('Frame deleted');
+          } else {
+            const data = await res.json().catch(() => ({}));
+            this.showToast(data.error || 'Failed to delete frame');
+          }
+        } catch (e) {
+          console.error('Delete failed:', e);
+          this.showToast('Network error, please try again');
+        } finally {
+          this.deleting = false;
+          this.deleteConfirmOpen = false;
+          this.frameToDelete = null;
+          this.frameToDeleteIndex = null;
+        }
+      },
+
+      showToast(message) {
+        this.toastMessage = message;
+        this.toastFading = false;
+        setTimeout(() => {
+          this.toastFading = true;
+          setTimeout(() => {
+            this.toastMessage = '';
+            this.toastFading = false;
+          }, 300);
+        }, 2000);
+      },
 
       syncLastCheckFromEntries(list) {
         let maxMs = this.lastCheckMs;
