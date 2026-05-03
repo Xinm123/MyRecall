@@ -434,6 +434,49 @@
     transform: scale(1.1);
   }
 
+  /* Navigation arrows on timeline image */
+  .nav-arrow {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    border: none;
+    background: rgba(0, 0, 0, 0.35);
+    color: white;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+    z-index: 5;
+    padding: 0;
+    line-height: 1;
+  }
+
+  .nav-arrow:hover {
+    background: rgba(0, 0, 0, 0.6);
+    transform: translateY(-50%) scale(1.1);
+  }
+
+  .nav-arrow:focus-visible {
+    outline: 2px solid var(--accent-color);
+    outline-offset: 2px;
+  }
+
+  .nav-arrow svg {
+    display: block;
+  }
+
+  .nav-arrow-left {
+    left: 12px;
+  }
+
+  .nav-arrow-right {
+    right: 12px;
+  }
+
   /* Delete confirm dialog (same styles as grid) */
   .delete-overlay {
     position: fixed;
@@ -698,6 +741,33 @@
         @click.stop="promptDelete()"
         x-show="currentFrame"
       >🗑️</button>
+
+      <!-- Previous frame button -->
+      <button
+        type="button"
+        class="nav-arrow nav-arrow-left"
+        title="Previous frame"
+        aria-label="Previous frame"
+        @click.stop="goPrev()"
+        x-show="frames.length > 1 && currentIndex > 0"
+        x-cloak
+      >
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+      </button>
+
+      <!-- Next frame button -->
+      <button
+        type="button"
+        class="nav-arrow nav-arrow-right"
+        title="Next frame"
+        aria-label="Next frame"
+        @click.stop="goNext()"
+        x-show="frames.length > 1 && currentIndex < frames.length - 1"
+        x-cloak
+      >
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+      </button>
+
       <img id="timestampImage"
         :src="currentFrame ? `${EDGE_BASE_URL}/v1/frames/${currentFrame.frame_id}` : ''"
         alt="Screenshot">
@@ -1029,6 +1099,20 @@
         if (this.playbackTimer) {
           clearInterval(this.playbackTimer);
           this.playbackTimer = null;
+        }
+      },
+
+      goPrev() {
+        this.stopPlayback();
+        if (this.currentIndex > 0) {
+          this.currentIndex -= 1;
+        }
+      },
+
+      goNext() {
+        this.stopPlayback();
+        if (this.currentIndex < this.frames.length - 1) {
+          this.currentIndex += 1;
         }
       },
 
