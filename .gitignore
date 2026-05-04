@@ -19,3 +19,4 @@ htmlcov
 _ref/
 
 server-local.toml
+docs/report/
