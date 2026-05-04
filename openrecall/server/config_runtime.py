@@ -263,6 +263,16 @@ class RuntimeSettings:
     def notify_change(self) -> None:
         self._change_event.set()
 
+    def bump_ai_processing_version(self) -> int:
+        """Atomically increment ai_processing_version and notify waiters.
+        Returns the new version. Used to signal that AI provider config changed.
+        """
+        with self._lock:
+            self.ai_processing_version += 1
+            new_version = self.ai_processing_version
+        self.notify_change()
+        return new_version
+
     def wait_for_change(self, timeout: float) -> None:
         self._change_event.wait(timeout)
         self._change_event.clear()

@@ -29,6 +29,7 @@ class DescriptionWorker(threading.Thread):
         self._stop_event = threading.Event()
         self._poll_interval = poll_interval
         self._service: Optional[DescriptionService] = None
+        self._last_processing_version: int = -1  # NEW; -1 forces first-batch alignment
         self._stats_counter = 0
         self._last_stats_time = 0.0
 
@@ -74,6 +75,17 @@ class DescriptionWorker(threading.Thread):
 
     def _process_batch(self, conn: sqlite3.Connection) -> None:
         """Fetch and process one pending description task."""
+        from openrecall.server.config_runtime import runtime_settings
+        current_version = runtime_settings.ai_processing_version
+        if current_version != self._last_processing_version:
+            if self._service is not None:
+                logger.info(
+                    f"DescriptionWorker rebuilding service (version "
+                    f"{self._last_processing_version} -> {current_version})"
+                )
+            self._service = None
+            self._last_processing_version = current_version
+
         # Log queue status periodically
         self._log_queue_status(conn)
 

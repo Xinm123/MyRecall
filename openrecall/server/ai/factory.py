@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import threading
 from typing import TYPE_CHECKING, Dict, Union
 
 if TYPE_CHECKING:
@@ -25,6 +26,16 @@ from openrecall.server.ai.providers import (
 from openrecall.shared.config import settings
 
 _instances: Dict[str, object] = {}
+_lock = threading.Lock()
+
+
+def invalidate(capability: str | None = None) -> None:
+    """Clear cached provider instance(s). None = clear all."""
+    with _lock:
+        if capability is None:
+            _instances.clear()
+        else:
+            _instances.pop(capability, None)
 
 
 def _resolve_ocr_config() -> tuple[str, str, str, str]:
@@ -141,36 +152,50 @@ def get_description_provider() -> "DescriptionProvider":
     No fallback to [ai] section - description must be explicitly configured.
     """
     capability = "description"
+
+    # Fast path: lock-free read
     cached = _instances.get(capability)
     if cached is not None:
         return cached  # type: ignore[return-value]
 
-    # Lazy import to avoid circular dependency
-    from openrecall.server.description.providers import (
-        LocalDescriptionProvider,
-        OpenAIDescriptionProvider,
-        DashScopeDescriptionProvider,
-    )
+    # Slow path: build under lock
+    with _lock:
+        # Re-check inside lock (double-checked locking)
+        cached = _instances.get(capability)
+        if cached is not None:
+            return cached  # type: ignore[return-value]
 
-    # Use [description] section only - no fallback to [ai]
-    provider = settings.description_provider.strip().lower() if settings.description_provider else "local"
-    model_name = settings.description_model
-    api_key = settings.description_api_key
-    api_base = settings.description_api_base
-
-    if provider == "local":
-        instance: DescriptionProvider = LocalDescriptionProvider(model_name=model_name)
-    elif provider == "dashscope":
-        instance = DashScopeDescriptionProvider(api_key=api_key, model_name=model_name)
-    elif provider == "openai":
-        instance = OpenAIDescriptionProvider(
-            api_key=api_key, model_name=model_name, api_base=api_base
+        # Lazy import to avoid circular dependency
+        from openrecall.server.description.providers import (
+            LocalDescriptionProvider,
+            OpenAIDescriptionProvider,
+            DashScopeDescriptionProvider,
         )
-    else:
-        raise AIProviderConfigError(f"Unknown description provider: {provider}")
+        from openrecall.server.runtime_config import (
+            get_description_provider as get_provider_name,
+            get_description_model,
+            get_description_api_key,
+            get_description_api_base,
+        )
 
-    _instances[capability] = instance
-    return instance
+        provider = get_provider_name().strip().lower()
+        model_name = get_description_model()
+        api_key = get_description_api_key()
+        api_base = get_description_api_base()
+
+        if provider == "local":
+            instance: DescriptionProvider = LocalDescriptionProvider(model_name=model_name)
+        elif provider == "dashscope":
+            instance = DashScopeDescriptionProvider(api_key=api_key, model_name=model_name)
+        elif provider == "openai":
+            instance = OpenAIDescriptionProvider(
+                api_key=api_key, model_name=model_name, api_base=api_base
+            )
+        else:
+            raise AIProviderConfigError(f"Unknown description provider: {provider}")
+
+        _instances[capability] = instance
+        return instance
 
 
 def get_multimodal_embedding_provider() -> "MultimodalEmbeddingProvider":

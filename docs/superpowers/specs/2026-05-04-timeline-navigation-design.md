@@ -33,9 +33,9 @@ Adopt **carousel-style overlay buttons** (centered vertically on each side of th
 | Left button    | `left: 12px`                               |
 | Right button   | `right: 12px`                              |
 | Default state  | `background: rgba(0,0,0,0.35)`             |
-| Icon           | White SVG chevron (`stroke="white"`)       |
+| Icon           | White SVG chevron (`stroke="currentColor"`) |
 | Hover          | `background: rgba(0,0,0,0.6)`              |
-| Focus          | Same as hover (visible focus ring for keyboard tab users) |
+| Focus          | `outline: 2px solid var(--accent-color)` with `outline-offset: 2px` on `:focus-visible` |
 | Boundary (first/last) | Hidden (`x-show` / `display: none`) |
 
 ### Layout (within `.image-container`)

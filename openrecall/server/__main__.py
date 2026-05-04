@@ -224,6 +224,13 @@ def main():
 
     ensure_v3_schema()
 
+    # Initialize server-side runtime_config BEFORE any worker dispatch.
+    # All three startup modes (noop, ocr, legacy) may start a DescriptionWorker,
+    # whose first batch reads runtime_config.get_description_*().
+    from openrecall.server.runtime_config import init_runtime_config
+    init_runtime_config(settings.paths_data_dir, settings)
+    logger.info("runtime_config initialized: data_dir=%s", settings.paths_data_dir)
+
     processing_mode = settings.processing_mode.strip().lower()
     worker = None
 

@@ -45,6 +45,7 @@ class ServerSettings(TOMLConfig):
     description_model: str = ""
     description_api_key: str = ""
     description_api_base: str = ""
+    description_request_timeout: int = 120  # NEW
 
     # [reranker]
     reranker_enabled: bool = False
@@ -101,6 +102,7 @@ class ServerSettings(TOMLConfig):
             description_model=data.get("description.model", ""),
             description_api_key=data.get("description.api_key", ""),
             description_api_base=data.get("description.api_base", ""),
+            description_request_timeout=data.get("description.request_timeout", 120),  # NEW
             reranker_enabled=data.get("reranker.enabled", False),
             reranker_mode=data.get("reranker.mode", "api"),
             reranker_url=data.get("reranker.url", "http://localhost:8083/rerank"),

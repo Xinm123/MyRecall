@@ -1,7 +1,31 @@
 """Tests for description provider models and protocol."""
 import json
+from pathlib import Path
 
 import pytest
+from openrecall.server.config_server import ServerSettings
+
+
+@pytest.fixture(autouse=True)
+def _init_runtime_config(tmp_path: Path):
+    """Initialize runtime_config so providers reading get_description_*() succeed.
+
+    Autouse: every test in this module gets a fresh DB and TOML defaults.
+    """
+    import openrecall.server.runtime_config as rc
+    rc._settings_store = None
+    rc._toml_settings = None
+    toml = ServerSettings(
+        description_provider="openai",
+        description_model="gpt-4o",
+        description_api_key="",
+        description_api_base="",
+        description_request_timeout=120,
+    )
+    rc.init_runtime_config(tmp_path, toml)
+    yield
+    rc._settings_store = None
+    rc._toml_settings = None
 
 from openrecall.server.description.models import FrameDescription, FrameContext
 from openrecall.server.description.providers.base import (

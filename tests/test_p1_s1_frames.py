@@ -153,7 +153,7 @@ class TestFrameDeletion:
 
     @pytest.mark.integration
     def test_delete_frame_success(self):
-        """Verify DELETE /v1/frames/:frame_id removes a frame."""
+        """Verify DELETE /v1/frames/:frame_id removes a frame and LanceDB embedding."""
         conn = sqlite3.connect(str(settings.db_path))
         cursor = conn.execute(
             "SELECT id FROM frames WHERE snapshot_path IS NOT NULL LIMIT 1"
@@ -166,6 +166,17 @@ class TestFrameDeletion:
 
         frame_id = row[0]
 
+        # Check if frame has a LanceDB embedding (optional — may not exist)
+        embedding_before = None
+        embedding_store = None
+        try:
+            from openrecall.server.database.embedding_store import EmbeddingStore
+
+            embedding_store = EmbeddingStore()
+            embedding_before = embedding_store.get_by_frame_id(frame_id)
+        except Exception:
+            pass  # LanceDB may not be available in this environment
+
         resp = requests.delete(f"{API_V1}/frames/{frame_id}", timeout=5)
         assert resp.status_code == 200
 
@@ -174,11 +185,18 @@ class TestFrameDeletion:
         assert data["frame_id"] == frame_id
         assert "request_id" in data
 
-        # Verify frame is gone
+        # Verify frame is gone from SQLite
         conn = sqlite3.connect(str(settings.db_path))
         cursor = conn.execute("SELECT 1 FROM frames WHERE id = ?", (frame_id,))
         assert cursor.fetchone() is None
         conn.close()
+
+        # If frame had a LanceDB embedding, verify it was also removed
+        if embedding_before is not None and embedding_store is not None:
+            embedding_after = embedding_store.get_by_frame_id(frame_id)
+            assert embedding_after is None, (
+                f"LanceDB embedding for frame_id={frame_id} was not deleted"
+            )
 
     @pytest.mark.integration
     def test_delete_nonexistent_frame_returns_404(self):

@@ -304,7 +304,10 @@
 {% endblock %}
 
 {% block content %}
-<div class="settings-container" x-data="settingsPage()" x-init="init()">
+<div class="settings-container"
+     x-data="settingsPage()"
+     x-init="init()"
+     @show-toast="showToast($event.detail.message, $event.detail.type)">
   <div class="settings-header">
     <h1>Settings</h1>
     <p>Configure MyRecall client settings. Changes are applied immediately.</p>
@@ -616,6 +619,152 @@
           style="width: 80px;">
         <span style="color: var(--text-secondary); font-size: 13px;">sec</span>
       </div>
+    </div>
+  </div>
+
+  <!-- Server (Edge) Settings Section -->
+  <div class="settings-section" x-data="serverSettings()" x-init="initServerSettings()">
+    <h2>Server (Edge) Settings</h2>
+
+    <!-- Connection status chip -->
+    <div style="margin-bottom: 16px;">
+      <span
+        class="status-badge"
+        :class="edgeConnected ? 'status-success' : 'status-error'"
+        x-text="edgeStatusText"
+      ></span>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Provider</label>
+      <select
+        class="form-input"
+        x-model="serverForm.provider"
+        @change="onProviderChange()"
+        :disabled="!edgeConnected"
+      >
+        <option value="local">Local (Ollama)</option>
+        <option value="openai">OpenAI</option>
+        <option value="dashscope">DashScope</option>
+      </select>
+      <span
+        x-show="serverPristine.source && serverPristine.source.provider === 'sqlite'"
+        style="font-size: 11px; color: var(--accent-color); margin-top: 4px; display: inline-block;"
+      >[overridden]</span>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Model</label>
+      <input
+        type="text"
+        class="form-input"
+        x-model="serverForm.model"
+        :placeholder="providerPlaceholders[serverForm.provider]?.model || ''"
+        :disabled="!edgeConnected"
+      >
+      <span
+        x-show="serverPristine.source && serverPristine.source.model === 'sqlite'"
+        style="font-size: 11px; color: var(--accent-color); margin-top: 4px; display: inline-block;"
+      >[overridden]</span>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">API Key</label>
+      <div class="form-input-group">
+        <input
+          :type="apiKeyEditing ? 'text' : 'password'"
+          class="form-input"
+          x-model="serverForm.api_key"
+          :disabled="!edgeConnected || !apiKeyEditing"
+          :placeholder="apiKeyEditing ? 'Enter API key' : ''"
+        >
+        <button
+          class="btn btn-secondary"
+          @click="apiKeyEditing = !apiKeyEditing"
+          :disabled="!edgeConnected"
+          x-text="apiKeyEditing ? 'Cancel' : 'Edit'"
+        ></button>
+        <button
+          class="btn btn-secondary"
+          @click="clearApiKey()"
+          :disabled="!edgeConnected"
+          title="Clear API key"
+        >Clear</button>
+      </div>
+      <span
+        x-show="serverPristine.source && serverPristine.source.api_key === 'sqlite'"
+        style="font-size: 11px; color: var(--accent-color); margin-top: 4px; display: inline-block;"
+      >[overridden]</span>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">API Base URL</label>
+      <input
+        type="url"
+        class="form-input"
+        x-model="serverForm.api_base"
+        :placeholder="providerPlaceholders[serverForm.provider]?.api_base || ''"
+        :disabled="!edgeConnected"
+      >
+      <span
+        x-show="serverPristine.source && serverPristine.source.api_base === 'sqlite'"
+        style="font-size: 11px; color: var(--accent-color); margin-top: 4px; display: inline-block;"
+      >[overridden]</span>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Request Timeout</label>
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <input
+          type="number"
+          class="form-input"
+          x-model="serverForm.request_timeout"
+          min="1"
+          max="600"
+          style="width: 100px;"
+          :disabled="!edgeConnected"
+        >
+        <span style="color: var(--text-secondary); font-size: 13px;">sec</span>
+      </div>
+      <span
+        x-show="serverPristine.source && serverPristine.source.request_timeout === 'sqlite'"
+        style="font-size: 11px; color: var(--accent-color); margin-top: 4px; display: inline-block;"
+      >[overridden]</span>
+    </div>
+
+    <!-- Test result line -->
+    <div x-show="testResult" style="margin-bottom: 16px;">
+      <span
+        class="status-badge"
+        :class="testResult?.ok ? 'status-success' : 'status-error'"
+        x-text="testResultText"
+      ></span>
+    </div>
+
+    <div class="btn-group">
+      <button
+        class="btn btn-secondary"
+        @click="testConnection()"
+        :disabled="!edgeConnected || testing"
+      >
+        <span x-show="!testing">Test Connection</span>
+        <span x-show="testing">Testing...</span>
+      </button>
+      <button
+        class="btn btn-primary"
+        @click="saveServerSettings()"
+        :disabled="!edgeConnected || !hasServerChanges() || saving"
+      >
+        <span x-show="!saving">Save</span>
+        <span x-show="saving">Saving...</span>
+      </button>
+      <button
+        class="btn btn-secondary"
+        @click="resetServerSettings()"
+        :disabled="!edgeConnected || !hasOverrides() || saving"
+      >
+        Reset
+      </button>
     </div>
   </div>
 
@@ -952,6 +1101,255 @@
           this.toast = null;
         }, 3000);
       }
+    };
+  }
+
+  function serverSettings() {
+    return {
+      serverForm: {
+        provider: 'local',
+        model: '',
+        api_key: '',
+        api_base: '',
+        request_timeout: 120,
+      },
+      serverPristine: {
+        provider: 'local',
+        model: '',
+        api_key: '',
+        api_base: '',
+        request_timeout: 120,
+        source: {},
+      },
+      apiKeyEditing: false,
+      edgeConnected: false,
+      edgeStatusText: 'Connecting...',
+      testing: false,
+      testResult: null,
+      saving: false,
+      providerPlaceholders: {
+        openai: { model: 'gpt-4o', api_base: 'https://api.openai.com/v1' },
+        dashscope: { model: 'qwen-vl-max', api_base: 'https://dashscope.aliyuncs.com/compatible-mode/v1' },
+        local: { model: 'qwen-vl-7b', api_base: 'http://localhost:11434/v1' },
+      },
+
+      initServerSettings() {
+        this.checkEdgeHealth();
+        setInterval(() => this.checkEdgeHealth(), 30000);
+      },
+
+      async checkEdgeHealth() {
+        try {
+          const url = window.EDGE_BASE_URL || 'http://localhost:8083';
+          const resp = await fetch(`${url}/v1/health`, { method: 'GET' });
+          if (resp.ok) {
+            const wasConnected = this.edgeConnected;
+            this.edgeConnected = true;
+            this.edgeStatusText = 'Connected';
+            if (!wasConnected) {
+              this.loadServerSettings();
+            }
+          } else {
+            this.edgeConnected = false;
+            this.edgeStatusText = 'Edge unreachable';
+          }
+        } catch (e) {
+          this.edgeConnected = false;
+          this.edgeStatusText = 'Edge unreachable';
+        }
+      },
+
+      async loadServerSettings() {
+        if (!this.edgeConnected) return;
+        try {
+          const base = window.EDGE_BASE_URL || 'http://localhost:8083';
+          const resp = await fetch(`${base}/v1/settings/description`);
+          if (resp.ok) {
+            const data = await resp.json();
+            this.serverForm.provider = data.provider || 'local';
+            this.serverForm.model = data.model || '';
+            this.serverForm.api_key = data.api_key_masked || '';
+            this.serverForm.api_base = data.api_base || '';
+            this.serverForm.request_timeout = data.request_timeout || 120;
+            this.serverPristine = { ...this.serverForm, source: data.source || {} };
+          }
+        } catch (e) {
+          console.error('Failed to load server settings:', e);
+        }
+      },
+
+      onProviderChange() {
+        const oldProvider = this.serverPristine.provider;
+        const newProvider = this.serverForm.provider;
+        const oldPlaceholder = this.providerPlaceholders[oldProvider];
+        const newPlaceholder = this.providerPlaceholders[newProvider];
+        if (oldPlaceholder && newPlaceholder && this.serverForm.model === oldPlaceholder.model) {
+          this.serverForm.model = newPlaceholder.model;
+        }
+        if (oldPlaceholder && newPlaceholder && this.serverForm.api_base === oldPlaceholder.api_base) {
+          this.serverForm.api_base = newPlaceholder.api_base;
+        }
+      },
+
+      hasServerChanges() {
+        return (
+          String(this.serverForm.provider) !== String(this.serverPristine.provider) ||
+          String(this.serverForm.model) !== String(this.serverPristine.model) ||
+          (this.apiKeyEditing && this.serverForm.api_key !== '') ||
+          String(this.serverForm.api_base) !== String(this.serverPristine.api_base) ||
+          String(this.serverForm.request_timeout) !== String(this.serverPristine.request_timeout)
+        );
+      },
+
+      hasOverrides() {
+        return this.serverPristine.source &&
+          Object.values(this.serverPristine.source).some(s => s === 'sqlite');
+      },
+
+      async testConnection() {
+        this.testing = true;
+        this.testResult = null;
+        try {
+          const base = window.EDGE_BASE_URL || 'http://localhost:8083';
+          const payload = {
+            provider: this.serverForm.provider,
+            model: this.serverForm.model,
+            api_base: this.serverForm.api_base,
+            request_timeout: parseInt(this.serverForm.request_timeout) || 120,
+          };
+          if (this.apiKeyEditing && this.serverForm.api_key) {
+            payload.api_key = this.serverForm.api_key;
+          }
+          const resp = await fetch(`${base}/v1/settings/description/test`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+          });
+          if (resp.ok) {
+            this.testResult = await resp.json();
+          } else {
+            this.testResult = { ok: false, error: 'Request failed' };
+          }
+        } catch (e) {
+          this.testResult = { ok: false, error: e.message || 'Connection failed' };
+        } finally {
+          this.testing = false;
+        }
+      },
+
+      get testResultText() {
+        if (!this.testResult) return '';
+        if (this.testResult.ok) {
+          return `✓ ${this.testResult.latency_ms}ms · ${this.testResult.detail || 'OK'}`;
+        }
+        return `✗ ${this.testResult.error || 'Failed'}`;
+      },
+
+      async saveServerSettings() {
+        this.saving = true;
+        try {
+          const payload = {};
+          for (const k of Object.keys(this.serverForm)) {
+            if (k === 'api_key') continue;
+            const a = String(this.serverForm[k]);
+            const b = String(this.serverPristine[k]);
+            if (a !== b) {
+              payload[k] = k === 'request_timeout' ? (parseInt(this.serverForm[k]) || 120) : this.serverForm[k];
+            }
+          }
+          if (this.apiKeyEditing && this.serverForm.api_key) {
+            payload.api_key = this.serverForm.api_key;
+          }
+          const base = window.EDGE_BASE_URL || 'http://localhost:8083';
+          const resp = await fetch(`${base}/v1/settings/description`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+          });
+          if (resp.ok) {
+            const data = await resp.json();
+            this.serverPristine = {
+              provider: data.provider,
+              model: data.model,
+              api_key: data.api_key_masked || '',
+              api_base: data.api_base,
+              request_timeout: data.request_timeout,
+              source: data.source,
+            };
+            this.apiKeyEditing = false;
+            this.showToast('Server settings saved', 'success');
+          } else {
+            const err = await resp.json();
+            this.showToast(err.error || 'Save failed', 'error');
+          }
+        } catch (e) {
+          console.error('Save failed:', e);
+          this.showToast('Save failed', 'error');
+        } finally {
+          this.saving = false;
+        }
+      },
+
+      clearApiKey() {
+        if (!confirm('Clear API key?')) return;
+        this.serverForm.api_key = '';
+        this.apiKeyEditing = false;
+        this.saveServerSettingsWithKey(null);
+      },
+
+      async saveServerSettingsWithKey(apiKeyValue) {
+        this.saving = true;
+        try {
+          const base = window.EDGE_BASE_URL || 'http://localhost:8083';
+          const resp = await fetch(`${base}/v1/settings/description`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ api_key: apiKeyValue }),
+          });
+          if (resp.ok) {
+            const data = await resp.json();
+            this.serverPristine.api_key = data.api_key_masked || '';
+            this.serverPristine.source = data.source;
+          }
+        } catch (e) {
+          console.error('Clear API key failed:', e);
+        } finally {
+          this.saving = false;
+        }
+      },
+
+      async resetServerSettings() {
+        if (!confirm('Reset all description settings to defaults? Workers will switch to TOML config.')) {
+          return;
+        }
+        this.saving = true;
+        try {
+          const base = window.EDGE_BASE_URL || 'http://localhost:8083';
+          const resp = await fetch(`${base}/v1/settings/description/reset`, { method: 'POST' });
+          if (resp.ok) {
+            const data = await resp.json();
+            this.serverForm.provider = data.provider;
+            this.serverForm.model = data.model;
+            this.serverForm.api_key = data.api_key_masked || '';
+            this.serverForm.api_base = data.api_base;
+            this.serverForm.request_timeout = data.request_timeout;
+            this.serverPristine = { ...this.serverForm, source: data.source };
+            this.apiKeyEditing = false;
+            this.showToast('Server settings reset to defaults', 'success');
+          } else {
+            this.showToast('Reset failed', 'error');
+          }
+        } catch (e) {
+          console.error('Reset failed:', e);
+          this.showToast('Reset failed', 'error');
+        } finally {
+          this.saving = false;
+        }
+      },
+
+      showToast(message, type) {
+        this.$dispatch('show-toast', { message, type });
+      },
     };
   }
 </script>

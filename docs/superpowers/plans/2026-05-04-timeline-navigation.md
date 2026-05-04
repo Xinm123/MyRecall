@@ -54,6 +54,11 @@
     transform: translateY(-50%) scale(1.1);
   }
 
+  .nav-arrow:focus-visible {
+    outline: 2px solid var(--accent-color);
+    outline-offset: 2px;
+  }
+
   .nav-arrow svg {
     display: block;
   }
@@ -69,9 +74,23 @@
 
 - [ ] **Step 2: Verify CSS is syntactically valid**
 
-  Run: `python -c "from bs4 import BeautifulSoup; soup = BeautifulSoup(open('openrecall/client/web/templates/timeline.html').read(), 'html.parser'); print('Style block found:', bool(soup.find('style')))"`
+  Run: `python -c "
+  import html.parser
+  content = open('openrecall/client/web/templates/timeline.html').read()
+  start = content.find('<style>')
+  end = content.find('</style>')
+  if start != -1 and end != -1:
+      css = content[start + 7:end]
+      # Basic syntax check: braces are balanced
+      if css.count('{') == css.count('}'):
+          print('Style block valid: True')
+      else:
+          print('Style block valid: False — unbalanced braces')
+  else:
+      print('Style block found: False')
+  "`
 
-  Expected output: `Style block found: True`
+  Expected output: `Style block valid: True`
 
 ---
 
@@ -129,7 +148,7 @@
 
 - [ ] **Step 1: Add goPrev() and goNext() methods**
 
-  In the `timelineView()` returned object, locate `stopPlayback()` (around line 1027). Add a comma after its closing `},` then insert the two new methods:
+  In the `timelineView()` returned object, locate `stopPlayback()` (around line 1027). It already ends with a comma. Insert the two new methods immediately after it:
 
   ```javascript
   stopPlayback() {
@@ -138,7 +157,7 @@
       clearInterval(this.playbackTimer);
       this.playbackTimer = null;
     }
-  },          // ← ensure comma here
+  },
 
   goPrev() {
     this.stopPlayback();
@@ -152,10 +171,50 @@
     if (this.currentIndex < this.frames.length - 1) {
       this.currentIndex += 1;
     }
-  },          // ← add comma here; next method follows
+  },
   ```
 
-  **Critical:** Each method in a JS object literal must be followed by a comma, including the last one if more methods follow. Verify that `goNext()` ends with `,` and the next existing method (`selectSpeed`) begins immediately after.
+  **Critical:** `goNext()` must end with a comma since `selectSpeed()` follows it in the object literal.
+
+  Use this exact `old_string` / `new_string` replacement to avoid errors:
+
+  ```
+  old_string:
+        stopPlayback() {
+          this.isPlaying = false;
+          if (this.playbackTimer) {
+            clearInterval(this.playbackTimer);
+            this.playbackTimer = null;
+          }
+        },
+
+        selectSpeed(speed) {
+
+  new_string:
+        stopPlayback() {
+          this.isPlaying = false;
+          if (this.playbackTimer) {
+            clearInterval(this.playbackTimer);
+            this.playbackTimer = null;
+          }
+        },
+
+        goPrev() {
+          this.stopPlayback();
+          if (this.currentIndex > 0) {
+            this.currentIndex -= 1;
+          }
+        },
+
+        goNext() {
+          this.stopPlayback();
+          if (this.currentIndex < this.frames.length - 1) {
+            this.currentIndex += 1;
+          }
+        },
+
+        selectSpeed(speed) {
+  ```
 
 - [ ] **Step 2: Verify the methods are reachable**
 

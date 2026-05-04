@@ -15,7 +15,7 @@ from openrecall.server.description.providers.base import (
     DescriptionProviderConfigError,
 )
 from openrecall.server.ai.providers import _normalize_api_base
-from openrecall.shared.config import settings
+from openrecall.server.runtime_config import get_description_request_timeout
 
 logger = logging.getLogger(__name__)
 
@@ -68,7 +68,7 @@ class OpenAIDescriptionProvider(DescriptionProvider):
 
         try:
             start_time = time.time()
-            resp = requests.post(url, headers=headers, json=payload, timeout=settings.ai_request_timeout)
+            resp = requests.post(url, headers=headers, json=payload, timeout=get_description_request_timeout())
             elapsed = time.time() - start_time
         except Exception as e:
             raise DescriptionProviderRequestError(f"OpenAI request failed: {e}") from e

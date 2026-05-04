@@ -8,6 +8,8 @@
 
 **Tech Stack:** Python (Flask, SQLite), Alpine.js, Jinja2 templates
 
+> **Line numbers:** All line numbers referenced in this plan are approximate and based on the codebase state at plan-writing time. Implementers should use the actual line numbers from the current files.
+
 ---
 
 ## File Structure
@@ -87,7 +89,7 @@ def test_delete_frame_removes_all_data(test_store):
     assert success is True
     assert snapshot_path == "/fake/path/test.jpg"
 
-    # Verify all rows are gone
+    # Verify frame and all associated rows are gone (query DB directly)
     with test_store._connect() as conn:
         assert conn.execute("SELECT 1 FROM frames WHERE id = ?", (frame_id,)).fetchone() is None
         assert conn.execute("SELECT 1 FROM ocr_text WHERE frame_id = ?", (frame_id,)).fetchone() is None
@@ -419,7 +421,7 @@ Add the following CSS inside the existing `<style>` block in `index.html`, after
 
 - [ ] **Step 2: Add confirm dialog and toast styles**
 
-Add at the end of the `<style>` block, before the closing `</style>` tag (around line 1516, just before `{% endblock %}` of `extra_head`):
+Add at the end of the `<style>` block, before the closing `</style>` tag (around line 1516):
 
 ```css
   /* Delete confirm dialog */
@@ -594,9 +596,10 @@ Add the confirm dialog and toast markup at the end of the main `div` (after the 
     x-show="deleteConfirmOpen"
     class="delete-overlay"
     @click.self="deleteConfirmOpen = false"
+    @keydown.escape.window="deleteConfirmOpen = false"
     x-cloak
   >
-    <div class="delete-dialog" @click.stop>
+    <div class="delete-dialog">
       <div class="delete-dialog-icon">🗑️</div>
       <h3>Delete this frame?</h3>
       <p>This will permanently remove the screenshot, OCR text, description, and search index.</p>
@@ -654,7 +657,7 @@ Add the following methods to `memoryGrid()`, before `syncLastCheckFromEntries()`
 
         this.deleting = true;
         try {
-          const res = await fetch(`${EDGE_BASE_URL}/v1/frames/${entry.id}`, {
+          const res = await fetch(`${EDGE_BASE_URL}/v1/frames/${entry.frame_id}`, {
             method: 'DELETE'
           });
 
@@ -667,12 +670,13 @@ Add the following methods to `memoryGrid()`, before `syncLastCheckFromEntries()`
               if (this.entries.length === 0) {
                 this.selectedIndex = null;
               } else if (this.selectedIndex === index) {
-                // Deleted the currently viewed frame in modal
-                if (index < this.entries.length) {
-                  // Stay at same index (next slides in)
-                } else {
-                  this.selectedIndex = this.entries.length - 1;
+                // splice slid next element into this index; keep it unless
+                // we deleted the last item, in which case wrap to first
+                if (this.selectedIndex >= this.entries.length) {
+                  this.selectedIndex = 0;
                 }
+                // Reuse openAt to handle description tab refresh
+                this.openAt(this.selectedIndex);
               } else if (this.selectedIndex > index) {
                 this.selectedIndex -= 1;
               }
@@ -923,7 +927,7 @@ Replace with:
         type="button"
         class="delete-btn"
         title="Delete frame"
-        @click="promptDelete()"
+        @click.stop="promptDelete()"
         x-show="currentFrame"
       >🗑️</button>
       <img id="timestampImage"
@@ -943,9 +947,10 @@ Add at the end of the main `div`, before the closing `</div>` (after line 547):
     x-show="deleteConfirmOpen"
     class="delete-overlay"
     @click.self="deleteConfirmOpen = false"
+    @keydown.escape.window="deleteConfirmOpen = false"
     x-cloak
   >
-    <div class="delete-dialog" @click.stop>
+    <div class="delete-dialog">
       <div class="delete-dialog-icon">🗑️</div>
       <h3>Delete this frame?</h3>
       <p>This will permanently remove the screenshot, OCR text, description, and search index.</p>
@@ -994,7 +999,7 @@ Add the following methods to `timelineView()`, before `formattedTime()` or other
 
       async confirmDelete() {
         if (!this.currentFrame) return;
-        const frameId = this.currentFrame.id;
+        const frameId = this.currentFrame.frame_id;
         const index = this.currentIndex;
 
         this.deleting = true;
@@ -1010,7 +1015,6 @@ Add the following methods to `timelineView()`, before `formattedTime()` or other
             // Adjust currentIndex
             if (this.frames.length === 0) {
               this.currentIndex = 0;
-              this.currentFrame = null;
             } else if (index >= this.frames.length) {
               this.currentIndex = this.frames.length - 1;
             }

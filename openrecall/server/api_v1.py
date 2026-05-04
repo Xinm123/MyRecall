@@ -1697,3 +1697,297 @@ def retry_failed_frames():
             request_id=request_id,
         )
 
+
+# ---------------------------------------------------------------------------
+# Settings endpoints
+# ---------------------------------------------------------------------------
+
+import requests  # module-level — `requests` is already a project dependency
+from openrecall.server.runtime_config import _mask_api_key  # single source of truth
+
+# Allowed provider values
+_ALLOWED_DESCRIPTION_PROVIDERS = frozenset({"local", "dashscope", "openai"})
+
+# Field validation rules
+_SETTINGS_FIELD_VALIDATORS = {
+    "provider": lambda v: v in _ALLOWED_DESCRIPTION_PROVIDERS,
+    "model": lambda v: isinstance(v, str) and len(v.strip()) > 0,
+    "api_key": lambda v: isinstance(v, str) and len(v) <= 1024,
+    "api_base": lambda v: v == "" or (
+        isinstance(v, str) and v.startswith(("http://", "https://")) and len(v) <= 512
+    ),
+    "request_timeout": lambda v: isinstance(v, int) and 1 <= v <= 600,
+}
+
+# Map flat field name to SQLite key
+_FIELD_TO_KEY = {
+    "provider": "description.provider",
+    "model": "description.model",
+    "api_key": "description.api_key",
+    "api_base": "description.api_base",
+    "request_timeout": "description.request_timeout",
+}
+
+# Default api_base per provider (matches frontend placeholders)
+_PROVIDER_DEFAULT_API_BASE = {
+    "openai": "https://api.openai.com/v1",
+    "dashscope": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+    "local": "http://localhost:11434/v1",
+}
+
+
+def _validate_settings_payload(
+    payload: dict, allow_empty_api_key: bool = False
+) -> tuple[bool, dict]:
+    """Validate a settings payload. Returns (ok, details dict for errors).
+
+    `allow_empty_api_key=True` is used by the test endpoint to permit an
+    empty `api_key` value (which signals "fall through to the saved key").
+    The update endpoint keeps the stricter behavior: empty api_key is a
+    validation error.
+    """
+    details = {}
+    for field, value in payload.items():
+        if field not in _FIELD_TO_KEY:
+            continue  # unknown keys silently ignored
+        if value is None:
+            continue  # null is valid (means delete)
+        if value == "":
+            if field == "api_base":
+                continue  # empty api_base is allowed
+            if field == "api_key" and allow_empty_api_key:
+                continue  # test endpoint: empty key -> fall back to saved
+            details[field] = "cannot be empty"
+            continue
+        validator = _SETTINGS_FIELD_VALIDATORS.get(field)
+        if validator and not validator(value):
+            details[field] = _field_error_message(field, value)
+    return (not details, details)
+
+
+def _field_error_message(field: str, value) -> str:
+    if field == "provider":
+        return "must be one of: local, dashscope, openai"
+    if field == "model":
+        return "must be a non-empty string"
+    if field == "api_key":
+        return "must be a string with length <= 1024"
+    if field == "api_base":
+        return "must be empty or start with http:// or https://"
+    if field == "request_timeout":
+        return "must be an integer between 1 and 600"
+    return "invalid value"
+
+
+def _build_response_dict(effective: dict) -> dict:
+    """Build the public response shape from a runtime_config effective dict."""
+    return {
+        "provider": effective["provider"],
+        "model": effective["model"],
+        "api_key_masked": _mask_api_key(effective["api_key"]),
+        "api_base": effective["api_base"],
+        "request_timeout": effective["request_timeout"],
+        "source": effective["source"],
+    }
+
+
+@v1_bp.route("/settings/description", methods=["GET"])
+def get_description_settings():
+    """Get effective description settings with source tags."""
+    from openrecall.server.runtime_config import get_effective_description_settings
+
+    effective = get_effective_description_settings()
+    return jsonify(_build_response_dict(effective)), 200
+
+
+@v1_bp.route("/settings/description", methods=["POST"])
+def update_description_settings():
+    """Update description settings. Only listed fields are modified."""
+    from openrecall.server.runtime_config import (
+        get_effective_description_settings,
+        _settings_store,
+    )
+    from openrecall.server.ai.factory import invalidate as factory_invalidate
+
+    try:
+        payload = request.get_json(silent=True) or {}
+    except Exception:
+        return make_error_response("Invalid request format", "invalid_request", 400)
+
+    ok, details = _validate_settings_payload(payload)
+    if not ok:
+        return make_error_response(
+            "Validation failed",
+            "invalid_request",
+            400,
+            details=details,
+        )
+
+    effective_before = get_effective_description_settings()
+
+    # Compute deletes & sets from the payload (no SQLite writes yet).
+    deletes: list[str] = []
+    sets: dict[str, str] = {}
+    for field, value in payload.items():
+        if field not in _FIELD_TO_KEY:
+            continue
+        key = _FIELD_TO_KEY[field]
+        if value is None:
+            if _settings_store.get(key) is not None:
+                deletes.append(key)
+        elif effective_before[field] == value:
+            continue  # no-op: already effective; do NOT flip source toml->sqlite
+        else:
+            sets[key] = str(value)
+
+    # Apply atomically. ANY SQLite failure -> 500, no partial write
+    try:
+        _settings_store.apply_changes(deletes, sets)
+    except Exception:
+        logger.exception("SQLite write failed in update_description_settings")
+        return make_error_response(
+            "Storage error",
+            "internal_error",
+            500,
+        )
+
+    effective_after = get_effective_description_settings()
+
+    # Compare values only (source map excluded)
+    value_fields = {"provider", "model", "api_key", "api_base", "request_timeout"}
+    changed = any(
+        effective_before.get(f) != effective_after.get(f)
+        for f in value_fields
+    )
+
+    if changed:
+        try:
+            factory_invalidate("description")
+        except Exception:
+            logger.exception("factory.invalidate failed (settings already saved)")
+        runtime_settings.bump_ai_processing_version()
+        logger.info(
+            f"description settings updated: deletes={deletes}, sets={list(sets.keys())}, "
+            f"version={runtime_settings.ai_processing_version}"
+        )
+
+    return jsonify(_build_response_dict(effective_after)), 200
+
+
+@v1_bp.route("/settings/description/test", methods=["POST"])
+def test_description_settings():
+    """Test provider connectivity without writing to SQLite."""
+    from openrecall.server.runtime_config import (
+        get_description_provider,
+        get_description_model,
+        get_description_api_key,
+        get_description_api_base,
+        get_description_request_timeout,
+    )
+
+    try:
+        payload = request.get_json(silent=True) or {}
+    except Exception:
+        return make_error_response("Invalid request format", "invalid_request", 400)
+
+    ok, details = _validate_settings_payload(payload, allow_empty_api_key=True)
+    if not ok:
+        return make_error_response(
+            "Validation failed", "invalid_request", 400, details=details
+        )
+
+    provider = payload.get("provider", get_description_provider())
+    model = payload.get("model", get_description_model())
+    api_key_payload = payload.get("api_key")
+    api_key = api_key_payload if api_key_payload else get_description_api_key()
+    api_base = payload.get("api_base", get_description_api_base())
+    timeout = payload.get("request_timeout", get_description_request_timeout())
+
+    result = _probe_provider(provider, model, api_key, api_base, timeout)
+    return jsonify(result), 200
+
+
+def _probe_provider(
+    provider: str, model: str, api_key: str, api_base: str, timeout: int
+) -> dict:
+    """Probe a provider via OpenAI-compat `GET {api_base}/models`."""
+    import time
+
+    abs_timeout = min(int(timeout), 30)
+    start = time.time()
+
+    if provider not in _ALLOWED_DESCRIPTION_PROVIDERS:
+        return {"ok": False, "error": f"Unknown provider: {provider}", "latency_ms": 0}
+
+    base = (api_base or _PROVIDER_DEFAULT_API_BASE.get(provider, "")).rstrip("/")
+    if not base:
+        return {"ok": False, "error": "api_base is required", "latency_ms": 0}
+
+    url = f"{base}/models"
+    headers = {}
+    if api_key:
+        headers["Authorization"] = f"Bearer {api_key}"
+
+    try:
+        resp = requests.get(url, headers=headers, timeout=abs_timeout)
+        latency_ms = int((time.time() - start) * 1000)
+        if resp.status_code == 200:
+            return {
+                "ok": True,
+                "latency_ms": latency_ms,
+                "detail": f"{provider}: reachable",
+            }
+        return {
+            "ok": False,
+            "error": f"{resp.status_code} {resp.reason}",
+            "latency_ms": latency_ms,
+        }
+    except requests.exceptions.Timeout:
+        latency_ms = int((time.time() - start) * 1000)
+        return {"ok": False, "error": "timeout", "latency_ms": latency_ms}
+    except Exception as e:
+        latency_ms = int((time.time() - start) * 1000)
+        return {"ok": False, "error": str(e)[:200], "latency_ms": latency_ms}
+
+
+@v1_bp.route("/settings/description/reset", methods=["POST"])
+def reset_description_settings():
+    """Reset all description settings to defaults (delete SQLite overrides)."""
+    from openrecall.server.runtime_config import (
+        get_effective_description_settings,
+        _settings_store,
+    )
+    from openrecall.server.ai.factory import invalidate as factory_invalidate
+
+    effective_before = get_effective_description_settings()
+
+    try:
+        _settings_store.reset_to_defaults()
+    except Exception:
+        logger.exception("SQLite write failed in reset_description_settings")
+        return make_error_response(
+            "Storage error",
+            "internal_error",
+            500,
+        )
+
+    effective_after = get_effective_description_settings()
+
+    value_fields = {"provider", "model", "api_key", "api_base", "request_timeout"}
+    changed = any(
+        effective_before.get(f) != effective_after.get(f)
+        for f in value_fields
+    )
+
+    if changed:
+        try:
+            factory_invalidate("description")
+        except Exception:
+            logger.exception("factory.invalidate failed (settings already reset)")
+        runtime_settings.bump_ai_processing_version()
+        logger.info(
+            f"description settings reset to defaults, version={runtime_settings.ai_processing_version}"
+        )
+
+    return jsonify(_build_response_dict(effective_after)), 200
+

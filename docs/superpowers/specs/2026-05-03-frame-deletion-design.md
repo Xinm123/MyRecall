@@ -16,14 +16,14 @@ When a frame is deleted, the following must be cleaned up:
 
 | Layer | Target | Method |
 |-------|--------|--------|
-| SQLite (transaction) | `frames` row | `DELETE FROM frames WHERE id = ?` |
+| SQLite (transaction) | `frames` row (includes `visibility_status` and all columns) | `DELETE FROM frames WHERE id = ?` |
 | SQLite (transaction) | `ocr_text` row | `DELETE FROM ocr_text WHERE frame_id = ?` |
 | SQLite (transaction) | `accessibility` row | `DELETE FROM accessibility WHERE frame_id = ?` |
 | SQLite (transaction) | `elements` rows | `DELETE FROM elements WHERE frame_id = ?` |
 | SQLite (transaction) | `frame_descriptions` row | `DELETE FROM frame_descriptions WHERE frame_id = ?` |
 | SQLite (transaction) | `description_tasks` row | `DELETE FROM description_tasks WHERE frame_id = ?` |
 | SQLite (transaction) | `embedding_tasks` row | `DELETE FROM embedding_tasks WHERE frame_id = ?` |
-| SQLite (transaction) | `frames_fts` (FTS5) | Auto-cleaned via `content='frames'` + `content_rowid='id'` |
+| SQLite (transaction) | `frames_fts` (FTS5) | Auto-cleaned via `frames_ad` AFTER DELETE trigger |
 | LanceDB (post-transaction) | embedding vector | `EmbeddingStore.delete_by_frame_id(frame_id)` |
 | Disk (post-transaction) | JPEG snapshot | `os.remove(snapshot_path)` |
 
@@ -149,10 +149,14 @@ A centered modal overlay that appears when the delete button is clicked:
 **Grid**:
 1. Remove the deleted entry from `entries` array via `splice`
 2. If the modal is open and the deleted frame is the current selection:
-   - If there is a next frame → navigate to it (`next()`)
-   - If it's the last frame → navigate to previous (`prev()`)
-   - If no frames remain → close modal
-3. Show toast: "Frame deleted" (auto-dismiss after 2 seconds)
+   - `splice` automatically slides the next element into the deleted position
+   - Call `openAt(this.selectedIndex)` to refresh the modal content, including description data if the description tab is active
+   - If the deleted frame was the last one → `openAt(0)` wraps to the first frame
+   - If no frames remain → close modal (`selectedIndex = null`)
+3. If `selectedIndex` pointed to a frame after the deleted one → decrement by 1
+4. Show toast: "Frame deleted" (auto-dismiss after 2 seconds)
+
+> **Note on design decision:** Grid wraps to the first frame when deleting the last one, while Timeline shows the previous frame. This is intentional — Grid's modal is a browsing experience where wrapping feels natural, whereas Timeline is a chronological playback where going backward is more appropriate.
 
 **Timeline**:
 1. Remove the deleted frame from `frames` array via `splice`
@@ -202,8 +206,7 @@ deleting: false,
 
 1. `FramesStore.delete_frame(frame_id)`:
    - Delete existing frame → returns `(True, snapshot_path)`
-   - Verify all associated rows are gone (ocr_text, accessibility, elements, descriptions, tasks)
-   - Verify frame no longer appears in `get_frame()`
+   - Verify all associated rows are gone (frames, ocr_text, accessibility, elements, frame_descriptions, description_tasks, embedding_tasks, frames_fts)
    - Delete non-existent frame → returns `(False, None)`
 
 2. `DELETE /v1/frames/{id}`:
@@ -215,7 +218,7 @@ deleting: false,
 
 1. Delete frame → verify not returned by search API
 2. Delete frame → verify not in timeline API
-3. Delete frame → verify LanceDB embedding removed
+3. Delete frame → verify LanceDB embedding removed (check `EmbeddingStore.get_by_frame_id()` returns None)
 
 ## Files to Modify
 
@@ -225,8 +228,7 @@ deleting: false,
 | `openrecall/server/api_v1.py` | Add `DELETE /v1/frames/<frame_id>` route |
 | `openrecall/client/web/templates/index.html` | Add delete button to card image + confirm dialog + Alpine.js methods |
 | `openrecall/client/web/templates/timeline.html` | Add delete button to image container + confirm dialog + Alpine.js methods |
-| `tests/test_p1_s1_frames.py` | Add tests for `delete_frame()` |
-| `tests/test_api_v1.py` | Add tests for DELETE endpoint |
+| `tests/test_p1_s1_frames.py` | Add tests for `delete_frame()` and DELETE endpoint |
 
 ## Out of Scope
 

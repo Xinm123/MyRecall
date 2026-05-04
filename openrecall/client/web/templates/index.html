@@ -2179,7 +2179,7 @@
     x-show="deleteConfirmOpen"
     class="delete-overlay"
     @click.self="deleteConfirmOpen = false"
-    @keydown.escape.window="deleteConfirmOpen = false"
+    @keydown.escape.window="if (deleteConfirmOpen) deleteConfirmOpen = false"
     x-cloak
   >
     <div class="delete-dialog">

@@ -464,13 +464,15 @@ def update_config():
                         "AI processing disabled: Will stop picking up new tasks"
                     )
                     sql_store.cancel_processing_tasks()
-                    runtime_settings.ai_processing_version += 1
+                    # RLock allows nested acquire — bump_ai_processing_version takes _lock again
+                    runtime_settings.bump_ai_processing_version()
                 if (
                     field == "ai_processing_enabled"
                     and value
                     and not getattr(runtime_settings, field)
                 ):
-                    runtime_settings.ai_processing_version += 1
+                    # RLock allows nested acquire — bump_ai_processing_version takes _lock again
+                    runtime_settings.bump_ai_processing_version()
 
                 setattr(runtime_settings, field, value)
                 runtime_settings.notify_change()
