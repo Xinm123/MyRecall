@@ -91,5 +91,5 @@ pytest tests/test_p1_s1_health_parsing.py -v
 ## Coverage
 
 ```bash
-pytest --cov=openrecall --cov-report=term-missing
+pytest --cov=myrecall --cov-report=term-missing
 ```

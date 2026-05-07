@@ -1,6 +1,6 @@
-# OpenRecall Server Configuration Template
+# MyRecall Server Configuration Template
 # Copy this file to ~/.myrecall/server.toml or ./server.toml and fill in your values
-# Or use: openrecall-server --config /path/to/server.toml
+# Or use: myrecall-server --config /path/to/server.toml
 
 # ==============================================================================
 # Server Settings

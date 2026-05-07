@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import pytest
 
-from openrecall.client.events.base import CaptureTrigger, RoutedCaptureTask
-from openrecall.client.recorder import ScreenRecorder
+from myrecall.client.events.base import CaptureTrigger, RoutedCaptureTask
+from myrecall.client.recorder import ScreenRecorder
 
 
 @pytest.mark.unit
@@ -80,7 +80,7 @@ def test_timestamp_represents_capture_completion_time(
 ) -> None:
     recorder = ScreenRecorder()
     monkeypatch.setattr(
-        "openrecall.client.recorder.utc_now_iso", lambda: "2026-03-15T00:00:01Z"
+        "myrecall.client.recorder.utc_now_iso", lambda: "2026-03-15T00:00:01Z"
     )
     task = RoutedCaptureTask(
         capture_trigger=CaptureTrigger.MANUAL,

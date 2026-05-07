@@ -12,9 +12,9 @@ Mark: @pytest.mark.integration
 import os
 import pytest
 
-from openrecall.client.chat.pi_manager import find_bun_executable, ensure_installed
-from openrecall.client.chat.service import ChatService
-from openrecall.client.chat.types import PiStatus
+from myrecall.client.chat.pi_manager import find_bun_executable, ensure_installed
+from myrecall.client.chat.service import ChatService
+from myrecall.client.chat.types import PiStatus
 
 
 def is_edge_server_reachable() -> bool:
@@ -58,7 +58,7 @@ class TestChatServiceIntegration:
 
     def test_add_message_and_save(self, chat_service):
         """Messages can be added to conversations."""
-        from openrecall.client.chat.conversation import add_message
+        from myrecall.client.chat.conversation import add_message
 
         conv = chat_service.create_conversation()
         add_message(conv, role="user", content="Hello")

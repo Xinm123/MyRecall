@@ -76,7 +76,7 @@ When switching conversations:
 
 ### 1. Pi RPC Manager
 
-**File**: `openrecall/client/chat/pi_rpc.py`
+**File**: `myrecall/client/chat/pi_rpc.py`
 
 **Responsibilities**:
 - Manage Pi subprocess lifecycle (start, stop, restart)
@@ -132,7 +132,7 @@ Response format (stdout, JSONL):
 
 ### 2. Chat Service
 
-**File**: `openrecall/client/chat/service.py`
+**File**: `myrecall/client/chat/service.py`
 
 **Responsibilities**:
 - Coordinate Pi RPC Manager
@@ -167,7 +167,7 @@ class ChatService:
 
 ### 3. Conversation Manager
 
-**File**: `openrecall/client/chat/conversation.py`
+**File**: `myrecall/client/chat/conversation.py`
 
 **Responsibilities**:
 - CRUD operations for conversations
@@ -222,7 +222,7 @@ def delete_conversation(conversation_id: str) -> bool:
 
 ### 4. SSE Endpoint
 
-**File**: `openrecall/client/chat/routes.py`
+**File**: `myrecall/client/chat/routes.py`
 
 **Endpoints**:
 
@@ -261,7 +261,7 @@ def stream():
 ## Directory Structure
 
 ```
-openrecall/client/chat/
+myrecall/client/chat/
 ├── __init__.py
 ├── service.py           # ChatService - main orchestrator
 ├── pi_rpc.py            # PiRpcManager - subprocess communication

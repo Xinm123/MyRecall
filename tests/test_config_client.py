@@ -1,5 +1,5 @@
 import pytest
-from openrecall.client.config_client import ClientSettings
+from myrecall.client.config_client import ClientSettings
 
 
 def test_client_settings_defaults():

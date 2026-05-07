@@ -6,8 +6,8 @@ from pathlib import Path
 
 import pytest
 
-from openrecall.server.embedding.models import FrameEmbedding
-from openrecall.server.database.embedding_store import EmbeddingStore
+from myrecall.server.embedding.models import FrameEmbedding
+from myrecall.server.database.embedding_store import EmbeddingStore
 
 
 class TestEmbeddingStore:

@@ -9,7 +9,7 @@ import pytest
 from PIL import Image
 from unittest.mock import MagicMock
 
-from openrecall.client.hash_utils import SimhashCache, compute_phash, hamming_distance
+from myrecall.client.hash_utils import SimhashCache, compute_phash, hamming_distance
 
 
 class TestSimhashHeartbeatIntegration:
@@ -140,7 +140,7 @@ class TestSimhashHeartbeatIntegration:
         mock_rc = MagicMock()
         mock_rc.get_dedup_cache_size.return_value = 2
         mock_rc.get_dedup_ttl_seconds.return_value = float("inf")
-        monkeypatch.setattr("openrecall.client.hash_utils.runtime_config", mock_rc)
+        monkeypatch.setattr("myrecall.client.hash_utils.runtime_config", mock_rc)
         cache = SimhashCache(cache_size_per_device=2)
 
         # Add 3 frames

@@ -1,4 +1,4 @@
-from openrecall.client.chat.models import DEFAULT_PROVIDER, DEFAULT_MODEL  # noqa: F401
+from myrecall.client.chat.models import DEFAULT_PROVIDER, DEFAULT_MODEL  # noqa: F401
 
 
 def test_default_provider():

@@ -16,7 +16,7 @@ from pathlib import Path
 
 import pytest
 
-from openrecall.server.search.engine import SearchEngine
+from myrecall.server.search.engine import SearchEngine
 
 
 pytestmark = [pytest.mark.integration, pytest.mark.search, pytest.mark.regression]
@@ -38,7 +38,7 @@ def temp_db():
 
         # Use actual migrations for correct schema
         init_sql = Path(
-            "openrecall/server/database/migrations/20260227000001_initial_schema.sql"
+            "myrecall/server/database/migrations/20260227000001_initial_schema.sql"
         ).read_text()
         conn.executescript(init_sql)
 
@@ -48,17 +48,18 @@ def temp_db():
             "20260317000001_ocr_text_unique_frame_id.sql",
             "20260321120000_dual_hash_storage.sql",
             "20260324120000_add_frame_description.sql",
+            "20260325120000_consolidate_fts_to_full_text.sql",
+            "20260408120000_description_fields_redesign.sql",
             "20260409120000_add_frame_embedding.sql",
+            "20260414000000_add_visibility_status.sql",
+            "20260426000000_add_local_timestamp.sql",
         ]:
-            mig_sql = Path(f"openrecall/server/database/migrations/{mig}").read_text()
+            mig_sql = Path(f"myrecall/server/database/migrations/{mig}").read_text()
             conn.executescript(mig_sql)
 
-        fts_sql = Path(
-            "openrecall/server/database/migrations/20260325120000_consolidate_fts_to_full_text.sql"
-        ).read_text()
-        conn.executescript(fts_sql)
-
         # Insert test frames with full_text populated (post-migration schema)
+        # timestamp is UTC (with Z), local_timestamp is local time (UTC+8, no Z)
+        from myrecall.server.database.frames_store import _utc_to_local_timestamp
         test_frames = [
             (1, "capture-001", "2026-03-18T10:00:00Z", "Safari", "Web Browser", True, "Hello world from Safari"),
             (2, "capture-002", "2026-03-18T11:00:00Z", "VSCode", "main.py", True, "def hello(): pass"),
@@ -66,10 +67,11 @@ def temp_db():
         ]
 
         for frame_id, capture_id, ts, app, window, focused, full_text in test_frames:
+            local_ts = _utc_to_local_timestamp(ts)
             conn.execute(
-                """INSERT INTO frames (id, capture_id, timestamp, app_name, window_name, focused, status, text_source, full_text)
-                   VALUES (?, ?, ?, ?, ?, ?, 'completed', 'ocr', ?)""",
-                (frame_id, capture_id, ts, app, window, focused, full_text),
+                """INSERT INTO frames (id, capture_id, timestamp, local_timestamp, app_name, window_name, focused, status, text_source, full_text, visibility_status)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, 'completed', 'ocr', ?, 'queryable')""",
+                (frame_id, capture_id, ts, local_ts, app, window, focused, full_text),
             )
 
         conn.commit()

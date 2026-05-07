@@ -12,8 +12,8 @@ from pathlib import Path
 
 import pytest
 
-from openrecall.server.database.frames_store import FramesStore
-from openrecall.server.database.migrations_runner import run_migrations
+from myrecall.server.database.frames_store import FramesStore, _utc_to_local_timestamp
+from myrecall.server.database.migrations_runner import run_migrations
 
 
 @pytest.fixture
@@ -22,7 +22,7 @@ def temp_db(tmp_path: Path) -> Path:
     db_path = tmp_path / "test_edge.db"
     conn = sqlite3.connect(str(db_path))
     migrations_dir = Path(__file__).resolve().parent.parent / (
-        "openrecall/server/database/migrations"
+        "myrecall/server/database/migrations"
     )
     run_migrations(conn, migrations_dir)
     conn.close()
@@ -68,6 +68,14 @@ def _create_completed_frame_with_accessibility(
         accessibility_truncated=False,
         elements=elements or [],
     )
+    # Set visibility_status='queryable' so frames appear in activity summary queries
+    # (In production this is set by try_set_queryable when all stages complete)
+    with sqlite3.connect(str(store.db_path)) as conn:
+        conn.execute(
+            "UPDATE frames SET visibility_status = 'queryable' WHERE id = ?",
+            (frame_id,)
+        )
+        conn.commit()
     return frame_id
 
 
@@ -96,8 +104,8 @@ class TestActivitySummaryApps:
         )
 
         apps = store.get_activity_summary_apps(
-            start_time="2026-03-20T09:00:00Z",
-            end_time="2026-03-20T11:00:00Z",
+            start_time=_utc_to_local_timestamp("2026-03-20T09:00:00Z"),
+            end_time=_utc_to_local_timestamp("2026-03-20T11:00:00Z"),
         )
 
         assert len(apps) == 1
@@ -118,10 +126,10 @@ class TestActivitySummaryApps:
             store, "cap-3", "2026-03-20T11:30:00Z", "Safari", "Late"
         )
 
-        # Query 09:00 to 11:00 window
+        # Query 09:00 to 11:00 window (local time = UTC+8)
         apps = store.get_activity_summary_apps(
-            start_time="2026-03-20T09:00:00Z",
-            end_time="2026-03-20T11:00:00Z",
+            start_time=_utc_to_local_timestamp("2026-03-20T09:00:00Z"),
+            end_time=_utc_to_local_timestamp("2026-03-20T11:00:00Z"),
         )
 
         assert apps[0]["frame_count"] == 2  # Only cap-1 and cap-2
@@ -138,8 +146,8 @@ class TestActivitySummaryApps:
         )
 
         apps = store.get_activity_summary_apps(
-            start_time="2026-03-20T09:00:00Z",
-            end_time="2026-03-20T11:00:00Z",
+            start_time=_utc_to_local_timestamp("2026-03-20T09:00:00Z"),
+            end_time=_utc_to_local_timestamp("2026-03-20T11:00:00Z"),
             app_name="Safari",
         )
 
@@ -169,8 +177,8 @@ class TestActivitySummaryTotalFrames:
         )
 
         total = store.get_activity_summary_total_frames(
-            start_time="2026-03-20T09:00:00Z",
-            end_time="2026-03-20T11:00:00Z",
+            start_time=_utc_to_local_timestamp("2026-03-20T09:00:00Z"),
+            end_time=_utc_to_local_timestamp("2026-03-20T11:00:00Z"),
         )
 
         assert total == 2
@@ -189,10 +197,10 @@ class TestActivitySummaryTotalFrames:
             store, "cap-3", "2026-03-20T11:30:00Z", "Safari", "Late"
         )
 
-        # Query 09:00 to 11:00 window
+        # Query 09:00 to 11:00 window (local time = UTC+8)
         total = store.get_activity_summary_total_frames(
-            start_time="2026-03-20T09:00:00Z",
-            end_time="2026-03-20T11:00:00Z",
+            start_time=_utc_to_local_timestamp("2026-03-20T09:00:00Z"),
+            end_time=_utc_to_local_timestamp("2026-03-20T11:00:00Z"),
         )
 
         assert total == 2  # Only cap-1 and cap-2
@@ -209,8 +217,8 @@ class TestActivitySummaryTotalFrames:
         )
 
         total = store.get_activity_summary_total_frames(
-            start_time="2026-03-20T09:00:00Z",
-            end_time="2026-03-20T11:00:00Z",
+            start_time=_utc_to_local_timestamp("2026-03-20T09:00:00Z"),
+            end_time=_utc_to_local_timestamp("2026-03-20T11:00:00Z"),
             app_name="Safari",
         )
 
@@ -232,21 +240,22 @@ class TestActivitySummaryTimeRange:
         )
 
         time_range = store.get_activity_summary_time_range(
-            start_time="2026-03-20T09:00:00Z",
-            end_time="2026-03-20T11:00:00Z",
+            start_time=_utc_to_local_timestamp("2026-03-20T09:00:00Z"),
+            end_time=_utc_to_local_timestamp("2026-03-20T11:00:00Z"),
         )
 
         assert time_range is not None
-        assert time_range["start"] == "2026-03-20T10:00:00Z"
-        assert time_range["end"] == "2026-03-20T10:30:00Z"
+        # Returns local_timestamp (UTC+8)
+        assert time_range["start"] == _utc_to_local_timestamp("2026-03-20T10:00:00Z")
+        assert time_range["end"] == _utc_to_local_timestamp("2026-03-20T10:30:00Z")
 
     def test_activity_summary_time_range_returns_none_when_no_frames(
         self, store: FramesStore
     ):
         """time_range should return None when no frames match."""
         time_range = store.get_activity_summary_time_range(
-            start_time="2026-03-20T09:00:00Z",
-            end_time="2026-03-20T11:00:00Z",
+            start_time=_utc_to_local_timestamp("2026-03-20T09:00:00Z"),
+            end_time=_utc_to_local_timestamp("2026-03-20T11:00:00Z"),
         )
 
         assert time_range is None

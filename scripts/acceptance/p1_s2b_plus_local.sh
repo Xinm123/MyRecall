@@ -14,8 +14,8 @@ Prerequisite:
 Options:
   --evidence-dir DIR      Evidence directory (default: docs/v3/acceptance/phase1/evidence)
   --client-log PATH       Client log file path (default: logs/client.log)
-  --edge-db PATH          Edge DB path (default: ${OPENRECALL_SERVER_DATA_DIR:-$HOME/MRS}/db/edge.db)
-  --spool-dir PATH        Spool dir path (default: ${OPENRECALL_CLIENT_DATA_DIR:-$HOME/MRC}/spool)
+  --edge-db PATH          Edge DB path (default: ${MYRECALL_SERVER_DATA_DIR:-$HOME/MRS}/db/edge.db)
+  --spool-dir PATH        Spool dir path (default: ${MYRECALL_CLIENT_DATA_DIR:-$HOME/MRC}/spool)
   --wait-seconds N        Runtime observation window (default: 20)
   --auto-seed-count N     Auto-insert N synthetic simhash rows into edge.db during runtime window (default: 0)
   --skip-runtime          Only run pytest checks
@@ -31,8 +31,8 @@ EOF
 
 EVIDENCE_DIR="docs/v3/acceptance/phase1/evidence"
 CLIENT_LOG="logs/client.log"
-EDGE_DB="${OPENRECALL_SERVER_DATA_DIR:-$HOME/MRS}/db/edge.db"
-SPOOL_DIR="${OPENRECALL_CLIENT_DATA_DIR:-$HOME/MRC}/spool"
+EDGE_DB="${MYRECALL_SERVER_DATA_DIR:-$HOME/MRS}/db/edge.db"
+SPOOL_DIR="${MYRECALL_CLIENT_DATA_DIR:-$HOME/MRC}/spool"
 WAIT_SECONDS=20
 AUTO_SEED_COUNT=0
 SKIP_RUNTIME=0

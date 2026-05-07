@@ -1,13 +1,13 @@
 # MyRecall v3
 
 ## Project Overview
-MyRecall v3 (formerly OpenRecall) is a fully open-source, privacy-first alternative to proprietary digital memory solutions like Microsoft's Windows Recall or Rewind.ai. It captures your digital history through automatic screenshots and uses local AI to analyze and make them searchable via natural language queries.
+MyRecall v3 is a fully open-source, privacy-first alternative to proprietary digital memory solutions like Microsoft's Windows Recall or Rewind.ai. It captures your digital history through automatic screenshots and uses local AI to analyze and make them searchable via natural language queries.
 
 ### Key Features
 - **Privacy-First**: All data stays local; no cloud is required.
 - **Full-Text Search**: Fast FTS5-based search with metadata filtering (app, window, browser URL, focused state).
 - **Local AI Processing**: Runs OCR and vision understanding entirely on the local machine (supports Qwen-VL locally or cloud providers like OpenAI/DashScope).
-- **Architecture**: Split into Host (Capture + Upload via `openrecall.client`) and Edge (Processing + API via `openrecall.server`).
+- **Architecture**: Split into Host (Capture + Upload via `myrecall.client`) and Edge (Processing + API via `myrecall.server`).
 
 ## Architecture & Data Storage
 - **Host (Client)**: Captures events (idle, app switches, clicks), debounces, and spools them locally to a disk queue (default: `~/MRC`).

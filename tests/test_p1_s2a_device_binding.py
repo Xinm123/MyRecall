@@ -3,13 +3,13 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from openrecall.client.events.base import (
+from myrecall.client.events.base import (
     CaptureTrigger,
     MonitorDescriptor,
     MonitorRegistry,
     TriggerEvent,
 )
-from openrecall.client.recorder import ScreenRecorder
+from myrecall.client.recorder import ScreenRecorder
 
 
 @pytest.mark.unit
@@ -54,7 +54,7 @@ def test_refresh_monitors_rebuilds_partition_state_when_monitor_set_changes(
         ]
     )
     monkeypatch.setattr(
-        "openrecall.client.recorder.list_monitors",
+        "myrecall.client.recorder.list_monitors",
         lambda _primary_only: next(monitor_rounds),
     )
 

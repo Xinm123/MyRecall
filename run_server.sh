@@ -109,7 +109,7 @@ if [[ -n "$env_file" ]]; then
 fi
 
 if [[ "$enable_debug" == "true" ]]; then
-  export OPENRECALL_DEBUG=true
+  export MYRECALL_DEBUG=true
 fi
 
 # Verify Python is available
@@ -119,7 +119,7 @@ if ! command -v python &> /dev/null; then
 fi
 
 # Build command arguments
-cmd_args=("-m" "openrecall.server")
+cmd_args=("-m" "myrecall.server")
 if [[ -n "$config_file" ]]; then
   cmd_args+=("--config" "$config_file")
 fi

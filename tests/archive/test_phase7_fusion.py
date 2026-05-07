@@ -17,7 +17,7 @@ class TestNLPEngine:
     @pytest.fixture(scope="class")
     def nlp_engine(self):
         """Load NLP engine once for all tests."""
-        from openrecall.server.nlp import NLPEngine
+        from myrecall.server.nlp import NLPEngine
         return NLPEngine()
     
     def test_embedding_dimension(self, nlp_engine):
@@ -47,7 +47,7 @@ class TestNLPEngine:
         emb2 = nlp_engine.encode("User is watching a movie")
         
         # Cosine similarity should be less than 1.0
-        from openrecall.server.nlp import cosine_similarity
+        from myrecall.server.nlp import cosine_similarity
         similarity = cosine_similarity(emb1, emb2)
         
         assert similarity < 0.95, f"Embeddings too similar: {similarity}"
@@ -58,9 +58,9 @@ class TestFusionStrategy:
     
     def test_build_fusion_text_with_both(self):
         """Test fusion with both description and OCR text."""
-        import openrecall.server.api
-        importlib.reload(openrecall.server.api)
-        from openrecall.server.api import _build_fusion_text
+        import myrecall.server.api
+        importlib.reload(myrecall.server.api)
+        from myrecall.server.api import _build_fusion_text
         
         result = _build_fusion_text(
             description="User is coding in VS Code",
@@ -72,9 +72,9 @@ class TestFusionStrategy:
     
     def test_build_fusion_text_description_only(self):
         """Test fusion with only description (OCR failed)."""
-        import openrecall.server.api
-        importlib.reload(openrecall.server.api)
-        from openrecall.server.api import _build_fusion_text
+        import myrecall.server.api
+        importlib.reload(myrecall.server.api)
+        from myrecall.server.api import _build_fusion_text
         
         result = _build_fusion_text(
             description="User viewing a video player",
@@ -85,9 +85,9 @@ class TestFusionStrategy:
     
     def test_build_fusion_text_ocr_only(self):
         """Test fusion with only OCR text (AI failed)."""
-        import openrecall.server.api
-        importlib.reload(openrecall.server.api)
-        from openrecall.server.api import _build_fusion_text
+        import myrecall.server.api
+        importlib.reload(myrecall.server.api)
+        from myrecall.server.api import _build_fusion_text
         
         result = _build_fusion_text(
             description=None,
@@ -98,9 +98,9 @@ class TestFusionStrategy:
     
     def test_build_fusion_text_both_empty(self):
         """Test fusion with both empty (edge case)."""
-        import openrecall.server.api
-        importlib.reload(openrecall.server.api)
-        from openrecall.server.api import _build_fusion_text
+        import myrecall.server.api
+        importlib.reload(myrecall.server.api)
+        from myrecall.server.api import _build_fusion_text
         
         result = _build_fusion_text(description=None, ocr_text="")
         assert result == ""
@@ -111,7 +111,7 @@ class TestEmbeddingConfig:
     
     def test_embedding_config_defaults(self):
         """Test that embedding config has correct defaults."""
-        from openrecall.shared.config import Settings
+        from myrecall.shared.config import Settings
         
         s = Settings()
         assert "Qwen3-Embedding-0.6B" in s.embedding_model_name
@@ -120,9 +120,9 @@ class TestEmbeddingConfig:
     def test_embedding_model_can_be_overridden(self):
         """Test that embedding model can be set via environment."""
         with mock.patch.dict(os.environ, {
-            "OPENRECALL_EMBEDDING_MODEL": "custom/model"
+            "MYRECALL_EMBEDDING_MODEL": "custom/model"
         }):
-            from openrecall.shared.config import Settings
+            from myrecall.shared.config import Settings
             s = Settings()
             assert s.embedding_model_name == "custom/model"
 
@@ -132,7 +132,7 @@ class TestGetEmbeddingFunction:
     
     def test_get_embedding_returns_correct_shape(self):
         """Test that get_embedding returns correct shape."""
-        from openrecall.server.nlp import get_embedding
+        from myrecall.server.nlp import get_embedding
         
         embedding = get_embedding("Test text")
         assert embedding.shape == (1024,)
@@ -140,7 +140,7 @@ class TestGetEmbeddingFunction:
     
     def test_get_embedding_empty_returns_zero(self):
         """Test that get_embedding with empty text returns zeros."""
-        from openrecall.server.nlp import get_embedding
+        from myrecall.server.nlp import get_embedding
         
         embedding = get_embedding("")
         assert np.allclose(embedding, 0)
@@ -151,7 +151,7 @@ class TestCosineSimiliarity:
     
     def test_identical_vectors_have_similarity_one(self):
         """Test that identical vectors have similarity 1.0."""
-        from openrecall.server.nlp import cosine_similarity
+        from myrecall.server.nlp import cosine_similarity
         
         vec = np.random.rand(1024).astype(np.float32)
         vec = vec / np.linalg.norm(vec)  # Normalize
@@ -161,7 +161,7 @@ class TestCosineSimiliarity:
     
     def test_orthogonal_vectors_have_similarity_zero(self):
         """Test that orthogonal vectors have similarity 0."""
-        from openrecall.server.nlp import cosine_similarity
+        from myrecall.server.nlp import cosine_similarity
         
         vec1 = np.zeros(1024, dtype=np.float32)
         vec1[0] = 1.0
@@ -173,7 +173,7 @@ class TestCosineSimiliarity:
     
     def test_zero_vector_returns_zero_similarity(self):
         """Test that zero vector returns 0 similarity."""
-        from openrecall.server.nlp import cosine_similarity
+        from myrecall.server.nlp import cosine_similarity
         
         vec1 = np.zeros(1024, dtype=np.float32)
         vec2 = np.random.rand(1024).astype(np.float32)

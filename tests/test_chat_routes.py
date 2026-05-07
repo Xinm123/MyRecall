@@ -6,7 +6,7 @@ import pytest
 @pytest.fixture
 def client():
     """Create test client."""
-    from openrecall.client.web.app import client_app as app
+    from myrecall.client.web.app import client_app as app
     app.config["TESTING"] = True
     with app.test_client() as client:
         yield client
@@ -15,7 +15,7 @@ def client():
 @pytest.fixture
 def chat_service(tmp_path):
     """Create ChatService with temp directory."""
-    from openrecall.client.chat.service import ChatService
+    from myrecall.client.chat.service import ChatService
     return ChatService(tmp_path)
 
 

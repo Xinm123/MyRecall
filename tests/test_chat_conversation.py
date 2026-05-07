@@ -4,7 +4,7 @@ import pytest
 from pathlib import Path
 from datetime import datetime
 
-from openrecall.client.chat.conversation import (
+from myrecall.client.chat.conversation import (
     ensure_chats_dir,
     create_conversation,
     load_conversation,
@@ -13,13 +13,13 @@ from openrecall.client.chat.conversation import (
     delete_conversation,
     add_message,
 )
-from openrecall.client.chat.types import Conversation, Message
+from myrecall.client.chat.types import Conversation, Message
 
 
 class TestEnsureChatsDir:
     def test_creates_directory(self, tmp_path, monkeypatch):
         """ensure_chats_dir creates the chats directory."""
-        import openrecall.client.chat.conversation as conv_mod
+        import myrecall.client.chat.conversation as conv_mod
         monkeypatch.setattr(conv_mod, "CHATS_DIR", tmp_path / "chats")
         result = ensure_chats_dir()
         assert result.exists()
@@ -29,7 +29,7 @@ class TestEnsureChatsDir:
 class TestConversationCRUD:
     def test_create_conversation(self, tmp_path, monkeypatch):
         """create_conversation creates a new conversation with UUID."""
-        import openrecall.client.chat.conversation as conv_mod
+        import myrecall.client.chat.conversation as conv_mod
         monkeypatch.setattr(conv_mod, "CHATS_DIR", tmp_path / "chats")
 
         conv = create_conversation()
@@ -41,7 +41,7 @@ class TestConversationCRUD:
 
     def test_save_and_load_conversation(self, tmp_path, monkeypatch):
         """save_conversation persists and load_conversation retrieves."""
-        import openrecall.client.chat.conversation as conv_mod
+        import myrecall.client.chat.conversation as conv_mod
         monkeypatch.setattr(conv_mod, "CHATS_DIR", tmp_path / "chats")
 
         conv = create_conversation()
@@ -55,7 +55,7 @@ class TestConversationCRUD:
 
     def test_load_nonexistent_returns_none(self, tmp_path, monkeypatch):
         """load_conversation returns None for nonexistent ID."""
-        import openrecall.client.chat.conversation as conv_mod
+        import myrecall.client.chat.conversation as conv_mod
         monkeypatch.setattr(conv_mod, "CHATS_DIR", tmp_path / "chats")
 
         result = load_conversation("nonexistent-id")
@@ -63,7 +63,7 @@ class TestConversationCRUD:
 
     def test_delete_conversation(self, tmp_path, monkeypatch):
         """delete_conversation removes the conversation file."""
-        import openrecall.client.chat.conversation as conv_mod
+        import myrecall.client.chat.conversation as conv_mod
         monkeypatch.setattr(conv_mod, "CHATS_DIR", tmp_path / "chats")
 
         conv = create_conversation()
@@ -76,7 +76,7 @@ class TestConversationCRUD:
 
     def test_delete_nonexistent_returns_false(self, tmp_path, monkeypatch):
         """delete_conversation returns False for nonexistent ID."""
-        import openrecall.client.chat.conversation as conv_mod
+        import myrecall.client.chat.conversation as conv_mod
         monkeypatch.setattr(conv_mod, "CHATS_DIR", tmp_path / "chats")
 
         result = delete_conversation("nonexistent-id")
@@ -86,7 +86,7 @@ class TestConversationCRUD:
 class TestListConversations:
     def test_list_conversations_sorted_by_updated_at(self, tmp_path, monkeypatch):
         """list_conversations returns conversations sorted by updated_at DESC."""
-        import openrecall.client.chat.conversation as conv_mod
+        import myrecall.client.chat.conversation as conv_mod
         import time
         monkeypatch.setattr(conv_mod, "CHATS_DIR", tmp_path / "chats")
 
@@ -115,7 +115,7 @@ class TestListConversations:
 
     def test_list_empty_returns_empty_list(self, tmp_path, monkeypatch):
         """list_conversations returns empty list when no conversations."""
-        import openrecall.client.chat.conversation as conv_mod
+        import myrecall.client.chat.conversation as conv_mod
         monkeypatch.setattr(conv_mod, "CHATS_DIR", tmp_path / "chats")
         ensure_chats_dir()
 
@@ -126,7 +126,7 @@ class TestListConversations:
 class TestAddMessage:
     def test_add_message_appends_to_conversation(self, tmp_path, monkeypatch):
         """add_message appends a message and updates timestamp."""
-        import openrecall.client.chat.conversation as conv_mod
+        import myrecall.client.chat.conversation as conv_mod
         monkeypatch.setattr(conv_mod, "CHATS_DIR", tmp_path / "chats")
 
         conv = create_conversation()
@@ -140,7 +140,7 @@ class TestAddMessage:
 
     def test_add_message_auto_generates_title(self, tmp_path, monkeypatch):
         """add_message auto-generates title from first user message."""
-        import openrecall.client.chat.conversation as conv_mod
+        import myrecall.client.chat.conversation as conv_mod
         monkeypatch.setattr(conv_mod, "CHATS_DIR", tmp_path / "chats")
 
         conv = create_conversation()

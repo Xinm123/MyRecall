@@ -13,10 +13,10 @@ import pytest
 from flask import Flask
 from flask.testing import FlaskClient
 
-from openrecall.server import __main__ as server_main
-from openrecall.server import api, api_v1
-from openrecall.server.config_runtime import runtime_settings
-from openrecall.server.database.frames_store import FramesStore
+from myrecall.server import __main__ as server_main
+from myrecall.server import api, api_v1
+from myrecall.server.config_runtime import runtime_settings
+from myrecall.server.database.frames_store import FramesStore
 
 
 def generate_uuid_v7() -> str:
@@ -541,8 +541,12 @@ def test_queue_status_returns_trigger_channel_and_status_sync(monkeypatch) -> No
 
 @pytest.mark.unit
 def test_layout_health_polling_handles_permission_payload() -> None:
-    content = Path(
-        "/Users/pyw/old/MyRecall/openrecall/server/templates/layout.html"
+    content = (
+        Path(__file__).parent.parent
+        / "myrecall"
+        / "server"
+        / "templates"
+        / "layout.html"
     ).read_text(encoding="utf-8")
 
     assert "capture_permission_status" in content

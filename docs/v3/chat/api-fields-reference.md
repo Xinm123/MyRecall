@@ -102,7 +102,7 @@
   "app_name": "Terminal",
   "window_name": "zsh — 120×40",
   "description": null,
-  "text": "ls -la\nopenrecall\nmyrecall\nscreenshots",
+  "text": "ls -la\nmyrecall\nscreenshots",
   "text_source": "ocr",
   "urls": [],
   "browser_url": null,
@@ -138,7 +138,7 @@
 | `browser_url` | `string` | — | Filter by browser URL |
 | `focused` | `boolean` | — | Filter by focus state |
 | `include_text` | `boolean` | `false` | Include `text` field in response |
-| `max_text_length` | `int` | `1000` | Max characters for `text` field (middle-truncated) |
+| `max_text_length` | `int` | `200` | Max characters for `text` field (middle-truncated) |
 | `content_type` | `string` | `"all"` | **Deprecated** — ignored. All searches return merged results. |
 
 ### Response Fields
@@ -252,11 +252,11 @@
     {
       "frame_id": 99,
       "timestamp": "2026-04-13T10:15:33Z",
-      "text": "GitHub Dashboard Pull requests Issues...143 chars...openrecall MyRecall",
+      "text": "GitHub Dashboard Pull requests Issues...143 chars...MyRecall",
       "text_source": "accessibility",
       "app_name": "Chrome",
       "window_name": "GitHub — MyRecall — Dashboard",
-      "browser_url": "https://github.com/pyw/openrecall",
+      "browser_url": "https://github.com/pyw/myrecall",
       "focused": true,
       "device_name": "monitor_0",
       "frame_url": "/v1/frames/99",
@@ -382,7 +382,7 @@ Example: `"Hello world this is a...143 chars...the end of the document"`
       "timestamp": "2026-03-26T16:30:00Z",
       "summary": "Viewing GitHub repo README",
       "intent": "browsing",
-      "entities": ["GitHub", "openrecall", "MyRecall"]
+      "entities": ["GitHub", "MyRecall"]
     }
   ]
 }

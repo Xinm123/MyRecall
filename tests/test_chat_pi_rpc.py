@@ -7,7 +7,7 @@ import subprocess
 import threading
 import time
 
-from openrecall.client.chat.pi_rpc import PiRpcManager
+from myrecall.client.chat.pi_rpc import PiRpcManager
 
 
 class MockProcess:
@@ -51,7 +51,7 @@ class TestPiRpcManager:
         mgr = PiRpcManager(workspace, lambda e: events.append(e))
         assert mgr.is_running() is False
 
-    @patch("openrecall.client.chat.pi_rpc.find_pi_executable")
+    @patch("myrecall.client.chat.pi_rpc.find_pi_executable")
     @patch("subprocess.Popen")
     def test_start_spawns_process(self, mock_popen, mock_find_pi, tmp_path):
         """start() spawns Pi process with correct arguments."""
@@ -72,7 +72,7 @@ class TestPiRpcManager:
         assert "--mode" in call_args[0][0]
         assert "rpc" in call_args[0][0]
 
-    @patch("openrecall.client.chat.pi_rpc.find_pi_executable")
+    @patch("myrecall.client.chat.pi_rpc.find_pi_executable")
     @patch("subprocess.Popen")
     def test_stop_terminates_process(self, mock_popen, mock_find_pi, tmp_path):
         """stop() terminates the Pi process."""
@@ -89,7 +89,7 @@ class TestPiRpcManager:
 
         assert mgr.is_running() is False
 
-    @patch("openrecall.client.chat.pi_rpc.find_pi_executable")
+    @patch("myrecall.client.chat.pi_rpc.find_pi_executable")
     @patch("subprocess.Popen")
     def test_send_prompt_writes_to_stdin(self, mock_popen, mock_find_pi, tmp_path):
         """send_prompt() writes JSON command to stdin."""
@@ -108,7 +108,7 @@ class TestPiRpcManager:
         # Verify stdin.write was called
         assert mock_process.stdin.write.called
 
-    @patch("openrecall.client.chat.pi_rpc.find_pi_executable")
+    @patch("myrecall.client.chat.pi_rpc.find_pi_executable")
     @patch("subprocess.Popen")
     def test_new_session_sends_command(self, mock_popen, mock_find_pi, tmp_path):
         """new_session() sends new_session command to Pi."""
@@ -132,6 +132,6 @@ class TestPiRpcManager:
         events = []
         mgr = PiRpcManager(workspace, lambda e: events.append(e))
 
-        with patch("openrecall.client.chat.pi_rpc.find_pi_executable", return_value=None):
+        with patch("myrecall.client.chat.pi_rpc.find_pi_executable", return_value=None):
             with pytest.raises(RuntimeError, match="Pi executable not found"):
                 mgr.start("minimax-cn", "MiniMax-M2.7")

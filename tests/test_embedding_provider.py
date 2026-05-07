@@ -3,7 +3,7 @@ import pytest
 import numpy as np
 from unittest.mock import patch, Mock
 
-from openrecall.server.embedding.providers.base import (
+from myrecall.server.embedding.providers.base import (
     MultimodalEmbeddingProvider,
     EmbeddingProviderError,
     EmbeddingProviderConfigError,
@@ -32,7 +32,7 @@ class TestEmbeddingProviderErrors:
 class TestQwenVLEmbeddingProvider:
     def test_init_allows_empty_api_key(self):
         """Empty api_key is allowed for local services without auth."""
-        from openrecall.server.embedding.providers.multimodal import (
+        from myrecall.server.embedding.providers.multimodal import (
             QwenVLEmbeddingProvider,
         )
 
@@ -44,7 +44,7 @@ class TestQwenVLEmbeddingProvider:
         assert provider.dimension == 1024
 
     def test_init_requires_model_name(self):
-        from openrecall.server.embedding.providers.multimodal import (
+        from myrecall.server.embedding.providers.multimodal import (
             QwenVLEmbeddingProvider,
         )
 
@@ -52,7 +52,7 @@ class TestQwenVLEmbeddingProvider:
             QwenVLEmbeddingProvider(api_key="test", model_name="", dimension=1024)
 
     def test_init_normalizes_api_base(self):
-        from openrecall.server.embedding.providers.multimodal import (
+        from myrecall.server.embedding.providers.multimodal import (
             QwenVLEmbeddingProvider,
         )
 
@@ -66,7 +66,7 @@ class TestQwenVLEmbeddingProvider:
 
     def test_embed_text_returns_normalized_vector(self):
         """embed_text should return normalized vector (L2 norm = 1)."""
-        from openrecall.server.embedding.providers.multimodal import (
+        from myrecall.server.embedding.providers.multimodal import (
             QwenVLEmbeddingProvider,
         )
 
@@ -101,7 +101,7 @@ class TestQwenVLEmbeddingProvider:
 
     def test_embed_image_returns_normalized_vector(self, tmp_path):
         """embed_image should return normalized vector for fused image+text."""
-        from openrecall.server.embedding.providers.multimodal import (
+        from myrecall.server.embedding.providers.multimodal import (
             QwenVLEmbeddingProvider,
         )
 
@@ -145,7 +145,7 @@ class TestQwenVLEmbeddingProvider:
 
     def test_embed_image_without_text_omits_text_field(self, tmp_path):
         """embed_image without text should only include image in content."""
-        from openrecall.server.embedding.providers.multimodal import (
+        from myrecall.server.embedding.providers.multimodal import (
             QwenVLEmbeddingProvider,
         )
 
@@ -176,7 +176,7 @@ class TestQwenVLEmbeddingProvider:
 class TestOpenAIEmbeddingProvider:
     def test_init_allows_empty_api_key_for_local_vllm(self):
         """Empty api_key is allowed for local vLLM without auth."""
-        from openrecall.server.embedding.providers.openai import (
+        from myrecall.server.embedding.providers.openai import (
             OpenAIEmbeddingProvider,
         )
 
@@ -187,7 +187,7 @@ class TestOpenAIEmbeddingProvider:
         assert provider.model_name == "qwen3-vl-embedding"
 
     def test_init_requires_model_name(self):
-        from openrecall.server.embedding.providers.openai import (
+        from myrecall.server.embedding.providers.openai import (
             OpenAIEmbeddingProvider,
         )
 
@@ -195,7 +195,7 @@ class TestOpenAIEmbeddingProvider:
             OpenAIEmbeddingProvider(api_key="sk-test", model_name="")
 
     def test_init_normalizes_api_base(self):
-        from openrecall.server.embedding.providers.openai import (
+        from myrecall.server.embedding.providers.openai import (
             OpenAIEmbeddingProvider,
         )
 
@@ -208,7 +208,7 @@ class TestOpenAIEmbeddingProvider:
 
     def test_embed_text_returns_normalized_vector(self):
         """embed_text should return normalized vector (L2 norm = 1)."""
-        from openrecall.server.embedding.providers.openai import (
+        from myrecall.server.embedding.providers.openai import (
             OpenAIEmbeddingProvider,
         )
 
@@ -234,7 +234,7 @@ class TestOpenAIEmbeddingProvider:
 
     def test_embed_image_raises_error(self, tmp_path):
         """embed_image should raise error - OpenAI doesn't support image embedding."""
-        from openrecall.server.embedding.providers.openai import (
+        from myrecall.server.embedding.providers.openai import (
             OpenAIEmbeddingProvider,
         )
 
@@ -253,7 +253,7 @@ class TestOpenAIEmbeddingProvider:
 
     def test_backwards_compat_alias_exists(self):
         """OpenAIMultimodalEmbeddingProvider should be an alias for OpenAIEmbeddingProvider."""
-        from openrecall.server.embedding.providers.openai import (
+        from myrecall.server.embedding.providers.openai import (
             OpenAIEmbeddingProvider,
             OpenAIMultimodalEmbeddingProvider,
         )
@@ -264,7 +264,7 @@ class TestOpenAIEmbeddingProvider:
 class TestDashScopeEmbeddingProvider:
     def test_init_allows_empty_api_key_for_local(self):
         """Empty api_key is allowed for testing."""
-        from openrecall.server.embedding.providers.dashscope import (
+        from myrecall.server.embedding.providers.dashscope import (
             DashScopeEmbeddingProvider,
         )
 
@@ -275,7 +275,7 @@ class TestDashScopeEmbeddingProvider:
         assert provider.model_name == "text-embedding-v3"
 
     def test_init_requires_model_name(self):
-        from openrecall.server.embedding.providers.dashscope import (
+        from myrecall.server.embedding.providers.dashscope import (
             DashScopeEmbeddingProvider,
         )
 
@@ -284,7 +284,7 @@ class TestDashScopeEmbeddingProvider:
 
     def test_init_uses_default_api_base(self):
         """Should use default DashScope API base if not specified."""
-        from openrecall.server.embedding.providers.dashscope import (
+        from myrecall.server.embedding.providers.dashscope import (
             DashScopeEmbeddingProvider,
         )
 
@@ -295,7 +295,7 @@ class TestDashScopeEmbeddingProvider:
 
     def test_embed_image_raises_not_implemented(self, tmp_path):
         """embed_image should raise NotImplementedError - not yet implemented."""
-        from openrecall.server.embedding.providers.dashscope import (
+        from myrecall.server.embedding.providers.dashscope import (
             DashScopeEmbeddingProvider,
         )
 
@@ -313,7 +313,7 @@ class TestDashScopeEmbeddingProvider:
 
     def test_embed_text_raises_not_implemented(self):
         """embed_text should raise NotImplementedError - not yet implemented."""
-        from openrecall.server.embedding.providers.dashscope import (
+        from myrecall.server.embedding.providers.dashscope import (
             DashScopeEmbeddingProvider,
         )
 

@@ -1,6 +1,6 @@
 import pytest
 import numpy as np
-from openrecall.server.nlp import cosine_similarity
+from myrecall.server.nlp import cosine_similarity
 
 
 def test_cosine_similarity_identical_vectors():

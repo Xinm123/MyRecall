@@ -15,8 +15,8 @@ from unittest.mock import patch, MagicMock
 import pytest
 from flask import Flask
 
-from openrecall.server.api_v1 import v1_bp
-from openrecall.server.search.engine import SearchEngine
+from myrecall.server.api_v1 import v1_bp
+from myrecall.server.search.engine import SearchEngine
 
 
 @pytest.fixture
@@ -33,10 +33,11 @@ def mock_search_engine():
     mock_engine = MagicMock(spec=SearchEngine)
 
     # Default test results (flat structure, no content wrapper)
+    # timestamp is local time (from local_timestamp, no Z suffix)
     test_results = [
         {
             "frame_id": 1,
-            "timestamp": "2026-03-18T10:00:00Z",
+            "timestamp": "2026-03-18T18:00:00.000",
             "text": "Hello world from Safari",
             "text_source": "ocr",
             "app_name": "Safari",
@@ -51,7 +52,7 @@ def mock_search_engine():
         },
         {
             "frame_id": 2,
-            "timestamp": "2026-03-18T11:00:00Z",
+            "timestamp": "2026-03-18T19:00:00.000",
             "text": "def hello(): pass",
             "text_source": "ocr",
             "app_name": "VSCode",
@@ -66,7 +67,7 @@ def mock_search_engine():
         },
         {
             "frame_id": 3,
-            "timestamp": "2026-03-18T12:00:00Z",
+            "timestamp": "2026-03-18T20:00:00.000",
             "text": "git status",
             "text_source": "ocr",
             "app_name": "Terminal",
@@ -90,21 +91,21 @@ class TestSearchAPIBasic:
 
     def test_search_returns_200(self, app_with_search_route, mock_search_engine):
         """Search endpoint returns 200."""
-        with patch("openrecall.server.api_v1._get_search_engine", return_value=mock_search_engine):
+        with patch("myrecall.server.api_v1._get_search_engine", return_value=mock_search_engine):
             client = app_with_search_route.test_client()
             response = client.get("/v1/search?q=hello&mode=fts")
             assert response.status_code == 200
 
     def test_search_returns_json(self, app_with_search_route, mock_search_engine):
         """Search endpoint returns JSON."""
-        with patch("openrecall.server.api_v1._get_search_engine", return_value=mock_search_engine):
+        with patch("myrecall.server.api_v1._get_search_engine", return_value=mock_search_engine):
             client = app_with_search_route.test_client()
             response = client.get("/v1/search?q=hello&mode=fts")
             assert response.content_type.startswith("application/json")
 
     def test_search_empty_query(self, app_with_search_route, mock_search_engine):
         """Empty query returns all frames."""
-        with patch("openrecall.server.api_v1._get_search_engine", return_value=mock_search_engine):
+        with patch("myrecall.server.api_v1._get_search_engine", return_value=mock_search_engine):
             client = app_with_search_route.test_client()
             response = client.get("/v1/search?q=&mode=fts")
             data = json.loads(response.data)
@@ -115,7 +116,7 @@ class TestSearchAPIBasic:
 
     def test_search_no_query_param(self, app_with_search_route, mock_search_engine):
         """Missing q parameter returns all frames."""
-        with patch("openrecall.server.api_v1._get_search_engine", return_value=mock_search_engine):
+        with patch("myrecall.server.api_v1._get_search_engine", return_value=mock_search_engine):
             client = app_with_search_route.test_client()
             response = client.get("/v1/search?mode=fts")
             data = json.loads(response.data)
@@ -128,7 +129,7 @@ class TestSearchAPIResponseSchema:
 
     def test_data_items_have_frame_id(self, app_with_search_route, mock_search_engine):
         """Each data item has frame_id field."""
-        with patch("openrecall.server.api_v1._get_search_engine", return_value=mock_search_engine):
+        with patch("myrecall.server.api_v1._get_search_engine", return_value=mock_search_engine):
             client = app_with_search_route.test_client()
             response = client.get("/v1/search?q=hello&mode=fts")
             data = json.loads(response.data)
@@ -140,7 +141,7 @@ class TestSearchAPIResponseSchema:
 
     def test_data_is_array(self, app_with_search_route, mock_search_engine):
         """Data field is an array."""
-        with patch("openrecall.server.api_v1._get_search_engine", return_value=mock_search_engine):
+        with patch("myrecall.server.api_v1._get_search_engine", return_value=mock_search_engine):
             client = app_with_search_route.test_client()
             response = client.get("/v1/search?q=&mode=fts")
             data = json.loads(response.data)
@@ -149,7 +150,7 @@ class TestSearchAPIResponseSchema:
 
     def test_items_have_required_fields(self, app_with_search_route, mock_search_engine):
         """Each item has required fields (flat structure, no content wrapper)."""
-        with patch("openrecall.server.api_v1._get_search_engine", return_value=mock_search_engine):
+        with patch("myrecall.server.api_v1._get_search_engine", return_value=mock_search_engine):
             client = app_with_search_route.test_client()
             response = client.get("/v1/search?q=&mode=fts")
             data = json.loads(response.data)
@@ -166,7 +167,7 @@ class TestSearchAPIResponseSchema:
 
     def test_reference_fields_non_null(self, app_with_search_route, mock_search_engine):
         """frame_id and timestamp are non-null."""
-        with patch("openrecall.server.api_v1._get_search_engine", return_value=mock_search_engine):
+        with patch("myrecall.server.api_v1._get_search_engine", return_value=mock_search_engine):
             client = app_with_search_route.test_client()
             response = client.get("/v1/search?q=&mode=fts")
             data = json.loads(response.data)
@@ -177,7 +178,7 @@ class TestSearchAPIResponseSchema:
 
     def test_browser_url_is_present(self, app_with_search_route, mock_search_engine):
         """browser_url field is present (may be null)."""
-        with patch("openrecall.server.api_v1._get_search_engine", return_value=mock_search_engine):
+        with patch("myrecall.server.api_v1._get_search_engine", return_value=mock_search_engine):
             client = app_with_search_route.test_client()
             response = client.get("/v1/search?q=&mode=fts")
             data = json.loads(response.data)
@@ -188,7 +189,7 @@ class TestSearchAPIResponseSchema:
 
     def test_pagination_structure(self, app_with_search_route, mock_search_engine):
         """Pagination has required fields."""
-        with patch("openrecall.server.api_v1._get_search_engine", return_value=mock_search_engine):
+        with patch("myrecall.server.api_v1._get_search_engine", return_value=mock_search_engine):
             client = app_with_search_route.test_client()
             response = client.get("/v1/search?q=&limit=2&offset=1&mode=fts")
             data = json.loads(response.data)
@@ -210,7 +211,7 @@ class TestSearchAPIParameters:
         # Return only 1 result for this test
         mock_search_engine.search.return_value = ([{
             "frame_id": 1,
-            "timestamp": "2026-03-18T10:00:00Z",
+            "timestamp": "2026-03-18T18:00:00.000",
             "text": "Hello",
             "text_source": "ocr",
             "app_name": "Safari",
@@ -224,7 +225,7 @@ class TestSearchAPIParameters:
             "fts_score": -2.5,
         }], 3)
 
-        with patch("openrecall.server.api_v1._get_search_engine", return_value=mock_search_engine):
+        with patch("myrecall.server.api_v1._get_search_engine", return_value=mock_search_engine):
             client = app_with_search_route.test_client()
             response = client.get("/v1/search?q=&limit=1&mode=fts")
             data = json.loads(response.data)
@@ -237,7 +238,7 @@ class TestSearchAPIParameters:
         # First result
         mock_search_engine.search.return_value = ([{
             "frame_id": 1,
-            "timestamp": "2026-03-18T10:00:00Z",
+            "timestamp": "2026-03-18T18:00:00.000",
             "text": "Hello",
             "text_source": "ocr",
             "app_name": "Safari",
@@ -251,7 +252,7 @@ class TestSearchAPIParameters:
             "fts_score": -2.5,
         }], 3)
 
-        with patch("openrecall.server.api_v1._get_search_engine", return_value=mock_search_engine):
+        with patch("myrecall.server.api_v1._get_search_engine", return_value=mock_search_engine):
             client = app_with_search_route.test_client()
             response1 = client.get("/v1/search?q=&limit=1&offset=0&mode=fts")
             data1 = json.loads(response1.data)
@@ -259,7 +260,7 @@ class TestSearchAPIParameters:
             # Second result
             mock_search_engine.search.return_value = ([{
                 "frame_id": 2,
-                "timestamp": "2026-03-18T11:00:00Z",
+                "timestamp": "2026-03-18T19:00:00.000",
                 "text": "World",
                 "text_source": "ocr",
                 "app_name": "VSCode",
@@ -283,7 +284,7 @@ class TestSearchAPIParameters:
 
     def test_limit_exceeds_max_not_clamped(self, app_with_search_route, mock_search_engine):
         """Limit is not clamped (no maximum)."""
-        with patch("openrecall.server.api_v1._get_search_engine", return_value=mock_search_engine):
+        with patch("myrecall.server.api_v1._get_search_engine", return_value=mock_search_engine):
             client = app_with_search_route.test_client()
             response = client.get("/v1/search?q=&limit=500&mode=fts")
             data = json.loads(response.data)
@@ -295,7 +296,7 @@ class TestSearchAPIParameters:
 
     def test_app_name_filter(self, app_with_search_route, mock_search_engine):
         """app_name filter is passed to search engine."""
-        with patch("openrecall.server.api_v1._get_search_engine", return_value=mock_search_engine):
+        with patch("myrecall.server.api_v1._get_search_engine", return_value=mock_search_engine):
             client = app_with_search_route.test_client()
             client.get("/v1/search?q=&app_name=Safari&mode=fts")
 
@@ -305,7 +306,7 @@ class TestSearchAPIParameters:
 
     def test_focused_filter_true(self, app_with_search_route, mock_search_engine):
         """focused=true filter is passed to search engine."""
-        with patch("openrecall.server.api_v1._get_search_engine", return_value=mock_search_engine):
+        with patch("myrecall.server.api_v1._get_search_engine", return_value=mock_search_engine):
             client = app_with_search_route.test_client()
             client.get("/v1/search?q=&focused=true&mode=fts")
 
@@ -315,18 +316,18 @@ class TestSearchAPIParameters:
 
     def test_time_range_filter(self, app_with_search_route, mock_search_engine):
         """Time range filter is passed to search engine."""
-        with patch("openrecall.server.api_v1._get_search_engine", return_value=mock_search_engine):
+        with patch("myrecall.server.api_v1._get_search_engine", return_value=mock_search_engine):
             client = app_with_search_route.test_client()
-            client.get("/v1/search?q=&start_time=2026-03-18T10:30:00Z&end_time=2026-03-18T11:30:00Z&mode=fts")
+            client.get("/v1/search?q=&start_time=2026-03-18T10:30:00&end_time=2026-03-18T11:30:00&mode=fts")
 
             # Verify time range was passed
             call_args = mock_search_engine.search.call_args
-            assert call_args.kwargs.get("start_time") == "2026-03-18T10:30:00Z"
-            assert call_args.kwargs.get("end_time") == "2026-03-18T11:30:00Z"
+            assert call_args.kwargs.get("start_time") == "2026-03-18T10:30:00"
+            assert call_args.kwargs.get("end_time") == "2026-03-18T11:30:00"
 
     def test_browser_url_accepted_noop(self, app_with_search_route, mock_search_engine):
         """browser_url parameter is accepted but no-op in P1."""
-        with patch("openrecall.server.api_v1._get_search_engine", return_value=mock_search_engine):
+        with patch("myrecall.server.api_v1._get_search_engine", return_value=mock_search_engine):
             client = app_with_search_route.test_client()
             # Should not error
             response = client.get("/v1/search?q=&browser_url=http://example.com&mode=fts")
@@ -340,7 +341,7 @@ class TestSearchAPINoResults:
         """Non-matching query returns empty data."""
         mock_search_engine.search.return_value = ([], 0)
 
-        with patch("openrecall.server.api_v1._get_search_engine", return_value=mock_search_engine):
+        with patch("myrecall.server.api_v1._get_search_engine", return_value=mock_search_engine):
             client = app_with_search_route.test_client()
             response = client.get("/v1/search?q=nonexistentterm12345xyz&mode=fts")
             data = json.loads(response.data)

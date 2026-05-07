@@ -18,7 +18,7 @@ from pathlib import Path
 
 import pytest
 
-from openrecall.server.search.engine import SearchEngine, SearchParams
+from myrecall.server.search.engine import SearchEngine, SearchParams
 
 
 pytestmark = [pytest.mark.integration, pytest.mark.search]
@@ -37,7 +37,7 @@ def temp_db():
 
         # Run initial schema
         init_sql = Path(
-            "openrecall/server/database/migrations/20260227000001_initial_schema.sql"
+            "myrecall/server/database/migrations/20260227000001_initial_schema.sql"
         ).read_text()
         conn.executescript(init_sql)
 
@@ -48,15 +48,14 @@ def temp_db():
             "20260317000001_ocr_text_unique_frame_id.sql",
             "20260321120000_dual_hash_storage.sql",
             "20260324120000_add_frame_description.sql",
+            "20260325120000_consolidate_fts_to_full_text.sql",
+            "20260408120000_description_fields_redesign.sql",
+            "20260409120000_add_frame_embedding.sql",
+            "20260414000000_add_visibility_status.sql",
+            "20260426000000_add_local_timestamp.sql",
         ]:
-            mig_sql = Path(f"openrecall/server/database/migrations/{mig}").read_text()
+            mig_sql = Path(f"myrecall/server/database/migrations/{mig}").read_text()
             conn.executescript(mig_sql)
-
-        # Run FTS unification migration
-        fts_sql = Path(
-            "openrecall/server/database/migrations/20260325120000_consolidate_fts_to_full_text.sql"
-        ).read_text()
-        conn.executescript(fts_sql)
 
         conn.commit()
         conn.close()
@@ -323,8 +322,8 @@ class TestSQLPathEdgeCases:
             q="",
             limit=20,
             offset=0,
-            start_time="2026-03-01T00:00:00Z",
-            end_time="2026-03-31T23:59:59Z",
+            start_time="2026-03-01T00:00:00",
+            end_time="2026-03-31T23:59:59",
         )
         sql, sql_params = engine._build_query(params, is_count=False)
 

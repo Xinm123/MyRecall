@@ -14,11 +14,11 @@ class TestNodeBounds:
 
     def test_import_node_bounds(self):
         """NodeBounds should be importable from types module."""
-        from openrecall.client.accessibility.types import NodeBounds
+        from myrecall.client.accessibility.types import NodeBounds
 
     def test_node_bounds_creation(self):
         """NodeBounds should have left, top, width, height fields."""
-        from openrecall.client.accessibility.types import NodeBounds
+        from myrecall.client.accessibility.types import NodeBounds
 
         bounds = NodeBounds(left=0.1, top=0.2, width=0.5, height=0.3)
         assert bounds.left == 0.1
@@ -28,7 +28,7 @@ class TestNodeBounds:
 
     def test_node_bounds_optional_for_nodes(self):
         """NodeBounds should be optional in AccessibilityTreeNode."""
-        from openrecall.client.accessibility.types import NodeBounds
+        from myrecall.client.accessibility.types import NodeBounds
 
         # Bounds can be None
         assert NodeBounds is not None
@@ -39,11 +39,11 @@ class TestAccessibilityTreeNode:
 
     def test_import_accessibility_tree_node(self):
         """AccessibilityTreeNode should be importable from types module."""
-        from openrecall.client.accessibility.types import AccessibilityTreeNode
+        from myrecall.client.accessibility.types import AccessibilityTreeNode
 
     def test_node_required_fields(self):
         """AccessibilityTreeNode should have role, text, depth as required fields."""
-        from openrecall.client.accessibility.types import AccessibilityTreeNode
+        from myrecall.client.accessibility.types import AccessibilityTreeNode
 
         node = AccessibilityTreeNode(role="AXStaticText", text="Hello", depth=1)
         assert node.role == "AXStaticText"
@@ -52,7 +52,7 @@ class TestAccessibilityTreeNode:
 
     def test_node_optional_bounds(self):
         """AccessibilityTreeNode should have optional bounds field."""
-        from openrecall.client.accessibility.types import AccessibilityTreeNode, NodeBounds
+        from myrecall.client.accessibility.types import AccessibilityTreeNode, NodeBounds
 
         # Without bounds
         node_no_bounds = AccessibilityTreeNode(role="AXButton", text="Click", depth=2)
@@ -71,11 +71,11 @@ class TestTreeSnapshot:
 
     def test_import_tree_snapshot(self):
         """TreeSnapshot should be importable from types module."""
-        from openrecall.client.accessibility.types import TreeSnapshot
+        from myrecall.client.accessibility.types import TreeSnapshot
 
     def test_snapshot_minimum_fields(self):
         """TreeSnapshot should have all required fields from MVP spec."""
-        from openrecall.client.accessibility.types import TreeSnapshot
+        from myrecall.client.accessibility.types import TreeSnapshot
 
         snapshot = TreeSnapshot(
             app_name="Safari",
@@ -107,7 +107,7 @@ class TestTreeSnapshot:
 
     def test_snapshot_with_nodes(self):
         """TreeSnapshot should store a list of AccessibilityTreeNode."""
-        from openrecall.client.accessibility.types import (
+        from myrecall.client.accessibility.types import (
             TreeSnapshot,
             AccessibilityTreeNode,
         )
@@ -140,11 +140,11 @@ class TestTreeWalkerConfig:
 
     def test_import_tree_walker_config(self):
         """TreeWalkerConfig should be importable from types module."""
-        from openrecall.client.accessibility.types import TreeWalkerConfig
+        from myrecall.client.accessibility.types import TreeWalkerConfig
 
     def test_default_bounds_from_mvp_spec(self):
         """TreeWalkerConfig should use MVP-specified default bounds."""
-        from openrecall.client.accessibility.types import TreeWalkerConfig
+        from myrecall.client.accessibility.types import TreeWalkerConfig
 
         config = TreeWalkerConfig()
         # MVP spec: max_depth=30, max_nodes=5000, max_text_length=50000, walk_timeout=250ms
@@ -155,7 +155,7 @@ class TestTreeWalkerConfig:
 
     def test_custom_bounds(self):
         """TreeWalkerConfig should allow custom bounds."""
-        from openrecall.client.accessibility.types import TreeWalkerConfig
+        from myrecall.client.accessibility.types import TreeWalkerConfig
 
         config = TreeWalkerConfig(
             max_depth=15, max_nodes=1000, max_text_length=25000, walk_timeout_ms=500
@@ -171,11 +171,11 @@ class TestAccessibilityDecision:
 
     def test_import_accessibility_decision(self):
         """AccessibilityDecision should be importable from types module."""
-        from openrecall.client.accessibility.types import AccessibilityDecision
+        from myrecall.client.accessibility.types import AccessibilityDecision
 
     def test_decision_fields(self):
         """AccessibilityDecision should have eligible, adopted, reason, snapshot fields."""
-        from openrecall.client.accessibility.types import AccessibilityDecision
+        from myrecall.client.accessibility.types import AccessibilityDecision
 
         decision = AccessibilityDecision(
             eligible=True,
@@ -190,7 +190,7 @@ class TestAccessibilityDecision:
 
     def test_decision_reason_vocabulary(self):
         """AccessibilityDecision should use MVP-defined reason vocabulary."""
-        from openrecall.client.accessibility.types import AccessibilityDecision
+        from myrecall.client.accessibility.types import AccessibilityDecision
 
         # MVP spec reason vocabulary:
         # non_focused_monitor, app_prefers_ocr, no_focused_window,
@@ -214,7 +214,7 @@ class TestReasonVocabulary:
 
     def test_reason_constants_exist(self):
         """Reason vocabulary constants should be defined in types module."""
-        from openrecall.client.accessibility.types import (
+        from myrecall.client.accessibility.types import (
             REASON_NON_FOCUSED_MONITOR,
             REASON_APP_PREFERS_OCR,
             REASON_NO_FOCUSED_WINDOW,
@@ -234,7 +234,7 @@ class TestTextSourceConstants:
 
     def test_text_source_constants_exist(self):
         """Text source constants should be defined in types module."""
-        from openrecall.client.accessibility.types import (
+        from myrecall.client.accessibility.types import (
             TEXT_SOURCE_ACCESSIBILITY,
             TEXT_SOURCE_OCR,
         )
@@ -248,7 +248,7 @@ class TestAccessibilityPayload:
 
     def test_accessibility_payload_shape(self):
         """Accessibility payload should match MVP upload contract."""
-        from openrecall.client.accessibility.types import AccessibilityPayload
+        from myrecall.client.accessibility.types import AccessibilityPayload
 
         payload = AccessibilityPayload(
             text_content="Hello World",

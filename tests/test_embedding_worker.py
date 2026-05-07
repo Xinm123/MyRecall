@@ -8,7 +8,7 @@ from unittest.mock import Mock, patch
 
 import pytest
 
-from openrecall.server.embedding.worker import EmbeddingWorker
+from myrecall.server.embedding.worker import EmbeddingWorker
 
 
 class TestEmbeddingWorker:
@@ -28,6 +28,7 @@ class TestEmbeddingWorker:
         conn.executescript("""
             CREATE TABLE frames (
                 id INTEGER PRIMARY KEY,
+                capture_id TEXT,
                 snapshot_path TEXT,
                 full_text TEXT,
                 timestamp TEXT,
@@ -49,14 +50,14 @@ class TestEmbeddingWorker:
             );
         """)
         conn.execute(
-            "INSERT INTO frames (id, snapshot_path, full_text, timestamp) VALUES (?, ?, ?, ?)",
-            (1, str(test_image), "test text", "2026-04-09T12:00:00Z"),
+            "INSERT INTO frames (id, capture_id, snapshot_path, full_text, timestamp) VALUES (?, ?, ?, ?, ?)",
+            (1, "test-capture-1", str(test_image), "test text", "2026-04-09T12:00:00Z"),
         )
         conn.execute("INSERT INTO embedding_tasks (frame_id, status) VALUES (1, 'pending')")
         conn.commit()
 
         # Create mock store and service
-        from openrecall.server.database.frames_store import FramesStore
+        from myrecall.server.database.frames_store import FramesStore
         store = FramesStore.__new__(FramesStore)
         store._db_path = str(db_path)
         store._frames_dir = frames_dir
@@ -144,9 +145,12 @@ class TestEmbeddingWorker:
         conn.executescript("""
             CREATE TABLE frames (
                 id INTEGER PRIMARY KEY,
+                capture_id TEXT,
                 snapshot_path TEXT,
                 full_text TEXT,
                 timestamp TEXT,
+                app_name TEXT,
+                window_name TEXT,
                 embedding_status TEXT DEFAULT NULL
             );
             CREATE TABLE embedding_tasks (
@@ -163,13 +167,13 @@ class TestEmbeddingWorker:
             );
         """)
         conn.execute(
-            "INSERT INTO frames (id, snapshot_path, full_text, timestamp) VALUES (?, ?, ?, ?)",
-            (1, str(test_image), "test", "2026-04-09T12:00:00Z"),
+            "INSERT INTO frames (id, capture_id, snapshot_path, full_text, timestamp) VALUES (?, ?, ?, ?, ?)",
+            (1, "test-capture-1", str(test_image), "test", "2026-04-09T12:00:00Z"),
         )
         conn.execute("INSERT INTO embedding_tasks (frame_id, status) VALUES (1, 'pending')")
         conn.commit()
 
-        from openrecall.server.database.frames_store import FramesStore
+        from myrecall.server.database.frames_store import FramesStore
         store = FramesStore.__new__(FramesStore)
         store._db_path = str(db_path)
 

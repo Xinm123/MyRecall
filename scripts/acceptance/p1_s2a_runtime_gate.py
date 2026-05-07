@@ -10,10 +10,10 @@ from collections import Counter
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
-from openrecall.client.events.base import CaptureTrigger, TriggerEvent, utc_now_iso
-from openrecall.client.events.macos import list_monitors
-from openrecall.client.recorder import ScreenRecorder
-from openrecall.shared.config import settings
+from myrecall.client.events.base import CaptureTrigger, TriggerEvent, utc_now_iso
+from myrecall.client.events.macos import list_monitors
+from myrecall.client.recorder import ScreenRecorder
+from myrecall.shared.config import settings
 
 
 ALLOWED_TRIGGERS = ("idle", "app_switch", "manual", "click")

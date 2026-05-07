@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 import requests
 
-from openrecall.client.uploader import HTTPUploader
+from myrecall.client.uploader import HTTPUploader
 
 
 @pytest.mark.unit
@@ -19,7 +19,7 @@ def test_upload_screenshot_logs_http_failure(monkeypatch, caplog) -> None:
     def _fake_post(*args, **kwargs):
         return _Response()
 
-    monkeypatch.setattr("openrecall.client.uploader.requests.post", _fake_post)
+    monkeypatch.setattr("myrecall.client.uploader.requests.post", _fake_post)
 
     with caplog.at_level("ERROR"):
         ok = uploader.upload_screenshot(
@@ -41,7 +41,7 @@ def test_upload_screenshot_logs_request_exception(monkeypatch, caplog) -> None:
     def _fake_post(*args, **kwargs):
         raise requests.RequestException("boom")
 
-    monkeypatch.setattr("openrecall.client.uploader.requests.post", _fake_post)
+    monkeypatch.setattr("myrecall.client.uploader.requests.post", _fake_post)
 
     with caplog.at_level("ERROR"):
         ok = uploader.upload_screenshot(

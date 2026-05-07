@@ -2,13 +2,13 @@ from __future__ import annotations
 
 import pytest
 
-from openrecall.client.events.base import (
+from myrecall.client.events.base import (
     CaptureTrigger,
     MonitorDescriptor,
     RoutedCaptureTask,
     TriggerEvent,
 )
-from openrecall.client.recorder import ScreenRecorder
+from myrecall.client.recorder import ScreenRecorder
 
 
 @pytest.mark.unit
@@ -322,7 +322,7 @@ def test_heartbeat_payload_contains_topology_and_outcome_evidence() -> None:
         captured_payload.update(payload)
         return _Response()
 
-    from openrecall.client import recorder as recorder_module
+    from myrecall.client import recorder as recorder_module
 
     original_post = recorder_module.requests.post
     recorder_module.requests.post = _fake_post

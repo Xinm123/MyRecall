@@ -1,10 +1,34 @@
 """Tests for description provider models and protocol."""
 import json
+from pathlib import Path
 
 import pytest
+from myrecall.server.config_server import ServerSettings
 
-from openrecall.server.description.models import FrameDescription, FrameContext
-from openrecall.server.description.providers.base import (
+
+@pytest.fixture(autouse=True)
+def _init_runtime_config(tmp_path: Path):
+    """Initialize runtime_config so providers reading get_description_*() succeed.
+
+    Autouse: every test in this module gets a fresh DB and TOML defaults.
+    """
+    import myrecall.server.runtime_config as rc
+    rc._settings_store = None
+    rc._toml_settings = None
+    toml = ServerSettings(
+        description_provider="openai",
+        description_model="gpt-4o",
+        description_api_key="",
+        description_api_base="",
+        description_request_timeout=120,
+    )
+    rc.init_runtime_config(tmp_path, toml)
+    yield
+    rc._settings_store = None
+    rc._toml_settings = None
+
+from myrecall.server.description.models import FrameDescription, FrameContext
+from myrecall.server.description.providers.base import (
     DescriptionProvider,
     DescriptionProviderError,
     DescriptionProviderConfigError,
@@ -82,7 +106,7 @@ class TestDescriptionProviderErrors:
 class TestOpenAIDescriptionProvider:
     def test_init_allows_empty_api_key_for_local_vllm(self):
         """Empty api_key is allowed for local vLLM without auth."""
-        from openrecall.server.description.providers.openai import (
+        from myrecall.server.description.providers.openai import (
             OpenAIDescriptionProvider,
         )
 
@@ -92,7 +116,7 @@ class TestOpenAIDescriptionProvider:
         assert provider.model_name == "gpt-4o"
 
     def test_init_requires_model_name(self):
-        from openrecall.server.description.providers.openai import (
+        from myrecall.server.description.providers.openai import (
             OpenAIDescriptionProvider,
         )
 
@@ -101,26 +125,28 @@ class TestOpenAIDescriptionProvider:
 
     def test_prompt_contains_new_fields(self):
         """Verify prompt contains new fields (narrative, summary, tags)."""
-        from openrecall.server.description.providers.openai import _PROMPT_TEXT, _EXAMPLE_OUTPUT
+        from myrecall.server.description.prompts import build_description_prompt
+
+        prompt_text = build_description_prompt()
 
         # Verify prompt contains new fields
-        assert "tags" in _PROMPT_TEXT
-        assert "narrative" in _PROMPT_TEXT
-        assert "summary" in _PROMPT_TEXT
+        assert "tags" in prompt_text
+        assert "narrative" in prompt_text
+        assert "summary" in prompt_text
 
-        # Verify example output contains new fields
-        assert "tags" in _EXAMPLE_OUTPUT
-        assert "narrative" in _EXAMPLE_OUTPUT
-        assert "summary" in _EXAMPLE_OUTPUT
+        # Verify example output contains new fields (embedded in prompt)
+        assert "\"narrative\"" in prompt_text
+        assert "\"summary\"" in prompt_text
+        assert "\"tags\"" in prompt_text
 
         # Verify old fields are NOT in prompt
-        assert "entities" not in _PROMPT_TEXT
-        assert "intent" not in _PROMPT_TEXT
+        assert "entities" not in prompt_text
+        assert '"intent"' not in prompt_text
 
 
 class TestDashScopeDescriptionProvider:
     def test_init_requires_api_key(self):
-        from openrecall.server.description.providers.dashscope import (
+        from myrecall.server.description.providers.dashscope import (
             DashScopeDescriptionProvider,
         )
 
@@ -128,7 +154,7 @@ class TestDashScopeDescriptionProvider:
             DashScopeDescriptionProvider(api_key="", model_name="qwen-vl-max")
 
     def test_init_requires_model_name(self):
-        from openrecall.server.description.providers.dashscope import (
+        from myrecall.server.description.providers.dashscope import (
             DashScopeDescriptionProvider,
         )
 
@@ -140,20 +166,13 @@ class TestLocalDescriptionProvider:
     @pytest.mark.unit
     def test_local_provider_builds_messages_with_new_prompt(self):
         """Test Local provider builds messages with new prompt format."""
-        from openrecall.server.description.providers.local import _build_messages
-        from openrecall.server.description.models import FrameContext
+        from myrecall.server.description.prompts import build_description_prompt
 
-        context = FrameContext(
-            app_name="Chrome",
-            window_name="GitHub",
-            browser_url="https://github.com"
-        )
-        messages = _build_messages(context)
+        prompt_text = build_description_prompt()
 
         # Check prompt contains new format keywords
-        prompt_text = messages[0]["content"][1]["text"]
         assert "tags" in prompt_text
         assert "entities" not in prompt_text
-        assert "intent" not in prompt_text
-        assert "1024" in prompt_text
-        assert "256" in prompt_text
+        assert '"intent"' not in prompt_text
+        assert "100-150 words" in prompt_text
+        assert "20-30 words" in prompt_text

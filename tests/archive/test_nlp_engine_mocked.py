@@ -2,7 +2,7 @@ import numpy as np
 
 
 def test_nlp_engine_encode_empty_text_returns_zero(monkeypatch):
-    import openrecall.server.nlp as nlp
+    import myrecall.server.nlp as nlp
 
     class DummyModel:
         def encode(self, *args, **kwargs):
@@ -20,7 +20,7 @@ def test_nlp_engine_encode_empty_text_returns_zero(monkeypatch):
 
 
 def test_nlp_engine_encode_success(monkeypatch):
-    import openrecall.server.nlp as nlp
+    import myrecall.server.nlp as nlp
 
     class DummyModel:
         def encode(self, text, normalize_embeddings=True):
@@ -39,7 +39,7 @@ def test_nlp_engine_encode_success(monkeypatch):
 
 
 def test_nlp_engine_encode_exception_returns_zero(monkeypatch):
-    import openrecall.server.nlp as nlp
+    import myrecall.server.nlp as nlp
 
     class DummyModel:
         def encode(self, *args, **kwargs):
@@ -56,7 +56,7 @@ def test_nlp_engine_encode_exception_returns_zero(monkeypatch):
 
 
 def test_get_nlp_engine_caches_instance(monkeypatch):
-    import openrecall.server.nlp as nlp
+    import myrecall.server.nlp as nlp
 
     class DummyModel:
         def encode(self, *args, **kwargs):
@@ -74,7 +74,7 @@ def test_get_nlp_engine_caches_instance(monkeypatch):
 
 
 def test_get_embedding_uses_singleton(monkeypatch):
-    import openrecall.server.nlp as nlp
+    import myrecall.server.nlp as nlp
 
     class DummyModel:
         def encode(self, *args, **kwargs):

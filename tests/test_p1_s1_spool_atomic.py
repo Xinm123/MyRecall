@@ -4,7 +4,7 @@ from pathlib import Path
 import pytest
 from PIL import Image
 
-from openrecall.client import spool
+from myrecall.client import spool
 
 
 @pytest.mark.unit

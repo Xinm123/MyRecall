@@ -3,7 +3,7 @@ import os  # noqa: F401
 
 import pytest  # noqa: F401
 
-from openrecall.client.chat.config_manager import (
+from myrecall.client.chat.config_manager import (
     AUTH_JSON,  # noqa: F401
     PROVIDER_ENV_MAP,
     SUPPORTED_PROVIDERS,
@@ -43,7 +43,7 @@ def test_get_api_key_kimi_from_env_var(monkeypatch):
 
 def test_get_api_key_falls_back_to_auth_json(tmp_path, monkeypatch):
     """get_api_key falls back to auth.json when env var not set."""
-    import openrecall.client.chat.config_manager as cm
+    import myrecall.client.chat.config_manager as cm
 
     monkeypatch.setattr(cm, "AUTH_JSON", tmp_path / "auth.json")
     monkeypatch.delenv("MINIMAX_CN_API_KEY", raising=False)
@@ -55,7 +55,7 @@ def test_get_api_key_falls_back_to_auth_json(tmp_path, monkeypatch):
 
 def test_save_api_key(tmp_path, monkeypatch):
     """save_api_key writes to auth.json with merge."""
-    import openrecall.client.chat.config_manager as cm
+    import myrecall.client.chat.config_manager as cm
 
     monkeypatch.setattr(cm, "AUTH_JSON", tmp_path / "auth.json")
     monkeypatch.setattr(cm, "PI_CONFIG_DIR", tmp_path)
@@ -74,7 +74,7 @@ def test_save_api_key(tmp_path, monkeypatch):
 
 def test_save_user_choice(tmp_path, monkeypatch):
     """save_user_choice persists provider/model to myrecall-config.json."""
-    import openrecall.client.chat.config_manager as cm
+    import myrecall.client.chat.config_manager as cm
 
     monkeypatch.setattr(cm, "MYRECALL_CONFIG", tmp_path / "myrecall-config.json")
     monkeypatch.setattr(cm, "PI_CONFIG_DIR", tmp_path)
@@ -88,7 +88,7 @@ def test_save_user_choice(tmp_path, monkeypatch):
 
 def test_get_user_provider_defaults(tmp_path, monkeypatch):
     """get_user_provider returns default when no config exists."""
-    import openrecall.client.chat.config_manager as cm
+    import myrecall.client.chat.config_manager as cm
 
     monkeypatch.setattr(cm, "MYRECALL_CONFIG", tmp_path / "nonexistent.json")
     assert get_user_provider() == "qianfan"

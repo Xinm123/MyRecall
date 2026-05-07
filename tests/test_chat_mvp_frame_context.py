@@ -12,8 +12,8 @@ from pathlib import Path
 
 import pytest
 
-from openrecall.server.database.frames_store import FramesStore
-from openrecall.server.database.migrations_runner import run_migrations
+from myrecall.server.database.frames_store import FramesStore, _utc_to_local_timestamp
+from myrecall.server.database.migrations_runner import run_migrations
 
 
 @pytest.fixture
@@ -22,7 +22,7 @@ def temp_db(tmp_path: Path) -> Path:
     db_path = tmp_path / "test_edge.db"
     conn = sqlite3.connect(str(db_path))
     migrations_dir = Path(__file__).resolve().parent.parent / (
-        "openrecall/server/database/migrations"
+        "myrecall/server/database/migrations"
     )
     run_migrations(conn, migrations_dir)
     conn.close()
@@ -318,7 +318,7 @@ class TestGetFrameContext:
         assert "https://direct-url.com" in context["urls"]
 
     def test_get_frame_context_truncates_text_at_5000_chars(self, store: FramesStore):
-        """Text should be truncated at 5000 chars with '...' suffix."""
+        """Text should be middle-truncated at 5000 chars when exceeding the limit."""
         # Exactly 5000 chars — no truncation
         text_5000 = "X" * 5000
         elements = [{"role": "AXStaticText", "text": text_5000, "depth": 0}]
@@ -330,7 +330,7 @@ class TestGetFrameContext:
         assert len(context["text"]) == 5000
         assert not context["text"].endswith("...")
 
-        # 5001 chars — truncated to 5000 + "..."
+        # 5001 chars — middle-truncated: [:2500] + "...1 chars..." + [-2500:]
         text_5001 = "Y" * 5001
         elements2 = [{"role": "AXStaticText", "text": text_5001, "depth": 0}]
         frame_id2 = _create_completed_frame_with_accessibility(
@@ -338,8 +338,11 @@ class TestGetFrameContext:
         )
         context2 = store.get_frame_context(frame_id2)
         assert context2 is not None
-        assert len(context2["text"]) == 5003  # 5000 + "..."
-        assert context2["text"].endswith("...")
+        # 2500 + "...1 chars..." (13) + 2500 = 5013
+        assert len(context2["text"]) == 5013
+        assert context2["text"].startswith("Y" * 2500)
+        assert context2["text"].endswith("Y" * 2500)
+        assert "...1 chars..." in context2["text"]
 
 
 class TestGetFrameContextMetadataFields:
@@ -348,7 +351,7 @@ class TestGetFrameContextMetadataFields:
     def test_get_frame_context_includes_timestamp(
         self, store: FramesStore
     ):
-        """Frame context should include timestamp from frames table."""
+        """Frame context should include local_timestamp from frames table."""
         frame_id = _create_completed_frame_with_accessibility(
             store, "cap-ts", "2026-03-26T14:32:05Z", "Safari", "Test text"
         )
@@ -356,7 +359,8 @@ class TestGetFrameContextMetadataFields:
         context = store.get_frame_context(frame_id)
 
         assert context is not None
-        assert context["timestamp"] == "2026-03-26T14:32:05Z"
+        # Returns local_timestamp (UTC+8)
+        assert context["timestamp"] == _utc_to_local_timestamp("2026-03-26T14:32:05Z")
 
     def test_get_frame_context_includes_app_name(
         self, store: FramesStore
@@ -391,7 +395,7 @@ class TestGetFrameContextBoundsPrecision:
 
     def test_normalize_bounds_rounds_to_3_decimals(self):
         """normalize_bounds should round all values to 3 decimal places."""
-        from openrecall.client.accessibility.macos import normalize_bounds
+        from myrecall.client.accessibility.macos import normalize_bounds
 
         bounds = normalize_bounds(
             elem_x=100.0, elem_y=50.0, elem_w=800.0, elem_h=600.0,

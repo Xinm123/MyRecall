@@ -1,0 +1,18 @@
+[Unit]
+Description=MyRecall Server
+After=network.target
+
+[Service]
+Type=simple
+User=cix
+Group=cix
+WorkingDirectory=/data/apps/MyRecall/myrecall
+EnvironmentFile=/data/apps/MyRecall/myrecall/myrecall.env
+Environment=UV_CACHE_DIR=/data/.cache/uv/myrecall
+ExecStart=/data/venvs/myrecall/bin/python -m myrecall.server
+Restart=always
+RestartSec=5
+TimeoutStartSec=180
+
+[Install]
+WantedBy=multi-user.target

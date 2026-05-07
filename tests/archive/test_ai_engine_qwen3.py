@@ -27,7 +27,7 @@ class TestAIEngine:
     @pytest.fixture(scope="class")
     def ai_engine(self):
         """Load AI engine once for all tests in this class."""
-        from openrecall.server.ai_engine import AIEngine
+        from myrecall.server.ai_engine import AIEngine
         return AIEngine()
     
     @pytest.fixture
@@ -81,7 +81,7 @@ class TestAIEngineSingleton:
     
     def test_get_ai_engine_returns_same_instance(self):
         """Test that get_ai_engine returns the same instance."""
-        from openrecall.server.ai_engine import get_ai_engine
+        from myrecall.server.ai_engine import get_ai_engine
         
         engine1 = get_ai_engine()
         engine2 = get_ai_engine()
@@ -102,7 +102,7 @@ if __name__ == "__main__":
     print(f"Memory before loading: {mem_before:.1f} MB")
     
     # Load engine
-    from openrecall.server.ai_engine import AIEngine
+    from myrecall.server.ai_engine import AIEngine
     engine = AIEngine()
     
     mem_after = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024 / 1024

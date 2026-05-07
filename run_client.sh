@@ -110,15 +110,15 @@ if [[ -n "$env_file" ]]; then
 fi
 
 if [[ "$enable_debug" == "true" ]]; then
-  export OPENRECALL_DEBUG=true
+  export MYRECALL_DEBUG=true
 fi
 
-# python_bin="${OPENRECALL_PYTHON_BIN:-/data/venvs/openrecall/bin/python}"
+# python_bin="${MYRECALL_PYTHON_BIN:-/data/venvs/myrecall/bin/python}"
 # if [[ ! -x "$python_bin" ]]; then
 #   python_bin="$(command -v python3 || true)"
 # fi
 # if [[ -z "${python_bin:-}" ]]; then
-#   echo "Python not found. Set OPENRECALL_PYTHON_BIN to your venv python." >&2
+#   echo "Python not found. Set MYRECALL_PYTHON_BIN to your venv python." >&2
 #   exit 1
 # fi
 
@@ -128,7 +128,7 @@ fi
 #   cmd_args+=("--config" "$config_file")
 # fi
 
-# exec "$python_bin" -m openrecall.client "${cmd_args[@]}" "$@"
+# exec "$python_bin" -m myrecall.client "${cmd_args[@]}" "$@"
 # Verify Python is available
 if ! command -v python &> /dev/null; then
   echo "Error: python not found. Activate your conda/venv environment first." >&2
@@ -136,7 +136,7 @@ if ! command -v python &> /dev/null; then
 fi
 
 # Build command arguments
-cmd_args=("-m" "openrecall.client")
+cmd_args=("-m" "myrecall.client")
 if [[ -n "$config_file" ]]; then
   cmd_args+=("--config" "$config_file")
 fi

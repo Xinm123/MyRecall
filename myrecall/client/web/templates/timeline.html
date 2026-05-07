@@ -1,0 +1,1240 @@
+{% extends "layout.html" %}
+
+{% block title %}Timeline - MyRecall{% endblock %}
+
+{% block extra_head %}
+<style>
+  html[data-current-view="timeline"] main {
+    padding-top: 12px;
+  }
+
+  .slider-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 12px 16px;
+    background: var(--bg-card);
+    border-radius: 12px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+    margin-bottom: 12px;
+  }
+
+  .slider {
+    width: 86%;
+    margin: 8px 0;
+  }
+
+  .slider-value {
+    margin-top: 6px;
+    font-size: 1.2em;
+    color: var(--text-primary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    width: 86%;
+    min-height: 32px;
+  }
+
+  .slider-info {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .image-container {
+    margin-top: 12px;
+    text-align: center;
+    background: var(--bg-card);
+    border-radius: 12px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+    padding: 10px 12px;
+  }
+
+  .image-container img {
+    max-width: 100%;
+    max-height: calc(72vh);
+    width: auto;
+    height: auto;
+    object-fit: contain;
+    border-radius: 8px;
+    display: block;
+    margin: 0 auto;
+  }
+
+  .alert {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 20px;
+    color: var(--text-primary);
+  }
+
+  :root {
+    --text-tertiary: #8E8E93;
+  }
+
+  .date-nav-toolbar {
+    position: relative;
+  }
+
+  .today-btn {
+    font-size: 13px;
+    font-weight: 500;
+    padding: 6px 14px;
+    border-radius: 6px;
+    border: 1px solid var(--border-color);
+    background: var(--bg-card);
+    color: var(--text-primary);
+    cursor: pointer;
+    transition: all 0.2s;
+    font-family: var(--font-stack);
+  }
+
+  .today-btn:hover:not(:disabled) {
+    background: var(--accent-color);
+    color: white;
+    border-color: var(--accent-color);
+  }
+
+  .toolbar-nav-btn {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+    background: var(--bg-card);
+    color: var(--text-tertiary);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+  }
+
+  .toolbar-nav-btn:hover {
+    background: rgba(0, 122, 255, 0.06);
+    border-color: var(--accent-color);
+    color: var(--accent-color);
+  }
+
+  .toolbar-nav-btn svg {
+    display: block;
+  }
+
+  .date-picker-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 14px;
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+    background: var(--bg-card);
+    color: var(--text-primary);
+    font-size: 14px;
+    font-weight: 500;
+    font-family: var(--font-stack);
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .date-picker-btn:hover {
+    border-color: var(--accent-color);
+    background: rgba(0, 122, 255, 0.05);
+  }
+
+  /* Note: position:relative is inline in HTML via style attribute */
+
+  .calendar-popover {
+    position: absolute;
+    top: 44px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 280px;
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
+    padding: 16px;
+    z-index: 1002;
+    animation: calendarPopoverIn 0.2s ease-out forwards;
+  }
+
+  .calendar-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+  }
+
+  .calendar-nav {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    border: none;
+    background: transparent;
+    color: var(--text-tertiary);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+  }
+
+  .calendar-nav:hover {
+    background: rgba(0, 122, 255, 0.06);
+    color: var(--accent-color);
+  }
+
+  .calendar-nav svg {
+    display: block;
+  }
+
+  .calendar-title {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text-primary);
+  }
+
+  .calendar-weekdays {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 2px;
+    margin-bottom: 4px;
+  }
+
+  .calendar-weekdays span {
+    text-align: center;
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--text-tertiary);
+    padding: 4px;
+  }
+
+  .calendar-days {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 2px;
+  }
+
+  .calendar-day {
+    aspect-ratio: 1;
+    border: none;
+    border-radius: 8px;
+    background: transparent;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-primary);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    transition: all 0.15s;
+  }
+
+  .calendar-day:hover:not(:disabled) {
+    background: rgba(0, 122, 255, 0.1);
+  }
+
+  .calendar-day.is-other-month {
+    color: var(--text-tertiary);
+    opacity: 0.5;
+  }
+
+  .calendar-day.is-selected {
+    background: var(--accent-color);
+    color: white;
+  }
+
+  .calendar-day.is-today:not(.is-selected) {
+    border: 1.5px solid var(--accent-color);
+    color: var(--accent-color);
+  }
+
+  .calendar-day.has-data::after {
+    content: '';
+    position: absolute;
+    bottom: 3px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background: var(--accent-color);
+  }
+
+  .calendar-day:disabled {
+    cursor: default;
+    opacity: 0.2;
+  }
+
+  @keyframes calendarPopoverIn {
+    from { opacity: 0; transform: translateX(-50%) translateY(-8px); }
+    to { opacity: 1; transform: translateX(-50%) translateY(0); }
+  }
+
+  .loading-bar {
+    height: 2px;
+    background: linear-gradient(90deg, transparent, var(--accent-color), transparent);
+    background-size: 200% 100%;
+    animation: loadingShimmer 1s ease-in-out infinite;
+    margin-bottom: 8px;
+    border-radius: 1px;
+  }
+
+  @keyframes loadingShimmer {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+  }
+
+  .playback-controls {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    position: absolute;
+    right: 0;
+    top: 50%;
+    transform: translateY(-50%);
+  }
+
+  .play-btn {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+    background: var(--bg-card);
+    color: var(--text-primary);
+    font-size: 14px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+  }
+
+  .play-btn:hover:not(:disabled) {
+    background: var(--accent-color);
+    color: white;
+    border-color: var(--accent-color);
+  }
+
+  .play-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+
+  .speed-btn {
+    font-size: 12px;
+    font-weight: 600;
+    padding: 4px 8px;
+    border-radius: 6px;
+    border: 1px solid var(--border-color);
+    background: var(--bg-card);
+    color: var(--text-primary);
+    cursor: pointer;
+    font-family: var(--font-stack);
+    transition: all 0.2s;
+    min-width: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+  }
+
+  .speed-btn:hover:not(:disabled) {
+    border-color: var(--accent-color);
+    color: var(--accent-color);
+  }
+
+  .speed-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+
+  .speed-dropdown {
+    position: absolute;
+    top: 38px;
+    right: 0;
+    min-width: 56px;
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+    padding: 4px;
+    z-index: 1001;
+    animation: speedDropdownIn 0.15s ease-out forwards;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  @keyframes speedDropdownIn {
+    from { opacity: 0; transform: translateY(-4px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .speed-option {
+    font-size: 12px;
+    font-weight: 500;
+    padding: 6px 10px;
+    border-radius: 6px;
+    border: none;
+    background: transparent;
+    color: var(--text-primary);
+    cursor: pointer;
+    text-align: center;
+    transition: all 0.15s;
+    font-family: var(--font-stack);
+  }
+
+  .speed-option:hover {
+    background: rgba(0, 122, 255, 0.08);
+  }
+
+  .speed-option.is-active {
+    background: var(--accent-color);
+    color: white;
+  }
+
+  .frame-counter {
+    font-size: 12px;
+    color: var(--text-secondary);
+    font-family: 'SF Mono', Monaco, Consolas, monospace;
+    margin-left: 8px;
+  }
+
+  /* Delete button on timeline image */
+  .image-container {
+    position: relative;
+  }
+
+  .image-container .delete-btn {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    border: none;
+    background: rgba(0, 0, 0, 0.4);
+    color: white;
+    font-size: 18px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+    z-index: 10;
+    padding: 0;
+    line-height: 1;
+  }
+
+  .image-container .delete-btn:hover {
+    background: #FF3B30;
+    transform: scale(1.1);
+  }
+
+  /* Navigation arrows on timeline image */
+  .nav-arrow {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    border: none;
+    background: rgba(0, 0, 0, 0.35);
+    color: white;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+    z-index: 5;
+    padding: 0;
+    line-height: 1;
+  }
+
+  .nav-arrow:hover {
+    background: rgba(0, 0, 0, 0.6);
+    transform: translateY(-50%) scale(1.1);
+  }
+
+  .nav-arrow:focus-visible {
+    outline: 2px solid var(--accent-color);
+    outline-offset: 2px;
+  }
+
+  .nav-arrow svg {
+    display: block;
+  }
+
+  .nav-arrow-left {
+    left: 12px;
+  }
+
+  .nav-arrow-right {
+    right: 12px;
+  }
+
+  /* Delete confirm dialog (same styles as grid) */
+  .delete-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 2000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .delete-dialog {
+    width: 360px;
+    background: var(--bg-card);
+    border-radius: 16px;
+    padding: 32px 28px;
+    text-align: center;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  }
+
+  .delete-dialog-icon {
+    font-size: 40px;
+    margin-bottom: 16px;
+  }
+
+  .delete-dialog h3 {
+    margin: 0 0 8px 0;
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--text-primary);
+  }
+
+  .delete-dialog p {
+    margin: 0 0 24px 0;
+    font-size: 14px;
+    color: var(--text-secondary);
+    line-height: 1.5;
+  }
+
+  .delete-dialog-actions {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+  }
+
+  .btn-cancel {
+    padding: 10px 20px;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    background: var(--bg-card);
+    color: var(--text-primary);
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-family: var(--font-stack);
+  }
+
+  .btn-cancel:hover {
+    background: var(--bg-body);
+  }
+
+  .btn-delete-confirm {
+    padding: 10px 20px;
+    border: none;
+    border-radius: 8px;
+    background: #FF3B30;
+    color: white;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-family: var(--font-stack);
+    min-width: 80px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+  }
+
+  .btn-delete-confirm:hover:not(:disabled) {
+    background: #E6352B;
+  }
+
+  .btn-delete-confirm:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+
+  /* Toast notification */
+  .toast {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    padding: 12px 20px;
+    background: #333;
+    color: white;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 500;
+    z-index: 3000;
+    animation: toastIn 0.3s ease-out;
+  }
+
+  .toast.toast-out {
+    animation: toastOut 0.3s ease-in forwards;
+  }
+
+  @keyframes toastIn {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  @keyframes toastOut {
+    from { opacity: 1; transform: translateY(0); }
+    to { opacity: 0; transform: translateY(20px); }
+  }
+
+  [x-cloak] {
+    display: none !important;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div x-data="timelineView()" x-init="await init()" x-cloak>
+  <!-- Loading Indicator -->
+  <div x-show="loading" class="loading-bar" x-cloak></div>
+
+  <!-- Date Navigation Toolbar -->
+  <div class="date-nav-toolbar" style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px;">
+    <button type="button" class="today-btn" @click="goToday()" :disabled="isToday(currentDate)">
+      Today
+    </button>
+    <button type="button" class="toolbar-nav-btn" @click="prevDay()" title="Previous day" aria-label="Previous day">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+    </button>
+    <div @click.away="calendarOpen = false" style="position: relative;">
+      <button type="button" class="date-picker-btn" @click="toggleCalendar()">
+        <span>&#128197;</span>
+        <span x-text="currentDate"></span>
+        <span style="font-size: 10px; opacity: 0.6;">&#9660;</span>
+      </button>
+      <!-- Calendar Popover -->
+      <div x-show="calendarOpen" class="calendar-popover" x-cloak>
+        <div class="calendar-header">
+          <button type="button" class="calendar-nav" @click="prevMonth()" aria-label="Previous month">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+          </button>
+          <span class="calendar-title" x-text="`${calendarYear}&#24180;${calendarMonth + 1}&#26376;`"></span>
+          <button type="button" class="calendar-nav" @click="nextMonth()" aria-label="Next month">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+          </button>
+        </div>
+        <div class="calendar-weekdays">
+          <span>&#26085;</span><span>&#19968;</span><span>&#20108;</span><span>&#19977;</span><span>&#22235;</span><span>&#20116;</span><span>&#20845;</span>
+        </div>
+        <div class="calendar-days">
+          <template x-for="day in calendarDays()" :key="day.date || `${calendarYear}-${calendarMonth}-${day.day}`">
+            <button
+              type="button"
+              class="calendar-day"
+              :class="{
+                'is-other-month': day.isOtherMonth,
+                'is-selected': day.date === currentDate,
+                'is-today': day.date && isToday(day.date),
+                'has-data': day.date && hasData(day.date)
+              }"
+              :disabled="!day.date"
+              @click="day.date && selectDate(day.date)"
+              x-text="day.day"
+            ></button>
+          </template>
+        </div>
+      </div>
+    </div>
+    <button type="button" class="toolbar-nav-btn" @click="nextDay()" title="Next day" aria-label="Next day">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+    </button>
+  </div>
+
+  <!-- No data -->
+  <div x-show="!loading && frames.length === 0" class="alert" role="alert">
+    No captures on <span x-text="currentDate"></span>.<br>
+    <span style="font-size: 13px; color: var(--text-secondary);">Select another date to browse history.</span>
+  </div>
+
+  <!-- Timeline -->
+  <div x-show="!loading && frames.length > 0">
+    <div class="slider-container">
+      <input type="range" class="slider" id="discreteSlider"
+        x-model.number="currentIndex"
+        :min="0" :max="frames.length - 1" step="1"
+        :disabled="loading || frames.length <= 1"
+        @input="onSliderInput()">
+      <div class="slider-value">
+        <div class="slider-info">
+          <span x-text="formattedTime"></span>
+          <span class="frame-counter" x-show="frames.length > 0" x-text="`(${currentIndex + 1} / ${frames.length})`"></span>
+        </div>
+        <div class="playback-controls">
+          <button
+            type="button"
+            class="play-btn"
+            @click="togglePlayback()"
+            :disabled="loading || frames.length <= 1"
+            x-text="isPlaying ? '\u25a0\u25a0' : '\u25b6'"
+            :title="isPlaying ? 'Pause' : 'Play'"
+          ></button>
+          <div style="position: relative;">
+            <button
+              type="button"
+              class="speed-btn"
+              @click="speedDropdownOpen = !speedDropdownOpen"
+              :disabled="loading || frames.length <= 1"
+              x-text="playbackSpeed + 'x \u25bc'"
+              title="Playback speed"
+            ></button>
+            <div
+              x-show="speedDropdownOpen"
+              class="speed-dropdown"
+              x-cloak
+              @click.away="speedDropdownOpen = false"
+            >
+              <button
+                type="button"
+                class="speed-option"
+                :class="{ 'is-active': playbackSpeed === 1 }"
+                @click="selectSpeed(1)"
+              >1x</button>
+              <button
+                type="button"
+                class="speed-option"
+                :class="{ 'is-active': playbackSpeed === 2 }"
+                @click="selectSpeed(2)"
+              >2x</button>
+              <button
+                type="button"
+                class="speed-option"
+                :class="{ 'is-active': playbackSpeed === 5 }"
+                @click="selectSpeed(5)"
+              >5x</button>
+              <button
+                type="button"
+                class="speed-option"
+                :class="{ 'is-active': playbackSpeed === 10 }"
+                @click="selectSpeed(10)"
+              >10x</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="image-container">
+      <button
+        type="button"
+        class="delete-btn"
+        title="Delete frame"
+        @click.stop="promptDelete()"
+        x-show="currentFrame"
+      >🗑️</button>
+
+      <!-- Previous frame button -->
+      <button
+        type="button"
+        class="nav-arrow nav-arrow-left"
+        title="Previous frame"
+        aria-label="Previous frame"
+        @click.stop="goPrev()"
+        x-show="frames.length > 1 && currentIndex > 0"
+        x-cloak
+      >
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+      </button>
+
+      <!-- Next frame button -->
+      <button
+        type="button"
+        class="nav-arrow nav-arrow-right"
+        title="Next frame"
+        aria-label="Next frame"
+        @click.stop="goNext()"
+        x-show="frames.length > 1 && currentIndex < frames.length - 1"
+        x-cloak
+      >
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+      </button>
+
+      <img id="timestampImage"
+        :src="currentFrame ? `${EDGE_BASE_URL}/v1/frames/${currentFrame.frame_id}` : ''"
+        alt="Screenshot">
+    </div>
+  </div>
+
+  <!-- Delete Confirm Dialog -->
+  <div
+    x-show="deleteConfirmOpen"
+    class="delete-overlay"
+    @click.self="deleteConfirmOpen = false"
+    @keydown.escape.window="deleteConfirmOpen = false"
+    x-cloak
+  >
+    <div class="delete-dialog">
+      <div class="delete-dialog-icon">🗑️</div>
+      <h3>Delete this frame?</h3>
+      <p>This will permanently remove the screenshot, OCR text, description, and search index.</p>
+      <div class="delete-dialog-actions">
+        <button type="button" class="btn-cancel" @click="deleteConfirmOpen = false">Cancel</button>
+        <button
+          type="button"
+          class="btn-delete-confirm"
+          @click="confirmDelete()"
+          :disabled="deleting"
+        >
+          <template x-if="!deleting">
+            <span>Delete</span>
+          </template>
+          <template x-if="deleting">
+            <span><span class="spinner" style="width: 12px; height: 12px; border-width: 2px;"></span> Deleting...</span>
+          </template>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast -->
+  <div x-show="toastMessage" x-text="toastMessage" class="toast" :class="{ 'toast-out': toastFading }" x-cloak></div>
+</div>
+{% endblock %}
+
+{% block extra_body %}
+<script>
+  function timelineView() {
+    return {
+      // Data
+      frames: [],
+      currentIndex: 0,
+      currentDate: '',
+      datesWithData: new Set(),
+
+      // Calendar
+      calendarOpen: false,
+      calendarYear: 0,
+      calendarMonth: 0,
+
+      // Playback
+      isPlaying: false,
+      playbackSpeed: 1,
+      playbackTimer: null,
+      BASE_INTERVAL: 1000,
+      speedDropdownOpen: false,
+      deleteConfirmOpen: false,
+      deleting: false,
+      toastMessage: '',
+      toastFading: false,
+
+      // UI
+      loading: true,
+
+      // Timers
+      refreshTimer: null,
+
+      // ---- Computed ----
+
+      get currentFrame() {
+        if (this.frames.length === 0) return null;
+        return this.frames[this.currentIndex];
+      },
+
+      get formattedTime() {
+        const frame = this.currentFrame;
+        if (!frame) return '';
+        const ts = frame.timestamp;
+        if (!ts) return 'Invalid timestamp';
+        const date = parseTimestamp(ts);
+        if (!date || isNaN(date.getTime())) return 'Invalid timestamp';
+        const y = date.getFullYear();
+        const mo = String(date.getMonth() + 1).padStart(2, '0');
+        const d = String(date.getDate()).padStart(2, '0');
+        const h = String(date.getHours()).padStart(2, '0');
+        const mi = String(date.getMinutes()).padStart(2, '0');
+        const s = String(date.getSeconds()).padStart(2, '0');
+        return `${y}-${mo}-${d} ${h}:${mi}:${s}`;
+      },
+
+      // ---- Date Helpers (match index.html) ----
+
+      _formatDateStr(date) {
+        const y = date.getFullYear();
+        const m = String(date.getMonth() + 1).padStart(2, '0');
+        const d = String(date.getDate()).padStart(2, '0');
+        return `${y}-${m}-${d}`;
+      },
+
+      _utc8Now() {
+        const now = new Date();
+        now.setMinutes(now.getMinutes() + now.getTimezoneOffset() + 480);
+        return now;
+      },
+
+      isToday(dateStr) {
+        return dateStr === this._formatDateStr(this._utc8Now());
+      },
+
+      // ---- Data Loading ----
+
+      async loadDay(date) {
+        this.stopPlayback();
+        this.loading = true;
+        try {
+          const res = await fetch(`${EDGE_BASE_URL}/api/memories/by-day?date=${date}`);
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          const data = await res.json();
+          if (Array.isArray(data)) {
+            // Sort ascending (oldest first) for timeline playback
+            this.frames = data.sort((a, b) => {
+              const ta = parseTimestamp(a.timestamp)?.getTime() || 0;
+              const tb = parseTimestamp(b.timestamp)?.getTime() || 0;
+              return ta - tb;
+            });
+          } else {
+            this.frames = [];
+          }
+          this.currentIndex = 0;
+        } catch (e) {
+          console.error('Failed to load day:', e);
+          this.frames = [];
+          this.currentIndex = 0;
+        } finally {
+          this.loading = false;
+        }
+      },
+
+      // ---- Day Navigation ----
+
+      prevDay() {
+        this.stopPlayback();
+        const [y, m, d] = this.currentDate.split('-').map(Number);
+        const date = new Date(y, m - 1, d);
+        date.setDate(date.getDate() - 1);
+        this.currentDate = this._formatDateStr(date);
+        this.calendarYear = date.getFullYear();
+        this.calendarMonth = date.getMonth();
+        this.loadDay(this.currentDate);
+      },
+
+      nextDay() {
+        this.stopPlayback();
+        const [y, m, d] = this.currentDate.split('-').map(Number);
+        const date = new Date(y, m - 1, d);
+        date.setDate(date.getDate() + 1);
+        this.currentDate = this._formatDateStr(date);
+        this.calendarYear = date.getFullYear();
+        this.calendarMonth = date.getMonth();
+        this.loadDay(this.currentDate);
+      },
+
+      goToday() {
+        this.stopPlayback();
+        const now = this._utc8Now();
+        this.currentDate = this._formatDateStr(now);
+        this.calendarYear = now.getFullYear();
+        this.calendarMonth = now.getMonth();
+        this.loadDay(this.currentDate);
+      },
+
+      selectDate(date) {
+        this.stopPlayback();
+        this.currentDate = date;
+        const [y, m] = date.split('-').map(Number);
+        this.calendarYear = y;
+        this.calendarMonth = m - 1;
+        this.calendarOpen = false;
+        this.loadDay(date);
+      },
+
+      // ---- Calendar ----
+
+      async loadCalendarDates() {
+        const monthStr = `${this.calendarYear}-${String(this.calendarMonth + 1).padStart(2, '0')}`;
+        try {
+          const res = await fetch(`${EDGE_BASE_URL}/api/memories/dates?month=${monthStr}`);
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          const data = await res.json();
+          this.datesWithData = new Set(data.dates || []);
+        } catch (e) {
+          console.error('Failed to load calendar dates:', e);
+        }
+      },
+
+      toggleCalendar() {
+        this.calendarOpen = !this.calendarOpen;
+        if (this.calendarOpen) {
+          this.loadCalendarDates();
+        }
+      },
+
+      prevMonth() {
+        this.calendarMonth -= 1;
+        if (this.calendarMonth < 0) {
+          this.calendarMonth = 11;
+          this.calendarYear -= 1;
+        }
+        this.loadCalendarDates();
+      },
+
+      nextMonth() {
+        this.calendarMonth += 1;
+        if (this.calendarMonth > 11) {
+          this.calendarMonth = 0;
+          this.calendarYear += 1;
+        }
+        this.loadCalendarDates();
+      },
+
+      calendarDays() {
+        const firstDay = new Date(this.calendarYear, this.calendarMonth, 1);
+        const lastDay = new Date(this.calendarYear, this.calendarMonth + 1, 0);
+        const startOffset = firstDay.getDay();
+        const days = [];
+
+        const prevMonthLastDay = new Date(this.calendarYear, this.calendarMonth, 0).getDate();
+        for (let i = startOffset - 1; i >= 0; i--) {
+          days.push({ date: null, day: prevMonthLastDay - i, isOtherMonth: true });
+        }
+
+        for (let i = 1; i <= lastDay.getDate(); i++) {
+          const dateStr = `${this.calendarYear}-${String(this.calendarMonth + 1).padStart(2, '0')}-${String(i).padStart(2, '0')}`;
+          days.push({ date: dateStr, day: i, isOtherMonth: false });
+        }
+
+        const remaining = 42 - days.length;
+        for (let i = 1; i <= remaining; i++) {
+          days.push({ date: null, day: i, isOtherMonth: true });
+        }
+
+        return days;
+      },
+
+      hasData(date) {
+        return this.datesWithData.has(date);
+      },
+
+      // ---- Real-Time Refresh ----
+
+      async refreshDay() {
+        if (!this.isToday(this.currentDate)) return;
+        try {
+          const res = await fetch(`${EDGE_BASE_URL}/api/memories/by-day?date=${this.currentDate}`);
+          if (!res.ok) return;
+          const fresh = await res.json();
+          if (!Array.isArray(fresh)) return;
+
+          // Sort ascending (oldest first)
+          fresh.sort((a, b) => {
+            const ta = parseTimestamp(a.timestamp)?.getTime() || 0;
+            const tb = parseTimestamp(b.timestamp)?.getTime() || 0;
+            return ta - tb;
+          });
+
+          // Update existing frames by ID
+          const freshById = new Map(fresh.map(e => [e.id, e]));
+          for (let i = 0; i < this.frames.length; i++) {
+            const frame = this.frames[i];
+            if (!frame?.id) continue;
+            const updated = freshById.get(frame.id);
+            if (updated) {
+              this.frames[i] = updated;
+              freshById.delete(frame.id);
+            }
+          }
+
+          // Append new frames to end
+          const newFrames = Array.from(freshById.values());
+          if (newFrames.length > 0) {
+            this.frames.push(...newFrames);
+          }
+        } catch (_e) {
+          // Silent fail
+        }
+      },
+
+      // ---- Playback ----
+
+      onSliderInput() {
+        // User manually dragged the slider — stop playback
+        this.stopPlayback();
+      },
+
+      togglePlayback() {
+        if (this.isPlaying) {
+          this.stopPlayback();
+        } else {
+          this.startPlayback();
+        }
+      },
+
+      startPlayback() {
+        if (this.frames.length <= 1) return;
+        if (this.currentIndex >= this.frames.length - 1) {
+          // Already at the end — restart from beginning
+          this.currentIndex = 0;
+        }
+        this.isPlaying = true;
+        const interval = this.BASE_INTERVAL / this.playbackSpeed;
+        this.playbackTimer = setInterval(() => {
+          if (this.currentIndex >= this.frames.length - 1) {
+            this.stopPlayback();
+            return;
+          }
+          this.currentIndex += 1;
+        }, interval);
+      },
+
+      stopPlayback() {
+        this.isPlaying = false;
+        if (this.playbackTimer) {
+          clearInterval(this.playbackTimer);
+          this.playbackTimer = null;
+        }
+      },
+
+      goPrev() {
+        this.stopPlayback();
+        if (this.currentIndex > 0) {
+          this.currentIndex -= 1;
+        }
+      },
+
+      goNext() {
+        this.stopPlayback();
+        if (this.currentIndex < this.frames.length - 1) {
+          this.currentIndex += 1;
+        }
+      },
+
+      selectSpeed(speed) {
+        this.playbackSpeed = speed;
+        this.speedDropdownOpen = false;
+        if (this.isPlaying) {
+          this.stopPlayback();
+          this.startPlayback();
+        }
+      },
+
+      // ---- Frame Deletion ----
+
+      promptDelete() {
+        this.deleteConfirmOpen = true;
+      },
+
+      async confirmDelete() {
+        if (!this.currentFrame) return;
+        const frameId = this.currentFrame.frame_id;
+        const index = this.currentIndex;
+
+        this.deleting = true;
+        try {
+          const res = await fetch(`${EDGE_BASE_URL}/v1/frames/${frameId}`, {
+            method: 'DELETE'
+          });
+
+          if (res.ok) {
+            // Remove from frames array
+            this.frames.splice(index, 1);
+
+            // Adjust currentIndex
+            if (this.frames.length === 0) {
+              this.currentIndex = 0;
+            } else if (index >= this.frames.length) {
+              this.currentIndex = this.frames.length - 1;
+            }
+            // else: keep current index, next frame slides in
+
+            this.showToast('Frame deleted');
+          } else {
+            const data = await res.json().catch(() => ({}));
+            this.showToast(data.error || 'Failed to delete frame');
+          }
+        } catch (e) {
+          console.error('Delete failed:', e);
+          this.showToast('Network error, please try again');
+        } finally {
+          this.deleting = false;
+          this.deleteConfirmOpen = false;
+        }
+      },
+
+      showToast(message) {
+        this.toastMessage = message;
+        this.toastFading = false;
+        setTimeout(() => {
+          this.toastFading = true;
+          setTimeout(() => {
+            this.toastMessage = '';
+            this.toastFading = false;
+          }, 300);
+        }, 2000);
+      },
+
+      // ---- Initialization ----
+
+      async init() {
+        const now = this._utc8Now();
+        this.currentDate = this._formatDateStr(now);
+        this.calendarYear = now.getFullYear();
+        this.calendarMonth = now.getMonth();
+        await this.loadDay(this.currentDate);
+
+        // Real-time refresh: every 5 seconds check for new frames
+        this.refreshTimer = setInterval(() => {
+          this.refreshDay();
+        }, 5000);
+
+        // Keyboard navigation
+        this._keydownHandler = (e) => {
+          // Ignore keyboard events in input elements
+          const tag = e.target.tagName;
+          if (tag === 'INPUT' || tag === 'TEXTAREA' || e.target.isContentEditable) {
+            return;
+          }
+          if (e.key === 'ArrowLeft') {
+            e.preventDefault();
+            this.stopPlayback();
+            if (this.currentIndex > 0) this.currentIndex -= 1;
+          }
+          if (e.key === 'ArrowRight') {
+            e.preventDefault();
+            this.stopPlayback();
+            if (this.currentIndex < this.frames.length - 1) this.currentIndex += 1;
+          }
+          if (e.key === ' ') {
+            e.preventDefault();
+            this.togglePlayback();
+          }
+        };
+        window.addEventListener('keydown', this._keydownHandler);
+
+        // Cleanup on page leave
+        this._beforeUnloadHandler = () => {
+          this.stopPlayback();
+          if (this.refreshTimer) {
+            clearInterval(this.refreshTimer);
+            this.refreshTimer = null;
+          }
+          if (this._keydownHandler) {
+            window.removeEventListener('keydown', this._keydownHandler);
+            this._keydownHandler = null;
+          }
+          window.removeEventListener('beforeunload', this._beforeUnloadHandler);
+          this._beforeUnloadHandler = null;
+        };
+        window.addEventListener('beforeunload', this._beforeUnloadHandler);
+      }
+    };
+  }
+</script>
+{% endblock %}

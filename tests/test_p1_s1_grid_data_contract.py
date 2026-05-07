@@ -3,8 +3,8 @@ from pathlib import Path
 
 import pytest
 
-from openrecall.server import __main__ as server_main
-from openrecall.server.database.frames_store import FramesStore
+from myrecall.server import __main__ as server_main
+from myrecall.server.database.frames_store import FramesStore
 
 
 @pytest.mark.unit

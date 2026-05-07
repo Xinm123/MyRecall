@@ -8,7 +8,7 @@ Usage: p1_s2a_local.sh [options]
 Run local P1-S2a gate checks and produce a standard evidence bundle.
 
 Options:
-  --base-url URL         Edge base URL (default: http://localhost:${OPENRECALL_PORT:-8083})
+  --base-url URL         Edge base URL (default: http://localhost:${MYRECALL_PORT:-8083})
   --evidence-dir DIR     Evidence output directory
                          (default: docs/v3/acceptance/phase1/evidence)
   --window-id ID         Custom window_id for this run
@@ -27,7 +27,7 @@ Outputs:
 EOF
 }
 
-BASE_URL="http://localhost:${OPENRECALL_PORT:-8083}"
+BASE_URL="http://localhost:${MYRECALL_PORT:-8083}"
 EVIDENCE_DIR="docs/v3/acceptance/phase1/evidence"
 WINDOW_ID=""
 EDGE_PID=""
@@ -83,7 +83,7 @@ RUN_TS="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 RUN_TAG="$(date -u +%Y%m%dT%H%M%SZ)"
 WINDOW_ID="${WINDOW_ID:-p1-s2a-${RUN_TAG}}"
 EDGE_PID="${EDGE_PID:-unknown}"
-EDGE_DB="${EDGE_DB:-${OPENRECALL_SERVER_DATA_DIR:-$HOME/MRS}/db/edge.db}"
+EDGE_DB="${EDGE_DB:-${MYRECALL_SERVER_DATA_DIR:-$HOME/MRS}/db/edge.db}"
 GIT_REV="$(git rev-parse --short HEAD 2>/dev/null || echo unknown)"
 HOSTNAME_VAL="$(hostname 2>/dev/null || echo unknown-host)"
 

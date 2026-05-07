@@ -7,8 +7,8 @@ from pathlib import Path
 
 import pytest
 
-from openrecall.client.events.base import CaptureTrigger, TriggerEvent
-from openrecall.server import __main__ as server_main
+from myrecall.client.events.base import CaptureTrigger, TriggerEvent
+from myrecall.server import __main__ as server_main
 
 
 def _iso_now_minus_ms(milliseconds: int) -> str:
@@ -148,16 +148,16 @@ def test_debounce_violation_count_detects_sub_interval_same_device_samples(
 def test_manual_and_idle_share_the_same_debounce_gate() -> None:
     # Must set ClientSettings BEFORE importing ScreenRecorder
     # (recorder imports settings at module level)
-    import openrecall.shared.config
-    from openrecall.client.config_client import ClientSettings
+    import myrecall.shared.config
+    from myrecall.client.config_client import ClientSettings
 
     # Save original and set ClientSettings
-    original_settings = openrecall.shared.config.settings
-    openrecall.shared.config.settings = ClientSettings._from_dict({})
+    original_settings = myrecall.shared.config.settings
+    myrecall.shared.config.settings = ClientSettings._from_dict({})
 
     try:
         # Import after settings is set
-        from openrecall.client.recorder import ScreenRecorder
+        from myrecall.client.recorder import ScreenRecorder
 
         recorder = ScreenRecorder()
 
@@ -189,4 +189,4 @@ def test_manual_and_idle_share_the_same_debounce_gate() -> None:
         assert accepted_idle_after_window is True
     finally:
         # Restore original settings
-        openrecall.shared.config.settings = original_settings
+        myrecall.shared.config.settings = original_settings

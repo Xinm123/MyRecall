@@ -15,12 +15,12 @@ class TestCollectForCapture:
 
     def test_import_collect_for_capture(self):
         """collect_for_capture should be importable from service module."""
-        from openrecall.client.accessibility.service import collect_for_capture
+        from myrecall.client.accessibility.service import collect_for_capture
 
     def test_collect_for_capture_rejects_non_focused_monitor(self):
         """Non-focused monitor should produce non_focused_monitor decision."""
-        from openrecall.client.accessibility.service import collect_for_capture
-        from openrecall.client.accessibility.types import REASON_NON_FOCUSED_MONITOR
+        from myrecall.client.accessibility.service import collect_for_capture
+        from myrecall.client.accessibility.types import REASON_NON_FOCUSED_MONITOR
 
         decision = collect_for_capture(
             app_name="Safari",
@@ -39,8 +39,8 @@ class TestCollectForCapture:
 
     def test_collect_for_capture_rejects_terminal_app(self):
         """Terminal-class app should produce app_prefers_ocr decision."""
-        from openrecall.client.accessibility.service import collect_for_capture
-        from openrecall.client.accessibility.types import REASON_APP_PREFERS_OCR
+        from myrecall.client.accessibility.service import collect_for_capture
+        from myrecall.client.accessibility.types import REASON_APP_PREFERS_OCR
 
         decision = collect_for_capture(
             app_name="iTerm2",
@@ -58,8 +58,8 @@ class TestCollectForCapture:
 
     def test_collect_for_capture_returns_placeholder_when_eligible(self):
         """Eligible capture should attempt walk (may return various reasons without real AX)."""
-        from openrecall.client.accessibility.service import collect_for_capture
-        from openrecall.client.accessibility.types import (
+        from myrecall.client.accessibility.service import collect_for_capture
+        from myrecall.client.accessibility.types import (
             REASON_NO_FOCUSED_WINDOW,
             REASON_ADOPTED_ACCESSIBILITY,
             REASON_EMPTY_TEXT,
@@ -84,7 +84,7 @@ class TestCollectForCapture:
 
     def test_collect_for_capture_includes_timing(self):
         """Decision should include duration_ms."""
-        from openrecall.client.accessibility.service import collect_for_capture
+        from myrecall.client.accessibility.service import collect_for_capture
 
         decision = collect_for_capture(
             app_name="Safari",
@@ -100,7 +100,7 @@ class TestCollectForCapture:
 
     def test_collect_for_capture_logs_decision(self, caplog):
         """Decision should be logged at debug level."""
-        from openrecall.client.accessibility.service import collect_for_capture
+        from myrecall.client.accessibility.service import collect_for_capture
         import logging
 
         with caplog.at_level(logging.DEBUG):
@@ -122,7 +122,7 @@ class TestCollectForCaptureEdgeCases:
 
     def test_empty_app_name_not_rejected_as_terminal(self):
         """Empty app name should not be rejected as terminal."""
-        from openrecall.client.accessibility.service import collect_for_capture
+        from myrecall.client.accessibility.service import collect_for_capture
 
         # Empty app name - should not match terminal list
         decision = collect_for_capture(
@@ -138,7 +138,7 @@ class TestCollectForCaptureEdgeCases:
 
     def test_none_app_name_handled(self):
         """None app name should be handled gracefully."""
-        from openrecall.client.accessibility.service import collect_for_capture
+        from myrecall.client.accessibility.service import collect_for_capture
 
         decision = collect_for_capture(
             app_name=None,
@@ -153,7 +153,7 @@ class TestCollectForCaptureEdgeCases:
 
     def test_empty_window_name_handled(self):
         """Empty window name should be handled gracefully."""
-        from openrecall.client.accessibility.service import collect_for_capture
+        from myrecall.client.accessibility.service import collect_for_capture
 
         decision = collect_for_capture(
             app_name="Safari",
@@ -169,8 +169,8 @@ class TestCollectForCaptureEdgeCases:
 
     def test_device_name_case_sensitive(self):
         """Device name comparison should be case-sensitive."""
-        from openrecall.client.accessibility.service import collect_for_capture
-        from openrecall.client.accessibility.types import REASON_NON_FOCUSED_MONITOR
+        from myrecall.client.accessibility.service import collect_for_capture
+        from myrecall.client.accessibility.types import REASON_NON_FOCUSED_MONITOR
 
         # Different case should be treated as different monitors
         decision = collect_for_capture(
@@ -190,8 +190,8 @@ class TestDebugDirIntegration:
 
     def test_collect_for_capture_with_debug_dir(self, tmp_path):
         """When debug_dir is provided, decision should be dumped."""
-        from openrecall.client.accessibility.service import collect_for_capture
-        from openrecall.client.accessibility.debug import set_debug_mode
+        from myrecall.client.accessibility.service import collect_for_capture
+        from myrecall.client.accessibility.debug import set_debug_mode
         import os
 
         # Enable debug mode
@@ -215,7 +215,7 @@ class TestDebugDirIntegration:
 
     def test_collect_for_capture_without_debug_dir(self):
         """When debug_dir is not provided, no dump should be created."""
-        from openrecall.client.accessibility.service import collect_for_capture
+        from myrecall.client.accessibility.service import collect_for_capture
 
         # No debug_dir provided
         decision = collect_for_capture(
@@ -235,7 +235,7 @@ class TestRecorderIntegration:
 
     def test_recorder_has_ax_duration_tracking(self):
         """ScreenRecorder should track last AX decision duration."""
-        from openrecall.client.recorder import ScreenRecorder
+        from myrecall.client.recorder import ScreenRecorder
 
         recorder = ScreenRecorder()
         assert hasattr(recorder, "_last_ax_duration_ms")
@@ -243,15 +243,15 @@ class TestRecorderIntegration:
 
     def test_recorder_imports_collect_for_capture(self):
         """recorder module should import collect_for_capture."""
-        from openrecall.client import recorder
+        from myrecall.client import recorder
 
         # The module should have accessibility imported
         assert hasattr(recorder, "collect_for_capture")
 
     def test_build_capture_metadata_works_with_ax_stage(self):
         """_build_capture_metadata should work after AX stage is added."""
-        from openrecall.client.recorder import ScreenRecorder
-        from openrecall.client.events.base import TriggerEvent, CaptureTrigger
+        from myrecall.client.recorder import ScreenRecorder
+        from myrecall.client.events.base import TriggerEvent, CaptureTrigger
 
         recorder = ScreenRecorder()
         event = TriggerEvent(
@@ -274,8 +274,8 @@ class TestRecorderIntegration:
 
     def test_recorder_capture_includes_accessibility_decision(self, monkeypatch):
         """Capture flow should make accessibility decision."""
-        from openrecall.client.recorder import ScreenRecorder
-        from openrecall.client.events.base import (
+        from myrecall.client.recorder import ScreenRecorder
+        from myrecall.client.events.base import (
             TriggerEvent,
             CaptureTrigger,
             MonitorDescriptor,
@@ -289,7 +289,7 @@ class TestRecorderIntegration:
         captured_decision = None
 
         original_collect = recorder.__class__.__module__
-        from openrecall.client.accessibility import collect_for_capture as original_fn
+        from myrecall.client.accessibility import collect_for_capture as original_fn
 
         def track_collect(*args, **kwargs):
             nonlocal call_count, captured_decision
@@ -298,7 +298,7 @@ class TestRecorderIntegration:
             return captured_decision
 
         monkeypatch.setattr(
-            "openrecall.client.recorder.collect_for_capture", track_collect
+            "myrecall.client.recorder.collect_for_capture", track_collect
         )
 
         # Verify the function can be called with expected parameters
@@ -319,13 +319,13 @@ class TestMergeAccessibilityMetadata:
 
     def test_merge_adds_canonical_fields_for_adopted(self):
         """When adopted=True, metadata should contain text, text_source, accessibility payload."""
-        from openrecall.client.accessibility.types import (
+        from myrecall.client.accessibility.types import (
             AccessibilityDecision,
             TreeSnapshot,
             AccessibilityTreeNode,
             NodeBounds,
         )
-        from openrecall.client.recorder import _merge_accessibility_metadata
+        from myrecall.client.recorder import _merge_accessibility_metadata
         from datetime import datetime, timezone
 
         snapshot = TreeSnapshot(
@@ -371,11 +371,11 @@ class TestMergeAccessibilityMetadata:
 
     def test_merge_adds_browser_url_for_empty_text(self):
         """When reason=empty_text, metadata should still contain browser_url from snapshot."""
-        from openrecall.client.accessibility.types import (
+        from myrecall.client.accessibility.types import (
             AccessibilityDecision,
             TreeSnapshot,
         )
-        from openrecall.client.recorder import _merge_accessibility_metadata
+        from myrecall.client.recorder import _merge_accessibility_metadata
         from datetime import datetime, timezone
 
         # Snapshot has browser_url but empty text_content
@@ -412,8 +412,8 @@ class TestMergeAccessibilityMetadata:
 
     def test_merge_omits_canonical_fields_for_non_adopted(self):
         """When adopted=False with no snapshot, metadata should NOT contain text or accessibility."""
-        from openrecall.client.accessibility.types import AccessibilityDecision
-        from openrecall.client.recorder import _merge_accessibility_metadata
+        from myrecall.client.accessibility.types import AccessibilityDecision
+        from myrecall.client.recorder import _merge_accessibility_metadata
 
         decision = AccessibilityDecision(
             eligible=False,
@@ -431,12 +431,12 @@ class TestMergeAccessibilityMetadata:
 
     def test_merge_preserves_base_metadata(self):
         """Merge should preserve all existing base metadata fields."""
-        from openrecall.client.accessibility.types import (
+        from myrecall.client.accessibility.types import (
             AccessibilityDecision,
             TreeSnapshot,
             AccessibilityTreeNode,
         )
-        from openrecall.client.recorder import _merge_accessibility_metadata
+        from myrecall.client.recorder import _merge_accessibility_metadata
         from datetime import datetime, timezone
 
         snapshot = TreeSnapshot(
@@ -482,12 +482,12 @@ class TestMergeAccessibilityMetadata:
 
     def test_merge_includes_truncation_info(self):
         """Merge should include truncation info in accessibility payload."""
-        from openrecall.client.accessibility.types import (
+        from myrecall.client.accessibility.types import (
             AccessibilityDecision,
             TreeSnapshot,
             AccessibilityTreeNode,
         )
-        from openrecall.client.recorder import _merge_accessibility_metadata
+        from myrecall.client.recorder import _merge_accessibility_metadata
         from datetime import datetime, timezone
 
         snapshot = TreeSnapshot(
@@ -526,8 +526,8 @@ class TestRecorderSkipsAx:
 
     def test_skips_ax_for_non_focused_monitor(self):
         """AX should be rejected for non-focused monitor."""
-        from openrecall.client.accessibility.service import collect_for_capture
-        from openrecall.client.accessibility.types import REASON_NON_FOCUSED_MONITOR
+        from myrecall.client.accessibility.service import collect_for_capture
+        from myrecall.client.accessibility.types import REASON_NON_FOCUSED_MONITOR
 
         decision = collect_for_capture(
             app_name="Safari",
@@ -542,8 +542,8 @@ class TestRecorderSkipsAx:
 
     def test_skips_ax_for_terminal_app(self):
         """AX should be rejected for terminal-class app."""
-        from openrecall.client.accessibility.service import collect_for_capture
-        from openrecall.client.accessibility.types import REASON_APP_PREFERS_OCR
+        from myrecall.client.accessibility.service import collect_for_capture
+        from myrecall.client.accessibility.types import REASON_APP_PREFERS_OCR
 
         decision = collect_for_capture(
             app_name="iTerm2",
@@ -558,7 +558,7 @@ class TestRecorderSkipsAx:
 
     def test_capture_still_succeeds_when_ax_skipped(self):
         """Capture should still succeed when AX is skipped."""
-        from openrecall.client.accessibility.service import collect_for_capture
+        from myrecall.client.accessibility.service import collect_for_capture
 
         # Non-focused monitor - AX is skipped
         decision = collect_for_capture(

@@ -6,7 +6,7 @@ import pytest
 
 class TestDescriptionService:
     def test_enqueue_is_idempotent(self):
-        from openrecall.server.description.service import DescriptionService
+        from myrecall.server.description.service import DescriptionService
 
         mock_store = MagicMock()
         svc = DescriptionService(store=mock_store)
@@ -15,7 +15,7 @@ class TestDescriptionService:
         mock_store.insert_description_task.assert_called_once_with(mock_conn, 1)
 
     def test_service_initializes_without_provider(self):
-        from openrecall.server.description.service import DescriptionService
+        from myrecall.server.description.service import DescriptionService
 
         mock_store = MagicMock()
         svc = DescriptionService(store=mock_store)
@@ -23,7 +23,7 @@ class TestDescriptionService:
         assert svc._provider is None
 
     def test_backfill_calls_store_method(self):
-        from openrecall.server.description.service import DescriptionService
+        from myrecall.server.description.service import DescriptionService
 
         mock_store = MagicMock()
         mock_store.enqueue_pending_descriptions.return_value = 5
@@ -34,7 +34,7 @@ class TestDescriptionService:
         mock_store.enqueue_pending_descriptions.assert_called_once_with(mock_conn)
 
     def test_get_queue_status_calls_store_method(self):
-        from openrecall.server.description.service import DescriptionService
+        from myrecall.server.description.service import DescriptionService
 
         mock_store = MagicMock()
         mock_store.get_description_queue_status.return_value = {

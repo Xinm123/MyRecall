@@ -20,10 +20,10 @@ import numpy as np
 from PIL import Image
 import requests
 
-from openrecall.server.config_runtime import runtime_settings
-from openrecall.server.worker import ProcessingWorker
-from openrecall.client.recorder import ScreenRecorder
-from openrecall.shared.config import settings
+from myrecall.server.config_runtime import runtime_settings
+from myrecall.server.worker import ProcessingWorker
+from myrecall.client.recorder import ScreenRecorder
+from myrecall.shared.config import settings
 
 
 logger = logging.getLogger(__name__)
@@ -127,13 +127,13 @@ class TestRecorderPhase82(unittest.TestCase):
         }
         
         # Act
-        with patch("openrecall.client.recorder.requests.post") as mock_post:
+        with patch("myrecall.client.recorder.requests.post") as mock_post:
             mock_response = MagicMock()
             mock_response.raise_for_status.return_value = None
             mock_response.json.return_value = mock_response_data
             mock_post.return_value = mock_response
 
-            with patch("openrecall.client.recorder.settings.api_url", "http://localhost:8083/api"):
+            with patch("myrecall.client.recorder.settings.api_url", "http://localhost:8083/api"):
                 recorder._send_heartbeat()
         
         # Assert
@@ -150,7 +150,7 @@ class TestRecorderPhase82(unittest.TestCase):
         recorder.upload_enabled = True
         
         # Act
-        with patch("openrecall.client.recorder.requests.post", side_effect=requests.RequestException("Network error")):
+        with patch("myrecall.client.recorder.requests.post", side_effect=requests.RequestException("Network error")):
             recorder._send_heartbeat()
         
         # Assert - should still have default values
@@ -165,8 +165,8 @@ class TestRecorderPhase82(unittest.TestCase):
         recorder = ScreenRecorder()
         
         # Act
-        with patch("openrecall.client.recorder.requests.post", side_effect=requests.RequestException("Stop here")) as mock_post:
-            with patch("openrecall.client.recorder.settings.api_url", "http://localhost:8083/api"):
+        with patch("myrecall.client.recorder.requests.post", side_effect=requests.RequestException("Stop here")) as mock_post:
+            with patch("myrecall.client.recorder.settings.api_url", "http://localhost:8083/api"):
                 recorder._send_heartbeat()
 
         called_url = mock_post.call_args[0][0]
@@ -190,8 +190,8 @@ class TestRecorderPhase82(unittest.TestCase):
             return True
         
         # Act
-        with patch('openrecall.client.recorder.take_screenshots', side_effect=mock_take_screenshots):
-            with patch('openrecall.client.recorder.is_user_active', side_effect=mock_is_user_active):
+        with patch('myrecall.client.recorder.take_screenshots', side_effect=mock_take_screenshots):
+            with patch('myrecall.client.recorder.is_user_active', side_effect=mock_is_user_active):
                 with patch.object(recorder, '_send_heartbeat'):
                     with patch.object(recorder, 'start'):
                         # Simulate one capture loop iteration
@@ -262,8 +262,8 @@ class TestPhase82Integration(unittest.TestCase):
         
         # Act
         with patch.object(recorder, '_send_heartbeat', side_effect=mock_send_heartbeat):
-            with patch('openrecall.client.recorder.take_screenshots') as mock_screenshots:
-                with patch('openrecall.client.recorder.is_user_active', return_value=False):
+            with patch('myrecall.client.recorder.take_screenshots') as mock_screenshots:
+                with patch('myrecall.client.recorder.is_user_active', return_value=False):
                     mock_screenshots.return_value = []
                     
                     # Simulate heartbeat timing
@@ -303,13 +303,13 @@ class TestPhase82Integration(unittest.TestCase):
             runtime_settings.recording_enabled = True
         
         # Act - Sync from server that has disabled recording
-        with patch("openrecall.client.recorder.requests.post") as mock_post:
+        with patch("myrecall.client.recorder.requests.post") as mock_post:
             mock_response = MagicMock()
             mock_response.raise_for_status.return_value = None
             mock_response.json.return_value = {"config": {"recording_enabled": False}}
             mock_post.return_value = mock_response
 
-            with patch("openrecall.client.recorder.settings.api_url", "http://localhost:8083/api"):
+            with patch("myrecall.client.recorder.settings.api_url", "http://localhost:8083/api"):
                 recorder._send_heartbeat()
         
         # Assert
@@ -324,13 +324,13 @@ class TestPhase82Integration(unittest.TestCase):
             runtime_settings.upload_enabled = True
         
         # Act - Sync from server that has disabled upload
-        with patch("openrecall.client.recorder.requests.post") as mock_post:
+        with patch("myrecall.client.recorder.requests.post") as mock_post:
             mock_response = MagicMock()
             mock_response.raise_for_status.return_value = None
             mock_response.json.return_value = {"config": {"upload_enabled": False}}
             mock_post.return_value = mock_response
 
-            with patch("openrecall.client.recorder.settings.api_url", "http://localhost:8083/api"):
+            with patch("myrecall.client.recorder.settings.api_url", "http://localhost:8083/api"):
                 recorder._send_heartbeat()
         
         # Assert
@@ -406,7 +406,7 @@ class TestPhase82EdgeCases(unittest.TestCase):
         recorder = ScreenRecorder()
         
         # Act
-        with patch("openrecall.client.recorder.requests.post", side_effect=requests.Timeout("Timeout")):
+        with patch("myrecall.client.recorder.requests.post", side_effect=requests.Timeout("Timeout")):
             recorder._send_heartbeat()
         
         # Assert - should keep current state
@@ -419,7 +419,7 @@ class TestPhase82EdgeCases(unittest.TestCase):
         recorder = ScreenRecorder()
         
         # Act
-        with patch("openrecall.client.recorder.requests.post") as mock_post:
+        with patch("myrecall.client.recorder.requests.post") as mock_post:
             mock_response = MagicMock()
             mock_response.raise_for_status.return_value = None
             mock_response.json.side_effect = ValueError("invalid json")
@@ -437,7 +437,7 @@ class TestPhase82EdgeCases(unittest.TestCase):
         recorder.upload_enabled = True
         
         # Act
-        with patch("openrecall.client.recorder.requests.post") as mock_post:
+        with patch("myrecall.client.recorder.requests.post") as mock_post:
             mock_response = MagicMock()
             mock_response.raise_for_status.return_value = None
             mock_response.json.return_value = {"config": {}}

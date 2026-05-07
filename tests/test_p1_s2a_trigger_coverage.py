@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from openrecall.server import __main__ as server_main
+from myrecall.server import __main__ as server_main
 
 
 ALLOWED_TRIGGERS = ("idle", "app_switch", "manual", "click")

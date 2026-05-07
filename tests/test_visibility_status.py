@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from openrecall.server.database.frames_store import FramesStore
+from myrecall.server.database.frames_store import FramesStore
 
 
 @pytest.fixture
@@ -20,6 +20,7 @@ def temp_store():
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     capture_id TEXT UNIQUE,
                     timestamp TEXT,
+                    local_timestamp TEXT,
                     status TEXT DEFAULT 'pending',
                     description_status TEXT,
                     embedding_status TEXT,
@@ -257,7 +258,7 @@ class TestSearchFiltersByVisibilityStatus:
 
     def test_fts_search_only_returns_queryable(self, temp_store):
         """FTS search should only return frames with visibility_status='queryable'."""
-        from openrecall.server.search.engine import SearchEngine
+        from myrecall.server.search.engine import SearchEngine
 
         # Create frames table with FTS
         with temp_store._connect() as conn:
@@ -301,20 +302,20 @@ class TestActivitySummaryFiltersByVisibilityStatus:
         with temp_store._connect() as conn:
             conn.execute("""
                 INSERT INTO frames (id, status, description_status, embedding_status,
-                                   visibility_status, app_name, timestamp)
+                                   visibility_status, app_name, timestamp, local_timestamp)
                 VALUES (1, 'completed', 'completed', 'completed', 'queryable',
-                        'TestApp', '2026-04-14T00:00:00Z')
+                        'TestApp', '2026-04-14T00:00:00Z', '2026-04-14T08:00:00.000')
             """)
             conn.execute("""
                 INSERT INTO frames (id, status, description_status, embedding_status,
-                                   visibility_status, app_name, timestamp)
+                                   visibility_status, app_name, timestamp, local_timestamp)
                 VALUES (2, 'completed', 'completed', 'pending', 'pending',
-                        'TestApp', '2026-04-14T00:01:00Z')
+                        'TestApp', '2026-04-14T00:01:00Z', '2026-04-14T08:01:00.000')
             """)
 
         total = temp_store.get_activity_summary_total_frames(
-            start_time="2026-04-14T00:00:00Z",
-            end_time="2026-04-14T23:59:59Z",
+            start_time="2026-04-14T08:00:00.000",
+            end_time="2026-04-14T23:59:59",
         )
 
         assert total == 1

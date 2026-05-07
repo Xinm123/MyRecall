@@ -15,8 +15,8 @@ from unittest.mock import patch, MagicMock
 import pytest
 from flask import Flask
 
-from openrecall.server.api_v1 import v1_bp
-from openrecall.server.search.engine import SearchEngine
+from myrecall.server.api_v1 import v1_bp
+from myrecall.server.search.engine import SearchEngine
 
 
 @pytest.fixture
@@ -40,7 +40,7 @@ class TestSearchCountsAPI:
 
     def test_search_counts_endpoint_returns_type_counts(self, app_with_search_counts_route, mock_search_engine):
         """Test /v1/search/counts returns ocr and accessibility counts."""
-        with patch("openrecall.server.api_v1._get_search_engine", return_value=mock_search_engine):
+        with patch("myrecall.server.api_v1._get_search_engine", return_value=mock_search_engine):
             client = app_with_search_counts_route.test_client()
             response = client.get("/v1/search/counts?q=test")
 
@@ -54,7 +54,7 @@ class TestSearchCountsAPI:
 
     def test_search_counts_endpoint_handles_invalid_params(self, app_with_search_counts_route, mock_search_engine):
         """Test /v1/search/counts handles invalid params gracefully."""
-        with patch("openrecall.server.api_v1._get_search_engine", return_value=mock_search_engine):
+        with patch("myrecall.server.api_v1._get_search_engine", return_value=mock_search_engine):
             client = app_with_search_counts_route.test_client()
             response = client.get("/v1/search/counts?min_length=invalid")
 
@@ -66,7 +66,7 @@ class TestSearchCountsAPI:
 
     def test_search_counts_endpoint_passes_query_params(self, app_with_search_counts_route, mock_search_engine):
         """Test /v1/search/counts passes query params to search engine."""
-        with patch("openrecall.server.api_v1._get_search_engine", return_value=mock_search_engine):
+        with patch("myrecall.server.api_v1._get_search_engine", return_value=mock_search_engine):
             client = app_with_search_counts_route.test_client()
             client.get("/v1/search/counts?q=hello&app_name=Safari&focused=true")
 
@@ -78,17 +78,17 @@ class TestSearchCountsAPI:
 
     def test_search_counts_endpoint_passes_time_range(self, app_with_search_counts_route, mock_search_engine):
         """Test /v1/search/counts passes time range params."""
-        with patch("openrecall.server.api_v1._get_search_engine", return_value=mock_search_engine):
+        with patch("myrecall.server.api_v1._get_search_engine", return_value=mock_search_engine):
             client = app_with_search_counts_route.test_client()
-            client.get("/v1/search/counts?q=test&start_time=2026-03-18T10:00:00Z&end_time=2026-03-18T11:00:00Z")
+            client.get("/v1/search/counts?q=test&start_time=2026-03-18T10:00:00&end_time=2026-03-18T11:00:00")
 
             call_args = mock_search_engine.count_by_type.call_args
-            assert call_args.kwargs.get("start_time") == "2026-03-18T10:00:00Z"
-            assert call_args.kwargs.get("end_time") == "2026-03-18T11:00:00Z"
+            assert call_args.kwargs.get("start_time") == "2026-03-18T10:00:00"
+            assert call_args.kwargs.get("end_time") == "2026-03-18T11:00:00"
 
     def test_search_counts_endpoint_passes_window_name(self, app_with_search_counts_route, mock_search_engine):
         """Test /v1/search/counts passes window_name param."""
-        with patch("openrecall.server.api_v1._get_search_engine", return_value=mock_search_engine):
+        with patch("myrecall.server.api_v1._get_search_engine", return_value=mock_search_engine):
             client = app_with_search_counts_route.test_client()
             client.get("/v1/search/counts?q=test&window_name=MyWindow")
 
@@ -97,7 +97,7 @@ class TestSearchCountsAPI:
 
     def test_search_counts_endpoint_passes_browser_url(self, app_with_search_counts_route, mock_search_engine):
         """Test /v1/search/counts passes browser_url param."""
-        with patch("openrecall.server.api_v1._get_search_engine", return_value=mock_search_engine):
+        with patch("myrecall.server.api_v1._get_search_engine", return_value=mock_search_engine):
             client = app_with_search_counts_route.test_client()
             client.get("/v1/search/counts?q=test&browser_url=http://example.com")
 
@@ -106,7 +106,7 @@ class TestSearchCountsAPI:
 
     def test_search_counts_endpoint_empty_query(self, app_with_search_counts_route, mock_search_engine):
         """Test /v1/search/counts handles empty query."""
-        with patch("openrecall.server.api_v1._get_search_engine", return_value=mock_search_engine):
+        with patch("myrecall.server.api_v1._get_search_engine", return_value=mock_search_engine):
             client = app_with_search_counts_route.test_client()
             response = client.get("/v1/search/counts")
 
@@ -118,7 +118,7 @@ class TestSearchCountsAPI:
 
     def test_search_counts_endpoint_focused_false(self, app_with_search_counts_route, mock_search_engine):
         """Test /v1/search/counts handles focused=false."""
-        with patch("openrecall.server.api_v1._get_search_engine", return_value=mock_search_engine):
+        with patch("myrecall.server.api_v1._get_search_engine", return_value=mock_search_engine):
             client = app_with_search_counts_route.test_client()
             client.get("/v1/search/counts?q=test&focused=false")
 
@@ -127,7 +127,7 @@ class TestSearchCountsAPI:
 
     def test_search_counts_endpoint_focused_variants(self, app_with_search_counts_route, mock_search_engine):
         """Test /v1/search/counts handles various focused param values."""
-        with patch("openrecall.server.api_v1._get_search_engine", return_value=mock_search_engine):
+        with patch("myrecall.server.api_v1._get_search_engine", return_value=mock_search_engine):
             client = app_with_search_counts_route.test_client()
 
             # Test "1" for true
@@ -162,7 +162,7 @@ def integration_test_db(tmp_path):
 
     with sqlite3.connect(str(db_path)) as conn:
         # Run initial schema
-        init_sql = Path("openrecall/server/database/migrations/20260227000001_initial_schema.sql").read_text()
+        init_sql = Path("myrecall/server/database/migrations/20260227000001_initial_schema.sql").read_text()
         conn.executescript(init_sql)
 
         # Run intermediate migrations
@@ -172,13 +172,14 @@ def integration_test_db(tmp_path):
             "20260317000001_ocr_text_unique_frame_id.sql",
             "20260321120000_dual_hash_storage.sql",
             "20260324120000_add_frame_description.sql",
+            "20260325120000_consolidate_fts_to_full_text.sql",
+            "20260408120000_description_fields_redesign.sql",
+            "20260409120000_add_frame_embedding.sql",
+            "20260414000000_add_visibility_status.sql",
+            "20260426000000_add_local_timestamp.sql",
         ]:
-            mig_sql = Path(f"openrecall/server/database/migrations/{mig}").read_text()
+            mig_sql = Path(f"myrecall/server/database/migrations/{mig}").read_text()
             conn.executescript(mig_sql)
-
-        # Run FTS unification migration
-        fts_sql = Path("openrecall/server/database/migrations/20260325120000_consolidate_fts_to_full_text.sql").read_text()
-        conn.executescript(fts_sql)
 
         conn.commit()
 
@@ -196,7 +197,7 @@ def app_with_real_engine(integration_test_db):
     original_engine = None
     _api_v1 = None
     try:
-        import openrecall.server.api_v1 as _api_v1
+        import myrecall.server.api_v1 as _api_v1
         original_engine = _api_v1._search_engine
         _api_v1._search_engine = engine
         yield app
@@ -212,11 +213,15 @@ class TestSearchCountsIntegration:
         """Insert a completed OCR frame with full_text and frames_fts.
 
         After FTS unification: full_text is set on frames, triggering frames_ai → frames_fts.
+        timestamp is UTC, local_timestamp is local time (UTC+8).
         """
+        # Compute local_timestamp from UTC timestamp (UTC+8)
+        from myrecall.server.database.frames_store import _utc_to_local_timestamp
+        local_ts = _utc_to_local_timestamp(timestamp)
         cursor = conn.execute(
-            """INSERT INTO frames (capture_id, timestamp, app_name, text_source, status, full_text)
-               VALUES (?, ?, ?, 'ocr', 'completed', ?)""",
-            (f"cap-ocr-{timestamp}", timestamp, app_name, text),
+            """INSERT INTO frames (capture_id, timestamp, local_timestamp, app_name, text_source, status, full_text, visibility_status)
+               VALUES (?, ?, ?, ?, 'ocr', 'completed', ?, 'queryable')""",
+            (f"cap-ocr-{timestamp}", timestamp, local_ts, app_name, text),
         )
         return cursor.lastrowid
 
@@ -224,11 +229,14 @@ class TestSearchCountsIntegration:
         """Insert a completed accessibility frame with full_text and frames_fts.
 
         After FTS unification: full_text is set on frames, triggering frames_ai → frames_fts.
+        timestamp is UTC, local_timestamp is local time (UTC+8).
         """
+        from myrecall.server.database.frames_store import _utc_to_local_timestamp
+        local_ts = _utc_to_local_timestamp(timestamp)
         cursor = conn.execute(
-            """INSERT INTO frames (capture_id, timestamp, app_name, text_source, status, full_text)
-               VALUES (?, ?, ?, 'accessibility', 'completed', ?)""",
-            (f"cap-ax-{timestamp}", timestamp, app_name, text),
+            """INSERT INTO frames (capture_id, timestamp, local_timestamp, app_name, text_source, status, full_text, visibility_status)
+               VALUES (?, ?, ?, ?, 'accessibility', 'completed', ?, 'queryable')""",
+            (f"cap-ax-{timestamp}", timestamp, local_ts, app_name, text),
         )
         return cursor.lastrowid
 

@@ -4,8 +4,8 @@ import time
 
 import pytest
 
-from openrecall.client import runtime_config
-from openrecall.client.database import ClientSettingsStore
+from myrecall.client import runtime_config
+from myrecall.client.database import ClientSettingsStore
 
 
 @pytest.fixture

@@ -4,8 +4,8 @@ from typing import Any
 
 import pytest
 
-from openrecall.client.spool import SpoolItem, SpoolQueue
-from openrecall.client.v3_uploader import SpoolUploader, UploadResult, upload_capture
+from myrecall.client.spool import SpoolItem, SpoolQueue
+from myrecall.client.v3_uploader import SpoolUploader, UploadResult, upload_capture
 
 
 class _FakeResponse:
@@ -44,14 +44,14 @@ def test_upload_capture_503_returns_retry_hint_without_sleep(
     monkeypatch.setattr(spool, "commit", lambda capture_id: commits.append(capture_id))
 
     monkeypatch.setattr(
-        "openrecall.client.v3_uploader.requests.post",
+        "myrecall.client.v3_uploader.requests.post",
         lambda *args, **kwargs: _FakeResponse(503, {"retry_after": 7}),
     )
 
     def _should_not_sleep(_seconds: float) -> None:
         raise AssertionError("upload_capture should not sleep on 503")
 
-    monkeypatch.setattr("openrecall.client.v3_uploader.time.sleep", _should_not_sleep)
+    monkeypatch.setattr("myrecall.client.v3_uploader.time.sleep", _should_not_sleep)
 
     result = upload_capture(item, spool=spool)
 
@@ -79,7 +79,7 @@ def test_spool_uploader_uses_single_wait_for_retry_after(tmp_path: Path, monkeyp
         return UploadResult(success=True, apply_backoff=False)
 
     monkeypatch.setattr(
-        "openrecall.client.v3_uploader.upload_capture", _fake_upload_capture
+        "myrecall.client.v3_uploader.upload_capture", _fake_upload_capture
     )
 
     uploader.run()

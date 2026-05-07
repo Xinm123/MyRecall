@@ -1,0 +1,3000 @@
+{% extends "layout.html" %}
+
+{% block title %}MyRecall{% endblock %}
+
+{% block extra_head %}
+<style>
+  /* Soft color system variables */
+  :root {
+    /* Soft status colors */
+    --color-success: #5BC88C;
+    --color-success-bg: rgba(91, 200, 140, 0.1);
+    --color-success-border: rgba(91, 200, 140, 0.15);
+
+    --color-primary: #4A9EFF;
+    --color-primary-bg: rgba(74, 158, 255, 0.1);
+    --color-primary-border: rgba(74, 158, 255, 0.15);
+
+    --color-warning: #FFB84D;
+    --color-warning-bg: rgba(255, 184, 77, 0.1);
+    --color-warning-border: rgba(255, 184, 77, 0.15);
+
+    --color-error: #FF6B6B;
+    --color-error-bg: rgba(255, 107, 107, 0.1);
+    --color-error-border: rgba(255, 107, 107, 0.15);
+
+    --color-neutral: #8E8E93;
+    --color-neutral-bg: rgba(142, 142, 147, 0.1);
+    --color-neutral-border: rgba(142, 142, 147, 0.15);
+
+    /* Text hierarchy */
+    --text-tertiary: #8E8E93;
+    --bg-footer: #FAFAFA;
+  }
+
+  /* Form groups for toolbar */
+  .form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+  }
+  
+  .form-group label {
+    font-size: 12px;
+    color: var(--text-secondary);
+    font-weight: 500;
+  }
+  
+  .form-group input {
+    padding: 8px 12px;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    font-size: 14px;
+    font-family: var(--font-stack);
+    background: var(--bg-body);
+    color: var(--text-primary);
+  }
+  
+  .form-group input:focus {
+    outline: none;
+    border-color: var(--accent-color);
+  }
+
+  /* =============================================
+     Day Header + Date Navigation
+     ============================================= */
+
+  .day-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 0;
+    margin-bottom: 8px;
+    border-bottom: 1px solid var(--border-color);
+  }
+
+  .day-title {
+    font-size: 20px;
+    font-weight: 600;
+    color: var(--text-primary);
+    letter-spacing: -0.3px;
+  }
+
+  .day-stats {
+    display: flex;
+    gap: 16px;
+    align-items: center;
+  }
+
+  .day-stat {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    color: var(--text-secondary);
+  }
+
+  .day-stat-value {
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-family: 'SF Mono', Monaco, Consolas, monospace;
+  }
+
+  .day-stat.completed .day-stat-value {
+    background: var(--color-success-bg);
+    color: #2A9D4A;
+  }
+
+  .day-stat.pending .day-stat-value {
+    background: var(--color-warning-bg);
+    color: #D4840D;
+  }
+
+  .day-stat.failed .day-stat-value {
+    background: rgba(255, 59, 48, 0.1);
+    color: #FF3B30;
+  }
+
+  /* Date Navigation Toolbar */
+  .date-nav-toolbar {
+    position: relative;
+  }
+
+  .today-btn {
+    font-size: 13px;
+    font-weight: 500;
+    padding: 6px 14px;
+    border-radius: 6px;
+    border: 1px solid var(--border-color);
+    background: var(--bg-card);
+    color: var(--text-primary);
+    cursor: pointer;
+    transition: all 0.2s;
+    font-family: var(--font-stack);
+  }
+
+  .today-btn:hover:not(:disabled) {
+    background: var(--accent-color);
+    color: white;
+    border-color: var(--accent-color);
+  }
+
+  .toolbar-nav-btn {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+    background: var(--bg-card);
+    color: var(--text-tertiary);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+  }
+
+  .toolbar-nav-btn:hover {
+    background: rgba(0, 122, 255, 0.06);
+    border-color: var(--accent-color);
+    color: var(--accent-color);
+  }
+
+  .toolbar-nav-btn svg {
+    display: block;
+  }
+
+  .date-picker-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 14px;
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+    background: var(--bg-card);
+    color: var(--text-primary);
+    font-size: 14px;
+    font-weight: 500;
+    font-family: var(--font-stack);
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .date-picker-btn:hover {
+    border-color: var(--accent-color);
+    background: rgba(0, 122, 255, 0.05);
+  }
+
+  /* Calendar Popover */
+  .calendar-popover {
+    position: absolute;
+    top: 44px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 280px;
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
+    padding: 16px;
+    z-index: 1002;
+    animation: popoverIn 0.2s ease-out forwards;
+  }
+
+  .calendar-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+  }
+
+  .calendar-nav {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    border: none;
+    background: transparent;
+    color: var(--text-tertiary);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+  }
+
+  .calendar-nav:hover {
+    background: rgba(0, 122, 255, 0.06);
+    color: var(--accent-color);
+  }
+
+  .calendar-nav svg {
+    display: block;
+  }
+
+  .calendar-title {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text-primary);
+  }
+
+  .calendar-weekdays {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 2px;
+    margin-bottom: 4px;
+  }
+
+  .calendar-weekdays span {
+    text-align: center;
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--text-tertiary);
+    padding: 4px;
+  }
+
+  .calendar-days {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 2px;
+  }
+
+  .calendar-day {
+    aspect-ratio: 1;
+    border: none;
+    border-radius: 8px;
+    background: transparent;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-primary);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    transition: all 0.15s;
+  }
+
+  .calendar-day:hover:not(:disabled) {
+    background: rgba(0, 122, 255, 0.1);
+  }
+
+  .calendar-day.is-other-month {
+    color: var(--text-tertiary);
+    opacity: 0.5;
+  }
+
+  .calendar-day.is-selected {
+    background: var(--accent-color);
+    color: white;
+  }
+
+  .calendar-day.is-today:not(.is-selected) {
+    border: 1.5px solid var(--accent-color);
+    color: var(--accent-color);
+  }
+
+  .calendar-day.has-data::after {
+    content: '';
+    position: absolute;
+    bottom: 3px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background: var(--accent-color);
+  }
+
+  .calendar-day:disabled {
+    cursor: default;
+    opacity: 0.2;
+  }
+
+  @keyframes popoverIn {
+    from { opacity: 0; transform: translateX(-50%) translateY(-8px); }
+    to { opacity: 1; transform: translateX(-50%) translateY(0); }
+  }
+
+  /* Loading Indicator */
+  .loading-bar {
+    height: 2px;
+    background: linear-gradient(90deg, transparent, var(--accent-color), transparent);
+    background-size: 200% 100%;
+    animation: loadingShimmer 1s ease-in-out infinite;
+    margin-bottom: 8px;
+    border-radius: 1px;
+  }
+
+  @keyframes loadingShimmer {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+  }
+
+  /* Spinner Animation */
+  @keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
+
+  @keyframes pulse-soft {
+    0%, 100% {
+      opacity: 1;
+      transform: scale(1);
+    }
+    50% {
+      opacity: 0.7;
+      transform: scale(0.95);
+    }
+  }
+
+  .spinner {
+    display: inline-block;
+    width: 14px;
+    height: 14px;
+    border: 2.5px solid rgba(0, 122, 255, 0.2);
+    border-top-color: var(--accent-color);
+    border-radius: 50%;
+    animation: spin 0.6s linear infinite;
+    flex-shrink: 0;
+  }
+  
+  /* Memory Grid Layout */
+  .memory-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+    gap: 28px;
+    padding: 28px 0;
+  }
+  
+  /* Memory Card */
+  .memory-card {
+    background: var(--bg-card);
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+    transition: transform 0.2s, box-shadow 0.2s;
+    content-visibility: auto;
+    contain-intrinsic-size: 420px 360px;
+  }
+  
+  .memory-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.1);
+  }
+  
+  /* Card Header */
+  .card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border-color);
+  }
+  
+  .card-app {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--text-primary);
+  }
+  
+  .card-time {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
+  }
+  
+  /* Card Image - 智能统一高度方案 */
+  .card-image-wrapper {
+    width: 100%;
+    height: 200px;
+    overflow: hidden;
+    background: #1a1a1a;
+    position: relative;
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+  }
+
+  /* Delete button on card image */
+  .card-image-wrapper .delete-btn {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    border: none;
+    background: rgba(0, 0, 0, 0.4);
+    color: white;
+    font-size: 16px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transition: all 0.2s ease;
+    z-index: 10;
+    padding: 0;
+    line-height: 1;
+  }
+
+  .card-image-wrapper:hover .delete-btn {
+    opacity: 1;
+  }
+
+  .card-image-wrapper .delete-btn:hover {
+    background: #FF3B30;
+    transform: scale(1.1);
+  }
+
+  .card-image {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: top center;
+    cursor: pointer;
+    transition: transform 0.3s ease;
+  }
+
+  .card-image:hover {
+    transform: scale(1.05);
+  }
+  
+  /* Card Footer with Status */
+  .card-footer {
+    padding: 12px 16px;
+    border-top: 1px solid var(--border-color);
+    background: #F9F9FB;
+    min-height: 60px;
+    display: flex;
+    align-items: flex-start;
+    padding-top: 14px;
+    transition: all 0.3s ease;
+  }
+  
+  .status-processing {
+    display: flex;
+    align-items: center;
+    color: var(--text-secondary);
+  }
+  
+  .status-processing span {
+    margin-left: 8px;
+    font-size: 0.85rem;
+  }
+  
+  .ai-description {
+    font-size: 0.85rem;
+    color: #333;
+    line-height: 1.4;
+    max-height: 3em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    transition: max-height 0.3s ease, -webkit-line-clamp 0.3s ease;
+  }
+  
+  .memory-card:hover .ai-description {
+    max-height: none;
+    -webkit-line-clamp: unset;
+    overflow: visible;
+  }
+  
+  .ai-icon {
+    margin-right: 6px;
+  }
+  
+  .fallback-text {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    font-style: italic;
+  }
+  
+  /* Modal for full image view */
+  .modal {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(0, 0, 0, 0.9);
+    z-index: 1000;
+    padding: 16px;
+    box-sizing: border-box;
+  }
+  
+  .modal.active {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  
+  .modal-content {
+    width: calc(100vw - 32px);
+    height: calc(100vh - 32px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+  }
+  
+  .modal-content img {
+    max-width: 100%;
+    max-height: 100%;
+    width: auto;
+    height: auto;
+    object-fit: contain;
+    border-radius: 8px;
+  }
+  
+  .modal-close {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    color: white;
+    font-size: 32px;
+    cursor: pointer;
+    z-index: 1001;
+  }
+
+  .modal-meta {
+    position: absolute;
+    top: 16px;
+    left: 16px;
+    max-width: calc(100vw - 160px);
+    padding: 10px 12px;
+    border-radius: 10px;
+    background: rgba(0, 0, 0, 0.35);
+    color: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    z-index: 1001;
+  }
+
+  .modal-meta-line {
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1.25;
+    opacity: 0.92;
+    margin-top: 6px;
+  }
+
+  .modal-meta-line:first-child {
+    margin-top: 0;
+  }
+
+  .modal-nav {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 44px;
+    height: 44px;
+    border-radius: 999px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    background: rgba(0, 0, 0, 0.35);
+    color: white;
+    font-size: 22px;
+    line-height: 1;
+    cursor: pointer;
+    z-index: 1001;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+  }
+
+  .modal-nav:hover {
+    background: rgba(0, 0, 0, 0.5);
+  }
+
+  .modal-nav.prev {
+    left: 16px;
+  }
+
+  .modal-nav.next {
+    right: 16px;
+  }
+
+  /* Modal Tab 样式 */
+  .modal-container {
+    display: flex;
+    flex-direction: column;
+    width: 90vw;
+    height: 90vh;
+    max-width: 1200px;
+    background: var(--bg-card, #fff);
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+  }
+
+  .modal-tabs {
+    display: flex;
+    gap: 0;
+    border-bottom: 1px solid var(--border-color, #e5e5e5);
+    background: var(--bg-body, #f5f5f5);
+  }
+
+  .modal-tab {
+    padding: 12px 24px;
+    border: none;
+    background: transparent;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text-secondary, #666);
+    cursor: pointer;
+    transition: all 0.2s;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+  }
+
+  .modal-tab:hover {
+    color: var(--text-primary, #333);
+    background: rgba(0, 0, 0, 0.02);
+  }
+
+  .modal-tab.active {
+    color: var(--accent-color, #007AFF);
+    border-bottom-color: var(--accent-color, #007AFF);
+    background: var(--bg-card, #fff);
+  }
+
+  .modal-tab-content {
+    flex: 1;
+    overflow: auto;
+    position: relative;
+  }
+
+  /* 图片面板 */
+  .modal-image-panel {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #1a1a1a;
+  }
+
+  .modal-image-wrapper {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+  }
+
+  .modal-image-wrapper img {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+    border-radius: 4px;
+  }
+
+  .modal-meta-overlay {
+    position: absolute;
+    top: 16px;
+    left: 16px;
+    max-width: calc(100% - 120px);
+    padding: 10px 12px;
+    border-radius: 10px;
+    background: rgba(0, 0, 0, 0.5);
+    color: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    z-index: 100;
+  }
+
+  .modal-meta-overlay .modal-meta-line {
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1.4;
+    opacity: 0.92;
+    margin-top: 4px;
+  }
+
+  .modal-meta-overlay .modal-meta-line:first-child {
+    margin-top: 0;
+  }
+
+  /* 文本面板 */
+  .modal-text-panel {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    background: var(--bg-body, #f9f9f9);
+  }
+
+  .text-panel-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 20px;
+    border-bottom: 1px solid var(--border-color, #e5e5e5);
+    font-size: 13px;
+    color: var(--text-secondary, #666);
+  }
+
+  .text-panel-header .source-info {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .text-panel-header .source-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 4px;
+  }
+
+  .text-panel-header .source-badge.ax {
+    background: rgba(52, 199, 89, 0.15);
+    color: #28a745;
+  }
+
+  .copy-btn {
+    padding: 4px 12px;
+    font-size: 12px;
+    border: 1px solid var(--border-color, #e5e5e5);
+    border-radius: 4px;
+    background: var(--bg-card, #fff);
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .copy-btn:hover {
+    background: var(--primary-color, #007AFF);
+    color: #fff;
+    border-color: var(--primary-color, #007AFF);
+  }
+
+  .text-panel-content {
+    flex: 1;
+    padding: 20px;
+    overflow-y: auto;
+    font-size: 14px;
+    line-height: 1.6;
+    white-space: pre-wrap;
+    word-break: break-word;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  }
+
+  /* 元数据面板 */
+  .modal-metadata-panel {
+    padding: 24px;
+    background: var(--bg-body, #f9f9f9);
+    min-height: 100%;
+  }
+
+  .metadata-section {
+    margin-bottom: 24px;
+    background: var(--bg-card, #fff);
+    padding: 16px 20px;
+    border-radius: 10px;
+    border: 1px solid var(--border-color, #e5e5e5);
+  }
+
+  .metadata-section h3 {
+    margin: 0 0 16px 0;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-primary, #333);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    opacity: 0.7;
+  }
+
+  .metadata-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 12px;
+  }
+
+  .metadata-item {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .metadata-label {
+    font-size: 11px;
+    color: var(--text-tertiary, #999);
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+  }
+
+  .metadata-value {
+    font-size: 13px;
+    color: var(--text-primary, #333);
+    font-weight: 500;
+    word-break: break-all;
+  }
+
+  .metadata-value.monospace {
+    font-family: 'SF Mono', Monaco, Consolas, monospace;
+    font-size: 12px;
+    background: rgba(0, 0, 0, 0.03);
+    padding: 2px 6px;
+    border-radius: 4px;
+  }
+
+  .metadata-error {
+    background: rgba(255, 59, 48, 0.08);
+    color: #ff3b30;
+    padding: 12px 16px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-family: 'SF Mono', Monaco, Consolas, monospace;
+  }
+
+  .empty-state {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 40px;
+    text-align: center;
+    color: var(--text-secondary);
+  }
+
+  /* Stats Bar - Refined */
+  .stats-bar {
+    display: flex;
+    gap: 24px;
+    margin-bottom: 24px;
+    padding: 14px 24px;
+    background: var(--bg-card);
+    border-radius: 12px;
+    border: 1px solid var(--border-color);
+    width: fit-content;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+  }
+
+  .stat-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+    color: var(--text-secondary);
+  }
+
+  .stat-value {
+    font-weight: 600;
+    color: var(--text-primary);
+    background: rgba(0, 0, 0, 0.04);
+    padding: 3px 10px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-family: 'SF Mono', Monaco, Consolas, monospace;
+    min-width: 24px;
+    text-align: center;
+  }
+
+  /* Stats status colors */
+  .stat-item[data-status="completed"] .stat-value {
+    background: var(--color-success-bg);
+    color: #2A9D4A;
+  }
+
+  .stat-item[data-status="pending"] .stat-value {
+    background: var(--color-warning-bg);
+    color: #D4840D;
+  }
+
+  .stat-item[data-status="failed"] .stat-value {
+    background: rgba(255, 59, 48, 0.1);
+    color: #FF3B30;
+  }
+
+  /* Retry Failed Button */
+  .retry-failed-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 16px;
+    border: 1px solid var(--color-error-border);
+    border-radius: 8px;
+    background: var(--color-error-bg);
+    color: var(--color-error);
+    font-size: 0.85rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  .retry-failed-btn:hover:not(:disabled) {
+    background: var(--color-error);
+    color: white;
+  }
+
+  .retry-failed-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+
+  .retry-failed-btn .spinner {
+    width: 12px;
+    height: 12px;
+    border-width: 2px;
+  }
+
+  .status-pending {
+    display: flex;
+    align-items: center;
+    color: var(--text-secondary);
+  }
+
+  .status-pending span {
+    margin-left: 8px;
+    font-size: 0.85rem;
+  }
+
+  /* P1-S3: Status-specific card styling - Apple style subtle */
+  .memory-card[data-frame-status="pending"] {
+    border-left: 2px solid var(--color-warning);
+  }
+
+  .memory-card[data-frame-status="processing"] {
+    border-left: 2px solid var(--color-primary);
+  }
+
+  .memory-card[data-frame-status="completed"] {
+    border-left: 2px solid var(--color-success);
+  }
+
+  .memory-card[data-frame-status="failed"] {
+    border-left: 2px solid var(--color-error);
+  }
+
+  /* =============================================
+   Card Footer Grid Layout
+   ============================================= */
+
+.card-footer-grid {
+  padding: 12px 14px;
+  background: var(--bg-footer);
+  border-top: 1px solid var(--border-color);
+}
+
+/* 2x2 Grid */
+.status-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.status-cell {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 10px;
+  background: rgba(255, 255, 255, 0.8);
+  border-radius: 8px;
+  border: 1px solid rgba(0, 0, 0, 0.04);
+  transition: all 0.2s ease;
+}
+
+.status-cell:hover {
+  background: rgba(255, 255, 255, 1);
+  border-color: rgba(0, 0, 0, 0.08);
+}
+
+.cell-icon {
+  font-size: 13px;
+}
+
+.cell-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  min-width: 32px;
+  text-align: left;
+}
+
+.cell-value {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-primary);
+  font-family: 'SF Mono', Monaco, Consolas, monospace;
+}
+
+/* Status-specific styles */
+.status-cell.active .cell-label,
+.status-cell.active .cell-value {
+  color: #2A9D4A;
+}
+
+.status-cell.inactive {
+  opacity: 0.6;
+}
+
+.status-cell.status-completed .cell-label,
+.status-cell.status-completed .cell-value {
+  color: #2A9D4A;
+}
+
+.status-cell.status-processing .cell-label,
+.status-cell.status-processing .cell-value {
+  color: #0A6ED6;
+}
+
+.status-cell.status-pending .cell-label,
+.status-cell.status-pending .cell-value {
+  color: var(--color-neutral);
+}
+
+.status-cell.status-failed .cell-label,
+.status-cell.status-failed .cell-value {
+  color: #D63126;
+}
+
+/* Frame status bar */
+.frame-status-bar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: capitalize;
+  transition: all 0.2s ease;
+}
+
+.frame-status-bar .status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.frame-status-bar.status-completed {
+  color: #2A9D4A;
+}
+
+.frame-status-bar.status-processing {
+  color: #0A6ED6;
+}
+
+.frame-status-bar.status-processing .status-dot {
+  animation: pulse-soft 1.5s ease-in-out infinite;
+}
+
+.frame-status-bar.status-pending {
+  color: #D4840D;
+}
+
+.frame-status-bar.status-failed {
+  color: #D63126;
+}
+
+/* Pulse dot */
+.pulse-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+  animation: pulse-soft 1.5s ease-in-out infinite;
+}
+
+  /* Card header with window name */
+  .card-header-content {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    overflow: hidden;
+  }
+
+  .card-app-line {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .card-app {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .card-window {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .card-device {
+    font-size: 0.65rem;
+    color: var(--text-tertiary, #8E8E93);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  /* =============================================
+     Header V3 - Apple Style Refined Layout
+     ============================================= */
+
+  .card-header-v3 {
+    display: flex;
+    flex-direction: column;
+    padding: 12px 16px;
+    gap: 6px;
+    border-bottom: 1px solid var(--border-color);
+    background: var(--bg-card);
+  }
+
+  /* Row 1: Context */
+  .header-row {
+    display: flex;
+    align-items: center;
+    min-height: 20px;
+  }
+
+  .context-row {
+    justify-content: space-between;
+  }
+
+  .context-left {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+    flex: 1;
+  }
+
+  .app-icon {
+    font-size: 14px;
+    width: 20px;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+
+  .app-name {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .app-name.fallback {
+    font-style: italic;
+    color: var(--text-secondary);
+  }
+
+  .trigger-badge {
+    font-size: 10px;
+    font-weight: 500;
+    padding: 2px 8px;
+    border-radius: 10px;
+    text-transform: capitalize;
+    flex-shrink: 0;
+    white-space: nowrap;
+    background: rgba(0, 0, 0, 0.05);
+    color: var(--text-secondary);
+  }
+
+  .trigger-badge[data-trigger="idle"] {
+    background: var(--color-warning-bg);
+    color: #D4840D;
+  }
+
+  .trigger-badge[data-trigger="app_switch"] {
+    background: var(--color-primary-bg);
+    color: #0A6ED6;
+  }
+
+  .trigger-badge[data-trigger="click"] {
+    background: var(--color-success-bg);
+    color: #2A9D4A;
+  }
+
+  .trigger-badge[data-trigger="manual"] {
+    background: rgba(175, 82, 222, 0.1);
+    color: #8E4DB0;
+  }
+
+  .frame-id {
+    font-size: 11px;
+    color: var(--text-tertiary);
+    font-weight: 500;
+    font-family: 'SF Mono', Monaco, Consolas, monospace;
+    flex-shrink: 0;
+  }
+
+  /* Row 2: Window title */
+  .window-row {
+    min-height: 18px;
+    display: flex;
+    align-items: center;
+  }
+
+  .window-name {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    line-height: 1.4;
+  }
+
+  /* Row 3: Meta info */
+  .meta-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 16px;
+    margin-top: 2px;
+    padding-top: 6px;
+    border-top: 1px solid rgba(0, 0, 0, 0.04);
+  }
+
+  .meta-row .timestamp,
+  .meta-row .relative-time,
+  .meta-row .device-name {
+    font-size: 11px;
+    color: var(--text-tertiary);
+    white-space: nowrap;
+  }
+
+  .meta-row .timestamp {
+    font-family: 'SF Mono', Monaco, Consolas, monospace;
+    letter-spacing: -0.2px;
+  }
+
+  .meta-row .separator {
+    font-size: 11px;
+    color: var(--text-tertiary);
+    opacity: 0.6;
+  }
+
+  /* OCR info section */
+  .ocr-info {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    margin-bottom: 4px;
+  }
+
+  .ocr-info-item {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .ocr-text-preview {
+    font-size: 0.8rem;
+    color: #333;
+    line-height: 1.4;
+    max-height: 3em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+  }
+
+  /* Text source badge */
+  .text-source-badge {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 4px;
+  }
+
+  .source-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    padding: 2px 6px;
+    border-radius: 4px;
+  }
+
+  .source-badge.ax {
+    background: rgba(52, 199, 89, 0.15);
+    color: #28a745;
+  }
+
+  .source-badge.ocr {
+    background: rgba(0, 122, 255, 0.12);
+    color: #007aff;
+  }
+
+  .char-count {
+    font-size: 0.7rem;
+    color: var(--text-tertiary, #8E8E93);
+  }
+
+  /* Description Status Badge */
+  .description-status-badge {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 6px;
+    font-size: 0.75rem;
+  }
+
+  .status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-weight: 500;
+    font-size: 0.7rem;
+  }
+
+  .status-badge.pending {
+    background: rgba(255, 149, 0, 0.12);
+    color: #FF9500;
+  }
+
+  .status-badge.processing {
+    background: rgba(0, 122, 255, 0.12);
+    color: #007AFF;
+  }
+
+  .status-badge.completed {
+    background: rgba(52, 199, 89, 0.15);
+    color: #34C759;
+  }
+
+  .status-badge.failed {
+    background: rgba(255, 59, 48, 0.12);
+    color: #FF3B30;
+  }
+
+  .spinner-inline {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border: 1.5px solid rgba(0, 122, 255, 0.2);
+    border-top-color: #007AFF;
+    border-radius: 50%;
+    animation: spin 0.6s linear infinite;
+  }
+
+  /* Text preview */
+  .text-preview {
+    font-size: 0.8rem;
+    color: #333;
+    line-height: 1.4;
+    max-height: 3em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    margin-bottom: 4px;
+  }
+
+  /* Meta row for browser URL */
+  .meta-row {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-top: 4px;
+    font-size: 0.75rem;
+  }
+
+  .meta-icon {
+    flex-shrink: 0;
+  }
+
+  .browser-url {
+    color: var(--accent-color, #007AFF);
+    text-decoration: none;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 200px;
+  }
+
+  .browser-url:hover {
+    text-decoration: underline;
+  }
+
+  /* Focused badge */
+  .focused-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 0.7rem;
+    color: #FF9500;
+    background: rgba(255, 149, 0, 0.12);
+    padding: 2px 6px;
+    border-radius: 4px;
+    margin-top: 4px;
+  }
+
+  /* Error message display */
+  .error-message {
+    font-size: 0.8rem;
+    color: #FF3B30;
+    background: rgba(255, 59, 48, 0.1);
+    padding: 6px 10px;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  /* Capture trigger label */
+  .trigger-label {
+    font-size: 0.7rem;
+    color: var(--text-secondary);
+    background: rgba(0, 0, 0, 0.05);
+    padding: 2px 6px;
+    border-radius: 4px;
+    text-transform: capitalize;
+  }
+
+  [x-cloak] {
+    display: none !important;
+  }
+
+/* =============================================
+   Responsive Adaptations
+   ============================================= */
+
+@media (max-width: 768px) {
+  .memory-grid {
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 20px;
+    padding: 20px 0;
+  }
+
+  .card-header-v3 {
+    padding: 10px 12px;
+  }
+
+  .app-name {
+    font-size: 13px;
+  }
+
+  .window-name {
+    font-size: 12px;
+  }
+
+  .status-grid {
+    gap: 6px;
+  }
+
+  .status-cell {
+    padding: 6px 8px;
+  }
+
+  .cell-label {
+    font-size: 10px;
+  }
+
+  .cell-value {
+    font-size: 11px;
+  }
+
+  .stats-bar {
+    gap: 16px;
+    padding: 12px 18px;
+  }
+
+  .stat-item {
+    font-size: 13px;
+  }
+}
+
+@media (max-width: 480px) {
+  .memory-grid {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+
+  .stats-bar {
+    flex-wrap: wrap;
+    gap: 12px;
+    padding: 12px 16px;
+    width: auto;
+  }
+
+  .card-footer-grid {
+    padding: 10px 12px;
+  }
+}
+
+  /* Delete confirm dialog */
+  .delete-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 2000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .delete-dialog {
+    width: 360px;
+    background: var(--bg-card);
+    border-radius: 16px;
+    padding: 32px 28px;
+    text-align: center;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  }
+
+  .delete-dialog-icon {
+    font-size: 40px;
+    margin-bottom: 16px;
+  }
+
+  .delete-dialog h3 {
+    margin: 0 0 8px 0;
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--text-primary);
+  }
+
+  .delete-dialog p {
+    margin: 0 0 24px 0;
+    font-size: 14px;
+    color: var(--text-secondary);
+    line-height: 1.5;
+  }
+
+  .delete-dialog-actions {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+  }
+
+  .btn-cancel {
+    padding: 10px 20px;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    background: var(--bg-card);
+    color: var(--text-primary);
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-family: var(--font-stack);
+  }
+
+  .btn-cancel:hover {
+    background: var(--bg-body);
+  }
+
+  .btn-delete-confirm {
+    padding: 10px 20px;
+    border: none;
+    border-radius: 8px;
+    background: #FF3B30;
+    color: white;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-family: var(--font-stack);
+    min-width: 80px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+  }
+
+  .btn-delete-confirm:hover:not(:disabled) {
+    background: #E6352B;
+  }
+
+  .btn-delete-confirm:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+
+  /* Toast notification */
+  .toast {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    padding: 12px 20px;
+    background: #333;
+    color: white;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 500;
+    z-index: 3000;
+    animation: toastIn 0.3s ease-out;
+  }
+
+  .toast.toast-out {
+    animation: toastOut 0.3s ease-in forwards;
+  }
+
+  @keyframes toastIn {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  @keyframes toastOut {
+    from { opacity: 1; transform: translateY(0); }
+    to { opacity: 0; transform: translateY(20px); }
+  }
+</style>
+
+<script id="initialEntriesData" type="application/json">{{ entries | tojson | safe }}</script>
+<script id="initialConfigData" type="application/json">{{ {'show_ai_description': settings.show_ai_description} | tojson | safe }}</script>
+<script>
+  (() => {
+    const entriesEl = document.getElementById("initialEntriesData");
+    const configEl = document.getElementById("initialConfigData");
+    try {
+      window.initialEntries = JSON.parse(entriesEl?.textContent || "[]");
+    } catch (_e) {
+      window.initialEntries = [];
+    }
+    try {
+      window.initialConfig = JSON.parse(configEl?.textContent || "{}");
+    } catch (_e) {
+      window.initialConfig = { show_ai_description: false };
+    }
+  })();
+</script>
+{% endblock %}
+
+{% block content %}
+<div x-data="memoryGrid()" x-init="await init()" x-cloak>
+  <!-- Date Navigation Toolbar -->
+  <div class="date-nav-toolbar" style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px;">
+    <button type="button" class="today-btn" @click="goToday()" :disabled="isToday(currentDate)">
+      Today
+    </button>
+    <button type="button" class="toolbar-nav-btn" @click="prevDay()" title="Previous day" aria-label="Previous day">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+    </button>
+    <!-- Calendar wrapper: click.away on the parent so clicking the button does NOT close -->
+    <div @click.away="calendarOpen = false" style="position: relative;">
+      <button type="button" class="date-picker-btn" @click="toggleCalendar()">
+        <span>📅</span>
+        <span x-text="currentDate"></span>
+        <span style="font-size: 10px; opacity: 0.6;">▼</span>
+      </button>
+      <!-- Calendar Popover -->
+      <div x-show="calendarOpen" class="calendar-popover" x-cloak>
+        <div class="calendar-header">
+          <button type="button" class="calendar-nav" @click="prevMonth()" aria-label="Previous month">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+          </button>
+          <span class="calendar-title" x-text="`${calendarYear}年${calendarMonth + 1}月`"></span>
+          <button type="button" class="calendar-nav" @click="nextMonth()" aria-label="Next month">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+          </button>
+        </div>
+        <div class="calendar-weekdays">
+          <span>日</span><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span>
+        </div>
+        <div class="calendar-days">
+          <template x-for="day in calendarDays()" :key="day.date || `${calendarYear}-${calendarMonth}-${day.day}`">
+            <button
+              type="button"
+              class="calendar-day"
+              :class="{
+                'is-other-month': day.isOtherMonth,
+                'is-selected': day.date === currentDate,
+                'is-today': day.date && isToday(day.date),
+                'has-data': day.date && hasData(day.date)
+              }"
+              :disabled="!day.date"
+              @click="day.date && selectDate(day.date)"
+              x-text="day.day"
+            ></button>
+          </template>
+        </div>
+      </div>
+    </div>
+    <button type="button" class="toolbar-nav-btn" @click="nextDay()" title="Next day" aria-label="Next day">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+    </button>
+  </div>
+
+  <!-- Loading Indicator -->
+  <div x-show="loading" class="loading-bar" x-cloak></div>
+
+  <!-- Day Header -->
+  <div class="day-header">
+    <h2 class="day-title" x-text="formatDateDisplay(currentDate)"></h2>
+    <div class="day-stats">
+      <div class="day-stat completed">
+        <span>Completed</span>
+        <span class="day-stat-value" x-text="stats().completed"></span>
+      </div>
+      <div class="day-stat pending">
+        <span>Pending</span>
+        <span class="day-stat-value" x-text="stats().pending"></span>
+      </div>
+      <div class="day-stat failed">
+        <span>Failed</span>
+        <span class="day-stat-value" x-text="stats().failed"></span>
+      </div>
+      <button
+        type="button"
+        class="retry-failed-btn"
+        x-show="stats().failed > 0"
+        @click="retryFailed()"
+        :disabled="retrying"
+      >
+        <template x-if="!retrying">
+          <span>↻ Retry Failed</span>
+        </template>
+        <template x-if="retrying">
+          <span><span class="spinner"></span> Retrying...</span>
+        </template>
+      </button>
+    </div>
+  </div>
+
+  <template x-if="entries.length > 0">
+    <div>
+      <div class="memory-grid">
+        <template x-for="(entry, i) in entries" :key="entry.id ?? (entry.timestamp + '-' + i)">
+          <article class="memory-card" :data-frame-status="entry.status ? entry.status.toLowerCase() : 'pending'">
+            <div class="card-header-v3">
+              <!-- Row 1: App + Trigger + Frame ID -->
+              <div class="header-row context-row">
+                <div class="context-left">
+                  <span class="app-icon" x-html="getAppIcon(entry)"></span>
+                  <span class="app-name"
+                        :class="{ 'fallback': !entry.app_name && !entry.app && entry.last_known_app }"
+                        x-text="getAppDisplay(entry)"
+                        :title="getAppNameTooltip(entry)"
+                  ></span>
+                  <span class="trigger-badge"
+                        x-text="entry.capture_trigger"
+                        x-show="entry.capture_trigger"
+                        :data-trigger="entry.capture_trigger"
+                  ></span>
+                  <span class="trigger-badge fallback-label"
+                        x-show="!entry.app_name && !entry.app && entry.last_known_app"
+                  >last known</span>
+                </div>
+                <span class="frame-id" x-text="'No.' + entry.frame_id"></span>
+              </div>
+
+              <!-- Row 2: Window title -->
+              <div class="header-row window-row">
+                <span class="window-name"
+                      x-text="entry.window_title || entry.title || entry.last_known_window || ''"
+                      :title="entry.window_title || entry.title || entry.last_known_window || ''"
+                ></span>
+              </div>
+
+              <!-- Row 3: Time info -->
+              <div class="header-row meta-row">
+                <span class="timestamp" x-text="formatTime(entry.timestamp)"></span>
+                <span class="separator">·</span>
+                <span class="relative-time" x-text="formatRelativeTime(entry.timestamp)"></span>
+                <span class="separator" x-show="entry.device_name">·</span>
+                <span class="device-name"
+                      x-text="entry.device_name"
+                      x-show="entry.device_name"
+                ></span>
+              </div>
+            </div>
+
+            <div class="card-image-wrapper">
+              <button
+                type="button"
+                class="delete-btn"
+                title="Delete frame"
+                @click.stop="promptDelete(entry, i)"
+              >🗑️</button>
+              <img
+                :src="imageSrc(entry)"
+                alt="Screenshot"
+                class="card-image"
+                :loading="i < 8 ? 'eager' : 'lazy'"
+                decoding="async"
+                :fetchpriority="i < 2 ? 'high' : 'auto'"
+                @click="openAt(i)"
+              >
+            </div>
+
+            <div class="card-footer-grid" role="region" aria-label="Processing Status">
+              <!-- 2x2 Grid -->
+              <div class="status-grid">
+                <!-- AX -->
+                <div class="status-cell" :class="[getTextSourceClass(entry, 'accessibility'), getTextSourceStatusClass(entry, 'accessibility')]">
+                  <span class="cell-icon">📱</span>
+                  <span class="cell-label">AX</span>
+                  <span class="cell-value" x-html="formatAxCount(entry)"></span>
+                </div>
+
+                <!-- OCR -->
+                <div class="status-cell" :class="[getTextSourceClass(entry, 'ocr'), getTextSourceStatusClass(entry, 'ocr')]">
+                  <span class="cell-icon">📝</span>
+                  <span class="cell-label">OCR</span>
+                  <span class="cell-value" x-html="formatOcrCount(entry)"></span>
+                </div>
+
+                <!-- Description -->
+                <div class="status-cell" :class="getDescriptionStatusClass(entry)">
+                  <span class="cell-icon">✨</span>
+                  <span class="cell-label">Desc</span>
+                  <span class="cell-value" x-html="getDescriptionStatusText(entry)"></span>
+                </div>
+
+                <!-- Embedding -->
+                <div class="status-cell" :class="getEmbeddingStatusClass(entry)">
+                  <span class="cell-icon">🧠</span>
+                  <span class="cell-label">Embed</span>
+                  <span class="cell-value" x-html="getEmbeddingStatusText(entry)"></span>
+                </div>
+              </div>
+
+              <!-- Frame status bar -->
+              <div class="frame-status-bar" :class="getFrameStatusClass(entry)">
+                <span class="status-dot"></span>
+                <span class="status-label" x-text="getFrameStatusText(entry)"></span>
+              </div>
+            </div>
+          </article>
+        </template>
+      </div>
+
+      <div id="imageModal" class="modal" :class="{ 'active': isOpen() }" @click.self="closeModal()">
+        <button class="modal-nav prev" type="button" aria-label="Previous image" @click="prev()">‹</button>
+        <button class="modal-nav next" type="button" aria-label="Next image" @click="next()">›</button>
+        <span class="modal-close" role="button" aria-label="Close" @click="closeModal()">&times;</span>
+        
+        <div class="modal-container" @click.stop>
+          <!-- Tab 导航 -->
+          <div class="modal-tabs">
+            <button
+              type="button"
+              class="modal-tab"
+              :class="{ 'active': modalTab === 'image' }"
+              @click="modalTab = 'image'"
+            >图片</button>
+            <button
+              type="button"
+              class="modal-tab"
+              :class="{ 'active': modalTab === 'ocr' }"
+              @click="modalTab = 'ocr'"
+              x-show="selectedEntry?.status === 'COMPLETED'"
+            >OCR</button>
+            <button
+              type="button"
+              class="modal-tab"
+              :class="{ 'active': modalTab === 'text' }"
+              @click="modalTab = 'text'"
+              x-show="selectedEntry?.status === 'COMPLETED'"
+            >文本</button>
+            <button
+              type="button"
+              class="modal-tab"
+              :class="{ 'active': modalTab === 'accessibility' }"
+              @click="modalTab = 'accessibility'"
+              x-show="selectedEntry?.status === 'COMPLETED' && selectedEntry?.text_source === 'accessibility'"
+            >Accessibility</button>
+            <button
+              type="button"
+              class="modal-tab"
+              :class="{ 'active': modalTab === 'description' }"
+              @click="modalTab = 'description'; fetchDescriptionData(selectedEntry?.frame_id)"
+              x-show="selectedEntry?.status === 'COMPLETED'"
+            >Description</button>
+            <button
+              type="button"
+              class="modal-tab"
+              :class="{ 'active': modalTab === 'metadata' }"
+              @click="modalTab = 'metadata'"
+            >元数据</button>
+          </div>
+          
+          <!-- Tab 内容 -->
+          <div class="modal-tab-content">
+            <!-- 图片预览 Tab -->
+            <div x-show="modalTab === 'image'" class="modal-image-panel">
+              <div class="modal-meta-overlay">
+                <div class="modal-meta-line" x-text="selectedIndex !== null ? `${selectedIndex + 1} / ${entries.length}` : ''"></div>
+                <div class="modal-meta-line" x-text="selectedEntry ? (selectedEntry.app || 'Unknown') : ''"></div>
+                <div class="modal-meta-line" x-text="selectedEntry ? formatTime(selectedEntry.timestamp) : ''"></div>
+              </div>
+              <div class="modal-image-wrapper">
+                <img id="modalImage" alt="Screenshot" :src="selectedEntry ? imageSrc(selectedEntry) : ''">
+              </div>
+            </div>
+
+            <!-- OCR 可视化 Tab -->
+            <div x-show="modalTab === 'ocr'" class="modal-image-panel">
+              <div class="modal-meta-overlay">
+                <div class="modal-meta-line">OCR 检测结果</div>
+                <div class="modal-meta-line" x-text="selectedEntry ? `${selectedEntry.text_length || 0} 字符` : ''"></div>
+              </div>
+              <div class="modal-image-wrapper">
+                <img alt="OCR Visualization" :src="selectedEntry ? `${EDGE_BASE_URL}/v1/frames/${selectedEntry.id}/ocr-vis` : ''">
+              </div>
+            </div>
+
+            <!-- 文本 Tab -->
+            <div x-show="modalTab === 'text'" class="modal-text-panel">
+              <div class="text-panel-header">
+                <span x-text="`${selectedEntry?.text_length || 0} 字符`"></span>
+                <button
+                  type="button"
+                  class="copy-btn"
+                  @click="copyOcrText()"
+                  x-show="selectedEntry?.ocr_text"
+                >复制</button>
+              </div>
+              <div class="text-panel-content" x-text="selectedEntry?.ocr_text || '无 OCR 文本'"></div>
+            </div>
+
+            <!-- Accessibility Tab -->
+            <div x-show="modalTab === 'accessibility'" class="modal-text-panel">
+              <div class="text-panel-header">
+                <div class="source-info">
+                  <span class="source-badge ax" x-show="selectedEntry?.text_source === 'accessibility'">
+                    <span>📱</span>
+                    <span>AX</span>
+                  </span>
+                  <span x-text="`${selectedEntry?.text_length || 0} 字符`"></span>
+                </div>
+                <button
+                  type="button"
+                  class="copy-btn"
+                  @click="copyAccessibilityText()"
+                  x-show="selectedEntry?.accessibility_text"
+                >复制</button>
+              </div>
+              <div class="text-panel-content" x-text="selectedEntry?.accessibility_text || '无 Accessibility 文本'"></div>
+            </div>
+
+            <!-- Description Tab -->
+            <div x-show="modalTab === 'description'" class="modal-metadata-panel">
+              <template x-if="selectedEntry?.description_status === 'completed'">
+                <div>
+                  <!-- Summary Section -->
+                  <div class="metadata-section" x-show="selectedEntry?.description?.summary">
+                    <h3>Summary</h3>
+                    <div class="metadata-value" style="font-size: 14px; line-height: 1.6;" x-text="selectedEntry.description.summary"></div>
+                  </div>
+
+                  <!-- Narrative Section -->
+                  <div class="metadata-section" x-show="selectedEntry?.description?.narrative">
+                    <h3>Narrative</h3>
+                    <div style="font-size: 13px; line-height: 1.7; color: var(--text-primary);" x-text="selectedEntry.description.narrative"></div>
+                  </div>
+
+                  <!-- Tags Section -->
+                  <div class="metadata-section" x-show="selectedEntry?.description?.tags?.length">
+                    <h3>Tags</h3>
+                    <div style="display: flex; flex-wrap: wrap; gap: 8px;">
+                      <template x-for="tag in selectedEntry.description.tags" :key="tag">
+                        <span style="
+                          display: inline-flex;
+                          align-items: center;
+                          padding: 4px 12px;
+                          background: rgba(0, 122, 255, 0.12);
+                          color: #007AFF;
+                          border-radius: 12px;
+                          font-size: 12px;
+                          font-weight: 500;
+                        " x-text="tag"></span>
+                      </template>
+                    </div>
+                  </div>
+
+                  <!-- Generation Info -->
+                  <div class="metadata-section" x-show="selectedEntry?.description_model">
+                    <h3>Generation Info</h3>
+                    <div class="metadata-grid">
+                      <div class="metadata-item">
+                        <span class="metadata-label">Model</span>
+                        <span class="metadata-value monospace" x-text="selectedEntry.description_model || '-'"></span>
+                      </div>
+                      <div class="metadata-item" x-show="selectedEntry?.description_generated_at">
+                        <span class="metadata-label">Generated At</span>
+                        <span class="metadata-value" x-text="formatTime(selectedEntry.description_generated_at)"></span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </template>
+
+              <template x-if="selectedEntry?.description_status === 'pending'">
+                <div class="status-pending" style="padding: 40px; justify-content: center;">
+                  <span class="ai-icon">⏳</span>
+                  <span>Description generation pending...</span>
+                </div>
+              </template>
+
+              <template x-if="selectedEntry?.description_status === 'processing'">
+                <div class="status-processing" style="padding: 40px; justify-content: center;">
+                  <div class="spinner"></div>
+                  <span>Generating description...</span>
+                </div>
+              </template>
+
+              <template x-if="selectedEntry?.description_status === 'failed'">
+                <div class="metadata-error" style="margin-top: 20px;">
+                  <span>⚠️</span>
+                  <span x-text="selectedEntry?.description_error || 'Description generation failed'"></span>
+                </div>
+              </template>
+            </div>
+
+            <!-- 元数据 Tab -->
+            <div x-show="modalTab === 'metadata'" class="modal-metadata-panel">
+              <div class="metadata-section" x-show="selectedEntry">
+                <h3>基本信息</h3>
+                <div class="metadata-grid">
+                  <div class="metadata-item">
+                    <span class="metadata-label">Frame ID</span>
+                    <span class="metadata-value" x-text="selectedEntry?.id || '-'"></span>
+                  </div>
+                  <div class="metadata-item">
+                    <span class="metadata-label">序号</span>
+                    <span class="metadata-value" x-text="selectedIndex !== null ? `${selectedIndex + 1} / ${entries.length}` : '-'"></span>
+                  </div>
+                  <div class="metadata-item">
+                    <span class="metadata-label">应用</span>
+                    <span class="metadata-value" x-text="selectedEntry?.app_name || selectedEntry?.app || 'Unknown'"></span>
+                  </div>
+                  <div class="metadata-item">
+                    <span class="metadata-label">窗口</span>
+                    <span class="metadata-value" x-text="selectedEntry?.window_title || selectedEntry?.title || '-'"></span>
+                  </div>
+                  <div class="metadata-item">
+                    <span class="metadata-label">设备</span>
+                    <span class="metadata-value" x-text="selectedEntry?.device_name || '-'"></span>
+                  </div>
+                  <div class="metadata-item">
+                    <span class="metadata-label">触发方式</span>
+                    <span class="metadata-value" x-text="selectedEntry?.capture_trigger || '-'"></span>
+                  </div>
+                </div>
+              </div>
+              
+              <div class="metadata-section" x-show="selectedEntry">
+                <h3>时间信息</h3>
+                <div class="metadata-grid">
+                  <div class="metadata-item">
+                    <span class="metadata-label">采集时间</span>
+                    <span class="metadata-value" x-text="selectedEntry ? formatTime(selectedEntry.timestamp) : '-'"></span>
+                  </div>
+                  <div class="metadata-item" x-show="selectedEntry?.ingested_at">
+                    <span class="metadata-label">入库时间</span>
+                    <span class="metadata-value" x-text="formatTime(selectedEntry?.ingested_at)"></span>
+                  </div>
+                  <div class="metadata-item" x-show="selectedEntry?.processed_at">
+                    <span class="metadata-label">处理完成</span>
+                    <span class="metadata-value" x-text="formatTime(selectedEntry?.processed_at)"></span>
+                  </div>
+                  <div class="metadata-item" x-show="selectedEntry?.processed_at && selectedEntry?.ingested_at">
+                    <span class="metadata-label">处理耗时</span>
+                    <span class="metadata-value" x-text="getProcessingDuration(selectedEntry)"></span>
+                  </div>
+                </div>
+              </div>
+              
+              <div class="metadata-section" x-show="selectedEntry">
+                <h3>技术信息</h3>
+                <div class="metadata-grid">
+                  <div class="metadata-item">
+                    <span class="metadata-label">状态</span>
+                    <span class="metadata-value" x-text="selectedEntry?.status || 'pending'"></span>
+                  </div>
+                  <div class="metadata-item" x-show="selectedEntry?.text_source">
+                    <span class="metadata-label">文本来源</span>
+                    <span class="metadata-value" x-text="selectedEntry?.text_source || '-'"></span>
+                  </div>
+                  <div class="metadata-item" x-show="selectedEntry?.ocr_engine">
+                    <span class="metadata-label">OCR 引擎</span>
+                    <span class="metadata-value" x-text="selectedEntry?.ocr_engine || '-'"></span>
+                  </div>
+                  <div class="metadata-item" x-show="selectedEntry?.text_length !== undefined && selectedEntry?.text_length !== null">
+                    <span class="metadata-label">文本长度</span>
+                    <span class="metadata-value" x-text="(selectedEntry?.text_length || 0) + ' 字符'"></span>
+                  </div>
+                  <div class="metadata-item" x-show="selectedEntry?.image_size_bytes">
+                    <span class="metadata-label">文件大小</span>
+                    <span class="metadata-value" x-text="formatFileSize(selectedEntry?.image_size_bytes)"></span>
+                  </div>
+                  <div class="metadata-item" x-show="selectedEntry?.capture_id">
+                    <span class="metadata-label">Capture ID</span>
+                    <span class="metadata-value monospace" x-text="(selectedEntry?.capture_id || '').substring(0, 8) + '...'"></span>
+                  </div>
+                </div>
+              </div>
+              
+              <div class="metadata-section" x-show="selectedEntry?.error_message">
+                <h3>错误信息</h3>
+                <div class="metadata-error">
+                  <span x-text="selectedEntry?.error_message"></span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </template>
+
+  <template x-if="entries.length === 0">
+    <div class="empty-state">
+      <div>No captures on <span x-text="currentDate"></span>.</div>
+      <div style="font-size: 13px; color: var(--text-tertiary); margin-top: 8px;">Select another date to browse history.</div>
+    </div>
+  </template>
+
+  <!-- Delete Confirm Dialog -->
+  <div
+    x-show="deleteConfirmOpen"
+    class="delete-overlay"
+    @click.self="deleteConfirmOpen = false"
+    @keydown.escape.window="if (deleteConfirmOpen) deleteConfirmOpen = false"
+    x-cloak
+  >
+    <div class="delete-dialog">
+      <div class="delete-dialog-icon">🗑️</div>
+      <h3>Delete this frame?</h3>
+      <p>This will permanently remove the screenshot, OCR text, description, and search index.</p>
+      <div class="delete-dialog-actions">
+        <button type="button" class="btn-cancel" @click="deleteConfirmOpen = false">Cancel</button>
+        <button
+          type="button"
+          class="btn-delete-confirm"
+          @click="confirmDelete()"
+          :disabled="deleting"
+        >
+          <template x-if="!deleting">
+            <span>Delete</span>
+          </template>
+          <template x-if="deleting">
+            <span><span class="spinner" style="width: 12px; height: 12px; border-width: 2px;"></span> Deleting...</span>
+          </template>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast -->
+  <div x-show="toastMessage" x-text="toastMessage" class="toast" :class="{ 'toast-out': toastFading }" x-cloak></div>
+</div>
+{% endblock %}
+
+{% block extra_body %}
+<script>
+  function memoryGrid() {
+    return {
+      entries: [],
+      config: window.initialConfig || { show_ai_description: false },
+      currentDate: '',
+      datesWithData: new Set(),
+      calendarOpen: false,
+      calendarYear: 0,
+      calendarMonth: 0,
+      lastCheckMs: 0,
+      selectedIndex: null,
+      modalTab: 'image',
+      retrying: false,
+      loading: false,
+      deleteConfirmOpen: false,
+      frameToDelete: null,
+      frameToDeleteIndex: null,
+      deleting: false,
+      toastMessage: '',
+      toastFading: false,
+
+      // ---- Frame Deletion ----
+
+      promptDelete(entry, index) {
+        this.frameToDelete = entry;
+        this.frameToDeleteIndex = index;
+        this.deleteConfirmOpen = true;
+      },
+
+      async confirmDelete() {
+        if (!this.frameToDelete) return;
+        const entry = this.frameToDelete;
+        const index = this.frameToDeleteIndex;
+
+        this.deleting = true;
+        try {
+          const res = await fetch(`${EDGE_BASE_URL}/v1/frames/${entry.frame_id}`, {
+            method: 'DELETE'
+          });
+
+          if (res.ok) {
+            // Remove from entries array
+            this.entries.splice(index, 1);
+
+            // Adjust modal selection if needed
+            if (this.selectedIndex !== null) {
+              if (this.entries.length === 0) {
+                this.selectedIndex = null;
+              } else if (this.selectedIndex === index) {
+                // splice slid next element into this index; keep it unless
+                // we deleted the last item, in which case wrap to first
+                if (this.selectedIndex >= this.entries.length) {
+                  this.selectedIndex = 0;
+                }
+                // Reuse openAt to handle description tab refresh
+                this.openAt(this.selectedIndex);
+              } else if (this.selectedIndex > index) {
+                this.selectedIndex -= 1;
+              }
+            }
+
+            this.showToast('Frame deleted');
+          } else {
+            const data = await res.json().catch(() => ({}));
+            this.showToast(data.error || 'Failed to delete frame');
+          }
+        } catch (e) {
+          console.error('Delete failed:', e);
+          this.showToast('Network error, please try again');
+        } finally {
+          this.deleting = false;
+          this.deleteConfirmOpen = false;
+          this.frameToDelete = null;
+          this.frameToDeleteIndex = null;
+        }
+      },
+
+      showToast(message) {
+        this.toastMessage = message;
+        this.toastFading = false;
+        setTimeout(() => {
+          this.toastFading = true;
+          setTimeout(() => {
+            this.toastMessage = '';
+            this.toastFading = false;
+          }, 300);
+        }, 2000);
+      },
+
+      syncLastCheckFromEntries(list) {
+        let maxMs = this.lastCheckMs;
+        for (const entry of list) {
+          const date = parseTimestamp(entry?.timestamp);
+          if (!date) continue;
+          const ms = date.getTime();
+          if (ms > maxMs) maxMs = ms;
+        }
+        this.lastCheckMs = maxMs;
+      },
+
+      /**
+       * 根据设备名称返回对应的图标
+       * @param {string} deviceName - 设备名称，如 'monitor_1', 'laptop_main'
+       * @returns {string} 设备图标 emoji
+       */
+      getDeviceIcon(deviceName) {
+        if (!deviceName) return '🖥️';
+        const name = deviceName.toLowerCase();
+        if (name.includes('laptop') || name.includes('macbook')) return '💻';
+        if (name.includes('phone') || name.includes('mobile') || name.includes('iphone')) return '📱';
+        if (name.includes('tablet') || name.includes('ipad')) return '📋';
+        if (name.includes('tv') || name.includes('television') || name.includes('display')) return '📺';
+        if (name.includes('watch') || name.includes('applewatch')) return '⌚';
+        return '🖥️';
+      },
+
+      /**
+       * 格式化相对时间
+       * @param {number|string} ts - 时间戳
+       * @returns {string} 相对时间描述
+       */
+      formatRelativeTime(ts) {
+        const date = parseTimestamp(ts);
+        if (!date) return '';
+
+        const now = new Date();
+        const diffMs = now - date;
+        const diffSec = Math.floor(diffMs / 1000);
+        const diffMin = Math.floor(diffSec / 60);
+        const diffHour = Math.floor(diffMin / 60);
+        const diffDay = Math.floor(diffHour / 24);
+
+        if (diffSec < 60) return '刚刚';
+        if (diffMin < 60) return `${diffMin}分钟前`;
+        if (diffHour < 24) return `${diffHour}小时前`;
+        if (diffDay < 7) return `${diffDay}天前`;
+
+        return this.formatTime(ts);
+      },
+
+      /**
+       * 获取应用显示名称（支持 last_known_app 回退）
+       * @param {Object} entry - frame entry
+       * @returns {string} 应用名称
+       */
+      getAppDisplay(entry) {
+        if (!entry) return 'Unknown';
+        return entry.app_name || entry.app || entry.last_known_app || 'Unknown';
+      },
+
+      /**
+       * 获取应用名称 tooltip（说明是否为回退数据）
+       * @param {Object} entry - frame entry
+       * @returns {string} tooltip 文本
+       */
+      getAppNameTooltip(entry) {
+        if (!entry) return '';
+        if (entry.app_name || entry.app) {
+          return entry.app_name || entry.app || '';
+        }
+        if (entry.last_known_app) {
+          return `Current context unknown. Last known: ${entry.last_known_app}`;
+        }
+        return 'Unknown application';
+      },
+
+      /**
+       * 计算处理耗时
+       * @param {Object} entry - frame entry
+       * @returns {string} 格式化后的耗时
+       */
+      getProcessingDuration(entry) {
+        if (!entry || !entry.processed_at || !entry.ingested_at) return '-';
+        const processed = new Date(entry.processed_at).getTime();
+        const ingested = new Date(entry.ingested_at).getTime();
+        const duration = processed - ingested;
+        if (duration < 1000) return `${duration}ms`;
+        if (duration < 60000) return `${(duration / 1000).toFixed(1)}s`;
+        return `${(duration / 60000).toFixed(1)}m`;
+      },
+
+      /**
+       * 复制 OCR 文本到剪贴板
+       */
+      copyOcrText() {
+        const text = this.selectedEntry?.ocr_text;
+        if (!text) return;
+        navigator.clipboard.writeText(text).then(() => {
+          // 可选：显示复制成功提示
+          const btn = document.querySelector('.copy-btn');
+          if (btn) {
+            const originalText = btn.textContent;
+            btn.textContent = '已复制';
+            setTimeout(() => {
+              btn.textContent = originalText;
+            }, 1500);
+          }
+        }).catch(err => {
+          console.error('复制失败:', err);
+        });
+      },
+
+      /**
+       * 复制 Accessibility 文本到剪贴板
+       */
+      copyAccessibilityText() {
+        const text = this.selectedEntry?.accessibility_text;
+        if (!text) return;
+        navigator.clipboard.writeText(text).then(() => {
+          const btn = document.querySelector('.modal-text-panel .copy-btn');
+          if (btn) {
+            const originalText = btn.textContent;
+            btn.textContent = '已复制';
+            setTimeout(() => {
+              btn.textContent = originalText;
+            }, 1500);
+          }
+        }).catch(err => {
+          console.error('复制失败:', err);
+        });
+      },
+
+      /**
+       * 获取帧的 AI 描述数据
+       * @param {number} frameId - 帧 ID
+       */
+      async fetchDescriptionData(frameId) {
+        if (!frameId) return;
+        // 如果已经加载过描述数据，不再重复请求
+        if (this.selectedEntry?.description) return;
+        try {
+          const res = await fetch(`${EDGE_BASE_URL}/v1/frames/${frameId}/context`);
+          if (!res.ok) return;
+          const data = await res.json();
+          if (data.description && this.selectedEntry && this.selectedEntry.frame_id === frameId) {
+            this.selectedEntry.description_status = data.description_status;
+            this.selectedEntry.description = data.description;
+            this.selectedEntry.description_model = data.description.model;
+            this.selectedEntry.description_generated_at = data.description.generated_at;
+          }
+        } catch (e) {
+          console.error('获取描述数据失败:', e);
+        }
+      },
+
+      /**
+       * 格式化文件大小
+       * @param {number} bytes - 字节数
+       * @returns {string} 格式化后的文件大小
+       */
+      formatFileSize(bytes) {
+        if (bytes === null || bytes === undefined || bytes === 0) return '-';
+        if (bytes < 1024) return `${bytes} B`;
+        if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+        if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+        return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
+      },
+
+      // Text source display helpers
+      getTextSourceClass(entry, sourceType) {
+        const actualSource = (entry.text_source || 'ocr').toLowerCase();
+        if (actualSource === 'hybrid') return 'active';
+        if (actualSource === sourceType) return 'active';
+        return 'inactive';
+      },
+
+      getTextSourceStatusIcon(entry, sourceType) {
+        const actualSource = (entry.text_source || 'ocr').toLowerCase();
+        const isActive = actualSource === sourceType || actualSource === 'hybrid';
+
+        if (!isActive) return '<span style="color: var(--text-secondary); opacity: 0.4;">—</span>';
+
+        // For active source, show based on text availability - subtle dot
+        const hasText = sourceType === 'accessibility'
+          ? (entry.accessibility_text_length || entry.accessibility_text?.length || 0) > 0
+          : (entry.ocr_text_length || entry.ocr_text?.length || 0) > 0;
+
+        if (hasText) {
+          // Apple style: small filled dot for active with content
+          return '<svg width="8" height="8" viewBox="0 0 8 8" fill="currentColor"><circle cx="4" cy="4" r="3"/></svg>';
+        }
+        // Empty circle for no content
+        return '<svg width="8" height="8" viewBox="0 0 8 8" fill="none" stroke="currentColor" stroke-width="1"><circle cx="4" cy="4" r="3"/></svg>';
+      },
+
+      getTextSourceStatusClass(entry, sourceType) {
+        const actualSource = (entry.text_source || 'ocr').toLowerCase();
+        const isActive = actualSource === sourceType || actualSource === 'hybrid';
+
+        if (!isActive) return 'inactive';
+
+        const status = (entry.status || 'pending').toLowerCase();
+        return `status-${status}`;
+      },
+
+      getAccessibilityCharCount(entry) {
+        return entry.accessibility_text_length || entry.accessibility_text?.length || 0;
+      },
+
+      getOcrCharCount(entry) {
+        return entry.ocr_text_length || entry.ocr_text?.length || 0;
+      },
+
+      // Parallel processing helpers - Apple style subtle dots
+      getDescriptionStatusIcon(entry) {
+        const status = (entry.description_status || 'pending').toLowerCase();
+        // Apple style: filled dot for completed, outlined for pending, spinner for processing
+        if (status === 'completed') return '<svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor"><circle cx="5" cy="5" r="4"/></svg>';
+        if (status === 'processing') return '<span class="spinner-inline"></span>';
+        if (status === 'failed') return '<svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="5" cy="5" r="4"/><line x1="3" y1="3" x2="7" y2="7"/><line x1="7" y1="3" x2="3" y2="7"/></svg>';
+        if (status === 'disabled') return '<svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1"><circle cx="5" cy="5" r="4"/><line x1="2" y1="2" x2="8" y2="8"/></svg>';
+        // Pending: outlined circle
+        return '<svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1"><circle cx="5" cy="5" r="4"/></svg>';
+      },
+
+      getDescriptionStatusClass(entry) {
+        const status = (entry.description_status || 'pending').toLowerCase();
+        return `status-${status}`;
+      },
+
+      getEmbeddingStatusIcon(entry) {
+        const status = (entry.embedding_status || 'pending').toLowerCase();
+        // Apple style: filled dot for completed, outlined for pending, spinner for processing
+        if (status === 'completed') return '<svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor"><circle cx="5" cy="5" r="4"/></svg>';
+        if (status === 'processing') return '<span class="spinner-inline"></span>';
+        if (status === 'failed') return '<svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="5" cy="5" r="4"/><line x1="3" y1="3" x2="7" y2="7"/><line x1="7" y1="3" x2="3" y2="7"/></svg>';
+        if (status === 'disabled') return '<svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1"><circle cx="5" cy="5" r="4"/><line x1="2" y1="2" x2="8" y2="8"/></svg>';
+        // Pending: outlined circle
+        return '<svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1"><circle cx="5" cy="5" r="4"/></svg>';
+      },
+
+      getEmbeddingStatusClass(entry) {
+        const status = (entry.embedding_status || 'pending').toLowerCase();
+        return `status-${status}`;
+      },
+
+      // Frame status helpers - derived from description and embedding status
+      getFrameStatus(entry) {
+        const descStatus = (entry.description_status || 'pending').toLowerCase();
+        const embedStatus = (entry.embedding_status || 'pending').toLowerCase();
+
+        // Priority: failed > processing > pending > completed
+        if (descStatus === 'failed' || embedStatus === 'failed') return 'failed';
+        if (descStatus === 'processing' || embedStatus === 'processing') return 'processing';
+        if (descStatus === 'pending' || embedStatus === 'pending') return 'pending';
+        if (descStatus === 'completed' && embedStatus === 'completed') return 'completed';
+        return 'pending';
+      },
+
+      getFrameStatusIcon(entry) {
+        const status = this.getFrameStatus(entry);
+        // Apple style: filled circle for completed, more subtle
+        if (status === 'completed') return '<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" stroke="none"><circle cx="12" cy="12" r="6"/></svg>';
+        if (status === 'processing') return '<span class="spinner-inline"></span>';
+        if (status === 'failed') return '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>';
+        // Pending: empty circle
+        return '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="6"/></svg>';
+      },
+
+      getFrameStatusClass(entry) {
+        const status = this.getFrameStatus(entry);
+        return `status-${status}`;
+      },
+
+      getFrameStatusText(entry) {
+        return this.getFrameStatus(entry);
+      },
+
+      // Format AX count (show ○ when no text, char count otherwise)
+      formatAxCount(entry) {
+        const source = (entry.text_source || '').toLowerCase();
+        const isActive = source === 'accessibility' || source === 'hybrid';
+        const count = this.getAccessibilityCharCount(entry);
+        if (count > 0) {
+          return count.toLocaleString('en-US');
+        }
+        return '○';
+      },
+
+      // Get app icon
+      getAppIcon(entry) {
+        const appName = entry.app_name || entry.app || '';
+        const iconMap = {
+          'Code': '💻',
+          'code': '💻',
+          'cursor': '💻',
+          'Google Chrome': '🌐',
+          'chrome': '🌐',
+          'Safari': '🌐',
+          'Firefox': '🌐',
+          'cmux': '📱',
+          'Terminal': '⌨️',
+          'terminal': '⌨️',
+          'iTerm': '⌨️',
+          'default': '📱'
+        };
+        return iconMap[appName] || iconMap['default'];
+      },
+
+      // Format OCR count (show ○ when no text, char count otherwise)
+      formatOcrCount(entry) {
+        const count = this.getOcrCharCount(entry);
+        if (count > 0) {
+          return count.toLocaleString('en-US');
+        }
+        return '○';
+      },
+
+      getDescriptionCharCount(entry) {
+        const text = entry.description_text || entry.description || '';
+        return text.length || entry.description_length || 0;
+      },
+
+      // Get description status text (with char count when completed)
+      getDescriptionStatusText(entry) {
+        const status = (entry.description_status || 'pending').toLowerCase();
+        if (status === 'pending') return '○';
+        if (status === 'processing') return '<span class="pulse-dot"></span>';
+        if (status === 'completed') {
+          const chars = this.getDescriptionCharCount(entry);
+          return chars > 0 ? chars.toLocaleString('en-US') : '—';
+        }
+        if (status === 'failed') return '●';
+        return '○';
+      },
+
+      // Get embedding status text (with dimension when completed)
+      getEmbeddingStatusText(entry) {
+        const status = (entry.embedding_status || 'pending').toLowerCase();
+        if (status === 'pending') return '○';
+        if (status === 'processing') return '<span class="pulse-dot"></span>';
+        if (status === 'completed') return '1024d';
+        if (status === 'failed') return '●';
+        return '○';
+      },
+
+      // ---- Date Navigation (new) ----
+
+      _formatDateStr(date) {
+        const y = date.getFullYear();
+        const m = String(date.getMonth() + 1).padStart(2, '0');
+        const d = String(date.getDate()).padStart(2, '0');
+        return `${y}-${m}-${d}`;
+      },
+
+      // Return current time as if in UTC+8, regardless of browser timezone.
+      _utc8Now() {
+        const now = new Date();
+        now.setMinutes(now.getMinutes() + now.getTimezoneOffset() + 480);
+        return now;
+      },
+
+      async loadDay(date) {
+        this.loading = true;
+        try {
+          const res = await fetch(`${EDGE_BASE_URL}/api/memories/by-day?date=${date}`);
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          const data = await res.json();
+          if (Array.isArray(data)) {
+            this.entries = data;
+            if (data.length > 0) {
+              this.syncLastCheckFromEntries(data);
+            } else {
+              // Prevent checkNew() from fetching all history when current day is empty
+              this.lastCheckMs = Date.now();
+            }
+          }
+        } catch (e) {
+          console.error('Failed to load day:', e);
+        } finally {
+          this.loading = false;
+        }
+      },
+
+      prevDay() {
+        const [y, m, d] = this.currentDate.split('-').map(Number);
+        const date = new Date(y, m - 1, d);
+        date.setDate(date.getDate() - 1);
+        this.currentDate = this._formatDateStr(date);
+        this.loadDay(this.currentDate);
+      },
+
+      nextDay() {
+        const [y, m, d] = this.currentDate.split('-').map(Number);
+        const date = new Date(y, m - 1, d);
+        date.setDate(date.getDate() + 1);
+        this.currentDate = this._formatDateStr(date);
+        this.loadDay(this.currentDate);
+      },
+
+      goToday() {
+        const now = this._utc8Now();
+        this.currentDate = this._formatDateStr(now);
+        this.calendarYear = now.getFullYear();
+        this.calendarMonth = now.getMonth();
+        this.loadDay(this.currentDate);
+      },
+
+      isToday(date) {
+        return date === this._formatDateStr(this._utc8Now());
+      },
+
+      formatDateDisplay(date) {
+        const [y, m, day] = date.split('-').map(Number);
+        const d = new Date(y, m - 1, day);
+        const weekdays = ['日', '一', '二', '三', '四', '五', '六'];
+        return `${y}年${m}月${day}日（星期${weekdays[d.getDay()]}）`;
+      },
+
+      // ---- Calendar (new) ----
+
+      async loadCalendarDates() {
+        const monthStr = `${this.calendarYear}-${String(this.calendarMonth + 1).padStart(2, '0')}`;
+        try {
+          const res = await fetch(`${EDGE_BASE_URL}/api/memories/dates?month=${monthStr}`);
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          const data = await res.json();
+          this.datesWithData = new Set(data.dates || []);
+        } catch (e) {
+          console.error('Failed to load calendar dates:', e);
+        }
+      },
+
+      toggleCalendar() {
+        this.calendarOpen = !this.calendarOpen;
+        if (this.calendarOpen) {
+          this.loadCalendarDates();
+        }
+      },
+
+      selectDate(date) {
+        this.currentDate = date;
+        this.calendarOpen = false;
+        this.loadDay(date);
+      },
+
+      prevMonth() {
+        this.calendarMonth -= 1;
+        if (this.calendarMonth < 0) {
+          this.calendarMonth = 11;
+          this.calendarYear -= 1;
+        }
+        this.loadCalendarDates();
+      },
+
+      nextMonth() {
+        this.calendarMonth += 1;
+        if (this.calendarMonth > 11) {
+          this.calendarMonth = 0;
+          this.calendarYear += 1;
+        }
+        this.loadCalendarDates();
+      },
+
+      calendarDays() {
+        const firstDay = new Date(this.calendarYear, this.calendarMonth, 1);
+        const lastDay = new Date(this.calendarYear, this.calendarMonth + 1, 0);
+        const startOffset = firstDay.getDay();
+        const days = [];
+
+        const prevMonthLastDay = new Date(this.calendarYear, this.calendarMonth, 0).getDate();
+        for (let i = startOffset - 1; i >= 0; i--) {
+          days.push({ date: null, day: prevMonthLastDay - i, isOtherMonth: true });
+        }
+
+        for (let i = 1; i <= lastDay.getDate(); i++) {
+          const dateStr = `${this.calendarYear}-${String(this.calendarMonth + 1).padStart(2, '0')}-${String(i).padStart(2, '0')}`;
+          days.push({ date: dateStr, day: i, isOtherMonth: false });
+        }
+
+        const remaining = 42 - days.length;
+        for (let i = 1; i <= remaining; i++) {
+          days.push({ date: null, day: i, isOtherMonth: true });
+        }
+
+        return days;
+      },
+
+      hasData(date) {
+        return this.datesWithData.has(date);
+      },
+
+      async refreshCurrentDay() {
+        if (!this.isToday(this.currentDate)) return;
+        try {
+          const res = await fetch(`${EDGE_BASE_URL}/api/memories/by-day?date=${this.currentDate}`);
+          if (!res.ok) return;
+          const fresh = await res.json();
+          if (!Array.isArray(fresh)) return;
+          const freshById = new Map(fresh.map(e => [e.id, e]));
+          for (let i = 0; i < this.entries.length; i++) {
+            const entry = this.entries[i];
+            if (!entry?.id) continue;
+            const updated = freshById.get(entry.id);
+            if (updated) {
+              // Preserve description object fetched from /v1/frames/{id}/context
+              if (entry.description) {
+                updated.description = entry.description;
+              }
+              this.entries[i] = updated;
+            }
+          }
+          const existingIds = new Set(this.entries.map(e => e.id).filter(Boolean));
+          const newItems = fresh.filter(e => e.id && !existingIds.has(e.id));
+          if (newItems.length > 0) {
+            this.entries.unshift(...newItems);
+            this.syncLastCheckFromEntries(newItems);
+          }
+        } catch (_e) {
+          // Silent fail
+        }
+      },
+
+      get selectedEntry() {
+        if (this.selectedIndex === null) return null;
+        return this.entries[this.selectedIndex] || null;
+      },
+
+      async init() {
+        const now = this._utc8Now();
+        this.currentDate = this._formatDateStr(now);
+        this.calendarYear = now.getFullYear();
+        this.calendarMonth = now.getMonth();
+
+        await this.loadDay(this.currentDate);
+
+        window.addEventListener("myrecall-config-changed", () => {
+          this.loadDay(this.currentDate);
+        });
+
+        window.addEventListener("keydown", (e) => {
+          if (!this.isOpen()) return;
+          if (e.key === "Escape") this.closeModal();
+          if (e.key === "ArrowLeft") this.prev();
+          if (e.key === "ArrowRight") this.next();
+        });
+
+        setInterval(() => {
+          this.checkNew();
+          this.refreshCurrentDay();
+        }, 5000);
+      },
+
+      formatLocalSince(ms) {
+        // ms is a UTC timestamp; add 8h to get the UTC+8 wall-clock Date,
+        // then read its UTC components to avoid double-applying browser offset.
+        const d = new Date(ms + 8 * 60 * 60 * 1000);
+        const pad = (v) => String(v).padStart(2, '0');
+        return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}T`
+             + `${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}:${pad(d.getUTCSeconds())}.${String(d.getUTCMilliseconds()).padStart(3, '0')}`;
+      },
+
+      async checkNew() {
+        if (!this.isToday(this.currentDate)) return;
+
+        try {
+          const sinceIso = this.lastCheckMs > 0
+            ? this.formatLocalSince(this.lastCheckMs)
+            : '1970-01-01T00:00:00.000';
+          const res = await fetch(`${EDGE_BASE_URL}/v1/frames/latest?since=${encodeURIComponent(sinceIso)}`);
+          if (!res.ok) return;
+          const newItems = await res.json();
+          if (!Array.isArray(newItems) || newItems.length === 0) return;
+
+          const existingKeys = new Set(
+            this.entries.map((e, idx) => (e?.id ?? `${e?.timestamp}-${idx}`)).filter((v) => v !== undefined)
+          );
+          const uniqueItems = newItems.filter((e, idx) => {
+            const key = e?.id ?? `${e?.timestamp}-${idx}`;
+            return !existingKeys.has(key);
+          });
+          if (uniqueItems.length === 0) return;
+
+          if (this.selectedIndex !== null) {
+            this.selectedIndex += uniqueItems.length;
+          }
+          this.entries.unshift(...uniqueItems);
+          this.syncLastCheckFromEntries(uniqueItems);
+        } catch (_e) {
+          return;
+        }
+      },
+
+      async retryFailed() {
+        if (this.retrying) return;
+
+        this.retrying = true;
+        try {
+          const res = await fetch(`${EDGE_BASE_URL}/v1/admin/frames/retry-failed`, {
+            method: 'POST'
+          });
+          if (res.ok) {
+            const data = await res.json();
+            console.log('Retry triggered:', data);
+            // Refresh the grid to show updated statuses
+            await this.loadDay(this.currentDate);
+          } else {
+            console.error('Retry failed:', res.status);
+          }
+        } catch (e) {
+          console.error('Retry failed:', e);
+        } finally {
+          this.retrying = false;
+        }
+      },
+
+      stats() {
+        const out = { completed: 0, pending: 0, failed: 0 };
+        for (const entry of this.entries) {
+          const status = (entry?.visibility_status || 'pending').toLowerCase();
+          if (status === "queryable") out.completed += 1;
+          else if (status === "pending") out.pending += 1;
+          else if (status === "failed") out.failed += 1;
+        }
+        return out;
+      },
+
+      formatTime(ts) {
+        const d = parseTimestamp(ts);
+        if (!d) return 'Invalid timestamp';
+        const pad = (v) => String(v).padStart(2, "0");
+        return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+      },
+
+      imageSrc(entry) {
+        const frameId = entry?.frame_id;
+        if (frameId !== undefined && frameId !== null) {
+          return `${EDGE_BASE_URL}/v1/frames/${frameId}`;
+        }
+        const filename = entry?.filename || `${entry?.timestamp}.png`;
+        return `${EDGE_BASE_URL}/screenshots/${filename}`;
+      },
+
+      isOpen() {
+        return this.selectedIndex !== null;
+      },
+
+      openAt(i) {
+        const idx = Number(i);
+        if (!Number.isFinite(idx)) return;
+        if (idx < 0 || idx >= this.entries.length) return;
+        this.selectedIndex = idx;
+        // If description tab is active, fetch description data for the new entry
+        if (this.modalTab === 'description') {
+          const entry = this.entries[idx];
+          if (entry?.frame_id) {
+            this.fetchDescriptionData(entry.frame_id);
+          }
+        }
+      },
+
+      closeModal() {
+        this.selectedIndex = null;
+      },
+
+      prev() {
+        if (this.selectedIndex === null) return;
+        const n = this.entries.length;
+        if (!n) return;
+        this.selectedIndex = (this.selectedIndex - 1 + n) % n;
+        // If description tab is active, fetch description data for the new entry
+        if (this.modalTab === 'description') {
+          const entry = this.entries[this.selectedIndex];
+          if (entry?.frame_id) {
+            this.fetchDescriptionData(entry.frame_id);
+          }
+        }
+      },
+
+      next() {
+        if (this.selectedIndex === null) return;
+        const n = this.entries.length;
+        if (!n) return;
+        this.selectedIndex = (this.selectedIndex + 1) % n;
+        // If description tab is active, fetch description data for the new entry
+        if (this.modalTab === 'description') {
+          const entry = this.entries[this.selectedIndex];
+          if (entry?.frame_id) {
+            this.fetchDescriptionData(entry.frame_id);
+          }
+        }
+      },
+    };
+  }
+</script>
+{% endblock %}

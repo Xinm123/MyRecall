@@ -9,7 +9,7 @@ Task 2: Rename score fields
 """
 from unittest.mock import patch, MagicMock
 
-from openrecall.server.search.hybrid_engine import HybridSearchEngine
+from myrecall.server.search.hybrid_engine import HybridSearchEngine
 
 
 # ---------------------------------------------------------------------------
@@ -90,9 +90,9 @@ class TestHybridSearchFieldRenames:
         mock_provider.embed_text.return_value = MagicMock(tolist=lambda: [0.1, 0.2])
 
         with patch(
-            "openrecall.server.database.frames_store.FramesStore"
+            "myrecall.server.database.frames_store.FramesStore"
         ) as mock_fs_cls, patch(
-            "openrecall.server.ai.factory.get_multimodal_embedding_provider",
+            "myrecall.server.ai.factory.get_multimodal_embedding_provider",
             return_value=mock_provider,
         ):
             mock_fs_cls.return_value.get_frames_by_ids.return_value = frame_data
@@ -185,9 +185,9 @@ class TestVectorOnlySearchScoreField:
         mock_provider.embed_text.return_value = MagicMock(tolist=lambda: [0.1, 0.2])
 
         with patch(
-            "openrecall.server.database.frames_store.FramesStore"
+            "myrecall.server.database.frames_store.FramesStore"
         ) as mock_fs_cls, patch(
-            "openrecall.server.ai.factory.get_multimodal_embedding_provider",
+            "myrecall.server.ai.factory.get_multimodal_embedding_provider",
             return_value=mock_provider,
         ):
             mock_fs_cls.return_value = mock_fs
@@ -221,7 +221,7 @@ class TestFTSEngineScoreRenaming:
 
     def test_fts_result_has_fts_score_not_fts_rank(self):
         """FTS-only result should have fts_score (BM25), not fts_rank."""
-        from openrecall.server.search.engine import SearchEngine
+        from myrecall.server.search.engine import SearchEngine
         from unittest.mock import patch, MagicMock
 
         # Create engine with mocked database
@@ -270,7 +270,7 @@ class TestFTSEngineScoreRenaming:
 
     def test_fts_result_has_score_field(self):
         """FTS-only result should have a unified 'score' field."""
-        from openrecall.server.search.engine import SearchEngine
+        from myrecall.server.search.engine import SearchEngine
         from unittest.mock import patch, MagicMock
 
         engine = SearchEngine()

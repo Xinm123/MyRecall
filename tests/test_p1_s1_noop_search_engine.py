@@ -1,6 +1,6 @@
 import pytest
 
-from openrecall.server import api
+from myrecall.server import api
 
 
 @pytest.mark.unit

@@ -8,58 +8,78 @@
 
 **Tech Stack:** Python, jieba, LanceDB 0.27, SQLite FTS5 (legacy, read-only)
 
+**Fixes from review (v2):**
+- API `mode=fts` routing now correctly goes through `HybridSearchEngine` (not direct `SearchEngine`)
+- Metadata filters (start_time/end_time/app_name/window_name/focused/browser_url) preserved in LanceDB FTS path
+- jieba warmup moved to module level (reliable on every startup)
+- Embedding backfill step added for data loss recovery
+- `full_text` stored in LanceDB to avoid JOIN in FTS-only hot path (documented trade-off)
+
 ---
 
 ## File Map
 
 ```
 Created:
-  openrecall/server/search/tokenizer.py         — jieba tokenization
+  openrecall/server/search/tokenizer.py         — jieba tokenization with warmup
   tests/unit/test_tokenizer.py                  — tokenizer unit tests
 
 Modified:
-  pyproject.toml                                — add jieba dependency
+  setup.py                                      — add jieba dependency
   openrecall/server/embedding/models.py         — + tokenized_text, full_text
   openrecall/server/database/embedding_store.py — schema, search_fts, _ensure_fts_index
   openrecall/server/embedding/service.py        — save_embedding signature
   openrecall/server/embedding/worker.py         — compute & pass tokenized_text
-  openrecall/server/search/hybrid_engine.py     — LanceDB FTS paths
+  openrecall/server/search/hybrid_engine.py     — LanceDB FTS paths + metadata filters + count_by_type delegation
   openrecall/server/search/engine.py            — mark deprecated
+  openrecall/server/api_v1.py                   — _get_search_engine returns HybridSearchEngine
 ```
+
+---
+
+## CRITICAL: Data Loss Warning
+
+**Task 4 (EmbeddingStore schema change) will delete ALL existing LanceDB embedding data.**
+The `_init_table()` logic drops and recreates the table when the LanceDB schema changes. Adding `tokenized_text` and `full_text` fields triggers this.
+
+**Before starting:** Back up LanceDB data if needed. After Task 4 completes, Task 9 will re-enqueue all frames for embedding backfill.
 
 ---
 
 ## Task 1: Add jieba dependency
 
 **Files:**
-- Modify: `pyproject.toml`
+- Modify: `setup.py`
 
-- [ ] **Step 1: Add jieba to pyproject.toml dependencies**
+- [ ] **Step 1: Add jieba to setup.py dependencies**
 
-Run: `grep -n "jieba" pyproject.toml`
+Run: `grep -n "jieba" setup.py`
 Expected: no output (not yet present)
 
-Edit `pyproject.toml`, add to `[project.dependencies]`:
+Edit `setup.py`, add `"jieba>=0.42"` to `install_requires`:
 
-```toml
-jieba = ">=0.42"
+```python
+install_requires = [
+    # ... existing dependencies ...
+    "jieba>=0.42",
+]
 ```
 
 - [ ] **Step 2: Verify jieba is installable**
 
-Run: `uv pip install jieba>=0.42 && python3 -c "import jieba; print(jieba.__version__)"`
+Run: `pip install jieba>=0.42 && python3 -c "import jieba; print(jieba.__version__)"`
 Expected: version number printed
 
 - [ ] **Step 3: Commit**
 
 ```bash
-git add pyproject.toml
+git add setup.py
 git commit -m "chore: add jieba dependency for BM25 tokenization"
 ```
 
 ---
 
-## Task 2: Implement tokenizer module
+## Task 2: Implement tokenizer module with warmup
 
 **Files:**
 - Create: `openrecall/server/search/tokenizer.py`
@@ -121,7 +141,7 @@ def test_punctuation_handling():
 Run: `pytest tests/unit/test_tokenizer.py -v`
 Expected: FAIL — module `openrecall` not yet importable (since it was just created)
 
-- [ ] **Step 2: Write minimal implementation**
+- [ ] **Step 2: Write implementation with module-level warmup**
 
 Create `openrecall/server/search/tokenizer.py`:
 
@@ -130,6 +150,11 @@ Create `openrecall/server/search/tokenizer.py`:
 from __future__ import annotations
 
 import jieba
+
+# Warmup jieba dictionary at module load time (~100ms).
+# This ensures no latency spike on the first tokenization call,
+# regardless of whether LanceDB's FTS index already exists.
+jieba.initialize()
 
 
 def tokenize_text(text: str | None) -> str:
@@ -149,6 +174,8 @@ def tokenize_text(text: str | None) -> str:
     tokens = jieba.cut(text.strip(), cut_all=False)
     return " ".join(tokens)
 ```
+
+> **Note:** `jieba.initialize()` runs once at module import time. This warmup is reliable — it fires on every server startup, not just when the LanceDB FTS index is created.
 
 - [ ] **Step 3: Run tests to verify they pass**
 
@@ -222,12 +249,12 @@ git commit -m "feat(embedding): add tokenized_text and full_text fields to Frame
 
 ## Task 4: Add search_fts and _ensure_fts_index to EmbeddingStore
 
+> **WARNING: This task deletes all existing LanceDB embedding data.** The `_init_table()` schema-mismatch logic drops and recreates the table. Existing vectors will be lost; Task 9 re-generates them via backfill.
+
 **Files:**
 - Modify: `openrecall/server/database/embedding_store.py`
 
 - [ ] **Step 1: Read current embedding_store.py**
-
-> **Note:** The existing `_init_table()` has schema-mismatch detection that drops and recreates the table if the LanceDB schema differs from the pydantic `FrameEmbeddingSchema`. Since Task 3 updated the schema with `tokenized_text` and `full_text`, the existing LanceDB table will be dropped and recreated on next `EmbeddingStore()` instantiation. This is acceptable per spec constraints (existing data will be deleted).
 
 Run: `cat openrecall/server/database/embedding_store.py`
 
@@ -294,19 +321,46 @@ Add after `search_with_distance`:
         return result
 ```
 
-- [ ] **Step 6: Verify LanceDB integration tests pass**
+- [ ] **Step 6: Update FrameEmbedding constructors in existing read methods**
+
+Update `search()`, `get_by_frame_id()`, and `search_with_distance()` to include the new fields when constructing `FrameEmbedding` objects. For example, in `search()` (around line 137) and `search_with_distance()` (around line 221):
+
+```python
+            emb = FrameEmbedding(
+                frame_id=r["frame_id"],
+                embedding_vector=r["embedding_vector"],
+                embedding_model=r.get("embedding_model", "qwen3-vl-embedding"),
+                timestamp=r["timestamp"],
+                app_name=r.get("app_name", ""),
+                window_name=r.get("window_name", ""),
+                tokenized_text=r.get("tokenized_text", ""),
+                full_text=r.get("full_text", ""),
+            )
+```
+
+And in `get_by_frame_id()` (around line 166):
+
+```python
+        return FrameEmbedding(
+            frame_id=r["frame_id"],
+            embedding_vector=r["embedding_vector"],
+            embedding_model=r.get("embedding_model", "qwen3-vl-embedding"),
+            timestamp=r["timestamp"],
+            app_name=r.get("app_name", ""),
+            window_name=r.get("window_name", ""),
+            tokenized_text=r.get("tokenized_text", ""),
+            full_text=r.get("full_text", ""),
+        )
+```
+
+- [ ] **Step 7: Verify LanceDB integration tests pass**
 
 Run: `pytest tests/ -k "embedding" -v --ignore=tests/integration -x`
 Expected: PASS
 
-> **Optional (performance):** jieba loads its dictionary on first call (~100ms). To avoid this latency spike on the first embedding write, add warmup in `_ensure_fts_index`:
-> ```python
-> import jieba
-> jieba.initialize()  # Pre-load dictionary at startup
-> ```
-> This is optional — jieba auto-initializes on first tokenization, so it's not required for correctness.
+> **Note:** Since this task recreates the LanceDB table (schema change), existing embedding data is lost. Task 9 handles backfill.
 
-- [ ] **Step 7: Commit**
+- [ ] **Step 8: Commit**
 
 ```bash
 git add openrecall/server/database/embedding_store.py
@@ -414,7 +468,7 @@ git commit -m "feat(worker): compute and persist jieba tokenized text"
 
 ---
 
-## Task 7: Rewrite HybridSearchEngine to use LanceDB FTS
+## Task 7: Rewrite HybridSearchEngine with LanceDB FTS + metadata filters
 
 **Files:**
 - Modify: `openrecall/server/search/hybrid_engine.py`
@@ -444,7 +498,12 @@ Then replace the entire `_fts_only_search` method body with:
     def _fts_only_search(
         self, q: str, limit: int, offset: int, **kwargs
     ) -> Tuple[List[Dict[str, Any]], int]:
-        """FTS-only search via LanceDB with jieba tokenizer."""
+        """FTS-only search via LanceDB with jieba tokenizer.
+
+        Metadata filters (start_time, end_time, app_name, window_name,
+        focused, browser_url) are applied in the Python layer after
+        LanceDB returns results, via FramesStore.get_frames_by_ids.
+        """
         from openrecall.server.search.tokenizer import tokenize_text
         from openrecall.server.database.frames_store import FramesStore
 
@@ -457,26 +516,69 @@ Then replace the entire `_fts_only_search` method body with:
         # Tokenize query with jieba
         tokenized_q = tokenize_text(q)
 
-        # Search LanceDB FTS
-        lance_results = self._embedding_store.search_fts(tokenized_q, limit=limit + offset)
+        # Fetch ALL potential results from LanceDB FTS (no limit applied yet —
+        # we need all to apply filters before pagination)
+        lance_results = self._embedding_store.search_fts(tokenized_q, limit=1000)
 
-        # Fetch full frame data from SQLite
+        # Fetch full frame data from SQLite for metadata filtering
         frame_ids = [r["frame_id"] for r in lance_results]
         frame_data_map = frames_store.get_frames_by_ids(frame_ids)
 
-        results = []
-        for r in lance_results[offset:offset + limit]:
+        # Apply metadata filters in Python layer
+        start_time = kwargs.get("start_time")
+        end_time = kwargs.get("end_time")
+        filter_app_name = kwargs.get("app_name")
+        filter_window_name = kwargs.get("window_name")
+        filter_focused = kwargs.get("focused")
+        filter_browser_url = kwargs.get("browser_url")
+
+        filtered_results = []
+        for r in lance_results:
             frame = frame_data_map.get(r["frame_id"], {})
-            # Fix: use frame timestamp first; fallback to lance timestamp only if falsy
+            if frame:
+                # Apply time range filter
+                if start_time and (frame.get("timestamp") or "") < start_time:
+                    continue
+                if end_time and (frame.get("timestamp") or "") > end_time:
+                    continue
+                # Apply app_name filter (case-insensitive substring)
+                if filter_app_name:
+                    frame_app = (frame.get("app_name") or "").lower()
+                    if filter_app_name.lower() not in frame_app:
+                        continue
+                # Apply window_name filter (case-insensitive substring)
+                if filter_window_name:
+                    frame_window = (frame.get("window_name") or "").lower()
+                    if filter_window_name.lower() not in frame_window:
+                        continue
+                # Apply focused filter
+                if filter_focused is not None:
+                    frame_focused = bool(frame.get("focused"))
+                    if frame_focused != filter_focused:
+                        continue
+                # Apply browser_url filter (case-insensitive substring)
+                if filter_browser_url:
+                    frame_url = (frame.get("browser_url") or "").lower()
+                    if filter_browser_url.lower() not in frame_url:
+                        continue
+                filtered_results.append(r)
+
+        # Apply offset and limit
+        total = len(filtered_results)
+        paginated = filtered_results[offset:offset + limit]
+
+        results = []
+        for r in paginated:
+            frame = frame_data_map.get(r["frame_id"], {})
             ts = frame.get("timestamp") if frame.get("timestamp") else (r.get("timestamp") or "")
             results.append({
                 "frame_id": r["frame_id"],
                 "score": r.get("_score"),
                 "fts_score": r.get("_score"),
                 "cosine_score": None,        # FTS-only has no vector score
-                "vector_rank": None,          # FTS-only has no vector rank
+                "vector_rank": None,         # FTS-only has no vector rank
                 "timestamp": ts,
-                "text": (r.get("full_text") or "")[:200],
+                "text": (r.get("full_text") or frame.get("full_text", ""))[:200],
                 "text_source": frame.get("text_source", ""),
                 "app_name": frame.get("app_name") or r.get("app_name", ""),
                 "window_name": frame.get("window_name") or r.get("window_name", ""),
@@ -487,10 +589,10 @@ Then replace the entire `_fts_only_search` method body with:
                 "embedding_status": frame.get("embedding_status", ""),
             })
 
-        return results, len(lance_results)
+        return results, total
 ```
 
-**Important:** If LanceDB returns an unexpected score column name (not `"_score"`), adjust `r.get("_score")` to match. Verify by inspecting `lance_results[0].keys()` after running.
+> **Important:** If LanceDB returns an unexpected score column name (not `"_score"`), adjust `r.get("_score")` to match. Verify by inspecting `lance_results[0].keys()` after running.
 
 - [ ] **Step 2: Update `_hybrid_search` to use the new `_fts_only_search`**
 
@@ -508,12 +610,25 @@ New:
 
 The `_fts_only_search` now calls LanceDB FTS with jieba, so `_hybrid_search` automatically benefits.
 
-- [ ] **Step 3: Verify search tests pass**
+- [ ] **Step 3: Add temporary `count_by_type` delegation to HybridSearchEngine**
+
+> Add: this is backward-compat for `/v1/search/counts` until Phase 3 cleanup.
+
+Add this method to `HybridSearchEngine` (after `_hybrid_search` or near the end of the class):
+
+```python
+    def count_by_type(self, **kwargs):
+        """Temporary backward-compat delegation to SearchEngine."""
+        from openrecall.server.search.engine import SearchEngine
+        return SearchEngine().count_by_type(**kwargs)
+```
+
+- [ ] **Step 4: Verify search tests pass**
 
 Run: `pytest tests/ -k "search" -v --ignore=tests/integration -x`
 Expected: PASS
 
-- [ ] **Step 4: Commit**
+- [ ] **Step 5: Commit**
 
 ```bash
 git add openrecall/server/search/hybrid_engine.py
@@ -553,7 +668,115 @@ git commit -m "docs(search): mark SearchEngine as deprecated"
 
 ---
 
-## Task 9: Integration verification
+## Task 9: Update API routing + Embedding backfill
+
+**Files:**
+- Modify: `openrecall/server/api_v1.py`
+- Modify: `tests/test_search_api_optimized.py`
+
+### Sub-task 9a: Update `_get_search_engine` to return HybridSearchEngine
+
+- [ ] **Step 1: Find `_get_search_engine` in api_v1.py**
+
+Run: `grep -n "def _get_search_engine" openrecall/server/api_v1.py`
+
+- [ ] **Step 2: Replace SearchEngine with HybridSearchEngine in `_get_search_engine`**
+
+Find the function around line 917:
+
+```python
+def _get_search_engine():
+    """Lazily initialize the SearchEngine singleton."""
+    global _search_engine
+    if _search_engine is None:
+        from openrecall.server.search.engine import SearchEngine
+
+        _search_engine = SearchEngine()
+    return _search_engine
+```
+
+Replace with:
+
+```python
+def _get_search_engine():
+    """Lazily initialize the search engine singleton."""
+    global _search_engine
+    if _search_engine is None:
+        from openrecall.server.search.hybrid_engine import HybridSearchEngine
+
+        _search_engine = HybridSearchEngine()
+    return _search_engine
+```
+
+> **Why this approach?** `mode=fts`, `mode=vector`, `mode=hybrid`, and `/v1/search/counts` all call `_get_search_engine()`. Updating the singleton avoids changing every call site and preserves ~76 existing test mocks that patch `_get_search_engine`.
+
+- [ ] **Step 3: Verify api_v1 tests pass**
+
+Run: `pytest tests/ -k "api" -v --ignore=tests/integration -x`
+Expected: PASS
+
+### Sub-task 9b: Trigger embedding backfill (recover lost LanceDB data)
+
+- [ ] **Step 4: Trigger embedding backfill**
+
+After the server starts with the new schema, trigger a backfill to regenerate all LanceDB embeddings:
+
+```bash
+curl -X POST "http://localhost:8083/v1/admin/embedding/backfill"
+```
+
+Or via Python:
+
+```python
+import requests
+resp = requests.post("http://localhost:8083/v1/admin/embedding/backfill")
+print(resp.json())
+```
+
+Expected: `{"enqueued": <N>}` where N is the number of frames without embeddings.
+
+- [ ] **Step 5: Commit api_v1 change**
+
+```bash
+git add openrecall/server/api_v1.py
+git commit -m "feat(api): _get_search_engine now returns HybridSearchEngine"
+```
+
+### Sub-task 9c: Update test name for clarity
+
+- [ ] **Step 6: Rename `test_fts_mode_uses_fts_engine` for accuracy**
+
+The test body still works (it patches `_get_search_engine`, which now returns `HybridSearchEngine`), but the name is misleading. Update around line 324:
+
+Old:
+```python
+    def test_fts_mode_uses_fts_engine(self, app_with_search_route):
+        """Test that mode=fts still uses the FTS engine (not hybrid)."""
+```
+
+New:
+```python
+    def test_fts_mode_uses_search_engine(self, app_with_search_route):
+        """Test that mode=fts routes through the search engine singleton."""
+```
+
+Leave the test body unchanged — it correctly verifies that `mode=fts` calls `engine.search()` on the object returned by `_get_search_engine()`.
+
+- [ ] **Step 7: Run updated test**
+
+Run: `pytest tests/test_search_api_optimized.py::TestSearchAPIOptimized::test_fts_mode_uses_search_engine -v`
+Expected: PASS
+
+- [ ] **Step 8: Commit**
+
+```bash
+git add tests/test_search_api_optimized.py
+git commit -m "test(search): rename fts mode test for accuracy after routing change"
+```
+
+---
+
+## Task 10: Integration verification
 
 - [ ] **Step 1: Start server and run ingest pipeline**
 
@@ -573,20 +796,27 @@ print(tbl.schema)
 # Should show tokenized_text and full_text fields
 ```
 
-- [ ] **Step 3: Test mode=fts search**
+- [ ] **Step 3: Test mode=fts search with Chinese query**
 
 ```bash
 curl "http://localhost:8083/v1/search?mode=fts&q=Python"
 curl "http://localhost:8083/v1/search?mode=fts&q=机器学习"
 ```
 
-- [ ] **Step 4: Test mode=hybrid search**
+- [ ] **Step 4: Test mode=fts with metadata filters**
+
+```bash
+curl "http://localhost:8083/v1/search?mode=fts&q=Python&app_name=Chrome"
+curl "http://localhost:8083/v1/search?mode=fts&q=学习&start_time=2026-04-01"
+```
+
+- [ ] **Step 5: Test mode=hybrid search**
 
 ```bash
 curl "http://localhost:8083/v1/search?q=Python教程"
 ```
 
-- [ ] **Step 5: Run all tests**
+- [ ] **Step 6: Run all tests**
 
 ```bash
 pytest tests/ -v --ignore=tests/integration -x
@@ -603,4 +833,13 @@ git status
 git log --oneline -10
 ```
 
-Confirm all 9 task commits are present. The implementation is complete.
+Confirm all 10 task commits are present. The implementation is complete.
+
+---
+
+## Post-Implementation: Phase 3 Cleanup (future PR)
+
+After verifying everything works:
+- Delete SQLite FTS triggers (migration SQL)
+- Delete `SearchEngine` class and `openrecall/server/search/engine.py`
+- Update `count_by_type` endpoint to route through `HybridSearchEngine`

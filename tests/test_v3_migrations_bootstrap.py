@@ -3,9 +3,9 @@ from pathlib import Path
 
 import pytest
 
-from openrecall.server import __main__ as server_main
-from openrecall.server.database.frames_store import FramesStore
-from openrecall.server.database.migrations_runner import (
+from myrecall.server import __main__ as server_main
+from myrecall.server.database.frames_store import FramesStore
+from myrecall.server.database.migrations_runner import (
     run_migrations,
     verify_schema_integrity,
 )
@@ -132,7 +132,7 @@ class TestFtsUnificationMigration:
         # Bootstrap using the initial schema SQL directly to avoid applying all migrations
         initial_sql = (
             Path(__file__).resolve().parent.parent
-            / "openrecall/server/database/migrations/20260227000001_initial_schema.sql"
+            / "myrecall/server/database/migrations/20260227000001_initial_schema.sql"
         ).read_text()
 
         conn = sqlite3.connect(db_path)
@@ -141,7 +141,7 @@ class TestFtsUnificationMigration:
         # Apply subsequent migrations up to (but not including) FTS unification
         migrations_dir = (
             Path(__file__).resolve().parent.parent
-            / "openrecall/server/database/migrations"
+            / "myrecall/server/database/migrations"
         )
         for sql_file in sorted(migrations_dir.glob("*.sql")):
             version = sql_file.stem.split("_")[0]
@@ -166,7 +166,7 @@ class TestFtsUnificationMigration:
         """Apply the FTS unification migration to a db that already has prior migrations."""
         migrations_dir = (
             Path(__file__).resolve().parent.parent
-            / "openrecall/server/database/migrations"
+            / "myrecall/server/database/migrations"
         )
         conn = sqlite3.connect(db_path)
         run_migrations(conn, migrations_dir)
@@ -477,7 +477,7 @@ class TestVisibilityStatusMigration:
         # Bootstrap using the initial schema SQL directly
         initial_sql = (
             Path(__file__).resolve().parent.parent
-            / "openrecall/server/database/migrations/20260227000001_initial_schema.sql"
+            / "myrecall/server/database/migrations/20260227000001_initial_schema.sql"
         ).read_text()
 
         conn = sqlite3.connect(db_path)
@@ -486,7 +486,7 @@ class TestVisibilityStatusMigration:
         # Apply subsequent migrations up to (but not including) visibility_status
         migrations_dir = (
             Path(__file__).resolve().parent.parent
-            / "openrecall/server/database/migrations"
+            / "myrecall/server/database/migrations"
         )
         for sql_file in sorted(migrations_dir.glob("*.sql")):
             version = sql_file.stem.split("_")[0]
@@ -511,7 +511,7 @@ class TestVisibilityStatusMigration:
         """Apply the visibility_status migration to a db that already has prior migrations."""
         migrations_dir = (
             Path(__file__).resolve().parent.parent
-            / "openrecall/server/database/migrations"
+            / "myrecall/server/database/migrations"
         )
         conn = sqlite3.connect(db_path)
         run_migrations(conn, migrations_dir)
@@ -572,3 +572,29 @@ class TestVisibilityStatusMigration:
         assert row["visibility_status"] == "failed"
 
         conn.close()
+
+
+def test_migration_20260426000000_adds_local_timestamp(tmp_path: Path) -> None:
+    """Verify local_timestamp migration adds column and index."""
+    from myrecall.server.database.migrations_runner import run_migrations
+
+    migrations_dir = Path("myrecall/server/database/migrations")
+    db_path = tmp_path / "edge.db"
+    conn = sqlite3.connect(str(db_path))
+    run_migrations(conn, migrations_dir)
+
+    # Verify column exists
+    columns = {
+        row[1] for row in conn.execute("PRAGMA table_info(frames)")
+    }
+    assert "local_timestamp" in columns
+
+    # Verify index exists
+    indexes = {
+        row[0] for row in conn.execute(
+            "SELECT name FROM sqlite_master WHERE type='index' AND tbl_name='frames'"
+        )
+    }
+    assert "idx_frames_local_timestamp" in indexes
+
+    conn.close()

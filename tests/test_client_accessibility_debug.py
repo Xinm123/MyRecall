@@ -18,11 +18,11 @@ class TestStructuredLogFormatter:
 
     def test_import_format_accessibility_log(self):
         """format_accessibility_log should be importable from debug module."""
-        from openrecall.client.accessibility.debug import format_accessibility_log
+        from myrecall.client.accessibility.debug import format_accessibility_log
 
     def test_log_contains_required_fields(self):
         """Structured log should contain all MVP-required fields."""
-        from openrecall.client.accessibility.debug import format_accessibility_log
+        from myrecall.client.accessibility.debug import format_accessibility_log
 
         log = format_accessibility_log(
             capture_id="cap_123",
@@ -55,7 +55,7 @@ class TestStructuredLogFormatter:
 
     def test_log_is_json_serializable(self):
         """Structured log should be JSON-serializable."""
-        from openrecall.client.accessibility.debug import format_accessibility_log
+        from myrecall.client.accessibility.debug import format_accessibility_log
 
         log = format_accessibility_log(
             capture_id="cap_123",
@@ -76,7 +76,7 @@ class TestStructuredLogFormatter:
 
     def test_log_with_rejection_reason(self):
         """Structured log should handle rejection reasons."""
-        from openrecall.client.accessibility.debug import format_accessibility_log
+        from myrecall.client.accessibility.debug import format_accessibility_log
 
         log = format_accessibility_log(
             capture_id="cap_456",
@@ -98,7 +98,7 @@ class TestStructuredLogFormatter:
 
     def test_log_text_preview_truncation(self):
         """Structured log should truncate long text previews."""
-        from openrecall.client.accessibility.debug import format_accessibility_log
+        from myrecall.client.accessibility.debug import format_accessibility_log
 
         long_text = "A" * 500
         log = format_accessibility_log(
@@ -124,15 +124,15 @@ class TestDebugDumpWriter:
 
     def test_import_dump_accessibility_decision(self):
         """dump_accessibility_decision should be importable from debug module."""
-        from openrecall.client.accessibility.debug import dump_accessibility_decision
+        from myrecall.client.accessibility.debug import dump_accessibility_decision
 
     def test_dump_creates_json_file(self):
         """Debug dump should create a JSON file."""
-        from openrecall.client.accessibility.debug import (
+        from myrecall.client.accessibility.debug import (
             dump_accessibility_decision,
             set_debug_mode,
         )
-        from openrecall.client.accessibility.types import (
+        from myrecall.client.accessibility.types import (
             TreeSnapshot,
             AccessibilityDecision,
         )
@@ -177,11 +177,11 @@ class TestDebugDumpWriter:
 
     def test_dump_content_has_required_fields(self):
         """Debug dump should contain MVP-specified fields."""
-        from openrecall.client.accessibility.debug import (
+        from myrecall.client.accessibility.debug import (
             dump_accessibility_decision,
             set_debug_mode,
         )
-        from openrecall.client.accessibility.types import (
+        from myrecall.client.accessibility.types import (
             TreeSnapshot,
             AccessibilityDecision,
         )
@@ -238,11 +238,11 @@ class TestDebugDumpWriter:
 
     def test_dump_with_no_snapshot(self):
         """Debug dump should handle decisions without snapshot."""
-        from openrecall.client.accessibility.debug import (
+        from myrecall.client.accessibility.debug import (
             dump_accessibility_decision,
             set_debug_mode,
         )
-        from openrecall.client.accessibility.types import AccessibilityDecision
+        from myrecall.client.accessibility.types import AccessibilityDecision
 
         # Enable debug mode for this test
         set_debug_mode(True)
@@ -275,11 +275,11 @@ class TestAccessibilityDebugMode:
 
     def test_import_is_debug_mode(self):
         """is_debug_mode should be importable from debug module."""
-        from openrecall.client.accessibility.debug import is_debug_mode
+        from myrecall.client.accessibility.debug import is_debug_mode
 
     def test_debug_mode_default_off(self):
         """Debug mode should be off by default."""
-        from openrecall.client.accessibility.debug import is_debug_mode
+        from myrecall.client.accessibility.debug import is_debug_mode
 
         # Without env var set, should return False
         # (Test may need adjustment based on actual implementation)
@@ -289,11 +289,11 @@ class TestAccessibilityDebugMode:
 
     def test_import_set_debug_mode(self):
         """set_debug_mode should be importable from debug module."""
-        from openrecall.client.accessibility.debug import set_debug_mode
+        from myrecall.client.accessibility.debug import set_debug_mode
 
     def test_set_debug_mode_toggles(self):
         """set_debug_mode should toggle debug state."""
-        from openrecall.client.accessibility.debug import set_debug_mode, is_debug_mode
+        from myrecall.client.accessibility.debug import set_debug_mode, is_debug_mode
 
         set_debug_mode(True)
         assert is_debug_mode() is True
@@ -307,11 +307,11 @@ class TestPerformanceLog:
 
     def test_import_format_performance_log(self):
         """format_performance_log should be importable from debug module."""
-        from openrecall.client.accessibility.debug import format_performance_log
+        from myrecall.client.accessibility.debug import format_performance_log
 
     def test_performance_log_required_fields(self):
         """Performance log should contain MVP-specified fields."""
-        from openrecall.client.accessibility.debug import format_performance_log
+        from myrecall.client.accessibility.debug import format_performance_log
 
         log = format_performance_log(
             trigger="click",
@@ -351,18 +351,18 @@ class TestTextPreview:
 
     def test_import_make_text_preview(self):
         """make_text_preview should be importable from debug module."""
-        from openrecall.client.accessibility.debug import make_text_preview
+        from myrecall.client.accessibility.debug import make_text_preview
 
     def test_short_text_unchanged(self):
         """Short text should be unchanged in preview."""
-        from openrecall.client.accessibility.debug import make_text_preview
+        from myrecall.client.accessibility.debug import make_text_preview
 
         preview = make_text_preview("Hello World", max_length=100)
         assert preview == "Hello World"
 
     def test_long_text_truncated(self):
         """Long text should be truncated with ellipsis."""
-        from openrecall.client.accessibility.debug import make_text_preview
+        from myrecall.client.accessibility.debug import make_text_preview
 
         long_text = "A" * 200
         preview = make_text_preview(long_text, max_length=50)
@@ -371,14 +371,14 @@ class TestTextPreview:
 
     def test_none_text(self):
         """None text should return None or empty string."""
-        from openrecall.client.accessibility.debug import make_text_preview
+        from myrecall.client.accessibility.debug import make_text_preview
 
         preview = make_text_preview(None)
         assert preview is None or preview == ""
 
     def test_empty_text(self):
         """Empty text should return empty string."""
-        from openrecall.client.accessibility.debug import make_text_preview
+        from myrecall.client.accessibility.debug import make_text_preview
 
         preview = make_text_preview("")
         assert preview == ""

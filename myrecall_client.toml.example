@@ -1,6 +1,6 @@
-# OpenRecall Client Configuration Template
+# MyRecall Client Configuration Template
 # Copy this file to ~/.myrecall/client.toml or ./client.toml and fill in your values
-# Or use: openrecall-client --config /path/to/client.toml
+# Or use: myrecall-client --config /path/to/client.toml
 
 # ==============================================================================
 # Client Settings

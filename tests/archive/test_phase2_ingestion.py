@@ -6,8 +6,8 @@ import sqlite3
 from pathlib import Path
 from PIL import Image
 
-from openrecall.server.app import app
-from openrecall.shared.config import settings
+from myrecall.server.app import app
+from myrecall.shared.config import settings
 
 class TestPhase2Ingestion(unittest.TestCase):
     def setUp(self):

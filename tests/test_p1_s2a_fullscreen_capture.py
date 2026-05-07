@@ -6,7 +6,7 @@ from unittest.mock import MagicMock, patch
 
 import numpy as np
 import pytest
-from openrecall.client.events.base import MonitorDescriptor
+from myrecall.client.events.base import MonitorDescriptor
 
 # Import Quartz at module level for monkeypatching
 import Quartz
@@ -32,7 +32,7 @@ def test_get_all_windows_info_returns_list(monkeypatch):
     ]
     monkeypatch.setattr(Quartz, "CGWindowListCopyWindowInfo", lambda *a, **kw: mock_window_list)
 
-    from openrecall.client.events.macos import get_all_windows_info
+    from myrecall.client.events.macos import get_all_windows_info
     windows = get_all_windows_info()
 
     assert isinstance(windows, list)
@@ -50,7 +50,7 @@ def test_get_all_windows_info_returns_empty_on_error(monkeypatch):
     def raises(*a, **kw):
         raise Exception("fail")
     monkeypatch.setattr(Quartz, "CGWindowListCopyWindowInfo", raises)
-    from openrecall.client.events.macos import get_all_windows_info
+    from myrecall.client.events.macos import get_all_windows_info
     windows = get_all_windows_info()
     assert windows == []
 
@@ -78,7 +78,7 @@ def test_capture_window_by_id_returns_numpy_array(monkeypatch, tmp_path):
 
     monkeypatch.setattr(subprocess, "run", fake_run)
 
-    from openrecall.client.recorder import ScreenRecorder
+    from myrecall.client.recorder import ScreenRecorder
     recorder = ScreenRecorder()
     result = recorder._capture_window_by_id(123)
 
@@ -92,7 +92,7 @@ def test_capture_window_by_id_returns_none_on_failure(monkeypatch):
     """_capture_window_by_id returns None when screencapture fails."""
     monkeypatch.setattr(subprocess, "run", lambda *a, **kw: (_ for _ in ()).throw(subprocess.TimeoutExpired("screencapture", 5)))
 
-    from openrecall.client.recorder import ScreenRecorder
+    from myrecall.client.recorder import ScreenRecorder
     recorder = ScreenRecorder()
     result = recorder._capture_window_by_id(999)
     assert result is None
@@ -115,8 +115,8 @@ def test_detect_fullscreen_window_returns_id(monkeypatch):
             "kCGWindowBounds": {"X": 0, "Y": 1560, "Width": 2560, "Height": 40},
         },
     ]
-    with patch("openrecall.client.recorder.get_all_windows_info", return_value=mock_windows):
-        from openrecall.client.recorder import ScreenRecorder
+    with patch("myrecall.client.recorder.get_all_windows_info", return_value=mock_windows):
+        from myrecall.client.recorder import ScreenRecorder
         recorder = ScreenRecorder()
         monitor = MonitorDescriptor(stable_id="1", left=0, top=0, width=2560, height=1600, is_primary=True)
         window_id = recorder._detect_fullscreen_window_on_monitor(monitor)
@@ -134,8 +134,8 @@ def test_detect_fullscreen_window_returns_none_when_no_fullscreen(monkeypatch):
             "kCGWindowBounds": {"X": 100, "Y": 100, "Width": 800, "Height": 600},
         },
     ]
-    with patch("openrecall.client.recorder.get_all_windows_info", return_value=mock_windows):
-        from openrecall.client.recorder import ScreenRecorder
+    with patch("myrecall.client.recorder.get_all_windows_info", return_value=mock_windows):
+        from myrecall.client.recorder import ScreenRecorder
         recorder = ScreenRecorder()
         monitor = MonitorDescriptor(stable_id="1", left=0, top=0, width=2560, height=1600, is_primary=True)
         window_id = recorder._detect_fullscreen_window_on_monitor(monitor)
@@ -153,8 +153,8 @@ def test_detect_fullscreen_window_returns_none_for_system_apps(monkeypatch):
             "kCGWindowBounds": {"X": 0, "Y": 0, "Width": 2560, "Height": 1600},
         },
     ]
-    with patch("openrecall.client.recorder.get_all_windows_info", return_value=mock_windows):
-        from openrecall.client.recorder import ScreenRecorder
+    with patch("myrecall.client.recorder.get_all_windows_info", return_value=mock_windows):
+        from myrecall.client.recorder import ScreenRecorder
         recorder = ScreenRecorder()
         monitor = MonitorDescriptor(stable_id="1", left=0, top=0, width=2560, height=1600, is_primary=True)
         window_id = recorder._detect_fullscreen_window_on_monitor(monitor)
@@ -172,8 +172,8 @@ def test_detect_fullscreen_window_skips_overlay_layers(monkeypatch):
             "kCGWindowBounds": {"X": 0, "Y": 0, "Width": 2560, "Height": 1600},
         },
     ]
-    with patch("openrecall.client.recorder.get_all_windows_info", return_value=mock_windows):
-        from openrecall.client.recorder import ScreenRecorder
+    with patch("myrecall.client.recorder.get_all_windows_info", return_value=mock_windows):
+        from myrecall.client.recorder import ScreenRecorder
         recorder = ScreenRecorder()
         monitor = MonitorDescriptor(stable_id="1", left=0, top=0, width=2560, height=1600, is_primary=True)
         window_id = recorder._detect_fullscreen_window_on_monitor(monitor)
@@ -213,11 +213,11 @@ def test_capture_single_monitor_uses_window_capture_for_fullscreen(monkeypatch):
             return True
         return real_exists(p)
 
-    with patch("openrecall.client.recorder.get_all_windows_info", return_value=mock_windows):
+    with patch("myrecall.client.recorder.get_all_windows_info", return_value=mock_windows):
         monkeypatch.setattr(subprocess, "run", fake_run)
         monkeypatch.setattr(os.path, "exists", fake_exists)
 
-        from openrecall.client.recorder import ScreenRecorder
+        from myrecall.client.recorder import ScreenRecorder
         recorder = ScreenRecorder()
         monitor = MonitorDescriptor(stable_id="1", left=0, top=0, width=2560, height=1600, is_primary=True)
         result = recorder._capture_single_monitor(monitor)

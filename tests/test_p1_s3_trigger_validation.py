@@ -11,7 +11,7 @@ SSOT: design.md D4
 
 import pytest
 
-from openrecall.server.processing.v3_worker import (
+from myrecall.server.processing.v3_worker import (
     VALID_CAPTURE_TRIGGERS,
     V3ProcessingWorker,
 )

@@ -28,6 +28,7 @@ install_requires = [
     "python-multipart",
     "rapidocr>=3.0.0",  # v3 API with EngineType, OCRVersion, ModelType enums
     "onnxruntime>=1.16.0",  # Explicit ONNX runtime for RapidOCR v3
+    "pyyaml>=6.0",
 ]
 
 # Define OS-specific dependencies
@@ -74,7 +75,7 @@ if current_os and current_os in extras_require:
 install_requires.extend(extras_require.get("python-doctr", []))
 
 setup(
-    name="OpenRecall",
+    name="MyRecall",
     version="0.8",
     packages=find_packages(),
     install_requires=install_requires,

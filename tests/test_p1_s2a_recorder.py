@@ -7,13 +7,13 @@ from unittest.mock import patch, MagicMock
 
 import pytest
 
-from openrecall.client.events.base import (
+from myrecall.client.events.base import (
     CaptureTrigger,
     MonitorDescriptor,
     TriggerEvent,
 )
-from openrecall.client.events.permissions import PermissionCheckResult
-from openrecall.client.recorder import HeartbeatThread, ScreenRecorder, take_screenshots
+from myrecall.client.events.permissions import PermissionCheckResult
+from myrecall.client.recorder import HeartbeatThread, ScreenRecorder, take_screenshots
 
 
 class TestHeartbeatThread:
@@ -73,7 +73,7 @@ class TestHeartbeatThread:
 
         with patch("requests.post", side_effect=req.RequestException("network error")):
             with patch("time.sleep", return_value=None) as mock_sleep:
-                with patch("openrecall.client.recorder.logger") as mock_logger:
+                with patch("myrecall.client.recorder.logger") as mock_logger:
                     thread = HeartbeatThread(recorder=recorder, stop_event=stop_event)
                     thread.start()
                     time.sleep(0.1)
@@ -284,10 +284,10 @@ def test_snapshot_active_context_uses_same_app_for_window_lookup(monkeypatch) ->
     captured_app: list[str] = []
 
     monkeypatch.setattr(
-        "openrecall.client.recorder.get_active_app_name", lambda: "Google Chrome"
+        "myrecall.client.recorder.get_active_app_name", lambda: "Google Chrome"
     )
     monkeypatch.setattr(
-        "openrecall.client.recorder.get_frontmost_app_name", lambda: "Antigravity"
+        "myrecall.client.recorder.get_frontmost_app_name", lambda: "Antigravity"
     )
 
     def _window_for_app(app_name: str) -> str:
@@ -295,12 +295,12 @@ def test_snapshot_active_context_uses_same_app_for_window_lookup(monkeypatch) ->
         return "Stack Overflow - Google Chrome"
 
     monkeypatch.setattr(
-        "openrecall.client.recorder.get_active_window_title_for_app",
+        "myrecall.client.recorder.get_active_window_title_for_app",
         _window_for_app,
     )
 
     monkeypatch.setattr(
-        "openrecall.client.recorder.get_active_app_monitor", lambda monitors: None
+        "myrecall.client.recorder.get_active_app_monitor", lambda monitors: None
     )
 
     active_app, active_window, active_monitor = recorder._snapshot_active_context()
@@ -318,12 +318,12 @@ def test_poll_permissions_uses_configured_cadence(monkeypatch):
 
     def _fake_detect_permissions():
         calls.append(1.0)
-        from openrecall.client.events.permissions import PermissionCheckResult
+        from myrecall.client.events.permissions import PermissionCheckResult
 
         return PermissionCheckResult(ok=True, reason="granted")
 
     monkeypatch.setattr(
-        "openrecall.client.recorder.detect_permissions", _fake_detect_permissions
+        "myrecall.client.recorder.detect_permissions", _fake_detect_permissions
     )
 
     recorder._poll_permissions(now_epoch=10.0)
@@ -355,9 +355,9 @@ def test_start_event_sources_wires_both_macos_emitters(monkeypatch):
         def start(self):
             started.append("switch")
 
-    monkeypatch.setattr("openrecall.client.recorder.MacOSEventTap", _FakeTap)
+    monkeypatch.setattr("myrecall.client.recorder.MacOSEventTap", _FakeTap)
     monkeypatch.setattr(
-        "openrecall.client.recorder.MacOSAppSwitchMonitor",
+        "myrecall.client.recorder.MacOSAppSwitchMonitor",
         _FakeSwitchMonitor,
     )
 
@@ -412,7 +412,7 @@ def test_send_heartbeat_reports_permission_and_trigger_channel(monkeypatch):
         captured_payload = payload
         return _Response()
 
-    monkeypatch.setattr("openrecall.client.recorder.requests.post", _fake_post)
+    monkeypatch.setattr("myrecall.client.recorder.requests.post", _fake_post)
 
     stop_event = threading.Event()
     heartbeat_thread = HeartbeatThread(recorder=recorder, stop_event=stop_event)
@@ -440,9 +440,9 @@ def test_take_screenshots_logs_warning_for_out_of_bounds_monitor(monkeypatch, ca
         def __exit__(self, exc_type, exc, tb) -> bool:
             return False
 
-    monkeypatch.setattr("openrecall.client.recorder.mss.mss", _FakeMSS)
+    monkeypatch.setattr("myrecall.client.recorder.mss.mss", _FakeMSS)
     monkeypatch.setattr(
-        "openrecall.client.recorder.settings.primary_monitor_only", True
+        "myrecall.client.recorder.settings.primary_monitor_only", True
     )
 
     with caplog.at_level("WARNING"):

@@ -121,11 +121,11 @@ class TestMacosWalkerImport:
 
     def test_module_imports(self):
         """macOS walker module should be importable."""
-        from openrecall.client.accessibility import macos
+        from myrecall.client.accessibility import macos
 
     def test_walk_focused_window_function_exists(self):
         """walk_focused_window function should exist."""
-        from openrecall.client.accessibility.macos import walk_focused_window
+        from myrecall.client.accessibility.macos import walk_focused_window
 
         assert callable(walk_focused_window)
 
@@ -140,7 +140,7 @@ class TestRoleConstants:
 
     def test_skip_roles_defined(self):
         """skip_roles constant should match MVP spec."""
-        from openrecall.client.accessibility.macos import SKIP_ROLES
+        from myrecall.client.accessibility.macos import SKIP_ROLES
 
         expected = {
             "AXScrollBar",
@@ -160,7 +160,7 @@ class TestRoleConstants:
 
     def test_text_bearing_roles_defined(self):
         """text_bearing_roles constant should match MVP spec."""
-        from openrecall.client.accessibility.macos import TEXT_BEARING_ROLES
+        from myrecall.client.accessibility.macos import TEXT_BEARING_ROLES
 
         expected = {
             "AXStaticText",
@@ -183,7 +183,7 @@ class TestRoleConstants:
 
     def test_light_container_roles_defined(self):
         """light_container_roles constant should match MVP spec."""
-        from openrecall.client.accessibility.macos import LIGHT_CONTAINER_ROLES
+        from myrecall.client.accessibility.macos import LIGHT_CONTAINER_ROLES
 
         expected = {"AXGroup", "AXWebArea"}
         assert LIGHT_CONTAINER_ROLES == expected
@@ -199,7 +199,7 @@ class TestTextExtraction:
 
     def test_extract_text_from_static_text_uses_value(self):
         """AXStaticText should use value attribute."""
-        from openrecall.client.accessibility.macos import extract_text_from_element
+        from myrecall.client.accessibility.macos import extract_text_from_element
 
         element = MockAXElement(role="AXStaticText", value="Hello World")
         text = extract_text_from_element(element)
@@ -207,7 +207,7 @@ class TestTextExtraction:
 
     def test_extract_text_from_text_field_prefers_value(self):
         """AXTextField should prefer value over title."""
-        from openrecall.client.accessibility.macos import extract_text_from_element
+        from myrecall.client.accessibility.macos import extract_text_from_element
 
         element = MockAXElement(
             role="AXTextField", value="input text", title="Label"
@@ -217,7 +217,7 @@ class TestTextExtraction:
 
     def test_extract_text_from_text_area_prefers_value(self):
         """AXTextArea should prefer value over title."""
-        from openrecall.client.accessibility.macos import extract_text_from_element
+        from myrecall.client.accessibility.macos import extract_text_from_element
 
         element = MockAXElement(
             role="AXTextArea", value="multi\nline\ntext", title="Label"
@@ -227,7 +227,7 @@ class TestTextExtraction:
 
     def test_extract_text_from_combo_box_prefers_value(self):
         """AXComboBox should prefer value over title."""
-        from openrecall.client.accessibility.macos import extract_text_from_element
+        from myrecall.client.accessibility.macos import extract_text_from_element
 
         element = MockAXElement(role="AXComboBox", value="selected", title="Options")
         text = extract_text_from_element(element)
@@ -235,7 +235,7 @@ class TestTextExtraction:
 
     def test_extract_text_falls_back_to_title(self):
         """Non-text-entry roles should use title first."""
-        from openrecall.client.accessibility.macos import extract_text_from_element
+        from myrecall.client.accessibility.macos import extract_text_from_element
 
         element = MockAXElement(role="AXButton", title="Click Me")
         text = extract_text_from_element(element)
@@ -243,7 +243,7 @@ class TestTextExtraction:
 
     def test_extract_text_falls_back_to_description(self):
         """Should fall back to description if title is empty."""
-        from openrecall.client.accessibility.macos import extract_text_from_element
+        from myrecall.client.accessibility.macos import extract_text_from_element
 
         element = MockAXElement(role="AXButton", description="Descriptive text")
         text = extract_text_from_element(element)
@@ -251,7 +251,7 @@ class TestTextExtraction:
 
     def test_extract_text_priority_is_value_title_description(self):
         """Priority should be value -> title -> description for text-entry roles."""
-        from openrecall.client.accessibility.macos import extract_text_from_element
+        from myrecall.client.accessibility.macos import extract_text_from_element
 
         # For text-entry roles, value comes first
         element = MockAXElement(
@@ -265,7 +265,7 @@ class TestTextExtraction:
 
     def test_extract_text_returns_none_for_empty(self):
         """Should return None if all attributes are empty."""
-        from openrecall.client.accessibility.macos import extract_text_from_element
+        from myrecall.client.accessibility.macos import extract_text_from_element
 
         element = MockAXElement(role="AXButton")
         text = extract_text_from_element(element)
@@ -273,7 +273,7 @@ class TestTextExtraction:
 
     def test_extract_text_strips_whitespace(self):
         """Should strip whitespace from extracted text."""
-        from openrecall.client.accessibility.macos import extract_text_from_element
+        from myrecall.client.accessibility.macos import extract_text_from_element
 
         element = MockAXElement(role="AXStaticText", value="  trimmed  ")
         text = extract_text_from_element(element)
@@ -285,42 +285,42 @@ class TestShortCircuitRecursion:
 
     def test_short_circuit_for_text_field_with_value(self):
         """AXTextField with non-empty value should short-circuit."""
-        from openrecall.client.accessibility.macos import should_short_circuit_recursion
+        from myrecall.client.accessibility.macos import should_short_circuit_recursion
 
         assert should_short_circuit_recursion("AXTextField", "has value") is True
         assert should_short_circuit_recursion("AXTextField", "") is False
 
     def test_short_circuit_for_text_area_with_value(self):
         """AXTextArea with non-empty value should short-circuit."""
-        from openrecall.client.accessibility.macos import should_short_circuit_recursion
+        from myrecall.client.accessibility.macos import should_short_circuit_recursion
 
         assert should_short_circuit_recursion("AXTextArea", "text") is True
         assert should_short_circuit_recursion("AXTextArea", "") is False
 
     def test_short_circuit_for_combo_box_with_value(self):
         """AXComboBox with non-empty value should short-circuit."""
-        from openrecall.client.accessibility.macos import should_short_circuit_recursion
+        from myrecall.client.accessibility.macos import should_short_circuit_recursion
 
         assert should_short_circuit_recursion("AXComboBox", "selected") is True
         assert should_short_circuit_recursion("AXComboBox", "") is False
 
     def test_short_circuit_for_static_text_with_value(self):
         """AXStaticText with non-empty value should short-circuit."""
-        from openrecall.client.accessibility.macos import should_short_circuit_recursion
+        from myrecall.client.accessibility.macos import should_short_circuit_recursion
 
         assert should_short_circuit_recursion("AXStaticText", "text") is True
         assert should_short_circuit_recursion("AXStaticText", "") is False
 
     def test_no_short_circuit_for_button(self):
         """AXButton should never short-circuit recursion."""
-        from openrecall.client.accessibility.macos import should_short_circuit_recursion
+        from myrecall.client.accessibility.macos import should_short_circuit_recursion
 
         assert should_short_circuit_recursion("AXButton", "has value") is False
         assert should_short_circuit_recursion("AXButton", "") is False
 
     def test_no_short_circuit_for_other_roles(self):
         """Other text-bearing roles should not short-circuit."""
-        from openrecall.client.accessibility.macos import should_short_circuit_recursion
+        from myrecall.client.accessibility.macos import should_short_circuit_recursion
 
         assert should_short_circuit_recursion("AXLink", "link text") is False
         assert should_short_circuit_recursion("AXHeading", "heading") is False
@@ -336,8 +336,8 @@ class TestWalkState:
 
     def test_walk_state_initializes_with_config(self):
         """WalkState should initialize from TreeWalkerConfig."""
-        from openrecall.client.accessibility.macos import WalkState
-        from openrecall.client.accessibility.types import TreeWalkerConfig
+        from myrecall.client.accessibility.macos import WalkState
+        from myrecall.client.accessibility.types import TreeWalkerConfig
 
         config = TreeWalkerConfig()
         state = WalkState(config)
@@ -348,8 +348,8 @@ class TestWalkState:
 
     def test_walk_state_tracks_node_count(self):
         """WalkState should track node_count."""
-        from openrecall.client.accessibility.macos import WalkState
-        from openrecall.client.accessibility.types import TreeWalkerConfig
+        from myrecall.client.accessibility.macos import WalkState
+        from myrecall.client.accessibility.types import TreeWalkerConfig
 
         state = WalkState(TreeWalkerConfig())
         assert state.node_count == 0
@@ -360,8 +360,8 @@ class TestWalkState:
 
     def test_walk_state_tracks_text_length(self):
         """WalkState should track text_length."""
-        from openrecall.client.accessibility.macos import WalkState
-        from openrecall.client.accessibility.types import TreeWalkerConfig
+        from myrecall.client.accessibility.macos import WalkState
+        from myrecall.client.accessibility.types import TreeWalkerConfig
 
         state = WalkState(TreeWalkerConfig())
         assert state.text_length == 0
@@ -372,8 +372,8 @@ class TestWalkState:
 
     def test_walk_state_detects_max_nodes_truncation(self):
         """WalkState should detect when max_nodes is reached."""
-        from openrecall.client.accessibility.macos import WalkState
-        from openrecall.client.accessibility.types import TreeWalkerConfig
+        from myrecall.client.accessibility.macos import WalkState
+        from myrecall.client.accessibility.types import TreeWalkerConfig
 
         config = TreeWalkerConfig(max_nodes=2)
         state = WalkState(config)
@@ -386,8 +386,8 @@ class TestWalkState:
 
     def test_walk_state_detects_max_text_length_truncation(self):
         """WalkState should detect when max_text_length is reached."""
-        from openrecall.client.accessibility.macos import WalkState
-        from openrecall.client.accessibility.types import TreeWalkerConfig
+        from myrecall.client.accessibility.macos import WalkState
+        from myrecall.client.accessibility.types import TreeWalkerConfig
 
         config = TreeWalkerConfig(max_text_length=10)
         state = WalkState(config)
@@ -400,8 +400,8 @@ class TestWalkState:
 
     def test_walk_state_detects_max_depth_truncation(self):
         """WalkState should detect when max_depth is exceeded."""
-        from openrecall.client.accessibility.macos import WalkState
-        from openrecall.client.accessibility.types import TreeWalkerConfig
+        from myrecall.client.accessibility.macos import WalkState
+        from myrecall.client.accessibility.types import TreeWalkerConfig
 
         config = TreeWalkerConfig(max_depth=2)
         state = WalkState(config)
@@ -414,8 +414,8 @@ class TestWalkState:
 
     def test_walk_state_tracks_max_depth_reached(self):
         """WalkState should track maximum depth reached."""
-        from openrecall.client.accessibility.macos import WalkState
-        from openrecall.client.accessibility.types import TreeWalkerConfig
+        from myrecall.client.accessibility.macos import WalkState
+        from myrecall.client.accessibility.types import TreeWalkerConfig
 
         state = WalkState(TreeWalkerConfig())
         state.update_depth(5)
@@ -425,8 +425,8 @@ class TestWalkState:
 
     def test_walk_state_detects_timeout(self):
         """WalkState should detect when walk_timeout is exceeded."""
-        from openrecall.client.accessibility.macos import WalkState
-        from openrecall.client.accessibility.types import TreeWalkerConfig
+        from myrecall.client.accessibility.macos import WalkState
+        from myrecall.client.accessibility.types import TreeWalkerConfig
         import time
 
         config = TreeWalkerConfig(walk_timeout_ms=1)  # 1ms timeout
@@ -446,8 +446,8 @@ class TestTreeTraversal:
 
     def test_walk_element_skips_skip_roles(self):
         """Walker should skip elements with skip_roles entirely."""
-        from openrecall.client.accessibility.macos import walk_element, WalkState
-        from openrecall.client.accessibility.types import TreeWalkerConfig
+        from myrecall.client.accessibility.macos import walk_element, WalkState
+        from myrecall.client.accessibility.types import TreeWalkerConfig
 
         state = WalkState(TreeWalkerConfig())
         element = MockAXElement(role="AXScrollBar", value="should be skipped")
@@ -458,8 +458,8 @@ class TestTreeTraversal:
 
     def test_walk_element_extracts_text_bearing_roles(self):
         """Walker should extract text from text_bearing_roles."""
-        from openrecall.client.accessibility.macos import walk_element, WalkState
-        from openrecall.client.accessibility.types import TreeWalkerConfig
+        from myrecall.client.accessibility.macos import walk_element, WalkState
+        from myrecall.client.accessibility.types import TreeWalkerConfig
 
         state = WalkState(TreeWalkerConfig())
         element = MockAXElement(role="AXStaticText", value="Hello")
@@ -472,8 +472,8 @@ class TestTreeTraversal:
 
     def test_walk_element_recurse_children(self):
         """Walker should recurse into children in depth-first order."""
-        from openrecall.client.accessibility.macos import walk_element, WalkState
-        from openrecall.client.accessibility.types import TreeWalkerConfig
+        from myrecall.client.accessibility.macos import walk_element, WalkState
+        from myrecall.client.accessibility.types import TreeWalkerConfig
 
         state = WalkState(TreeWalkerConfig())
         child = MockAXElement(role="AXStaticText", value="Child")
@@ -488,8 +488,8 @@ class TestTreeTraversal:
 
     def test_walk_element_respects_max_depth(self):
         """Walker should stop at max_depth."""
-        from openrecall.client.accessibility.macos import walk_element, WalkState
-        from openrecall.client.accessibility.types import TreeWalkerConfig
+        from myrecall.client.accessibility.macos import walk_element, WalkState
+        from myrecall.client.accessibility.types import TreeWalkerConfig
 
         config = TreeWalkerConfig(max_depth=1)
         state = WalkState(config)
@@ -507,8 +507,8 @@ class TestTreeTraversal:
 
     def test_walk_element_short_circuits_for_text_entry_with_value(self):
         """AXTextField with value should not recurse into children."""
-        from openrecall.client.accessibility.macos import walk_element, WalkState
-        from openrecall.client.accessibility.types import TreeWalkerConfig
+        from myrecall.client.accessibility.macos import walk_element, WalkState
+        from myrecall.client.accessibility.types import TreeWalkerConfig
 
         state = WalkState(TreeWalkerConfig())
         child = MockAXElement(role="AXStaticText", value="Should be skipped")
@@ -523,8 +523,8 @@ class TestTreeTraversal:
 
     def test_walk_element_handles_light_containers(self):
         """Light container roles should contribute text but continue recursing."""
-        from openrecall.client.accessibility.macos import walk_element, WalkState
-        from openrecall.client.accessibility.types import TreeWalkerConfig
+        from myrecall.client.accessibility.macos import walk_element, WalkState
+        from myrecall.client.accessibility.types import TreeWalkerConfig
 
         state = WalkState(TreeWalkerConfig())
         child = MockAXElement(role="AXStaticText", value="Child")
@@ -540,8 +540,8 @@ class TestTreeTraversal:
 
     def test_walk_element_maintains_depth_first_order(self):
         """Nodes should be in depth-first traversal order."""
-        from openrecall.client.accessibility.macos import walk_element, WalkState
-        from openrecall.client.accessibility.types import TreeWalkerConfig
+        from myrecall.client.accessibility.macos import walk_element, WalkState
+        from myrecall.client.accessibility.types import TreeWalkerConfig
 
         state = WalkState(TreeWalkerConfig())
         root = MockAXElement(
@@ -578,7 +578,7 @@ class TestBoundsExtraction:
 
     def test_normalize_bounds_to_window(self):
         """Bounds should be normalized to 0-1 relative to window."""
-        from openrecall.client.accessibility.macos import normalize_bounds
+        from myrecall.client.accessibility.macos import normalize_bounds
 
         result = normalize_bounds(
             elem_x=100,
@@ -599,14 +599,14 @@ class TestBoundsExtraction:
 
     def test_bounds_none_for_invalid_window(self):
         """Should return None for zero-size window."""
-        from openrecall.client.accessibility.macos import normalize_bounds
+        from myrecall.client.accessibility.macos import normalize_bounds
 
         result = normalize_bounds(100, 50, 200, 100, 0, 0, 0, 0)
         assert result is None
 
     def test_bounds_clamped_to_valid_range(self):
         """Bounds outside window should be clamped to valid range."""
-        from openrecall.client.accessibility.macos import normalize_bounds
+        from myrecall.client.accessibility.macos import normalize_bounds
 
         result = normalize_bounds(
             elem_x=-50,
@@ -636,7 +636,7 @@ class TestBrowserUrlExtraction:
 
     def test_is_browser_candidate_safari(self):
         """Should detect Safari as browser candidate."""
-        from openrecall.client.accessibility.macos import is_browser_candidate
+        from myrecall.client.accessibility.macos import is_browser_candidate
 
         assert is_browser_candidate("Safari") is True
         assert is_browser_candidate("safari") is True
@@ -644,7 +644,7 @@ class TestBrowserUrlExtraction:
 
     def test_is_browser_candidate_chrome(self):
         """Should detect Chrome as browser candidate."""
-        from openrecall.client.accessibility.macos import is_browser_candidate
+        from myrecall.client.accessibility.macos import is_browser_candidate
 
         assert is_browser_candidate("Google Chrome") is True
         assert is_browser_candidate("chrome") is True
@@ -652,7 +652,7 @@ class TestBrowserUrlExtraction:
 
     def test_is_browser_candidate_non_browser(self):
         """Should not detect non-browser apps."""
-        from openrecall.client.accessibility.macos import is_browser_candidate
+        from myrecall.client.accessibility.macos import is_browser_candidate
 
         assert is_browser_candidate("Finder") is False
         assert is_browser_candidate("Terminal") is False
@@ -661,7 +661,7 @@ class TestBrowserUrlExtraction:
 
     def test_extract_browser_url_from_axdocument(self):
         """Should extract URL from AXDocument attribute."""
-        from openrecall.client.accessibility.macos import extract_browser_url
+        from myrecall.client.accessibility.macos import extract_browser_url
 
         window = MockAXElement(role="AXWindow", attributes={"AXDocument": "https://example.com"})
         url = extract_browser_url(window, "Safari", "Example")
@@ -670,7 +670,7 @@ class TestBrowserUrlExtraction:
 
     def test_extract_browser_url_only_http_https(self):
         """Should only return http/https URLs."""
-        from openrecall.client.accessibility.macos import extract_browser_url
+        from myrecall.client.accessibility.macos import extract_browser_url
 
         window = MockAXElement(role="AXWindow", attributes={"AXDocument": "file:///local/path"})
         url = extract_browser_url(window, "Safari", "Local")
@@ -679,7 +679,7 @@ class TestBrowserUrlExtraction:
 
     def test_extract_browser_url_none_for_non_browser(self):
         """Should return None for non-browser apps."""
-        from openrecall.client.accessibility.macos import extract_browser_url
+        from myrecall.client.accessibility.macos import extract_browser_url
 
         window = MockAXElement(role="AXWindow", attributes={"AXDocument": "https://example.com"})
         url = extract_browser_url(window, "Finder", "Documents")
@@ -688,7 +688,7 @@ class TestBrowserUrlExtraction:
 
     def test_extract_browser_url_none_for_missing_axdocument(self):
         """Should return None when AXDocument is not available."""
-        from openrecall.client.accessibility.macos import extract_browser_url
+        from myrecall.client.accessibility.macos import extract_browser_url
 
         window = MockAXElement(role="AXWindow", attributes={})
         url = extract_browser_url(window, "Safari", "Example")
@@ -706,8 +706,8 @@ class TestWalkFocusedWindow:
 
     def test_returns_none_when_no_focused_app(self):
         """Should return None when no focused app is found."""
-        from openrecall.client.accessibility.macos import walk_focused_window
-        from openrecall.client.accessibility.types import TreeWalkerConfig
+        from myrecall.client.accessibility.macos import walk_focused_window
+        from myrecall.client.accessibility.types import TreeWalkerConfig
 
         mock_provider = MockAXProvider(focused_app=None)
         result = walk_focused_window(TreeWalkerConfig(), ax_provider=mock_provider)
@@ -716,8 +716,8 @@ class TestWalkFocusedWindow:
 
     def test_returns_none_when_no_focused_window(self):
         """Should return None when no focused window is found."""
-        from openrecall.client.accessibility.macos import walk_focused_window
-        from openrecall.client.accessibility.types import TreeWalkerConfig
+        from myrecall.client.accessibility.macos import walk_focused_window
+        from myrecall.client.accessibility.types import TreeWalkerConfig
 
         mock_provider = MockAXProvider(
             focused_app=MockAXApp(name="Safari"), focused_window=None
@@ -728,8 +728,8 @@ class TestWalkFocusedWindow:
 
     def test_returns_snapshot_with_app_and_window_names(self):
         """Should return snapshot with correct app and window names."""
-        from openrecall.client.accessibility.macos import walk_focused_window
-        from openrecall.client.accessibility.types import TreeWalkerConfig
+        from myrecall.client.accessibility.macos import walk_focused_window
+        from myrecall.client.accessibility.types import TreeWalkerConfig
 
         mock_provider = MockAXProvider(
             focused_app=MockAXApp(name="Safari"),
@@ -747,8 +747,8 @@ class TestWalkFocusedWindow:
 
     def test_returns_snapshot_with_nodes(self):
         """Should return snapshot with extracted nodes."""
-        from openrecall.client.accessibility.macos import walk_focused_window
-        from openrecall.client.accessibility.types import TreeWalkerConfig
+        from myrecall.client.accessibility.macos import walk_focused_window
+        from myrecall.client.accessibility.types import TreeWalkerConfig
 
         mock_provider = MockAXProvider(
             focused_app=MockAXApp(name="TextEdit"),
@@ -768,8 +768,8 @@ class TestWalkFocusedWindow:
 
     def test_returns_snapshot_with_text_content(self):
         """Should return snapshot with aggregated text content."""
-        from openrecall.client.accessibility.macos import walk_focused_window
-        from openrecall.client.accessibility.types import TreeWalkerConfig
+        from myrecall.client.accessibility.macos import walk_focused_window
+        from myrecall.client.accessibility.types import TreeWalkerConfig
 
         mock_provider = MockAXProvider(
             focused_app=MockAXApp(name="TextEdit"),
@@ -789,8 +789,8 @@ class TestWalkFocusedWindow:
 
     def test_returns_snapshot_with_hashes(self):
         """Should return snapshot with computed hashes."""
-        from openrecall.client.accessibility.macos import walk_focused_window
-        from openrecall.client.accessibility.types import TreeWalkerConfig
+        from myrecall.client.accessibility.macos import walk_focused_window
+        from myrecall.client.accessibility.types import TreeWalkerConfig
 
         mock_provider = MockAXProvider(
             focused_app=MockAXApp(name="TextEdit"),
@@ -807,8 +807,8 @@ class TestWalkFocusedWindow:
 
     def test_returns_snapshot_with_timing(self):
         """Should return snapshot with duration_ms."""
-        from openrecall.client.accessibility.macos import walk_focused_window
-        from openrecall.client.accessibility.types import TreeWalkerConfig
+        from myrecall.client.accessibility.macos import walk_focused_window
+        from myrecall.client.accessibility.types import TreeWalkerConfig
 
         mock_provider = MockAXProvider(
             focused_app=MockAXApp(name="TextEdit"),
@@ -824,8 +824,8 @@ class TestWalkFocusedWindow:
 
     def test_handles_ax_exception_gracefully(self):
         """Should handle AX exceptions and return None."""
-        from openrecall.client.accessibility.macos import walk_focused_window
-        from openrecall.client.accessibility.types import TreeWalkerConfig
+        from myrecall.client.accessibility.macos import walk_focused_window
+        from myrecall.client.accessibility.types import TreeWalkerConfig
 
         mock_provider = MockAXProvider(raises_exception=True)
         result = walk_focused_window(TreeWalkerConfig(), ax_provider=mock_provider)
@@ -834,8 +834,8 @@ class TestWalkFocusedWindow:
 
     def test_returns_browser_url_for_browser_candidate(self):
         """Should extract browser URL for browser candidates."""
-        from openrecall.client.accessibility.macos import walk_focused_window
-        from openrecall.client.accessibility.types import TreeWalkerConfig
+        from myrecall.client.accessibility.macos import walk_focused_window
+        from myrecall.client.accessibility.types import TreeWalkerConfig
 
         mock_provider = MockAXProvider(
             focused_app=MockAXApp(name="Safari"),
@@ -857,8 +857,8 @@ class TestRaceConditionFix:
 
     def test_uses_expected_app_name_when_provided(self):
         """Should use expected_app_name to find app, avoiding race condition."""
-        from openrecall.client.accessibility.macos import walk_focused_window
-        from openrecall.client.accessibility.types import TreeWalkerConfig
+        from myrecall.client.accessibility.macos import walk_focused_window
+        from myrecall.client.accessibility.types import TreeWalkerConfig
 
         # Simulate: frontmost is "Code" but we want "Safari"
         safari_app = MockAXApp(name="Safari")
@@ -887,8 +887,8 @@ class TestRaceConditionFix:
 
     def test_falls_back_to_frontmost_when_app_not_found_by_name(self):
         """Should fall back to frontmost app when expected app not found."""
-        from openrecall.client.accessibility.macos import walk_focused_window
-        from openrecall.client.accessibility.types import TreeWalkerConfig
+        from myrecall.client.accessibility.macos import walk_focused_window
+        from myrecall.client.accessibility.types import TreeWalkerConfig
 
         mock_provider = MockAXProvider(
             focused_app=MockAXApp(name="Code"),
@@ -912,8 +912,8 @@ class TestRaceConditionFix:
 
     def test_without_expected_app_name_uses_frontmost(self):
         """Without expected_app_name, should use frontmost app (original behavior)."""
-        from openrecall.client.accessibility.macos import walk_focused_window
-        from openrecall.client.accessibility.types import TreeWalkerConfig
+        from myrecall.client.accessibility.macos import walk_focused_window
+        from myrecall.client.accessibility.types import TreeWalkerConfig
 
         mock_provider = MockAXProvider(
             focused_app=MockAXApp(name="Code"),
@@ -944,14 +944,14 @@ class TestPlatformSafety:
 
     def test_module_has_platform_check(self):
         """Module should have platform detection."""
-        from openrecall.client.accessibility import macos
+        from myrecall.client.accessibility import macos
 
         assert hasattr(macos, "IS_MACOS")
 
     def test_module_works_on_non_macos(self):
         """Module should not crash on non-macOS platforms."""
-        from openrecall.client.accessibility.macos import walk_focused_window
-        from openrecall.client.accessibility.types import TreeWalkerConfig
+        from myrecall.client.accessibility.macos import walk_focused_window
+        from myrecall.client.accessibility.types import TreeWalkerConfig
 
         # On non-macOS without ax_provider, should return None gracefully
         # This test runs on actual platform, just verify no crash

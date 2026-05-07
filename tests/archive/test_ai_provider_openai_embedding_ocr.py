@@ -3,13 +3,13 @@ from unittest.mock import Mock, patch
 
 
 def test_openai_embedding_provider_builds_embeddings_request():
-    from openrecall.server.ai.providers import OpenAIEmbeddingProvider
+    from myrecall.server.ai.providers import OpenAIEmbeddingProvider
 
     response = Mock()
     response.ok = True
     response.json.return_value = {"data": [{"embedding": [1.0, 0.0, 0.0]}]}
 
-    with patch("openrecall.server.ai.providers.requests.post", return_value=response) as post:
+    with patch("myrecall.server.ai.providers.requests.post", return_value=response) as post:
         provider = OpenAIEmbeddingProvider(
             api_key="test-key",
             model_name="text-embedding-3-large",
@@ -31,7 +31,7 @@ def test_openai_embedding_provider_builds_embeddings_request():
 
 
 def test_openai_ocr_provider_builds_chat_completions_request(tmp_path):
-    from openrecall.server.ai.providers import OpenAIOCRProvider
+    from myrecall.server.ai.providers import OpenAIOCRProvider
 
     image_path = tmp_path / "test.png"
     image_path.write_bytes(b"fakepngbytes")
@@ -40,7 +40,7 @@ def test_openai_ocr_provider_builds_chat_completions_request(tmp_path):
     response.ok = True
     response.json.return_value = {"choices": [{"message": {"content": "OCR"}}]}
 
-    with patch("openrecall.server.ai.providers.requests.post", return_value=response) as post:
+    with patch("myrecall.server.ai.providers.requests.post", return_value=response) as post:
         provider = OpenAIOCRProvider(
             api_key="test-key",
             model_name="gpt-4o",

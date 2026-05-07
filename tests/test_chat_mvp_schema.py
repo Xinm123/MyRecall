@@ -77,7 +77,7 @@ def sqlite_conn():
     conn = sqlite3.connect(":memory:")
 
     # Find and apply migrations
-    migrations_dir = Path(__file__).parent.parent / "openrecall" / "server" / "database" / "migrations"
+    migrations_dir = Path(__file__).parent.parent / "myrecall" / "server" / "database" / "migrations"
     migration_files = sorted(migrations_dir.glob("*.sql"))
 
     for mf in migration_files:

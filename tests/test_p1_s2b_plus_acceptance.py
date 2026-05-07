@@ -5,15 +5,15 @@ import logging
 import numpy as np
 import pytest
 
-from openrecall.client.events.base import (
+from myrecall.client.events.base import (
     CaptureTrigger,
     MonitorDescriptor,
     RoutedCaptureTask,
     TriggerEvent,
 )
-from openrecall.client.hash_utils import SimhashCache, is_similar
-from openrecall.client.recorder import ScreenRecorder
-from openrecall.shared.config import settings
+from myrecall.client.hash_utils import SimhashCache, is_similar
+from myrecall.client.recorder import ScreenRecorder
+from myrecall.shared.config import settings
 
 
 def _run_two_frame_capture(

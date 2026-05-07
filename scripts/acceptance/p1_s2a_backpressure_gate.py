@@ -14,14 +14,14 @@ import numpy as np
 import requests
 from numpy.typing import NDArray
 
-from openrecall.client.events.base import (
+from myrecall.client.events.base import (
     CaptureTrigger,
     MonitorDescriptor,
     TriggerEvent,
     utc_now_iso,
 )
-from openrecall.client.recorder import ScreenRecorder
-from openrecall.client.spool import SpoolQueue
+from myrecall.client.recorder import ScreenRecorder
+from myrecall.client.spool import SpoolQueue
 
 
 def utc_now_seconds() -> str:

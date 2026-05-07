@@ -12,7 +12,7 @@ from pathlib import Path
 import pytest
 import requests
 
-from openrecall.server.database.frames_store import FramesStore
+from myrecall.server.database.frames_store import FramesStore
 
 BASE_URL = "http://localhost:8083"
 API_V1 = f"{BASE_URL}/v1"

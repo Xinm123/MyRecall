@@ -1,7 +1,7 @@
 """Unit tests for AtomicInt."""
 import threading
 import pytest
-from openrecall.client.events.atomic import AtomicInt
+from myrecall.client.events.atomic import AtomicInt
 
 
 def test_atomic_int_basic_get_set():
@@ -46,7 +46,7 @@ def test_atomic_int_cross_thread():
 
 
 def test_trigger_debouncer_hot_reload():
-    from openrecall.client.events.base import TriggerDebouncer
+    from myrecall.client.events.base import TriggerDebouncer
 
     d = TriggerDebouncer(1000)  # 1000ms
     now = 10000
@@ -63,7 +63,7 @@ def test_trigger_debouncer_hot_reload():
 
 
 def test_lockfree_debouncer_hot_reload():
-    from openrecall.client.events.base import LockFreeDebouncer
+    from myrecall.client.events.base import LockFreeDebouncer
 
     d = LockFreeDebouncer(1000)
     now = 10000

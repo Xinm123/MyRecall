@@ -15,8 +15,8 @@ from pathlib import Path
 
 import pytest
 
-from openrecall.server.database.frames_store import FramesStore
-from openrecall.server.database.migrations_runner import run_migrations
+from myrecall.server.database.frames_store import FramesStore
+from myrecall.server.database.migrations_runner import run_migrations
 
 
 def generate_uuid7() -> str:
@@ -49,7 +49,7 @@ def temp_db(tmp_path: Path) -> Path:
     db_path = tmp_path / "test_edge.db"
     conn = sqlite3.connect(str(db_path))
     migrations_dir = Path(__file__).resolve().parent.parent / (
-        "openrecall/server/database/migrations"
+        "myrecall/server/database/migrations"
     )
     run_migrations(conn, migrations_dir)
     conn.close()
@@ -466,29 +466,29 @@ class TestHttpAccessibilityIngest:
         server_dir = tmp_path / "server"
         server_dir.mkdir(parents=True, exist_ok=True)
 
-        monkeypatch.setenv("OPENRECALL_SERVER_DATA_DIR", str(server_dir))
-        monkeypatch.setenv("OPENRECALL_DATA_DIR", str(server_dir))
+        monkeypatch.setenv("MYRECALL_SERVER_DATA_DIR", str(server_dir))
+        monkeypatch.setenv("MYRECALL_DATA_DIR", str(server_dir))
 
-        import openrecall.shared.config
-        importlib.reload(openrecall.shared.config)
+        import myrecall.shared.config
+        importlib.reload(myrecall.shared.config)
 
         # Apply migrations to the temp database before starting the app
-        from openrecall.server.database.migrations_runner import run_migrations
+        from myrecall.server.database.migrations_runner import run_migrations
         db_path = server_dir / "db"
         db_path.mkdir(parents=True, exist_ok=True)
         conn = sqlite3.connect(str(db_path / "edge.db"))
         migrations_dir = Path(__file__).resolve().parent.parent / (
-            "openrecall/server/database/migrations"
+            "myrecall/server/database/migrations"
         )
         run_migrations(conn, migrations_dir)
         conn.close()
 
         # Pre-create the store with the temp DB and inject it into the module
-        import openrecall.server.api_v1 as api_module
-        from openrecall.server.database.frames_store import FramesStore
+        import myrecall.server.api_v1 as api_module
+        from myrecall.server.database.frames_store import FramesStore
         api_module._frames_store = FramesStore(db_path=db_path / "edge.db")
 
-        from openrecall.server.api_v1 import v1_bp
+        from myrecall.server.api_v1 import v1_bp
 
         from flask import Flask
         app = Flask(__name__)

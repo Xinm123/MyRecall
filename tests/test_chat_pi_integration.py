@@ -15,12 +15,12 @@ from pathlib import Path
 
 import pytest
 
-from openrecall.client.chat.config_manager import (
+from myrecall.client.chat.config_manager import (
     get_api_key,
     get_default_model,
     get_default_provider,
 )
-from openrecall.client.chat.pi_manager import (
+from myrecall.client.chat.pi_manager import (
     PiInstallError,  # noqa: F401
     ensure_installed,
     find_bun_executable,

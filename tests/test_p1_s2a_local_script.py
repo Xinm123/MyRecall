@@ -6,7 +6,7 @@ import subprocess
 
 import pytest
 
-from openrecall.server import __main__ as server_main
+from myrecall.server import __main__ as server_main
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -78,7 +78,7 @@ def test_p1_s2a_local_script_writes_static_evidence_bundle(tmp_path: Path) -> No
     _seed_local_script_db(data_dir)
 
     env = {
-        "OPENRECALL_SERVER_DATA_DIR": str(data_dir),
+        "MYRECALL_SERVER_DATA_DIR": str(data_dir),
     }
     result = subprocess.run(
         [

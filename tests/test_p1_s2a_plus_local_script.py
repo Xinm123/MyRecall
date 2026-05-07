@@ -57,8 +57,8 @@ def test_p1_s2a_plus_local_script_writes_static_evidence_bundle(
         cwd=REPO_ROOT,
         env={
             **os.environ,
-            "OPENRECALL_PERMISSION_POLL_INTERVAL_SEC": "10",
-            "OPENRECALL_MIN_CAPTURE_INTERVAL_MS": "1000",
+            "MYRECALL_PERMISSION_POLL_INTERVAL_SEC": "10",
+            "MYRECALL_MIN_CAPTURE_INTERVAL_MS": "1000",
         },
     )
 
@@ -81,7 +81,7 @@ def test_p1_s2a_plus_local_script_writes_static_evidence_bundle(
     assert context["git_rev"]
     assert context["execution_window"]["run_ts"]
     assert context["execution_window"]["sample_seconds"] == 2
-    assert context["permission_env"]["OPENRECALL_PERMISSION_POLL_INTERVAL_SEC"] == "10"
+    assert context["permission_env"]["MYRECALL_PERMISSION_POLL_INTERVAL_SEC"] == "10"
 
     health = json.loads(health_path.read_text())
     assert health["run_ts"]

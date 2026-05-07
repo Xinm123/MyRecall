@@ -26,8 +26,8 @@ class TestLocalBuffer:
     @pytest.fixture
     def buffer(self, buffer_dir):
         """Create a LocalBuffer instance."""
-        with patch.dict("os.environ", {"OPENRECALL_DATA_DIR": str(buffer_dir.parent)}):
-            from openrecall.client.buffer import LocalBuffer
+        with patch.dict("os.environ", {"MYRECALL_DATA_DIR": str(buffer_dir.parent)}):
+            from myrecall.client.buffer import LocalBuffer
             return LocalBuffer(storage_dir=buffer_dir)
 
     @pytest.fixture
@@ -150,9 +150,9 @@ class TestUploaderConsumer:
 
     def test_consumer_stops_on_signal(self, buffer_dir, mock_uploader):
         """Test that consumer stops when stop() is called."""
-        with patch.dict("os.environ", {"OPENRECALL_DATA_DIR": str(buffer_dir.parent)}):
-            from openrecall.client.buffer import LocalBuffer
-            from openrecall.client.consumer import UploaderConsumer
+        with patch.dict("os.environ", {"MYRECALL_DATA_DIR": str(buffer_dir.parent)}):
+            from myrecall.client.buffer import LocalBuffer
+            from myrecall.client.consumer import UploaderConsumer
             
             buffer = LocalBuffer(storage_dir=buffer_dir)
             consumer = UploaderConsumer(buffer=buffer, uploader=mock_uploader)
@@ -167,9 +167,9 @@ class TestUploaderConsumer:
 
     def test_consumer_uploads_and_commits(self, buffer_dir, mock_uploader):
         """Test that consumer uploads items and deletes them."""
-        with patch.dict("os.environ", {"OPENRECALL_DATA_DIR": str(buffer_dir.parent)}):
-            from openrecall.client.buffer import LocalBuffer
-            from openrecall.client.consumer import UploaderConsumer
+        with patch.dict("os.environ", {"MYRECALL_DATA_DIR": str(buffer_dir.parent)}):
+            from myrecall.client.buffer import LocalBuffer
+            from myrecall.client.consumer import UploaderConsumer
             
             buffer = LocalBuffer(storage_dir=buffer_dir)
             
@@ -195,9 +195,9 @@ class TestUploaderConsumer:
 
     def test_consumer_retries_on_failure(self, buffer_dir):
         """Test item preserved on failure (not deleted)."""
-        with patch.dict("os.environ", {"OPENRECALL_DATA_DIR": str(buffer_dir.parent)}):
-            from openrecall.client.buffer import LocalBuffer
-            from openrecall.client.consumer import UploaderConsumer
+        with patch.dict("os.environ", {"MYRECALL_DATA_DIR": str(buffer_dir.parent)}):
+            from myrecall.client.buffer import LocalBuffer
+            from myrecall.client.consumer import UploaderConsumer
             
             mock_uploader = MagicMock()
             mock_uploader.upload_screenshot.return_value = False  # Always fail
@@ -221,9 +221,9 @@ class TestUploaderConsumer:
 
     def test_consumer_interruptible_backoff(self, buffer_dir):
         """Test that consumer can be stopped during backoff."""
-        with patch.dict("os.environ", {"OPENRECALL_DATA_DIR": str(buffer_dir.parent)}):
-            from openrecall.client.buffer import LocalBuffer
-            from openrecall.client.consumer import UploaderConsumer
+        with patch.dict("os.environ", {"MYRECALL_DATA_DIR": str(buffer_dir.parent)}):
+            from myrecall.client.buffer import LocalBuffer
+            from myrecall.client.consumer import UploaderConsumer
             
             mock_uploader = MagicMock()
             mock_uploader.upload_screenshot.return_value = False  # Trigger backoff
@@ -256,8 +256,8 @@ class TestProducerConsumerIntegration:
         """Test that buffer files survive process restart."""
         buffer_dir = tmp_path / "buffer"
         
-        with patch.dict("os.environ", {"OPENRECALL_DATA_DIR": str(tmp_path)}):
-            from openrecall.client.buffer import LocalBuffer
+        with patch.dict("os.environ", {"MYRECALL_DATA_DIR": str(tmp_path)}):
+            from myrecall.client.buffer import LocalBuffer
             
             # First "process": create buffer and add items
             buffer1 = LocalBuffer(storage_dir=buffer_dir)
@@ -278,9 +278,9 @@ class TestProducerConsumerIntegration:
         """Test that items remain in buffer when upload fails."""
         buffer_dir = tmp_path / "buffer"
         
-        with patch.dict("os.environ", {"OPENRECALL_DATA_DIR": str(tmp_path)}):
-            from openrecall.client.buffer import LocalBuffer
-            from openrecall.client.consumer import UploaderConsumer
+        with patch.dict("os.environ", {"MYRECALL_DATA_DIR": str(tmp_path)}):
+            from myrecall.client.buffer import LocalBuffer
+            from myrecall.client.consumer import UploaderConsumer
             
             mock_uploader = MagicMock()
             mock_uploader.upload_screenshot.return_value = False
@@ -310,10 +310,10 @@ class TestScreenRecorder:
 
     def test_recorder_stop_graceful(self, tmp_path):
         """Test that recorder stops gracefully."""
-        with patch.dict("os.environ", {"OPENRECALL_DATA_DIR": str(tmp_path)}):
-            from openrecall.client.buffer import LocalBuffer
-            from openrecall.client.consumer import UploaderConsumer
-            from openrecall.client.recorder import ScreenRecorder
+        with patch.dict("os.environ", {"MYRECALL_DATA_DIR": str(tmp_path)}):
+            from myrecall.client.buffer import LocalBuffer
+            from myrecall.client.consumer import UploaderConsumer
+            from myrecall.client.recorder import ScreenRecorder
             
             mock_uploader = MagicMock()
             mock_uploader.upload_screenshot.return_value = True

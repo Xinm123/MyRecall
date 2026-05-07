@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from openrecall.server.database.frames_store import FramesStore
+from myrecall.server.database.frames_store import FramesStore
 
 
 @pytest.fixture
@@ -22,6 +22,7 @@ def temp_db():
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     capture_id TEXT UNIQUE NOT NULL,
                     timestamp TEXT NOT NULL,
+                    local_timestamp TEXT,
                     app_name TEXT,
                     window_name TEXT,
                     browser_url TEXT,

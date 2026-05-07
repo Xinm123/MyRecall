@@ -7,7 +7,7 @@ import time
 import json
 
 import pytest
-from openrecall.server.config_runtime import RuntimeSettings, runtime_settings
+from myrecall.server.config_runtime import RuntimeSettings, runtime_settings
 
 
 class TestRuntimeSettings:
@@ -246,7 +246,7 @@ class TestRuntimeConfigAPI:
 def app():
     """Create and configure test app."""
     try:
-        from openrecall.server.app import app as flask_app
+        from myrecall.server.app import app as flask_app
     except ImportError:
         # If import fails, skip the integration tests
         pytest.skip("Could not import Flask app")

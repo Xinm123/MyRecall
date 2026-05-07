@@ -14,13 +14,13 @@ This plan outlines the implementation steps for Phase 1, establishing Pi integra
 
 ### Task 1.1: Pi Manager Module
 
-**File**: `openrecall/client/chat/pi_manager.py`
+**File**: `myrecall/client/chat/pi_manager.py`
 
 **Estimated effort**: Medium
 
 **Steps**:
 
-1. Create `openrecall/client/chat/` directory structure
+1. Create `myrecall/client/chat/` directory structure
 2. Implement `find_bun_executable()`
    - Check bundled bun (next to executable)
    - Check common paths: `~/.bun/bin/bun`, `/opt/homebrew/bin/bun`, `/usr/local/bin/bun`
@@ -41,20 +41,20 @@ This plan outlines the implementation steps for Phase 1, establishing Pi integra
    - Call `ensure_skill_installed()` to copy skill to Pi skills directory
 6. Implement `ensure_skill_installed()`
    - Create `~/.pi/agent/skills/` directory if needed
-   - Copy skill file from `openrecall/client/chat/skills/myrecall-search/SKILL.md`
+   - Copy skill file from `myrecall/client/chat/skills/myrecall-search/SKILL.md`
      to `~/.pi/agent/skills/myrecall-search/SKILL.md`
    - Always overwrite to pick up changes
 7. Add logging and error handling
 8. Write unit tests
 
 **Deliverables**:
-- `openrecall/client/chat/__init__.py`
-- `openrecall/client/chat/pi_manager.py`
+- `myrecall/client/chat/__init__.py`
+- `myrecall/client/chat/pi_manager.py`
 - `tests/test_chat_pi_manager.py`
 
 **Validation**:
 ```bash
-python -c "from openrecall.client.chat.pi_manager import ensure_installed; ensure_installed()"
+python -c "from myrecall.client.chat.pi_manager import ensure_installed; ensure_installed()"
 # Verify: ls ~/.myrecall/pi-agent/node_modules/@mariozechner/pi-coding-agent/
 # Verify skill: cat ~/.pi/agent/skills/myrecall-search/SKILL.md
 ```
@@ -63,7 +63,7 @@ python -c "from openrecall.client.chat.pi_manager import ensure_installed; ensur
 
 ### Task 1.2: Config Manager Module
 
-**File**: `openrecall/client/chat/config_manager.py`
+**File**: `myrecall/client/chat/config_manager.py`
 
 **Estimated effort**: Small (read-only in Phase 1)
 
@@ -91,17 +91,17 @@ python -c "from openrecall.client.chat.pi_manager import ensure_installed; ensur
 | `openai` | `OPENAI_API_KEY` | Future expansion |
 
 **Deliverables**:
-- `openrecall/client/chat/config_manager.py`
+- `myrecall/client/chat/config_manager.py`
 - `tests/test_chat_config_manager.py`
 
 **Validation**:
 ```bash
 export MINIMAX_CN_API_KEY=sk-test
-python -c "from openrecall.client.chat.config_manager import get_api_key; print(get_api_key('minimax-cn'))"
+python -c "from myrecall.client.chat.config_manager import get_api_key; print(get_api_key('minimax-cn'))"
 # Output: sk-test
 
 # Also verify auth.json fallback:
-python -c "from openrecall.client.chat.config_manager import get_api_key; print(get_api_key('minimax-cn'))"
+python -c "from myrecall.client.chat.config_manager import get_api_key; print(get_api_key('minimax-cn'))"
 # Reads from ~/.pi/agent/auth.json if env var not set
 ```
 
@@ -109,7 +109,7 @@ python -c "from openrecall.client.chat.config_manager import get_api_key; print(
 
 ### Task 1.3: Model Definitions
 
-**File**: `openrecall/client/chat/models.py`
+**File**: `myrecall/client/chat/models.py`
 
 **Estimated effort**: Small
 
@@ -117,7 +117,7 @@ python -c "from openrecall.client.chat.config_manager import get_api_key; print(
 
 **Steps**:
 
-1. Create `openrecall/client/chat/models.py` with:
+1. Create `myrecall/client/chat/models.py` with:
 
    ```python
    DEFAULT_PROVIDER = "minimax-cn"
@@ -130,11 +130,11 @@ python -c "from openrecall.client.chat.config_manager import get_api_key; print(
    - No `MYRECALL_MODELS` dictionary is defined here
 
 **Deliverables**:
-- `openrecall/client/chat/models.py`
+- `myrecall/client/chat/models.py`
 
 **Validation**:
 ```bash
-python -c "from openrecall.client.chat.models import DEFAULT_PROVIDER, DEFAULT_MODEL; print(DEFAULT_PROVIDER, DEFAULT_MODEL)"
+python -c "from myrecall.client.chat.models import DEFAULT_PROVIDER, DEFAULT_MODEL; print(DEFAULT_PROVIDER, DEFAULT_MODEL)"
 # Output: minimax-cn MiniMax-M2.7
 ```
 
@@ -142,15 +142,15 @@ python -c "from openrecall.client.chat.models import DEFAULT_PROVIDER, DEFAULT_M
 
 ### Task 1.4: myrecall-search Skill
 
-**File**: `openrecall/client/chat/skills/myrecall-search/SKILL.md`
+**File**: `myrecall/client/chat/skills/myrecall-search/SKILL.md`
 
 **Estimated effort**: Medium
 
-**Status**: ✅ **Completed** — skill file already exists at `openrecall/client/chat/skills/myrecall-search/SKILL.md`
+**Status**: ✅ **Completed** — skill file already exists at `myrecall/client/chat/skills/myrecall-search/SKILL.md`
 
 **Steps** (already completed):
 
-1. ✅ Created skill directory structure: `openrecall/client/chat/skills/myrecall-search/`
+1. ✅ Created skill directory structure: `myrecall/client/chat/skills/myrecall-search/`
 2. ✅ Written SKILL.md with:
    - YAML frontmatter (`name: myrecall-search`, `description`)
    - Context window protection rules
@@ -161,7 +161,7 @@ python -c "from openrecall.client.chat.models import DEFAULT_PROVIDER, DEFAULT_M
 4. ✅ `pi_manager.ensure_skill_installed()` copies skill to `~/.pi/agent/skills/`
 
 **Deliverables**:
-- `openrecall/client/chat/skills/myrecall-search/SKILL.md` ✅
+- `myrecall/client/chat/skills/myrecall-search/SKILL.md` ✅
 
 ---
 
@@ -238,7 +238,7 @@ Task 1.3 (Model Defs) ───┘
 ## File Checklist
 
 ```
-openrecall/client/chat/
+myrecall/client/chat/
 ├── __init__.py              [✅] Created
 ├── pi_manager.py            [✅] Implemented
 ├── config_manager.py        [✅] Implemented

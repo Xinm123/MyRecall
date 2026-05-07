@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from openrecall.server.embedding.service import EmbeddingService
+from myrecall.server.embedding.service import EmbeddingService
 
 
 class TestEmbeddingService:
@@ -36,7 +36,7 @@ class TestEmbeddingService:
         """)
         conn.commit()
 
-        from openrecall.server.database.frames_store import FramesStore
+        from myrecall.server.database.frames_store import FramesStore
         store = FramesStore.__new__(FramesStore)
         store._db_path = str(db_path)
 
@@ -83,7 +83,7 @@ class TestEmbeddingService:
         """)
         conn.commit()
 
-        from openrecall.server.database.frames_store import FramesStore
+        from myrecall.server.database.frames_store import FramesStore
         store = FramesStore.__new__(FramesStore)
         store._db_path = str(db_path)
 

@@ -19,7 +19,7 @@ This plan outlines the implementation steps for Phase 2, building the Chat Servi
 
 ### Task 2.1: Types and Data Models
 
-**File**: `openrecall/client/chat/types.py`
+**File**: `myrecall/client/chat/types.py`
 
 **Estimated effort**: Small
 
@@ -60,12 +60,12 @@ This plan outlines the implementation steps for Phase 2, building the Chat Servi
 6. Add JSON serialization helpers (to_dict, from_dict)
 
 **Deliverables**:
-- `openrecall/client/chat/types.py`
+- `myrecall/client/chat/types.py`
 
 **Validation**:
 ```bash
 python -c "
-from openrecall.client.chat.types import Conversation, Message
+from myrecall.client.chat.types import Conversation, Message
 c = Conversation(id='test', title='Test', messages=[], created_at=None, updated_at=None)
 print(c.to_dict())
 "
@@ -75,14 +75,14 @@ print(c.to_dict())
 
 ### Task 2.2: Conversation Manager
 
-**File**: `openrecall/client/chat/conversation.py`
+**File**: `myrecall/client/chat/conversation.py`
 
 **Estimated effort**: Medium
 
 **Steps**:
 
 1. Define storage path: `~/MRC/chats/`
-   - Use `OPENRECALL_CLIENT_DATA_DIR` if set, else `~/MRC`
+   - Use `MYRECALL_CLIENT_DATA_DIR` if set, else `~/MRC`
 
 2. Implement `ensure_chats_dir() -> Path`
    - Create `chats/` directory if not exists
@@ -121,13 +121,13 @@ print(c.to_dict())
 9. Write unit tests
 
 **Deliverables**:
-- `openrecall/client/chat/conversation.py`
+- `myrecall/client/chat/conversation.py`
 - `tests/test_chat_conversation.py`
 
 **Validation**:
 ```bash
 python -c "
-from openrecall.client.chat.conversation import create_conversation, list_conversations
+from myrecall.client.chat.conversation import create_conversation, list_conversations
 c = create_conversation()
 print(f'Created: {c.id}')
 print(f'List: {len(list_conversations())} conversations')
@@ -138,7 +138,7 @@ print(f'List: {len(list_conversations())} conversations')
 
 ### Task 2.3: Pi RPC Manager
 
-**File**: `openrecall/client/chat/pi_rpc.py`
+**File**: `myrecall/client/chat/pi_rpc.py`
 
 **Estimated effort**: Large
 
@@ -208,7 +208,7 @@ print(f'List: {len(list_conversations())} conversations')
 11. Write unit tests (mocked subprocess)
 
 **Deliverables**:
-- `openrecall/client/chat/pi_rpc.py`
+- `myrecall/client/chat/pi_rpc.py`
 - `tests/test_chat_pi_rpc.py`
 
 **Validation**:
@@ -218,7 +218,7 @@ export MINIMAX_CN_API_KEY=your_key
 
 python -c "
 import asyncio
-from openrecall.client.chat.pi_rpc import PiRpcManager
+from myrecall.client.chat.pi_rpc import PiRpcManager
 from pathlib import Path
 
 events = []
@@ -235,7 +235,7 @@ mgr.stop()
 
 ### Task 2.4: Chat Service
 
-**File**: `openrecall/client/chat/service.py`
+**File**: `myrecall/client/chat/service.py`
 
 **Estimated effort**: Large
 
@@ -286,7 +286,7 @@ mgr.stop()
 9. Write unit tests
 
 **Deliverables**:
-- `openrecall/client/chat/service.py`
+- `myrecall/client/chat/service.py`
 - `tests/test_chat_service.py`
 
 **Validation**:
@@ -299,7 +299,7 @@ pytest tests/test_chat_service.py -v -k "test_stream"
 
 ### Task 2.5: SSE Routes
 
-**File**: `openrecall/client/chat/routes.py`
+**File**: `myrecall/client/chat/routes.py`
 
 **Estimated effort**: Medium
 
@@ -341,13 +341,13 @@ pytest tests/test_chat_service.py -v -k "test_stream"
 8. Implement `GET /api/pi-status`
    - Return Pi process status
 
-9. Register blueprint with Flask app in `openrecall/client/web/app.py`
+9. Register blueprint with Flask app in `myrecall/client/web/app.py`
 
 10. Write integration tests
 
 **Deliverables**:
-- `openrecall/client/chat/routes.py`
-- Update `openrecall/client/web/app.py`
+- `myrecall/client/chat/routes.py`
+- Update `myrecall/client/web/app.py`
 - `tests/test_chat_routes.py`
 
 **Validation**:
@@ -467,7 +467,7 @@ Task 2.3 (Pi RPC) ◄── depends ─────────┤
 ## File Checklist
 
 ```
-openrecall/client/chat/
+myrecall/client/chat/
 ├── __init__.py              [✅] Exists (Phase 1)
 ├── pi_manager.py            [✅] Exists (Phase 1)
 ├── config_manager.py        [✅] Exists (Phase 1)
@@ -481,7 +481,7 @@ openrecall/client/chat/
     └── myrecall-search/
         └── SKILL.md         [✅] Exists (Phase 1)
 
-openrecall/client/web/
+myrecall/client/web/
 └── app.py                   [ ] Update to register chat blueprint
 
 tests/

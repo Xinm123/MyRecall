@@ -17,7 +17,7 @@ from datetime import datetime, timezone
 
 import pytest
 
-from openrecall.server.search.engine import SearchEngine, _sanitize_fts_value
+from myrecall.server.search.engine import SearchEngine, _sanitize_fts_value
 
 
 class TestSanitizeFtsValue:
@@ -72,24 +72,30 @@ def temp_db():
 
         # Run initial schema
         init_sql = Path(
-            "openrecall/server/database/migrations/20260227000001_initial_schema.sql"
+            "myrecall/server/database/migrations/20260227000001_initial_schema.sql"
         ).read_text()
         conn.executescript(init_sql)
 
-        # Run embedding migration (adds embedding_status column)
-        embedding_sql = Path(
-            "openrecall/server/database/migrations/20260409120000_add_frame_embedding.sql"
-        ).read_text()
-        conn.executescript(embedding_sql)
-
-        # Run FTS unification migration
-        migration_sql = Path(
-            "openrecall/server/database/migrations/20260325120000_consolidate_fts_to_full_text.sql"
-        ).read_text()
-        conn.executescript(migration_sql)
+        # Run all remaining migrations in order
+        for mig in [
+            "20260310121000_add_event_ts_to_frames.sql",
+            "20260315140000_add_last_known_context_to_frames.sql",
+            "20260317000001_ocr_text_unique_frame_id.sql",
+            "20260321120000_dual_hash_storage.sql",
+            "20260324120000_add_frame_description.sql",
+            "20260325120000_consolidate_fts_to_full_text.sql",
+            "20260408120000_description_fields_redesign.sql",
+            "20260409120000_add_frame_embedding.sql",
+            "20260414000000_add_visibility_status.sql",
+            "20260426000000_add_local_timestamp.sql",
+        ]:
+            mig_sql = Path(f"myrecall/server/database/migrations/{mig}").read_text()
+            conn.executescript(mig_sql)
 
         # Insert test frames with full_text populated (post-migration schema)
         # These mirror the test data from the old fixture, but use full_text
+        # timestamp is UTC (with Z), local_timestamp is local time (UTC+8, no Z)
+        from myrecall.server.database.frames_store import _utc_to_local_timestamp
         test_frames = [
             (1, "capture-001", "2026-03-18T10:00:00Z", "Safari", "Web Browser", None, True, "Hello world from Safari", "ocr"),
             (2, "capture-002", "2026-03-18T11:00:00Z", "VSCode", "main.py", None, True, "def hello(): pass # code here", "ocr"),
@@ -99,10 +105,11 @@ def temp_db():
         ]
 
         for frame_id, capture_id, ts, app, window, url, focused, full_text, text_source in test_frames:
+            local_ts = _utc_to_local_timestamp(ts)
             conn.execute(
-                """INSERT INTO frames (id, capture_id, timestamp, app_name, window_name, browser_url, focused, status, text_source, full_text)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, 'completed', ?, ?)""",
-                (frame_id, capture_id, ts, app, window, url, focused, text_source, full_text),
+                """INSERT INTO frames (id, capture_id, timestamp, local_timestamp, app_name, window_name, browser_url, focused, status, text_source, full_text, visibility_status)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'completed', ?, ?, 'queryable')""",
+                (frame_id, capture_id, ts, local_ts, app, window, url, focused, text_source, full_text),
             )
 
         conn.commit()
@@ -232,11 +239,11 @@ class TestSearchEngineFiltering:
             q="",
             limit=20,
             offset=0,
-            start_time="2026-03-18T11:00:00Z",
-            end_time="2026-03-18T12:30:00Z",
+            start_time="2026-03-18T19:00:00.000",
+            end_time="2026-03-18T20:30:00.000",
         )
 
-        # Should match VSCode (11:00) and Terminal (12:00)
+        # Should match VSCode (UTC 11:00 -> local 19:00) and Terminal (UTC 12:00 -> local 20:00)
         assert total == 2
 
     def test_text_length_filter(self, temp_db):
@@ -381,34 +388,42 @@ class TestUnifiedFtsSearch:
 
         # Run initial schema
         init_sql = Path(
-            "openrecall/server/database/migrations/20260227000001_initial_schema.sql"
+            "myrecall/server/database/migrations/20260227000001_initial_schema.sql"
         ).read_text()
         conn.executescript(init_sql)
 
-        # Run embedding migration (adds embedding_status column)
-        embedding_sql = Path(
-            "openrecall/server/database/migrations/20260409120000_add_frame_embedding.sql"
-        ).read_text()
-        conn.executescript(embedding_sql)
-
-        # Run FTS unification migration
-        migration_sql = Path(
-            "openrecall/server/database/migrations/20260325120000_consolidate_fts_to_full_text.sql"
-        ).read_text()
-        conn.executescript(migration_sql)
+        # Run all remaining migrations in order
+        for mig in [
+            "20260310121000_add_event_ts_to_frames.sql",
+            "20260315140000_add_last_known_context_to_frames.sql",
+            "20260317000001_ocr_text_unique_frame_id.sql",
+            "20260321120000_dual_hash_storage.sql",
+            "20260324120000_add_frame_description.sql",
+            "20260325120000_consolidate_fts_to_full_text.sql",
+            "20260408120000_description_fields_redesign.sql",
+            "20260409120000_add_frame_embedding.sql",
+            "20260414000000_add_visibility_status.sql",
+            "20260426000000_add_local_timestamp.sql",
+        ]:
+            mig_sql = Path(f"myrecall/server/database/migrations/{mig}").read_text()
+            conn.executescript(mig_sql)
 
         # Insert test frames with full_text
+        # timestamp is UTC (with Z), local_timestamp is local time (UTC+8, no Z)
+        from myrecall.server.database.frames_store import _utc_to_local_timestamp
         conn.execute(
             """
-            INSERT INTO frames (capture_id, timestamp, full_text, app_name, window_name, status, text_source)
-            VALUES ('ax-1', '2026-03-25T10:00:00Z', 'Email from alice@example.com about project', 'Mail', 'Inbox', 'completed', 'accessibility')
-            """
+            INSERT INTO frames (capture_id, timestamp, local_timestamp, full_text, app_name, window_name, status, text_source, visibility_status)
+            VALUES ('ax-1', '2026-03-25T10:00:00Z', ?, 'Email from alice@example.com about project', 'Mail', 'Inbox', 'completed', 'accessibility', 'queryable')
+            """,
+            (_utc_to_local_timestamp("2026-03-25T10:00:00Z"),)
         )
         conn.execute(
             """
-            INSERT INTO frames (capture_id, timestamp, full_text, app_name, window_name, status, text_source)
-            VALUES ('ocr-1', '2026-03-25T11:00:00Z', 'Meeting notes from yesterday standup', 'Notes', 'Meeting', 'completed', 'ocr')
-            """
+            INSERT INTO frames (capture_id, timestamp, local_timestamp, full_text, app_name, window_name, status, text_source, visibility_status)
+            VALUES ('ocr-1', '2026-03-25T11:00:00Z', ?, 'Meeting notes from yesterday standup', 'Notes', 'Meeting', 'completed', 'ocr', 'queryable')
+            """,
+            (_utc_to_local_timestamp("2026-03-25T11:00:00Z"),)
         )
         conn.commit()
         conn.close()
@@ -417,7 +432,7 @@ class TestUnifiedFtsSearch:
 
     def test_search_finds_text_in_full_text(self, unified_db):
         """Verify search finds text in full_text column."""
-        from openrecall.server.search.engine import SearchEngine
+        from myrecall.server.search.engine import SearchEngine
 
         engine = SearchEngine(db_path=unified_db)
         results, total = engine.search(q="alice")
@@ -427,7 +442,7 @@ class TestUnifiedFtsSearch:
 
     def test_search_with_metadata_filter(self, unified_db):
         """Verify search with app_name filter works."""
-        from openrecall.server.search.engine import SearchEngine
+        from myrecall.server.search.engine import SearchEngine
 
         engine = SearchEngine(db_path=unified_db)
         results, total = engine.search(q="project", app_name="Mail")
@@ -438,7 +453,7 @@ class TestUnifiedFtsSearch:
 
     def test_content_type_param_ignored(self, unified_db):
         """Verify content_type parameter is accepted but ignored."""
-        from openrecall.server.search.engine import SearchEngine
+        from myrecall.server.search.engine import SearchEngine
 
         engine = SearchEngine(db_path=unified_db)
 
@@ -454,7 +469,7 @@ class TestUnifiedFtsSearch:
 
     def test_count_by_type_returns_ocr_and_accessibility_keys(self, unified_db):
         """Verify count_by_type returns a dict with 'ocr' and 'accessibility' keys."""
-        from openrecall.server.search.engine import SearchEngine
+        from myrecall.server.search.engine import SearchEngine
 
         engine = SearchEngine(db_path=unified_db)
         result = engine.count_by_type(q="")
@@ -467,7 +482,7 @@ class TestUnifiedFtsSearch:
 
     def test_count_by_type_with_text_query(self, unified_db):
         """Verify count_by_type works with a text query."""
-        from openrecall.server.search.engine import SearchEngine
+        from myrecall.server.search.engine import SearchEngine
 
         engine = SearchEngine(db_path=unified_db)
         result = engine.count_by_type(q="alice")
@@ -479,7 +494,7 @@ class TestUnifiedFtsSearch:
 
     def test_count_by_type_with_app_name_filter(self, unified_db):
         """Verify count_by_type works with metadata filter."""
-        from openrecall.server.search.engine import SearchEngine
+        from myrecall.server.search.engine import SearchEngine
 
         engine = SearchEngine(db_path=unified_db)
         result = engine.count_by_type(q="", app_name="Mail")

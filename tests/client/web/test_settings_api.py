@@ -15,22 +15,22 @@ def client(tmp_path, monkeypatch):
         edge_base_url = "http://localhost:8083"
 
     # Initialize the shared config proxy before importing routes
-    import openrecall.shared.config
-    openrecall.shared.config.settings = MockSettings()
+    import myrecall.shared.config
+    myrecall.shared.config.settings = MockSettings()
 
     # Now import the settings module after setting up the proxy
-    from openrecall.client.web.routes import settings
+    from myrecall.client.web.routes import settings
     test_db_path = tmp_path / "test_client.db"
 
     # Create a new store with test path
-    from openrecall.client.database import ClientSettingsStore
+    from myrecall.client.database import ClientSettingsStore
     test_store = ClientSettingsStore(test_db_path)
 
     # Replace the module-level store
     settings._settings_store = test_store
 
     # Create app
-    from openrecall.client.web.app import client_app
+    from myrecall.client.web.app import client_app
     client_app.config['TESTING'] = True
 
     with client_app.test_client() as client:

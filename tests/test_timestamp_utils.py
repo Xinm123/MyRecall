@@ -1,4 +1,4 @@
-from openrecall.shared.utils import timestamp_to_human_readable
+from myrecall.shared.utils import timestamp_to_human_readable
 
 
 def test_timestamp_to_human_readable_accepts_iso8601() -> None:

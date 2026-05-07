@@ -15,7 +15,7 @@ from pathlib import Path
 import pytest
 
 
-SEARCH_TEMPLATE_PATH = Path(__file__).parent.parent / "openrecall" / "client" / "web" / "templates" / "search.html"
+SEARCH_TEMPLATE_PATH = Path(__file__).parent.parent / "myrecall" / "client" / "web" / "templates" / "search.html"
 
 
 @pytest.fixture

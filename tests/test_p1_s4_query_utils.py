@@ -13,7 +13,7 @@ Per tasks.md §1.2 and specs/fts-search/spec.md §Query normalization.
 
 import pytest
 
-from openrecall.server.search.query_utils import sanitize_fts5_query
+from myrecall.server.search.query_utils import sanitize_fts5_query
 
 
 class TestSanitizeFts5QueryBasic:

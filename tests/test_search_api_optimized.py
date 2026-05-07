@@ -14,7 +14,7 @@ from unittest.mock import patch, MagicMock
 import pytest
 from flask import Flask
 
-from openrecall.server.api_v1 import v1_bp
+from myrecall.server.api_v1 import v1_bp
 
 
 @pytest.fixture
@@ -62,7 +62,7 @@ class TestSearchAPIOptimized:
     def test_mode_defaults_to_hybrid(self, app_with_search_route, mock_hybrid_engine):
         """Test that mode parameter defaults to 'hybrid' instead of 'fts'."""
         with patch(
-            "openrecall.server.search.hybrid_engine.HybridSearchEngine",
+            "myrecall.server.search.hybrid_engine.HybridSearchEngine",
             return_value=mock_hybrid_engine,
         ):
             client = app_with_search_route.test_client()
@@ -77,7 +77,7 @@ class TestSearchAPIOptimized:
     def test_no_type_field_in_response(self, app_with_search_route, mock_hybrid_engine):
         """Test that response items do not contain 'type' field."""
         with patch(
-            "openrecall.server.search.hybrid_engine.HybridSearchEngine",
+            "myrecall.server.search.hybrid_engine.HybridSearchEngine",
             return_value=mock_hybrid_engine,
         ):
             client = app_with_search_route.test_client()
@@ -92,7 +92,7 @@ class TestSearchAPIOptimized:
     def test_no_tags_field_in_response(self, app_with_search_route, mock_hybrid_engine):
         """Test that response items do not contain 'tags' field."""
         with patch(
-            "openrecall.server.search.hybrid_engine.HybridSearchEngine",
+            "myrecall.server.search.hybrid_engine.HybridSearchEngine",
             return_value=mock_hybrid_engine,
         ):
             client = app_with_search_route.test_client()
@@ -106,7 +106,7 @@ class TestSearchAPIOptimized:
     def test_no_file_path_field_in_response(self, app_with_search_route, mock_hybrid_engine):
         """Test that response items do not contain 'file_path' field."""
         with patch(
-            "openrecall.server.search.hybrid_engine.HybridSearchEngine",
+            "myrecall.server.search.hybrid_engine.HybridSearchEngine",
             return_value=mock_hybrid_engine,
         ):
             client = app_with_search_route.test_client()
@@ -120,7 +120,7 @@ class TestSearchAPIOptimized:
     def test_no_content_wrapper(self, app_with_search_route, mock_hybrid_engine):
         """Test that response items are flat, not wrapped in 'content'."""
         with patch(
-            "openrecall.server.search.hybrid_engine.HybridSearchEngine",
+            "myrecall.server.search.hybrid_engine.HybridSearchEngine",
             return_value=mock_hybrid_engine,
         ):
             client = app_with_search_route.test_client()
@@ -138,7 +138,7 @@ class TestSearchAPIOptimized:
     def test_include_text_false_hides_text(self, app_with_search_route, mock_hybrid_engine):
         """Test that include_text=false (default) does not include text field."""
         with patch(
-            "openrecall.server.search.hybrid_engine.HybridSearchEngine",
+            "myrecall.server.search.hybrid_engine.HybridSearchEngine",
             return_value=mock_hybrid_engine,
         ):
             client = app_with_search_route.test_client()
@@ -153,7 +153,7 @@ class TestSearchAPIOptimized:
     def test_include_text_true_shows_text(self, app_with_search_route, mock_hybrid_engine):
         """Test that include_text=true includes text field."""
         with patch(
-            "openrecall.server.search.hybrid_engine.HybridSearchEngine",
+            "myrecall.server.search.hybrid_engine.HybridSearchEngine",
             return_value=mock_hybrid_engine,
         ):
             client = app_with_search_route.test_client()
@@ -190,7 +190,7 @@ class TestSearchAPIOptimized:
         )
 
         with patch(
-            "openrecall.server.search.hybrid_engine.HybridSearchEngine",
+            "myrecall.server.search.hybrid_engine.HybridSearchEngine",
             return_value=mock_engine,
         ):
             client = app_with_search_route.test_client()
@@ -213,7 +213,7 @@ class TestSearchAPIOptimized:
     def test_limit_no_max_restriction(self, app_with_search_route, mock_hybrid_engine):
         """Test that limit has no maximum restriction (was capped at 100)."""
         with patch(
-            "openrecall.server.search.hybrid_engine.HybridSearchEngine",
+            "myrecall.server.search.hybrid_engine.HybridSearchEngine",
             return_value=mock_hybrid_engine,
         ):
             client = app_with_search_route.test_client()
@@ -228,7 +228,7 @@ class TestSearchAPIOptimized:
     def test_no_min_length_parameter(self, app_with_search_route, mock_hybrid_engine):
         """Test that min_length parameter is not passed to engine (removed)."""
         with patch(
-            "openrecall.server.search.hybrid_engine.HybridSearchEngine",
+            "myrecall.server.search.hybrid_engine.HybridSearchEngine",
             return_value=mock_hybrid_engine,
         ):
             client = app_with_search_route.test_client()
@@ -242,7 +242,7 @@ class TestSearchAPIOptimized:
     def test_no_max_length_parameter(self, app_with_search_route, mock_hybrid_engine):
         """Test that max_length parameter is not passed to engine (removed)."""
         with patch(
-            "openrecall.server.search.hybrid_engine.HybridSearchEngine",
+            "myrecall.server.search.hybrid_engine.HybridSearchEngine",
             return_value=mock_hybrid_engine,
         ):
             client = app_with_search_route.test_client()
@@ -282,11 +282,11 @@ class TestSearchAPIOptimized:
         }
 
         with patch(
-            "openrecall.server.search.hybrid_engine.HybridSearchEngine",
+            "myrecall.server.search.hybrid_engine.HybridSearchEngine",
             return_value=mock_engine,
         ):
             with patch(
-                "openrecall.server.api_v1._get_frames_store",
+                "myrecall.server.api_v1._get_frames_store",
                 return_value=mock_store,
             ):
                 client = app_with_search_route.test_client()
@@ -301,7 +301,7 @@ class TestSearchAPIOptimized:
     def test_score_fields_copied_to_response(self, app_with_search_route, mock_hybrid_engine):
         """Test that all score fields from engine are copied to response."""
         with patch(
-            "openrecall.server.search.hybrid_engine.HybridSearchEngine",
+            "myrecall.server.search.hybrid_engine.HybridSearchEngine",
             return_value=mock_hybrid_engine,
         ):
             client = app_with_search_route.test_client()
@@ -342,7 +342,7 @@ class TestSearchAPIOptimized:
         )
 
         with patch(
-            "openrecall.server.api_v1._get_search_engine",
+            "myrecall.server.api_v1._get_search_engine",
             return_value=mock_fts_engine,
         ):
             client = app_with_search_route.test_client()
@@ -364,7 +364,7 @@ class TestSearchAPIIncludeTextVariants:
         )
 
         with patch(
-            "openrecall.server.search.hybrid_engine.HybridSearchEngine",
+            "myrecall.server.search.hybrid_engine.HybridSearchEngine",
             return_value=mock_engine,
         ):
             client = app_with_search_route.test_client()
@@ -383,7 +383,7 @@ class TestSearchAPIIncludeTextVariants:
         )
 
         with patch(
-            "openrecall.server.search.hybrid_engine.HybridSearchEngine",
+            "myrecall.server.search.hybrid_engine.HybridSearchEngine",
             return_value=mock_engine,
         ):
             client = app_with_search_route.test_client()
@@ -402,7 +402,7 @@ class TestSearchAPIIncludeTextVariants:
         )
 
         with patch(
-            "openrecall.server.search.hybrid_engine.HybridSearchEngine",
+            "myrecall.server.search.hybrid_engine.HybridSearchEngine",
             return_value=mock_engine,
         ):
             client = app_with_search_route.test_client()

@@ -13,9 +13,9 @@ Prerequisite:
 
 Options:
   --client-log PATH      Client log file path (default: /tmp/myrecall-client.log)
-  --edge-db PATH         Edge DB path (default: ${OPENRECALL_SERVER_DATA_DIR:-$HOME/MRS}/db/edge.db)
+  --edge-db PATH         Edge DB path (default: ${MYRECALL_SERVER_DATA_DIR:-$HOME/MRS}/db/edge.db)
   --heartbeat-sec N      Heartbeat threshold seconds (default: 10)
-  --idle-interval-sec N  Idle trigger interval seconds (default: OPENRECALL_IDLE_CAPTURE_INTERVAL_MS/1000 or 30)
+  --idle-interval-sec N  Idle trigger interval seconds (default: MYRECALL_IDLE_CAPTURE_INTERVAL_MS/1000 or 30)
   --padding-sec N        Extra observation seconds after threshold (default: 5)
   --evidence-dir DIR     Evidence output directory (default: docs/v3/acceptance/phase1/evidence)
   -h, --help             Show help
@@ -27,7 +27,7 @@ EOF
 }
 
 CLIENT_LOG="/tmp/myrecall-client.log"
-EDGE_DB="${OPENRECALL_SERVER_DATA_DIR:-$HOME/MRS}/db/edge.db"
+EDGE_DB="${MYRECALL_SERVER_DATA_DIR:-$HOME/MRS}/db/edge.db"
 HEARTBEAT_SEC=10
 IDLE_INTERVAL_SEC=""
 PADDING_SEC=5
@@ -74,8 +74,8 @@ done
 mkdir -p "$EVIDENCE_DIR"
 
 if [[ -z "$IDLE_INTERVAL_SEC" ]]; then
-  if [[ -n "${OPENRECALL_IDLE_CAPTURE_INTERVAL_MS:-}" ]]; then
-    IDLE_INTERVAL_SEC=$((OPENRECALL_IDLE_CAPTURE_INTERVAL_MS / 1000))
+  if [[ -n "${MYRECALL_IDLE_CAPTURE_INTERVAL_MS:-}" ]]; then
+    IDLE_INTERVAL_SEC=$((MYRECALL_IDLE_CAPTURE_INTERVAL_MS / 1000))
   else
     IDLE_INTERVAL_SEC=30
   fi

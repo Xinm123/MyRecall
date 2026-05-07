@@ -264,7 +264,7 @@ class TestLegacyRedirects:
 
         Each legacy API call must produce a log line with '[DEPRECATED]' prefix.
         """
-        log_path = "/tmp/openrecall_server.log"
+        log_path = "/tmp/myrecall_server.log"
 
         if not os.path.exists(log_path):
             pytest.skip(f"Log file not found: {log_path}")

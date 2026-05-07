@@ -13,7 +13,7 @@ class TestProcessingModeSwitch:
 
     def test_processing_mode_default_is_ocr(self):
         """Test that default processing_mode is 'ocr'."""
-        from openrecall.shared.config import Settings
+        from myrecall.shared.config import Settings
 
         # Create settings without env override
         settings = Settings()
@@ -22,38 +22,38 @@ class TestProcessingModeSwitch:
 
     def test_processing_mode_can_be_set_to_noop(self, monkeypatch):
         """Test that processing_mode can be explicitly set to 'noop'."""
-        monkeypatch.setenv("OPENRECALL_PROCESSING_MODE", "noop")
+        monkeypatch.setenv("MYRECALL_PROCESSING_MODE", "noop")
 
         # Need to reload to pick up new env var
         import importlib
-        import openrecall.shared.config
+        import myrecall.shared.config
 
-        importlib.reload(openrecall.shared.config)
+        importlib.reload(myrecall.shared.config)
 
-        assert openrecall.shared.config.settings.processing_mode == "noop"
+        assert myrecall.shared.config.settings.processing_mode == "noop"
 
     def test_processing_mode_can_be_set_to_ocr(self, monkeypatch):
         """Test that processing_mode can be explicitly set to 'ocr'."""
-        monkeypatch.setenv("OPENRECALL_PROCESSING_MODE", "ocr")
+        monkeypatch.setenv("MYRECALL_PROCESSING_MODE", "ocr")
 
         import importlib
-        import openrecall.shared.config
+        import myrecall.shared.config
 
-        importlib.reload(openrecall.shared.config)
+        importlib.reload(myrecall.shared.config)
 
-        assert openrecall.shared.config.settings.processing_mode == "ocr"
+        assert myrecall.shared.config.settings.processing_mode == "ocr"
 
     def test_processing_mode_lowercase_normalization(self, monkeypatch):
         """Test that processing_mode is normalized to lowercase."""
-        monkeypatch.setenv("OPENRECALL_PROCESSING_MODE", "OCR")
+        monkeypatch.setenv("MYRECALL_PROCESSING_MODE", "OCR")
 
         import importlib
-        import openrecall.shared.config
+        import myrecall.shared.config
 
-        importlib.reload(openrecall.shared.config)
+        importlib.reload(myrecall.shared.config)
 
         # The main() function lowercases the processing_mode
-        mode = openrecall.shared.config.settings.processing_mode.strip().lower()
+        mode = myrecall.shared.config.settings.processing_mode.strip().lower()
         assert mode == "ocr"
 
 
@@ -62,7 +62,7 @@ class TestProcessingModeFunctions:
 
     def test_start_noop_mode_creates_driver(self):
         """Test that _start_noop_mode creates NoopQueueDriver."""
-        from openrecall.server.__main__ import _start_noop_mode
+        from myrecall.server.__main__ import _start_noop_mode
 
         driver = _start_noop_mode()
 
@@ -78,14 +78,14 @@ class TestProcessingModeFunctions:
         """Test that _preload_ocr_model succeeds with auto-download mode."""
         # Use auto-download mode (no local models required)
         # This test validates the function runs without error, not that models load
-        monkeypatch.setenv("OPENRECALL_OCR_RAPID_USE_LOCAL", "false")
+        monkeypatch.setenv("MYRECALL_OCR_RAPID_USE_LOCAL", "false")
 
         # Force reload settings
         import importlib
-        import openrecall.shared.config
-        importlib.reload(openrecall.shared.config)
+        import myrecall.shared.config
+        importlib.reload(myrecall.shared.config)
 
-        from openrecall.server.__main__ import _preload_ocr_model
+        from myrecall.server.__main__ import _preload_ocr_model
 
         # Should not raise in auto-download mode
         # (May fail if network unavailable, but that's acceptable for this test)
@@ -102,10 +102,10 @@ class TestProcessingModeFunctions:
         No local model path configuration needed.
         """
         # Clear the singleton instance and reload rapid_backend module
-        from openrecall.server.ocr import rapid_backend
+        from myrecall.server.ocr import rapid_backend
         rapid_backend.RapidOCRBackend._instance = None
 
-        from openrecall.server.__main__ import _preload_ocr_model
+        from myrecall.server.__main__ import _preload_ocr_model
 
         # Should succeed - models are bundled with pip package
         _preload_ocr_model()

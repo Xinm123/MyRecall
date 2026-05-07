@@ -1,7 +1,7 @@
 """Tests for hybrid search (FTS + vector)."""
 import pytest
 
-from openrecall.server.search.hybrid_engine import (
+from myrecall.server.search.hybrid_engine import (
     reciprocal_rank_fusion,
     HybridSearchEngine,
 )

@@ -4,15 +4,15 @@ import ast
 from pathlib import Path
 from types import SimpleNamespace
 
-from openrecall.shared.config import Settings
+from myrecall.shared.config import Settings
 
 
 def test_settings_expose_s2a_defaults_and_legacy_idle_mapping(monkeypatch):
-    monkeypatch.setenv("OPENRECALL_CAPTURE_INTERVAL", "17")
-    monkeypatch.delenv("OPENRECALL_IDLE_CAPTURE_INTERVAL_MS", raising=False)
-    monkeypatch.delenv("OPENRECALL_MIN_CAPTURE_INTERVAL_MS", raising=False)
-    monkeypatch.delenv("OPENRECALL_PERMISSION_POLL_INTERVAL_SEC", raising=False)
-    monkeypatch.delenv("OPENRECALL_TRIGGER_QUEUE_CAPACITY", raising=False)
+    monkeypatch.setenv("MYRECALL_CAPTURE_INTERVAL", "17")
+    monkeypatch.delenv("MYRECALL_IDLE_CAPTURE_INTERVAL_MS", raising=False)
+    monkeypatch.delenv("MYRECALL_MIN_CAPTURE_INTERVAL_MS", raising=False)
+    monkeypatch.delenv("MYRECALL_PERMISSION_POLL_INTERVAL_SEC", raising=False)
+    monkeypatch.delenv("MYRECALL_TRIGGER_QUEUE_CAPACITY", raising=False)
 
     settings = Settings()
 
@@ -25,7 +25,7 @@ def test_settings_expose_s2a_defaults_and_legacy_idle_mapping(monkeypatch):
 
 
 def test_normalize_device_name_formats_stable_monitor_id():
-    from openrecall.client.events.base import normalize_device_name
+    from myrecall.client.events.base import normalize_device_name
 
     assert normalize_device_name(42) == "monitor_42"
     assert normalize_device_name("display-uuid") == "monitor_display-uuid"
@@ -33,7 +33,7 @@ def test_normalize_device_name_formats_stable_monitor_id():
 
 
 def test_trigger_debouncer_is_partitioned_per_device():
-    from openrecall.client.events.base import TriggerDebouncer
+    from myrecall.client.events.base import TriggerDebouncer
 
     debouncer = TriggerDebouncer(min_interval_ms=1000)
 
@@ -44,7 +44,7 @@ def test_trigger_debouncer_is_partitioned_per_device():
 
 
 def test_trigger_event_channel_collapses_oldest_item_when_full():
-    from openrecall.client.events.base import (
+    from myrecall.client.events.base import (
         CaptureTrigger,
         TriggerEvent,
         TriggerEventChannel,
@@ -83,7 +83,7 @@ def test_trigger_event_channel_collapses_oldest_item_when_full():
 
 
 def test_permission_state_machine_requires_consecutive_failures_and_successes():
-    from openrecall.client.events.permissions import (
+    from myrecall.client.events.permissions import (
         PermissionCheckResult,
         PermissionState,
         PermissionStateMachine,
@@ -110,7 +110,7 @@ def test_permission_state_machine_requires_consecutive_failures_and_successes():
 
 
 def test_permission_state_machine_stays_recovering_until_third_success():
-    from openrecall.client.events.permissions import (
+    from myrecall.client.events.permissions import (
         PermissionCheckResult,
         PermissionState,
         PermissionStateMachine,
@@ -140,7 +140,7 @@ def test_permission_state_machine_stays_recovering_until_third_success():
 
 
 def test_permission_state_machine_emits_on_cooldown_only():
-    from openrecall.client.events.permissions import PermissionStateMachine
+    from myrecall.client.events.permissions import PermissionStateMachine
 
     machine = PermissionStateMachine()
 
@@ -150,7 +150,7 @@ def test_permission_state_machine_emits_on_cooldown_only():
 
 
 def test_list_monitors_has_single_fallback_monitors_declaration():
-    source = Path("openrecall/client/events/macos.py").read_text()
+    source = Path("myrecall/client/events/macos.py").read_text()
     module = ast.parse(source)
 
     list_monitors = next(
@@ -170,21 +170,21 @@ def test_list_monitors_has_single_fallback_monitors_declaration():
 
 
 def test_list_monitors_uses_distinct_quartz_binding_name():
-    source = Path("openrecall/client/events/macos.py").read_text()
+    source = Path("myrecall/client/events/macos.py").read_text()
 
     assert "quartz_monitors: list[MonitorDescriptor] = []" in source
     assert "return quartz_monitors" in source
 
 
 def test_app_switch_monitor_uses_frontmost_app_polling_fallback():
-    source = Path("openrecall/client/events/macos.py").read_text()
+    source = Path("myrecall/client/events/macos.py").read_text()
 
     assert "get_active_app_name() or get_frontmost_app_name()" in source
     assert "self._stop_event.wait(0.5)" in source  # Polling interval increased to 500ms
 
 
 def test_list_monitors_falls_back_to_mss_on_quartz_error(monkeypatch):
-    from openrecall.client.events import macos
+    from myrecall.client.events import macos
 
     class _FakeMSS:
         def __init__(self) -> None:
@@ -221,8 +221,8 @@ def test_list_monitors_falls_back_to_mss_on_quartz_error(monkeypatch):
 
 
 def test_app_switch_monitor_emits_when_frontmost_app_changes(monkeypatch):
-    from openrecall.client.events import macos
-    from openrecall.client.events.base import CaptureTrigger, MonitorDescriptor
+    from myrecall.client.events import macos
+    from myrecall.client.events.base import CaptureTrigger, MonitorDescriptor
 
     events = []
     monitor = MonitorDescriptor(
@@ -272,8 +272,8 @@ def test_click_on_unregistered_monitor_counts_miss():
     With the new single-layer architecture, monitor misses are tracked via
     the _monitor_misses counter instead of log messages.
     """
-    from openrecall.client.events import macos
-    from openrecall.client.events.base import (
+    from myrecall.client.events import macos
+    from myrecall.client.events.base import (
         LockFreeDebouncer,
         TriggerEventChannel,
     )

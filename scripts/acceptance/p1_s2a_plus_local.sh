@@ -10,10 +10,10 @@ Run local P1-S2a+ permission stability checks and produce the required evidence 
 Prerequisite:
   - Start server first in another terminal: ./run_server.sh --debug
   - Verify health endpoint is reachable before running this script
-    (for example: curl http://localhost:${OPENRECALL_PORT:-8083}/v1/health)
+    (for example: curl http://localhost:${MYRECALL_PORT:-8083}/v1/health)
 
 Options:
-  --base-url URL         Edge base URL (default: http://localhost:${OPENRECALL_PORT:-8083})
+  --base-url URL         Edge base URL (default: http://localhost:${MYRECALL_PORT:-8083})
   --evidence-dir DIR     Evidence output directory
                          (default: docs/v3/acceptance/phase1/evidence)
   --window-id ID         Custom window_id for this run
@@ -31,7 +31,7 @@ Outputs:
 EOF
 }
 
-BASE_URL="http://localhost:${OPENRECALL_PORT:-8083}"
+BASE_URL="http://localhost:${MYRECALL_PORT:-8083}"
 EVIDENCE_DIR="docs/v3/acceptance/phase1/evidence"
 WINDOW_ID=""
 EDGE_PID=""
@@ -269,11 +269,11 @@ sample_seconds = int(sys.argv[7])
 permission_suite_status = sys.argv[8]
 
 permission_env_keys = [
-    "OPENRECALL_PERMISSION_POLL_INTERVAL_SEC",
-    "OPENRECALL_MIN_CAPTURE_INTERVAL_MS",
-    "OPENRECALL_IDLE_CAPTURE_INTERVAL_MS",
-    "OPENRECALL_SKIP_PERMISSION_CHECK",
-    "OPENRECALL_PORT",
+    "MYRECALL_PERMISSION_POLL_INTERVAL_SEC",
+    "MYRECALL_MIN_CAPTURE_INTERVAL_MS",
+    "MYRECALL_IDLE_CAPTURE_INTERVAL_MS",
+    "MYRECALL_SKIP_PERMISSION_CHECK",
+    "MYRECALL_PORT",
 ]
 
 context_path.write_text(

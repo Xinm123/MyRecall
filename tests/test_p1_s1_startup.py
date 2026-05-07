@@ -23,7 +23,7 @@ BASE_URL = "http://localhost:8083"
 API_V1 = f"{BASE_URL}/v1"
 
 # Log file path - adjust if needed
-DEFAULT_LOG_PATH = "/tmp/openrecall_server.log"
+DEFAULT_LOG_PATH = "/tmp/myrecall_server.log"
 
 
 def get_queue_status() -> dict:
@@ -83,7 +83,7 @@ class TestManualStartup:
 
     @pytest.fixture(autouse=True)
     def setup(self):
-        self.log_path = os.environ.get("OPENRECALL_LOG_PATH", DEFAULT_LOG_PATH)
+        self.log_path = os.environ.get("MYRECALL_LOG_PATH", DEFAULT_LOG_PATH)
         yield
 
     @pytest.mark.integration

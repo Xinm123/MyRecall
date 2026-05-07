@@ -9,16 +9,16 @@ import numpy as np
 import pytest
 from flask import Flask
 
-from openrecall.client.events.base import CaptureTrigger, TriggerEvent
-from openrecall.client.events.base import MonitorDescriptor
-from openrecall.client.events.permissions import (
+from myrecall.client.events.base import CaptureTrigger, TriggerEvent
+from myrecall.client.events.base import MonitorDescriptor
+from myrecall.client.events.permissions import (
     PermissionCheckResult,
     PermissionState,
     PermissionStateMachine,
 )
-from openrecall.client.recorder import ScreenRecorder
-from openrecall.server import api_v1
-from openrecall.server.config_runtime import runtime_settings
+from myrecall.client.recorder import ScreenRecorder
+from myrecall.server import api_v1
+from myrecall.server.config_runtime import runtime_settings
 
 
 def _utc_now_iso() -> str:
@@ -131,7 +131,7 @@ def test_startup_denied_transitions_to_denied_or_revoked() -> None:
 def test_detect_permissions_uses_input_monitoring_event_tap(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    from openrecall.client.events import permissions
+    from myrecall.client.events import permissions
 
     calls: dict[str, int] = {"event_tap_create": 0}
 
@@ -173,7 +173,7 @@ def test_detect_permissions_uses_input_monitoring_event_tap(
 def test_detect_permissions_does_not_manually_release_event_tap(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    from openrecall.client.events import permissions
+    from myrecall.client.events import permissions
 
     def _event_tap_create(*args):
         return object()
@@ -327,7 +327,7 @@ def test_degraded_capture_loop_blocks_idle_fallback_until_recovered(
         recorder._stop_event.set()
 
     monkeypatch.setattr(recorder, "_degraded_sleep", _degraded_sleep)
-    monkeypatch.setattr("openrecall.client.recorder.time.time", lambda: 100.0)
+    monkeypatch.setattr("myrecall.client.recorder.time.time", lambda: 100.0)
 
     recorder.run_capture_loop()
 
@@ -424,8 +424,12 @@ def test_health_contract_contains_permission_fields(
 
 @pytest.mark.unit
 def test_layout_health_polling_handles_transient_permission_payload() -> None:
-    content = Path(
-        "/Users/pyw/old/MyRecall/openrecall/server/templates/layout.html"
+    content = (
+        Path(__file__).parent.parent
+        / "myrecall"
+        / "server"
+        / "templates"
+        / "layout.html"
     ).read_text(encoding="utf-8")
 
     assert "transient_failure" in content

@@ -42,7 +42,7 @@ Phase 1 establishes the infrastructure for Pi integration, enabling MyRecall to 
 
 ### 1. Pi Manager
 
-**File**: `openrecall/client/chat/pi_manager.py`
+**File**: `myrecall/client/chat/pi_manager.py`
 
 **Responsibilities**:
 - Find bun executable
@@ -75,7 +75,7 @@ PI_INSTALL_DIR = Path.home() / ".myrecall" / "pi-agent"
 
 ### 2. Config Manager
 
-**File**: `openrecall/client/chat/config_manager.py`
+**File**: `myrecall/client/chat/config_manager.py`
 
 **Responsibilities**:
 - Read API key for a given provider (diagnostic/informational use)
@@ -128,7 +128,7 @@ AUTH_JSON = PI_CONFIG_DIR / "auth.json"
 
 ### 3. Skill: myrecall-search
 
-**File**: `openrecall/client/chat/skills/myrecall-search/SKILL.md`
+**File**: `myrecall/client/chat/skills/myrecall-search/SKILL.md`
 
 **Purpose**: Teach Pi how to use MyRecall's API endpoints for search and retrieval.
 
@@ -147,7 +147,7 @@ Pi discovers skills from specific directories. PiManager ensures the skill is
 available at the correct location for Pi to discover:
 
 ```
-Source:   openrecall/client/chat/skills/myrecall-search/SKILL.md
+Source:   myrecall/client/chat/skills/myrecall-search/SKILL.md
 Target:   ~/.pi/agent/skills/myrecall-search/SKILL.md
 Install:  pi_manager.ensure_skill_installed() (called from ensure_installed())
 Update:   Always copy from source (overwrite) to pick up changes
@@ -190,7 +190,7 @@ Local REST API at `http://localhost:8083`.
 
 ### 4. Model Definitions
 
-**File**: `openrecall/client/chat/models.py`
+**File**: `myrecall/client/chat/models.py`
 
 **Purpose**: Define default provider and model constants only. These are the **only** model-related values MyRecall needs — all model metadata (context windows, cost, capabilities) is maintained by Pi internally in `models.generated.ts` and is not duplicated by MyRecall.
 
@@ -211,7 +211,7 @@ DEFAULT_MODEL = "MiniMax-M2.7"
 ## Directory Structure
 
 ```
-openrecall/client/chat/
+myrecall/client/chat/
 ├── __init__.py
 ├── pi_manager.py           # Pi installation management
 ├── config_manager.py       # Provider/API key configuration

@@ -12,9 +12,9 @@ from pathlib import Path
 
 import pytest
 
-from openrecall.server.database.frames_store import FramesStore
-from openrecall.server.database.migrations_runner import run_migrations
-from openrecall.server.processing.v3_worker import V3ProcessingWorker
+from myrecall.server.database.frames_store import FramesStore
+from myrecall.server.database.migrations_runner import run_migrations
+from myrecall.server.processing.v3_worker import V3ProcessingWorker
 
 
 @pytest.fixture
@@ -30,7 +30,7 @@ def temp_db(tmp_path: Path) -> Path:
     db_path = tmp_path / "test_edge.db"
     conn = sqlite3.connect(str(db_path))
     migrations_dir = Path(__file__).resolve().parent.parent / (
-        "openrecall/server/database/migrations"
+        "myrecall/server/database/migrations"
     )
     run_migrations(conn, migrations_dir)
     conn.close()

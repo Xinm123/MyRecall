@@ -14,8 +14,8 @@ import uuid
 import pytest
 from flask import Flask
 
-from openrecall.server.api import api_bp
-from openrecall.server.api_v1 import v1_bp
+from myrecall.server.api import api_bp
+from myrecall.server.api_v1 import v1_bp
 
 
 @pytest.fixture

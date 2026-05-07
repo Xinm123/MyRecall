@@ -1,6 +1,6 @@
 """Tests for embedding models."""
 import pytest
-from openrecall.server.embedding.models import FrameEmbedding
+from myrecall.server.embedding.models import FrameEmbedding
 
 
 class TestFrameEmbedding:

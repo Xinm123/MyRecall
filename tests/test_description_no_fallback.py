@@ -2,7 +2,7 @@
 import tempfile
 from pathlib import Path
 
-from openrecall.server.config_server import ServerSettings
+from myrecall.server.config_server import ServerSettings
 
 
 def test_description_no_fallback_to_ai():

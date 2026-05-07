@@ -1,15 +1,15 @@
 [run]
 branch = False
-source = openrecall
+source = myrecall
 omit =
     tests/*
     */__main__.py
-    openrecall/main.py
-    openrecall/client/recorder.py
-    openrecall/server/ai_engine.py
-    openrecall/server/ocr.py
-    openrecall/shared/utils.py
-    openrecall/shared/logging_config.py
+    myrecall/main.py
+    myrecall/client/recorder.py
+    myrecall/server/ai_engine.py
+    myrecall/server/ocr.py
+    myrecall/shared/utils.py
+    myrecall/shared/logging_config.py
 
 [report]
 show_missing = True

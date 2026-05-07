@@ -1,0 +1,1356 @@
+{% extends "layout.html" %}
+
+{% block title %}Settings - MyRecall{% endblock %}
+
+{% block extra_head %}
+<style>
+  /* Settings page specific styles */
+  .settings-container {
+    max-width: 600px;
+    margin: 40px auto;
+    padding: 0 20px;
+  }
+
+  .settings-header {
+    margin-bottom: 32px;
+  }
+
+  .settings-header h1 {
+    font-size: 28px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin: 0 0 8px 0;
+  }
+
+  .settings-header p {
+    color: var(--text-secondary);
+    margin: 0;
+  }
+
+  .settings-section {
+    background: var(--bg-card);
+    border-radius: 12px;
+    padding: 24px;
+    margin-bottom: 20px;
+    border: 1px solid var(--border-color);
+  }
+
+  .settings-section h2 {
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin: 0 0 20px 0;
+  }
+
+  .form-group {
+    margin-bottom: 20px;
+  }
+
+  .form-group:last-child {
+    margin-bottom: 0;
+  }
+
+  .form-label {
+    display: block;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text-primary);
+    margin-bottom: 8px;
+  }
+
+  .form-label-description {
+    display: block;
+    font-size: 12px;
+    color: var(--text-secondary);
+    margin-bottom: 8px;
+  }
+
+  .form-input {
+    width: 100%;
+    padding: 10px 14px;
+    font-size: 14px;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    background: var(--bg-body);
+    color: var(--text-primary);
+    font-family: var(--font-stack);
+    box-sizing: border-box;
+  }
+
+  .form-input:focus {
+    outline: none;
+    border-color: var(--accent-color);
+  }
+
+  .form-input-group {
+    display: flex;
+    gap: 8px;
+  }
+
+  .form-input-group .form-input {
+    flex: 1;
+  }
+
+  .btn {
+    padding: 10px 16px;
+    font-size: 14px;
+    font-weight: 500;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-family: var(--font-stack);
+  }
+
+  .btn-primary {
+    background: var(--accent-color);
+    color: white;
+  }
+
+  .btn-primary:hover {
+    background: #0056CC;
+  }
+
+  .btn-secondary {
+    background: var(--bg-body);
+    color: var(--text-primary);
+    border: 1px solid var(--border-color);
+  }
+
+  .btn-secondary:hover {
+    background: rgba(0, 0, 0, 0.05);
+  }
+
+  .btn-group {
+    display: flex;
+    gap: 12px;
+    margin-top: 24px;
+  }
+
+  .status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 500;
+  }
+
+  .status-success {
+    background: rgba(52, 199, 89, 0.15);
+    color: #28a745;
+  }
+
+  .status-error {
+    background: rgba(255, 59, 48, 0.12);
+    color: #FF3B30;
+  }
+
+  .status-testing {
+    background: rgba(0, 122, 255, 0.12);
+    color: #007AFF;
+  }
+
+  .toast {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    padding: 14px 20px;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 500;
+    color: white;
+    z-index: 10000;
+    animation: toastIn 0.3s ease-out;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  }
+
+  .toast-success {
+    background: #34C759;
+  }
+
+  .toast-error {
+    background: #FF3B30;
+  }
+
+  @keyframes toastIn {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .current-value {
+    font-size: 12px;
+    color: var(--text-secondary);
+    margin-top: 6px;
+  }
+
+  .current-value code {
+    background: rgba(0, 0, 0, 0.05);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-family: 'SF Mono', Monaco, Consolas, monospace;
+  }
+
+  /* Toggle Switch */
+  .toggle-wrapper {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+  }
+
+  .toggle-label {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .toggle-label .label-title {
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text-primary);
+  }
+
+  .toggle-label .label-description {
+    font-size: 12px;
+    color: var(--text-secondary);
+  }
+
+  .toggle-switch {
+    position: relative;
+    width: 44px;
+    height: 24px;
+    flex-shrink: 0;
+  }
+
+  .toggle-switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+  }
+
+  .toggle-slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: var(--border-color);
+    transition: 0.2s;
+    border-radius: 24px;
+    border: 1px solid var(--border-color);
+  }
+
+  .toggle-slider:before {
+    position: absolute;
+    content: "";
+    height: 18px;
+    width: 18px;
+    left: 2px;
+    bottom: 2px;
+    background-color: white;
+    transition: 0.2s;
+    border-radius: 50%;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+  }
+
+  .toggle-switch input:checked + .toggle-slider {
+    background-color: var(--accent-color);
+    border-color: var(--accent-color);
+  }
+
+  .toggle-switch input:checked + .toggle-slider:before {
+    transform: translateX(20px);
+  }
+
+  .toggle-switch input:focus + .toggle-slider {
+    box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.15);
+  }
+
+  .toggle-status {
+    font-size: 12px;
+    color: var(--text-secondary);
+    font-weight: 500;
+  }
+
+  .settings-section .inline-fields {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+
+  .settings-section .inline-fields .form-group {
+    margin-bottom: 0;
+  }
+
+  .settings-section .inline-fields-3 {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 16px;
+  }
+
+  .settings-section .inline-fields-3 .form-group {
+    margin-bottom: 0;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="settings-container"
+     x-data="settingsPage()"
+     x-init="init()"
+     @show-toast="showToast($event.detail.message, $event.detail.type)">
+  <div class="settings-header">
+    <h1>Settings</h1>
+    <p>Configure MyRecall client settings. Changes are applied immediately.</p>
+  </div>
+
+  <div class="settings-section">
+    <h2>Connection</h2>
+
+    <div class="form-group">
+      <label class="form-label" for="edge_base_url">Edge Server URL</label>
+      <span class="form-label-description">
+        The base URL of the Edge API server. Default is http://localhost:8083 for local mode.
+      </span>
+      <div class="form-input-group">
+        <input
+          type="url"
+          id="edge_base_url"
+          class="form-input"
+          x-model="settings.edge_base_url"
+          placeholder="http://localhost:8083"
+          @keydown.enter="saveSettings()"
+        >
+        <button class="btn btn-secondary" @click="testConnection()" :disabled="testStatus === 'testing'">
+          <span x-show="testStatus !== 'testing'">Test</span>
+          <span x-show="testStatus === 'testing'">Testing...</span>
+        </button>
+      </div>
+      <div class="current-value">
+        Current: <code x-text="originalSettings.edge_base_url || '{{ EDGE_BASE_URL }}'">{{ EDGE_BASE_URL }}</code>
+        <span x-show="!originalSettings.edge_base_url" style="color: var(--text-secondary); font-size: 11px; margin-left: 8px;">(from config)</span>
+      </div>
+      <div x-show="testStatus === 'success'" class="status-badge status-success" style="margin-top: 12px;">
+        <span>✓</span>
+        <span>Connected successfully</span>
+      </div>
+      <div x-show="testStatus === 'error'" class="status-badge status-error" style="margin-top: 12px;">
+        <span>✗</span>
+        <span x-text="testError || 'Connection failed'"></span>
+      </div>
+    </div>
+  </div>
+
+  <div class="settings-section">
+    <h2>Capture</h2>
+
+    <div class="form-group">
+      <div class="toggle-wrapper">
+        <div class="toggle-label">
+          <span class="label-title">Save Local Copies</span>
+          <span class="label-description">Save screenshot copies locally in addition to uploading to Edge server</span>
+        </div>
+        <label class="toggle-switch">
+          <input
+            type="checkbox"
+            id="capture_save_local_copies"
+            x-model="settings.capture_save_local_copies"
+            :checked="settings.capture_save_local_copies === 'true'"
+            @change="settings.capture_save_local_copies = $event.target.checked ? 'true' : 'false'"
+          >
+          <span class="toggle-slider"></span>
+        </label>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label" for="capture_permission_poll_sec">Permission Poll Interval</label>
+      <span class="form-label-description">
+        How often to check for screen recording permission (in seconds).
+      </span>
+      <input
+        type="number"
+        id="capture_permission_poll_sec"
+        class="form-input"
+        x-model="settings.capture_permission_poll_sec"
+        min="1"
+        max="300"
+        style="width: 120px;"
+      >
+      <div class="current-value">
+        Current: <code x-text="originalSettings.capture_permission_poll_sec + ' seconds'">10 seconds</code>
+      </div>
+    </div>
+  </div>
+
+  <div class="settings-section">
+    <h2>Debounce</h2>
+
+    <div class="form-group">
+      <label class="form-label" for="debounce_click_sec">Click Debounce</label>
+      <span class="form-label-description">Suppress rapid consecutive clicks (seconds)</span>
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <input
+          type="range"
+          min="0"
+          max="60"
+          step="0.1"
+          x-model="settings.debounce_click_sec"
+          style="flex: 1;"
+        >
+        <input
+          type="number"
+          id="debounce_click_sec"
+          class="form-input"
+          x-model="settings.debounce_click_sec"
+          min="0"
+          max="60"
+          step="0.1"
+          style="width: 80px;"
+        >
+        <span style="color: var(--text-secondary); font-size: 13px;">sec</span>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label" for="debounce_trigger_sec">Trigger Debounce</label>
+      <span class="form-label-description">Suppress rapid app switches (seconds)</span>
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <input
+          type="range"
+          min="0"
+          max="60"
+          step="0.1"
+          x-model="settings.debounce_trigger_sec"
+          style="flex: 1;"
+        >
+        <input
+          type="number"
+          id="debounce_trigger_sec"
+          class="form-input"
+          x-model="settings.debounce_trigger_sec"
+          min="0"
+          max="60"
+          step="0.1"
+          style="width: 80px;"
+        >
+        <span style="color: var(--text-secondary); font-size: 13px;">sec</span>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label" for="debounce_capture_sec">Capture Debounce</label>
+      <span class="form-label-description">Global minimum interval between captures (seconds)</span>
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <input
+          type="range"
+          min="0"
+          max="60"
+          step="0.1"
+          x-model="settings.debounce_capture_sec"
+          style="flex: 1;"
+        >
+        <input
+          type="number"
+          id="debounce_capture_sec"
+          class="form-input"
+          x-model="settings.debounce_capture_sec"
+          min="0"
+          max="60"
+          step="0.1"
+          style="width: 80px;"
+        >
+        <span style="color: var(--text-secondary); font-size: 13px;">sec</span>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label" for="debounce_idle_sec">Idle Capture Interval</label>
+      <span class="form-label-description">Background capture when idle for N seconds</span>
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <input
+          type="range"
+          min="10"
+          max="600"
+          step="1"
+          x-model="settings.debounce_idle_sec"
+          style="flex: 1;"
+        >
+        <input
+          type="number"
+          id="debounce_idle_sec"
+          class="form-input"
+          x-model="settings.debounce_idle_sec"
+          min="10"
+          max="600"
+          step="1"
+          style="width: 80px;"
+        >
+        <span style="color: var(--text-secondary); font-size: 13px;">sec</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="settings-section">
+    <h2>Stats</h2>
+
+    <div class="form-group" style="max-width: 200px;">
+      <label class="form-label" for="stats_interval_sec">Reporting Interval</label>
+      <span class="form-label-description">How often to log capture statistics (sec)</span>
+      <input
+        type="number"
+        id="stats_interval_sec"
+        class="form-input"
+        x-model="settings.stats_interval_sec"
+        min="10"
+        max="3600"
+        step="1"
+        style="width: 100%;"
+      >
+      <div class="current-value">
+        Current: <code x-text="originalSettings.stats_interval_sec + ' seconds'">120 seconds</code>
+      </div>
+    </div>
+  </div>
+
+  <div class="settings-section">
+    <h2>Deduplication</h2>
+
+    <div class="form-group">
+      <div class="toggle-wrapper">
+        <div class="toggle-label">
+          <span class="label-title">Enable Deduplication</span>
+          <span class="label-description">Drop visually similar consecutive frames</span>
+        </div>
+        <label class="toggle-switch">
+          <input type="checkbox" id="dedup_enabled"
+            x-model="settings.dedup_enabled"
+            :checked="settings.dedup_enabled === 'true'"
+            @change="settings.dedup_enabled = $event.target.checked ? 'true' : 'false'">
+          <span class="toggle-slider"></span>
+        </label>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label" for="dedup_threshold">Similarity Threshold</label>
+      <span class="form-label-description">Hamming distance threshold (lower = more strict)</span>
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <input type="range" min="0" max="64" step="1"
+          x-model="settings.dedup_threshold" style="flex: 1;">
+        <input type="number" id="dedup_threshold" class="form-input"
+          x-model="settings.dedup_threshold" min="0" max="64" step="1"
+          style="width: 60px;">
+        <span style="color: var(--text-secondary); font-size: 13px;">bits</span>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label" for="dedup_ttl_seconds">Cache TTL</label>
+      <span class="form-label-description">Duration before similar content can be recaptured</span>
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <input type="range" min="1" max="600" step="1"
+          x-model="settings.dedup_ttl_seconds" style="flex: 1;">
+        <input type="number" id="dedup_ttl_seconds" class="form-input"
+          x-model="settings.dedup_ttl_seconds" min="1" max="600" step="1"
+          style="width: 80px;">
+        <span style="color: var(--text-secondary); font-size: 13px;">sec</span>
+      </div>
+    </div>
+
+    <div class="form-group" style="max-width: 200px;">
+      <label class="form-label" for="dedup_cache_size_per_device">Cache Size</label>
+      <span class="form-label-description">Recent hashes to keep per device</span>
+      <input type="number" id="dedup_cache_size_per_device" class="form-input"
+        x-model="settings.dedup_cache_size_per_device" min="1" max="100" step="1">
+    </div>
+
+    <div class="inline-fields" style="margin-top: 16px;">
+      <div class="form-group" style="margin-bottom: 0;">
+        <div class="toggle-wrapper">
+          <div class="toggle-label">
+            <span class="label-title">For Click</span>
+            <span class="label-description">Dedup on click triggers</span>
+          </div>
+          <label class="toggle-switch">
+            <input type="checkbox" id="dedup_for_click"
+              x-model="settings.dedup_for_click"
+              :checked="settings.dedup_for_click === 'true'"
+              @change="settings.dedup_for_click = $event.target.checked ? 'true' : 'false'">
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+      </div>
+
+      <div class="form-group" style="margin-bottom: 0;">
+        <div class="toggle-wrapper">
+          <div class="toggle-label">
+            <span class="label-title">For App Switch</span>
+            <span class="label-description">Dedup on app_switch triggers</span>
+          </div>
+          <label class="toggle-switch">
+            <input type="checkbox" id="dedup_for_app_switch"
+              x-model="settings.dedup_for_app_switch"
+              :checked="settings.dedup_for_app_switch === 'true'"
+              @change="settings.dedup_for_app_switch = $event.target.checked ? 'true' : 'false'">
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+      </div>
+    </div>
+
+    <div class="form-group" style="max-width: 300px; margin-top: 16px;">
+      <label class="form-label" for="dedup_force_after_skip_seconds">Force After Skip</label>
+      <span class="form-label-description">Force capture after N seconds even if similar</span>
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <input type="range" min="1" max="3600" step="1"
+          x-model="settings.dedup_force_after_skip_seconds" style="flex: 1;">
+        <input type="number" id="dedup_force_after_skip_seconds" class="form-input"
+          x-model="settings.dedup_force_after_skip_seconds" min="1" max="3600" step="1"
+          style="width: 80px;">
+        <span style="color: var(--text-secondary); font-size: 13px;">sec</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Server (Edge) Settings Section -->
+  <div class="settings-section" x-data="serverSettings()" x-init="initServerSettings()">
+    <h2>Server (Edge) Settings</h2>
+
+    <!-- Connection status chip -->
+    <div style="margin-bottom: 16px;">
+      <span
+        class="status-badge"
+        :class="edgeConnected ? 'status-success' : 'status-error'"
+        x-text="edgeStatusText"
+      ></span>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Provider</label>
+      <select
+        class="form-input"
+        x-model="serverForm.provider"
+        @change="onProviderChange()"
+        :disabled="!edgeConnected"
+      >
+        <option value="local">Local (Ollama)</option>
+        <option value="openai">OpenAI</option>
+        <option value="dashscope">DashScope</option>
+      </select>
+      <span
+        x-show="serverPristine.source && serverPristine.source.provider === 'sqlite'"
+        style="font-size: 11px; color: var(--accent-color); margin-top: 4px; display: inline-block;"
+      >[overridden]</span>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Model</label>
+      <input
+        type="text"
+        class="form-input"
+        x-model="serverForm.model"
+        :placeholder="providerPlaceholders[serverForm.provider]?.model || ''"
+        :disabled="!edgeConnected"
+      >
+      <span
+        x-show="serverPristine.source && serverPristine.source.model === 'sqlite'"
+        style="font-size: 11px; color: var(--accent-color); margin-top: 4px; display: inline-block;"
+      >[overridden]</span>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">API Key</label>
+      <div class="form-input-group">
+        <input
+          :type="apiKeyEditing ? 'text' : 'password'"
+          class="form-input"
+          x-model="serverForm.api_key"
+          :disabled="!edgeConnected || !apiKeyEditing"
+          :placeholder="apiKeyEditing ? 'Enter API key' : ''"
+        >
+        <button
+          class="btn btn-secondary"
+          @click="apiKeyEditing = !apiKeyEditing"
+          :disabled="!edgeConnected"
+          x-text="apiKeyEditing ? 'Cancel' : 'Edit'"
+        ></button>
+        <button
+          class="btn btn-secondary"
+          @click="clearApiKey()"
+          :disabled="!edgeConnected"
+          title="Clear API key"
+        >Clear</button>
+      </div>
+      <span
+        x-show="serverPristine.source && serverPristine.source.api_key === 'sqlite'"
+        style="font-size: 11px; color: var(--accent-color); margin-top: 4px; display: inline-block;"
+      >[overridden]</span>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">API Base URL</label>
+      <input
+        type="url"
+        class="form-input"
+        x-model="serverForm.api_base"
+        :placeholder="providerPlaceholders[serverForm.provider]?.api_base || ''"
+        :disabled="!edgeConnected"
+      >
+      <span
+        x-show="serverPristine.source && serverPristine.source.api_base === 'sqlite'"
+        style="font-size: 11px; color: var(--accent-color); margin-top: 4px; display: inline-block;"
+      >[overridden]</span>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Request Timeout</label>
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <input
+          type="number"
+          class="form-input"
+          x-model="serverForm.request_timeout"
+          min="1"
+          max="600"
+          style="width: 100px;"
+          :disabled="!edgeConnected"
+        >
+        <span style="color: var(--text-secondary); font-size: 13px;">sec</span>
+      </div>
+      <span
+        x-show="serverPristine.source && serverPristine.source.request_timeout === 'sqlite'"
+        style="font-size: 11px; color: var(--accent-color); margin-top: 4px; display: inline-block;"
+      >[overridden]</span>
+    </div>
+
+    <!-- Test result line -->
+    <div x-show="testResult" style="margin-bottom: 16px;">
+      <span
+        class="status-badge"
+        :class="testResult?.ok ? 'status-success' : 'status-error'"
+        x-text="testResultText"
+      ></span>
+    </div>
+
+    <div class="btn-group">
+      <button
+        class="btn btn-secondary"
+        @click="testConnection()"
+        :disabled="!edgeConnected || testing"
+      >
+        <span x-show="!testing">Test Connection</span>
+        <span x-show="testing">Testing...</span>
+      </button>
+      <button
+        class="btn btn-primary"
+        @click="saveServerSettings()"
+        :disabled="!edgeConnected || !hasServerChanges() || saving"
+      >
+        <span x-show="!saving">Save</span>
+        <span x-show="saving">Saving...</span>
+      </button>
+      <button
+        class="btn btn-secondary"
+        @click="resetServerSettings()"
+        :disabled="!edgeConnected || !hasOverrides() || saving"
+      >
+        Reset
+      </button>
+    </div>
+  </div>
+
+  <div class="btn-group">
+    <button class="btn btn-primary" @click="saveSettings()" :disabled="!hasChanges() || saving">
+      <span x-show="!saving">Save Changes</span>
+      <span x-show="saving">Saving...</span>
+    </button>
+    <button class="btn btn-secondary" @click="resetSettings()" :disabled="saving">
+      Reset to Default
+    </button>
+  </div>
+
+  <!-- Toast notification -->
+  <template x-if="toast">
+    <div class="toast" :class="toast.type" x-text="toast.message"></div>
+  </template>
+</div>
+
+<script>
+  function settingsPage() {
+    return {
+      settings: {
+        edge_base_url: '',
+        capture_save_local_copies: 'false',
+        capture_permission_poll_sec: '10',
+        // Debounce — displayed as seconds, stored as ms
+        debounce_click_sec: '3.0',
+        debounce_trigger_sec: '3.0',
+        debounce_capture_sec: '3.0',
+        debounce_idle_sec: '60',
+        // Stats
+        stats_interval_sec: '120',
+        // Dedup
+        dedup_enabled: 'true',
+        dedup_threshold: '10',
+        dedup_ttl_seconds: '60',
+        dedup_cache_size_per_device: '1',
+        dedup_for_click: 'true',
+        dedup_for_app_switch: 'false',
+        dedup_force_after_skip_seconds: '30'
+      },
+      originalSettings: {
+        edge_base_url: '',
+        capture_save_local_copies: 'false',
+        capture_permission_poll_sec: '10',
+        debounce_click_sec: '3.0',
+        debounce_trigger_sec: '3.0',
+        debounce_capture_sec: '3.0',
+        debounce_idle_sec: '60',
+        stats_interval_sec: '120',
+        // Dedup
+        dedup_enabled: 'true',
+        dedup_threshold: '10',
+        dedup_ttl_seconds: '60',
+        dedup_cache_size_per_device: '1',
+        dedup_for_click: 'true',
+        dedup_for_app_switch: 'false',
+        dedup_force_after_skip_seconds: '30'
+      },
+      testStatus: null, // null | 'testing' | 'success' | 'error'
+      testError: '',
+      toast: null,
+      saving: false,
+
+      init() {
+        // Load current settings from server
+        this.loadSettings();
+
+        // Set current view for toolbar highlighting
+        document.documentElement.setAttribute('data-current-view', 'settings');
+      },
+
+      async loadSettings() {
+        try {
+          const response = await fetch('/api/client/settings');
+          if (response.ok) {
+            const data = await response.json();
+            this.settings.edge_base_url = data.edge_base_url || '';
+            this.originalSettings.edge_base_url = data.edge_base_url || '';
+            this.settings.capture_save_local_copies = data.capture_save_local_copies || 'false';
+            this.originalSettings.capture_save_local_copies = data.capture_save_local_copies || 'false';
+            this.settings.capture_permission_poll_sec = data.capture_permission_poll_sec || '10';
+            this.originalSettings.capture_permission_poll_sec = data.capture_permission_poll_sec || '10';
+            // Debounce: convert ms to seconds for display
+            this.settings.debounce_click_sec = (parseInt(data['debounce.click_ms'] || '3000') / 1000).toFixed(1);
+            this.originalSettings.debounce_click_sec = this.settings.debounce_click_sec;
+            this.settings.debounce_trigger_sec = (parseInt(data['debounce.trigger_ms'] || '3000') / 1000).toFixed(1);
+            this.originalSettings.debounce_trigger_sec = this.settings.debounce_trigger_sec;
+            this.settings.debounce_capture_sec = (parseInt(data['debounce.capture_ms'] || '3000') / 1000).toFixed(1);
+            this.originalSettings.debounce_capture_sec = this.settings.debounce_capture_sec;
+            this.settings.debounce_idle_sec = (parseInt(data['debounce.idle_interval_ms'] || '60000') / 1000).toFixed(1);
+            this.originalSettings.debounce_idle_sec = this.settings.debounce_idle_sec;
+            // Stats
+            this.settings.stats_interval_sec = data['stats.interval_sec'] || '120';
+            this.originalSettings.stats_interval_sec = this.settings.stats_interval_sec;
+            // Dedup fields
+            this.settings.dedup_enabled = data['dedup.enabled'] || 'true';
+            this.originalSettings.dedup_enabled = this.settings.dedup_enabled;
+            this.settings.dedup_threshold = data['dedup.threshold'] || '10';
+            this.originalSettings.dedup_threshold = this.settings.dedup_threshold;
+            this.settings.dedup_ttl_seconds = data['dedup.ttl_seconds'] || '60';
+            this.originalSettings.dedup_ttl_seconds = this.settings.dedup_ttl_seconds;
+            this.settings.dedup_cache_size_per_device = data['dedup.cache_size_per_device'] || '1';
+            this.originalSettings.dedup_cache_size_per_device = this.settings.dedup_cache_size_per_device;
+            this.settings.dedup_for_click = data['dedup.for_click'] || 'true';
+            this.originalSettings.dedup_for_click = this.settings.dedup_for_click;
+            this.settings.dedup_for_app_switch = data['dedup.for_app_switch'] || 'false';
+            this.originalSettings.dedup_for_app_switch = this.settings.dedup_for_app_switch;
+            this.settings.dedup_force_after_skip_seconds = data['dedup.force_after_skip_seconds'] || '30';
+            this.originalSettings.dedup_force_after_skip_seconds = this.settings.dedup_force_after_skip_seconds;
+          } else {
+            this.showToast('Failed to load settings', 'error');
+          }
+        } catch (error) {
+          console.error('Failed to load settings:', error);
+          this.showToast('Failed to load settings', 'error');
+        }
+      },
+
+      hasChanges() {
+        return this.settings.edge_base_url !== this.originalSettings.edge_base_url ||
+               this.settings.capture_save_local_copies !== this.originalSettings.capture_save_local_copies ||
+               this.settings.capture_permission_poll_sec !== this.originalSettings.capture_permission_poll_sec ||
+               this.settings.debounce_click_sec !== this.originalSettings.debounce_click_sec ||
+               this.settings.debounce_trigger_sec !== this.originalSettings.debounce_trigger_sec ||
+               this.settings.debounce_capture_sec !== this.originalSettings.debounce_capture_sec ||
+               this.settings.debounce_idle_sec !== this.originalSettings.debounce_idle_sec ||
+               this.settings.stats_interval_sec !== this.originalSettings.stats_interval_sec ||
+               this.settings.dedup_enabled !== this.originalSettings.dedup_enabled ||
+               this.settings.dedup_threshold !== this.originalSettings.dedup_threshold ||
+               this.settings.dedup_ttl_seconds !== this.originalSettings.dedup_ttl_seconds ||
+               this.settings.dedup_cache_size_per_device !== this.originalSettings.dedup_cache_size_per_device ||
+               this.settings.dedup_for_click !== this.originalSettings.dedup_for_click ||
+               this.settings.dedup_for_app_switch !== this.originalSettings.dedup_for_app_switch ||
+               this.settings.dedup_force_after_skip_seconds !== this.originalSettings.dedup_force_after_skip_seconds;
+      },
+
+      async testConnection() {
+        this.testStatus = 'testing';
+        this.testError = '';
+
+        try {
+          const url = this.settings.edge_base_url;
+          const testUrl = url ? `/api/client/settings/edge/health?url=${encodeURIComponent(url)}` : '/api/client/settings/edge/health';
+          const response = await fetch(testUrl);
+          const data = await response.json();
+
+          if (response.ok && data.reachable) {
+            this.testStatus = 'success';
+          } else {
+            this.testStatus = 'error';
+            this.testError = data.error || 'Connection failed';
+          }
+        } catch (error) {
+          this.testStatus = 'error';
+          this.testError = error.message || 'Connection failed';
+        }
+
+        // Clear test status after 3 seconds
+        setTimeout(() => {
+          this.testStatus = null;
+        }, 3000);
+      },
+
+      async saveSettings() {
+        this.saving = true;
+
+        try {
+          const payload = {
+            edge_base_url: this.settings.edge_base_url,
+            capture_save_local_copies: this.settings.capture_save_local_copies,
+            capture_permission_poll_sec: this.settings.capture_permission_poll_sec,
+            'debounce.click_ms': String(Math.round(parseFloat(this.settings.debounce_click_sec) * 1000)),
+            'debounce.trigger_ms': String(Math.round(parseFloat(this.settings.debounce_trigger_sec) * 1000)),
+            'debounce.capture_ms': String(Math.round(parseFloat(this.settings.debounce_capture_sec) * 1000)),
+            'debounce.idle_interval_ms': String(Math.round(parseFloat(this.settings.debounce_idle_sec) * 1000)),
+            'stats.interval_sec': String(parseInt(this.settings.stats_interval_sec)),
+            'dedup.enabled': this.settings.dedup_enabled,
+            'dedup.threshold': this.settings.dedup_threshold,
+            'dedup.ttl_seconds': this.settings.dedup_ttl_seconds,
+            'dedup.cache_size_per_device': this.settings.dedup_cache_size_per_device,
+            'dedup.for_click': this.settings.dedup_for_click,
+            'dedup.for_app_switch': this.settings.dedup_for_app_switch,
+            'dedup.force_after_skip_seconds': this.settings.dedup_force_after_skip_seconds,
+          };
+          const response = await fetch('/api/client/settings', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+          });
+
+          if (response.ok) {
+            const data = await response.json();
+            this.originalSettings.edge_base_url = data.edge_base_url || '';
+            this.originalSettings.capture_save_local_copies = data.capture_save_local_copies || 'false';
+            this.originalSettings.capture_permission_poll_sec = data.capture_permission_poll_sec || '10';
+            // Sync originalSettings
+            this.originalSettings.debounce_click_sec = this.settings.debounce_click_sec;
+            this.originalSettings.debounce_trigger_sec = this.settings.debounce_trigger_sec;
+            this.originalSettings.debounce_capture_sec = this.settings.debounce_capture_sec;
+            this.originalSettings.debounce_idle_sec = this.settings.debounce_idle_sec;
+            this.originalSettings.stats_interval_sec = this.settings.stats_interval_sec;
+            this.originalSettings.dedup_enabled = this.settings.dedup_enabled;
+            this.originalSettings.dedup_threshold = this.settings.dedup_threshold;
+            this.originalSettings.dedup_ttl_seconds = this.settings.dedup_ttl_seconds;
+            this.originalSettings.dedup_cache_size_per_device = this.settings.dedup_cache_size_per_device;
+            this.originalSettings.dedup_for_click = this.settings.dedup_for_click;
+            this.originalSettings.dedup_for_app_switch = this.settings.dedup_for_app_switch;
+            this.originalSettings.dedup_force_after_skip_seconds = this.settings.dedup_force_after_skip_seconds;
+
+            // Update global EDGE_BASE_URL for hot reload
+            window.EDGE_BASE_URL = this.settings.edge_base_url || window.EDGE_BASE_URL;
+
+            // Broadcast event for hot reload
+            window.dispatchEvent(new CustomEvent('myrecall-config-changed', {
+              detail: {
+                edge_base_url: this.settings.edge_base_url,
+                capture_save_local_copies: this.settings.capture_save_local_copies,
+                capture_permission_poll_sec: this.settings.capture_permission_poll_sec,
+                'debounce.click_ms': String(Math.round(parseFloat(this.settings.debounce_click_sec) * 1000)),
+                'debounce.trigger_ms': String(Math.round(parseFloat(this.settings.debounce_trigger_sec) * 1000)),
+                'debounce.capture_ms': String(Math.round(parseFloat(this.settings.debounce_capture_sec) * 1000)),
+                'debounce.idle_interval_ms': String(Math.round(parseFloat(this.settings.debounce_idle_sec) * 1000)),
+                'stats.interval_sec': String(parseInt(this.settings.stats_interval_sec)),
+                'dedup.enabled': this.settings.dedup_enabled,
+                'dedup.threshold': this.settings.dedup_threshold,
+                'dedup.ttl_seconds': this.settings.dedup_ttl_seconds,
+                'dedup.cache_size_per_device': this.settings.dedup_cache_size_per_device,
+                'dedup.for_click': this.settings.dedup_for_click,
+                'dedup.for_app_switch': this.settings.dedup_for_app_switch,
+                'dedup.force_after_skip_seconds': this.settings.dedup_force_after_skip_seconds,
+              }
+            }));
+
+            this.showToast('Settings saved successfully', 'success');
+          } else {
+            const error = await response.json();
+            this.showToast(error.error || 'Failed to save settings', 'error');
+          }
+        } catch (error) {
+          console.error('Failed to save settings:', error);
+          this.showToast('Failed to save settings', 'error');
+        } finally {
+          this.saving = false;
+        }
+      },
+
+      async resetSettings() {
+        if (!confirm('Reset all settings to default values?')) {
+          return;
+        }
+
+        this.saving = true;
+
+        try {
+          const response = await fetch('/api/client/settings/reset', {
+            method: 'POST'
+          });
+
+          if (response.ok) {
+            const data = await response.json();
+            this.settings.edge_base_url = data.edge_base_url || '';
+            this.originalSettings.edge_base_url = data.edge_base_url || '';
+            this.settings.capture_save_local_copies = data.capture_save_local_copies || 'false';
+            this.originalSettings.capture_save_local_copies = data.capture_save_local_copies || 'false';
+            this.settings.capture_permission_poll_sec = data.capture_permission_poll_sec || '10';
+            this.originalSettings.capture_permission_poll_sec = data.capture_permission_poll_sec || '10';
+            this.settings.debounce_click_sec = (parseInt(data['debounce.click_ms'] || '3000') / 1000).toFixed(1);
+            this.originalSettings.debounce_click_sec = this.settings.debounce_click_sec;
+            this.settings.debounce_trigger_sec = (parseInt(data['debounce.trigger_ms'] || '3000') / 1000).toFixed(1);
+            this.originalSettings.debounce_trigger_sec = this.settings.debounce_trigger_sec;
+            this.settings.debounce_capture_sec = (parseInt(data['debounce.capture_ms'] || '3000') / 1000).toFixed(1);
+            this.originalSettings.debounce_capture_sec = this.settings.debounce_capture_sec;
+            this.settings.debounce_idle_sec = (parseInt(data['debounce.idle_interval_ms'] || '60000') / 1000).toFixed(1);
+            this.originalSettings.debounce_idle_sec = this.settings.debounce_idle_sec;
+            this.settings.stats_interval_sec = data['stats.interval_sec'] || '120';
+            this.originalSettings.stats_interval_sec = this.settings.stats_interval_sec;
+            // Dedup fields
+            this.settings.dedup_enabled = data['dedup.enabled'] || 'true';
+            this.originalSettings.dedup_enabled = this.settings.dedup_enabled;
+            this.settings.dedup_threshold = data['dedup.threshold'] || '10';
+            this.originalSettings.dedup_threshold = this.settings.dedup_threshold;
+            this.settings.dedup_ttl_seconds = data['dedup.ttl_seconds'] || '60';
+            this.originalSettings.dedup_ttl_seconds = this.settings.dedup_ttl_seconds;
+            this.settings.dedup_cache_size_per_device = data['dedup.cache_size_per_device'] || '1';
+            this.originalSettings.dedup_cache_size_per_device = this.settings.dedup_cache_size_per_device;
+            this.settings.dedup_for_click = data['dedup.for_click'] || 'true';
+            this.originalSettings.dedup_for_click = this.settings.dedup_for_click;
+            this.settings.dedup_for_app_switch = data['dedup.for_app_switch'] || 'false';
+            this.originalSettings.dedup_for_app_switch = this.settings.dedup_for_app_switch;
+            this.settings.dedup_force_after_skip_seconds = data['dedup.force_after_skip_seconds'] || '30';
+            this.originalSettings.dedup_force_after_skip_seconds = this.settings.dedup_force_after_skip_seconds;
+
+            // Update global EDGE_BASE_URL
+            window.EDGE_BASE_URL = data.edge_base_url || window.EDGE_BASE_URL;
+
+            // Broadcast event
+            window.dispatchEvent(new CustomEvent('myrecall-config-changed', {
+              detail: {
+                edge_base_url: data.edge_base_url,
+                capture_save_local_copies: data.capture_save_local_copies,
+                capture_permission_poll_sec: data.capture_permission_poll_sec,
+                'debounce.click_ms': data['debounce.click_ms'],
+                'debounce.trigger_ms': data['debounce.trigger_ms'],
+                'debounce.capture_ms': data['debounce.capture_ms'],
+                'debounce.idle_interval_ms': data['debounce.idle_interval_ms'],
+                'stats.interval_sec': data['stats.interval_sec'],
+                'dedup.enabled': data['dedup.enabled'],
+                'dedup.threshold': data['dedup.threshold'],
+                'dedup.ttl_seconds': data['dedup.ttl_seconds'],
+                'dedup.cache_size_per_device': data['dedup.cache_size_per_device'],
+                'dedup.for_click': data['dedup.for_click'],
+                'dedup.for_app_switch': data['dedup.for_app_switch'],
+                'dedup.force_after_skip_seconds': data['dedup.force_after_skip_seconds'],
+              }
+            }));
+
+            this.showToast('Settings reset to defaults', 'success');
+          } else {
+            this.showToast('Failed to reset settings', 'error');
+          }
+        } catch (error) {
+          console.error('Failed to reset settings:', error);
+          this.showToast('Failed to reset settings', 'error');
+        } finally {
+          this.saving = false;
+        }
+      },
+
+      showToast(message, type) {
+        this.toast = { message, type };
+        setTimeout(() => {
+          this.toast = null;
+        }, 3000);
+      }
+    };
+  }
+
+  function serverSettings() {
+    return {
+      serverForm: {
+        provider: 'local',
+        model: '',
+        api_key: '',
+        api_base: '',
+        request_timeout: 120,
+      },
+      serverPristine: {
+        provider: 'local',
+        model: '',
+        api_key: '',
+        api_base: '',
+        request_timeout: 120,
+        source: {},
+      },
+      apiKeyEditing: false,
+      edgeConnected: false,
+      edgeStatusText: 'Connecting...',
+      testing: false,
+      testResult: null,
+      saving: false,
+      providerPlaceholders: {
+        openai: { model: 'gpt-4o', api_base: 'https://api.openai.com/v1' },
+        dashscope: { model: 'qwen-vl-max', api_base: 'https://dashscope.aliyuncs.com/compatible-mode/v1' },
+        local: { model: 'qwen-vl-7b', api_base: 'http://localhost:11434/v1' },
+      },
+
+      initServerSettings() {
+        this.checkEdgeHealth();
+        setInterval(() => this.checkEdgeHealth(), 30000);
+      },
+
+      async checkEdgeHealth() {
+        try {
+          const url = window.EDGE_BASE_URL || 'http://localhost:8083';
+          const resp = await fetch(`${url}/v1/health`, { method: 'GET' });
+          if (resp.ok) {
+            const wasConnected = this.edgeConnected;
+            this.edgeConnected = true;
+            this.edgeStatusText = 'Connected';
+            if (!wasConnected) {
+              this.loadServerSettings();
+            }
+          } else {
+            this.edgeConnected = false;
+            this.edgeStatusText = 'Edge unreachable';
+          }
+        } catch (e) {
+          this.edgeConnected = false;
+          this.edgeStatusText = 'Edge unreachable';
+        }
+      },
+
+      async loadServerSettings() {
+        if (!this.edgeConnected) return;
+        try {
+          const base = window.EDGE_BASE_URL || 'http://localhost:8083';
+          const resp = await fetch(`${base}/v1/settings/description`);
+          if (resp.ok) {
+            const data = await resp.json();
+            this.serverForm.provider = data.provider || 'local';
+            this.serverForm.model = data.model || '';
+            this.serverForm.api_key = data.api_key_masked || '';
+            this.serverForm.api_base = data.api_base || '';
+            this.serverForm.request_timeout = data.request_timeout || 120;
+            this.serverPristine = { ...this.serverForm, source: data.source || {} };
+          }
+        } catch (e) {
+          console.error('Failed to load server settings:', e);
+        }
+      },
+
+      onProviderChange() {
+        const oldProvider = this.serverPristine.provider;
+        const newProvider = this.serverForm.provider;
+        const oldPlaceholder = this.providerPlaceholders[oldProvider];
+        const newPlaceholder = this.providerPlaceholders[newProvider];
+        if (oldPlaceholder && newPlaceholder && this.serverForm.model === oldPlaceholder.model) {
+          this.serverForm.model = newPlaceholder.model;
+        }
+        if (oldPlaceholder && newPlaceholder && this.serverForm.api_base === oldPlaceholder.api_base) {
+          this.serverForm.api_base = newPlaceholder.api_base;
+        }
+      },
+
+      hasServerChanges() {
+        return (
+          String(this.serverForm.provider) !== String(this.serverPristine.provider) ||
+          String(this.serverForm.model) !== String(this.serverPristine.model) ||
+          (this.apiKeyEditing && this.serverForm.api_key !== '') ||
+          String(this.serverForm.api_base) !== String(this.serverPristine.api_base) ||
+          String(this.serverForm.request_timeout) !== String(this.serverPristine.request_timeout)
+        );
+      },
+
+      hasOverrides() {
+        return this.serverPristine.source &&
+          Object.values(this.serverPristine.source).some(s => s === 'sqlite');
+      },
+
+      async testConnection() {
+        this.testing = true;
+        this.testResult = null;
+        try {
+          const base = window.EDGE_BASE_URL || 'http://localhost:8083';
+          const payload = {
+            provider: this.serverForm.provider,
+            model: this.serverForm.model,
+            api_base: this.serverForm.api_base,
+            request_timeout: parseInt(this.serverForm.request_timeout) || 120,
+          };
+          if (this.apiKeyEditing && this.serverForm.api_key) {
+            payload.api_key = this.serverForm.api_key;
+          }
+          const resp = await fetch(`${base}/v1/settings/description/test`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+          });
+          if (resp.ok) {
+            this.testResult = await resp.json();
+          } else {
+            this.testResult = { ok: false, error: 'Request failed' };
+          }
+        } catch (e) {
+          this.testResult = { ok: false, error: e.message || 'Connection failed' };
+        } finally {
+          this.testing = false;
+        }
+      },
+
+      get testResultText() {
+        if (!this.testResult) return '';
+        if (this.testResult.ok) {
+          return `✓ ${this.testResult.latency_ms}ms · ${this.testResult.detail || 'OK'}`;
+        }
+        return `✗ ${this.testResult.error || 'Failed'}`;
+      },
+
+      async saveServerSettings() {
+        this.saving = true;
+        try {
+          const payload = {};
+          for (const k of Object.keys(this.serverForm)) {
+            if (k === 'api_key') continue;
+            const a = String(this.serverForm[k]);
+            const b = String(this.serverPristine[k]);
+            if (a !== b) {
+              payload[k] = k === 'request_timeout' ? (parseInt(this.serverForm[k]) || 120) : this.serverForm[k];
+            }
+          }
+          if (this.apiKeyEditing && this.serverForm.api_key) {
+            payload.api_key = this.serverForm.api_key;
+          }
+          const base = window.EDGE_BASE_URL || 'http://localhost:8083';
+          const resp = await fetch(`${base}/v1/settings/description`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+          });
+          if (resp.ok) {
+            const data = await resp.json();
+            this.serverPristine = {
+              provider: data.provider,
+              model: data.model,
+              api_key: data.api_key_masked || '',
+              api_base: data.api_base,
+              request_timeout: data.request_timeout,
+              source: data.source,
+            };
+            this.apiKeyEditing = false;
+            this.showToast('Server settings saved', 'success');
+          } else {
+            const err = await resp.json();
+            this.showToast(err.error || 'Save failed', 'error');
+          }
+        } catch (e) {
+          console.error('Save failed:', e);
+          this.showToast('Save failed', 'error');
+        } finally {
+          this.saving = false;
+        }
+      },
+
+      clearApiKey() {
+        if (!confirm('Clear API key?')) return;
+        this.serverForm.api_key = '';
+        this.apiKeyEditing = false;
+        this.saveServerSettingsWithKey(null);
+      },
+
+      async saveServerSettingsWithKey(apiKeyValue) {
+        this.saving = true;
+        try {
+          const base = window.EDGE_BASE_URL || 'http://localhost:8083';
+          const resp = await fetch(`${base}/v1/settings/description`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ api_key: apiKeyValue }),
+          });
+          if (resp.ok) {
+            const data = await resp.json();
+            this.serverPristine.api_key = data.api_key_masked || '';
+            this.serverPristine.source = data.source;
+          }
+        } catch (e) {
+          console.error('Clear API key failed:', e);
+        } finally {
+          this.saving = false;
+        }
+      },
+
+      async resetServerSettings() {
+        if (!confirm('Reset all description settings to defaults? Workers will switch to TOML config.')) {
+          return;
+        }
+        this.saving = true;
+        try {
+          const base = window.EDGE_BASE_URL || 'http://localhost:8083';
+          const resp = await fetch(`${base}/v1/settings/description/reset`, { method: 'POST' });
+          if (resp.ok) {
+            const data = await resp.json();
+            this.serverForm.provider = data.provider;
+            this.serverForm.model = data.model;
+            this.serverForm.api_key = data.api_key_masked || '';
+            this.serverForm.api_base = data.api_base;
+            this.serverForm.request_timeout = data.request_timeout;
+            this.serverPristine = { ...this.serverForm, source: data.source };
+            this.apiKeyEditing = false;
+            this.showToast('Server settings reset to defaults', 'success');
+          } else {
+            this.showToast('Reset failed', 'error');
+          }
+        } catch (e) {
+          console.error('Reset failed:', e);
+          this.showToast('Reset failed', 'error');
+        } finally {
+          this.saving = false;
+        }
+      },
+
+      showToast(message, type) {
+        this.$dispatch('show-toast', { message, type });
+      },
+    };
+  }
+</script>
+{% endblock %}

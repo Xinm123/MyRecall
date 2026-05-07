@@ -1,7 +1,7 @@
 import pytest
 from pathlib import Path
 
-from openrecall.server.config_server import ServerSettings
+from myrecall.server.config_server import ServerSettings
 
 
 def test_server_settings_defaults():

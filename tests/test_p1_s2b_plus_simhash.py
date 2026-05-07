@@ -12,7 +12,7 @@ from unittest.mock import MagicMock
 
 from PIL import Image
 
-from openrecall.client.hash_utils import (
+from myrecall.client.hash_utils import (
     SimhashCache,
     compute_phash,
     hamming_distance,
@@ -145,7 +145,7 @@ class TestSimhashCache:
         mock_rc = MagicMock()
         mock_rc.get_dedup_cache_size.return_value = 2
         mock_rc.get_dedup_ttl_seconds.return_value = float("inf")
-        monkeypatch.setattr("openrecall.client.hash_utils.runtime_config", mock_rc)
+        monkeypatch.setattr("myrecall.client.hash_utils.runtime_config", mock_rc)
         cache = SimhashCache(cache_size_per_device=2)
 
         cache.add("monitor_0", 0xABC, timestamp=100.0)
@@ -234,7 +234,7 @@ class TestSimhashCache:
         mock_rc = MagicMock()
         mock_rc.get_dedup_cache_size.return_value = 3
         mock_rc.get_dedup_ttl_seconds.return_value = float("inf")
-        monkeypatch.setattr("openrecall.client.hash_utils.runtime_config", mock_rc)
+        monkeypatch.setattr("myrecall.client.hash_utils.runtime_config", mock_rc)
         cache = SimhashCache(cache_size_per_device=3)
         cache.add("monitor_0", 0xABC, timestamp=100.0)
         cache.add("monitor_0", 0xDEF, timestamp=200.0)
@@ -253,7 +253,7 @@ class TestSimhashCache:
         mock_rc = MagicMock()
         mock_rc.get_dedup_cache_size.return_value = 2
         mock_rc.get_dedup_ttl_seconds.return_value = float("inf")
-        monkeypatch.setattr("openrecall.client.hash_utils.runtime_config", mock_rc)
+        monkeypatch.setattr("myrecall.client.hash_utils.runtime_config", mock_rc)
         cache = SimhashCache(cache_size_per_device=2)
 
         cache.add("monitor_0", 0xABC, timestamp=100.0)  # Oldest

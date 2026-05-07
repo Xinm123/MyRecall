@@ -15,8 +15,8 @@ from unittest.mock import patch, MagicMock
 import pytest
 from flask import Flask
 
-from openrecall.server.api_v1 import v1_bp
-from openrecall.server.search.engine import SearchEngine
+from myrecall.server.api_v1 import v1_bp
+from myrecall.server.search.engine import SearchEngine
 
 
 pytestmark = [pytest.mark.integration, pytest.mark.api]
@@ -36,10 +36,11 @@ def mock_search_engine():
     mock_engine = MagicMock(spec=SearchEngine)
 
     # Flat structure results (no content wrapper)
+    # timestamp is local time (from local_timestamp, no Z suffix)
     test_results = [
         {
             "frame_id": 1,
-            "timestamp": "2026-03-18T10:00:00Z",
+            "timestamp": "2026-03-18T18:00:00.000",
             "text": "Hello world from Safari",
             "text_source": "ocr",
             "app_name": "Safari",
@@ -72,7 +73,7 @@ class TestResponseSchemaSuccess:
     def test_response_has_data_array(self, app_with_search_route, mock_search_engine):
         """Response has data field as array."""
         with patch(
-            "openrecall.server.api_v1._get_search_engine",
+            "myrecall.server.api_v1._get_search_engine",
             return_value=mock_search_engine,
         ):
             client = app_with_search_route.test_client()
@@ -85,7 +86,7 @@ class TestResponseSchemaSuccess:
     def test_response_has_pagination(self, app_with_search_route, mock_search_engine):
         """Response has pagination object."""
         with patch(
-            "openrecall.server.api_v1._get_search_engine",
+            "myrecall.server.api_v1._get_search_engine",
             return_value=mock_search_engine,
         ):
             client = app_with_search_route.test_client()
@@ -104,7 +105,7 @@ class TestItemFieldCompleteness:
     ):
         """Each item has all required fields per spec (flat structure)."""
         with patch(
-            "openrecall.server.api_v1._get_search_engine",
+            "myrecall.server.api_v1._get_search_engine",
             return_value=mock_search_engine,
         ):
             client = app_with_search_route.test_client()
@@ -130,7 +131,7 @@ class TestItemFieldCompleteness:
     def test_frame_id_is_integer(self, app_with_search_route, mock_search_engine):
         """frame_id is an integer."""
         with patch(
-            "openrecall.server.api_v1._get_search_engine",
+            "myrecall.server.api_v1._get_search_engine",
             return_value=mock_search_engine,
         ):
             client = app_with_search_route.test_client()
@@ -143,7 +144,7 @@ class TestItemFieldCompleteness:
     def test_timestamp_is_string(self, app_with_search_route, mock_search_engine):
         """timestamp is a string (ISO8601)."""
         with patch(
-            "openrecall.server.api_v1._get_search_engine",
+            "myrecall.server.api_v1._get_search_engine",
             return_value=mock_search_engine,
         ):
             client = app_with_search_route.test_client()
@@ -156,7 +157,7 @@ class TestItemFieldCompleteness:
     def test_focused_is_boolean(self, app_with_search_route, mock_search_engine):
         """focused field is boolean."""
         with patch(
-            "openrecall.server.api_v1._get_search_engine",
+            "myrecall.server.api_v1._get_search_engine",
             return_value=mock_search_engine,
         ):
             client = app_with_search_route.test_client()
@@ -173,7 +174,7 @@ class TestOptionalFields:
     def test_browser_url_can_be_null(self, app_with_search_route, mock_search_engine):
         """browser_url can be null for non-browser frames."""
         with patch(
-            "openrecall.server.api_v1._get_search_engine",
+            "myrecall.server.api_v1._get_search_engine",
             return_value=mock_search_engine,
         ):
             client = app_with_search_route.test_client()
@@ -187,7 +188,7 @@ class TestOptionalFields:
     def test_score_fields_present(self, app_with_search_route, mock_search_engine):
         """Score fields are present in search results."""
         with patch(
-            "openrecall.server.api_v1._get_search_engine",
+            "myrecall.server.api_v1._get_search_engine",
             return_value=mock_search_engine,
         ):
             client = app_with_search_route.test_client()
@@ -207,7 +208,7 @@ class TestPaginationStructure:
     def test_pagination_has_limit(self, app_with_search_route, mock_search_engine):
         """Pagination has limit field."""
         with patch(
-            "openrecall.server.api_v1._get_search_engine",
+            "myrecall.server.api_v1._get_search_engine",
             return_value=mock_search_engine,
         ):
             client = app_with_search_route.test_client()
@@ -221,7 +222,7 @@ class TestPaginationStructure:
     def test_pagination_has_offset(self, app_with_search_route, mock_search_engine):
         """Pagination has offset field."""
         with patch(
-            "openrecall.server.api_v1._get_search_engine",
+            "myrecall.server.api_v1._get_search_engine",
             return_value=mock_search_engine,
         ):
             client = app_with_search_route.test_client()
@@ -235,7 +236,7 @@ class TestPaginationStructure:
     def test_pagination_has_total(self, app_with_search_route, mock_search_engine):
         """Pagination has total field."""
         with patch(
-            "openrecall.server.api_v1._get_search_engine",
+            "myrecall.server.api_v1._get_search_engine",
             return_value=mock_search_engine,
         ):
             client = app_with_search_route.test_client()
@@ -249,7 +250,7 @@ class TestPaginationStructure:
     def test_pagination_default_values(self, app_with_search_route, mock_search_engine):
         """Pagination uses correct defaults when not specified."""
         with patch(
-            "openrecall.server.api_v1._get_search_engine",
+            "myrecall.server.api_v1._get_search_engine",
             return_value=mock_search_engine,
         ):
             client = app_with_search_route.test_client()
@@ -265,7 +266,7 @@ class TestPaginationStructure:
     ):
         """Pagination has all required fields: limit, offset, total."""
         with patch(
-            "openrecall.server.api_v1._get_search_engine",
+            "myrecall.server.api_v1._get_search_engine",
             return_value=mock_search_engine,
         ):
             client = app_with_search_route.test_client()
@@ -286,7 +287,7 @@ class TestEmptyResultStructure:
     ):
         """Empty results returns data as empty array."""
         with patch(
-            "openrecall.server.api_v1._get_search_engine",
+            "myrecall.server.api_v1._get_search_engine",
             return_value=mock_empty_search_engine,
         ):
             client = app_with_search_route.test_client()
@@ -302,7 +303,7 @@ class TestEmptyResultStructure:
     ):
         """Empty results has pagination with total=0."""
         with patch(
-            "openrecall.server.api_v1._get_search_engine",
+            "myrecall.server.api_v1._get_search_engine",
             return_value=mock_empty_search_engine,
         ):
             client = app_with_search_route.test_client()
@@ -319,7 +320,7 @@ class TestEmptyResultStructure:
     ):
         """Empty results returns 200 status."""
         with patch(
-            "openrecall.server.api_v1._get_search_engine",
+            "myrecall.server.api_v1._get_search_engine",
             return_value=mock_empty_search_engine,
         ):
             client = app_with_search_route.test_client()
@@ -332,7 +333,7 @@ class TestEmptyResultStructure:
     ):
         """Empty results has complete response structure."""
         with patch(
-            "openrecall.server.api_v1._get_search_engine",
+            "myrecall.server.api_v1._get_search_engine",
             return_value=mock_empty_search_engine,
         ):
             client = app_with_search_route.test_client()
@@ -356,7 +357,7 @@ class TestErrorResponseFormat:
     ):
         """Invalid limit parameter is handled gracefully (uses default)."""
         with patch(
-            "openrecall.server.api_v1._get_search_engine",
+            "myrecall.server.api_v1._get_search_engine",
             return_value=mock_search_engine,
         ):
             client = app_with_search_route.test_client()
@@ -370,7 +371,7 @@ class TestErrorResponseFormat:
     ):
         """Invalid offset parameter is handled gracefully (uses default)."""
         with patch(
-            "openrecall.server.api_v1._get_search_engine",
+            "myrecall.server.api_v1._get_search_engine",
             return_value=mock_search_engine,
         ):
             client = app_with_search_route.test_client()
@@ -382,7 +383,7 @@ class TestErrorResponseFormat:
     def test_negative_limit_handled(self, app_with_search_route, mock_search_engine):
         """Negative limit is handled (clamped to minimum)."""
         with patch(
-            "openrecall.server.api_v1._get_search_engine",
+            "myrecall.server.api_v1._get_search_engine",
             return_value=mock_search_engine,
         ):
             client = app_with_search_route.test_client()
@@ -395,7 +396,7 @@ class TestErrorResponseFormat:
     def test_negative_offset_handled(self, app_with_search_route, mock_search_engine):
         """Negative offset is handled (clamped to minimum)."""
         with patch(
-            "openrecall.server.api_v1._get_search_engine",
+            "myrecall.server.api_v1._get_search_engine",
             return_value=mock_search_engine,
         ):
             client = app_with_search_route.test_client()

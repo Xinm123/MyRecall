@@ -1,7 +1,7 @@
 """Tests for chat types (Conversation, Message, ToolCall, etc.)."""
 from datetime import datetime
 
-from openrecall.client.chat.types import (
+from myrecall.client.chat.types import (
     Conversation,
     ConversationMeta,
     Message,

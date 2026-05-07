@@ -15,16 +15,16 @@ import numpy as np
 from numpy.typing import NDArray
 from PIL import Image
 
-from openrecall.client.events.base import (
+from myrecall.client.events.base import (
     CaptureTrigger,
     MonitorDescriptor,
     TriggerEvent,
     utc_now_iso,
 )
-from openrecall.client.recorder import ScreenRecorder
-from openrecall.client.spool import SpoolQueue
-from openrecall.client.v3_uploader import SpoolUploader
-from openrecall.shared.config import settings
+from myrecall.client.recorder import ScreenRecorder
+from myrecall.client.spool import SpoolQueue
+from myrecall.client.v3_uploader import SpoolUploader
+from myrecall.shared.config import settings
 
 
 def utc_now_seconds() -> str:

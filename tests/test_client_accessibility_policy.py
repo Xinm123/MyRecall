@@ -14,11 +14,11 @@ class TestAppPrefersOcr:
 
     def test_import_app_prefers_ocr(self):
         """app_prefers_ocr should be importable from policy module."""
-        from openrecall.client.accessibility.policy import app_prefers_ocr
+        from myrecall.client.accessibility.policy import app_prefers_ocr
 
     def test_terminal_apps_prefer_ocr(self):
         """Terminal-class apps should prefer OCR over accessibility."""
-        from openrecall.client.accessibility.policy import app_prefers_ocr
+        from myrecall.client.accessibility.policy import app_prefers_ocr
 
         # MVP spec terminal apps:
         # wezterm, iterm, terminal, alacritty, kitty, hyper, warp, ghostty
@@ -37,7 +37,7 @@ class TestAppPrefersOcr:
 
     def test_terminal_apps_case_insensitive(self):
         """Terminal app detection should be case-insensitive."""
-        from openrecall.client.accessibility.policy import app_prefers_ocr
+        from myrecall.client.accessibility.policy import app_prefers_ocr
 
         assert app_prefers_ocr("wezterm")
         assert app_prefers_ocr("WEZTERM")
@@ -47,7 +47,7 @@ class TestAppPrefersOcr:
 
     def test_non_terminal_apps_dont_prefer_ocr(self):
         """Non-terminal apps should not prefer OCR."""
-        from openrecall.client.accessibility.policy import app_prefers_ocr
+        from myrecall.client.accessibility.policy import app_prefers_ocr
 
         non_terminal_apps = [
             "Safari",
@@ -64,7 +64,7 @@ class TestAppPrefersOcr:
 
     def test_empty_app_name(self):
         """Empty or None app name should not prefer OCR."""
-        from openrecall.client.accessibility.policy import app_prefers_ocr
+        from myrecall.client.accessibility.policy import app_prefers_ocr
 
         assert not app_prefers_ocr("")
         assert not app_prefers_ocr(None)
@@ -75,11 +75,11 @@ class TestFocusedMonitorEligibility:
 
     def test_import_is_focused_monitor_eligible(self):
         """is_focused_monitor_eligible should be importable from policy module."""
-        from openrecall.client.accessibility.policy import is_focused_monitor_eligible
+        from myrecall.client.accessibility.policy import is_focused_monitor_eligible
 
     def test_focused_monitor_eligible(self):
         """Frames on focused monitor should be AX-eligible."""
-        from openrecall.client.accessibility.policy import is_focused_monitor_eligible
+        from myrecall.client.accessibility.policy import is_focused_monitor_eligible
 
         result = is_focused_monitor_eligible(
             target_device_name="monitor_1",
@@ -89,7 +89,7 @@ class TestFocusedMonitorEligibility:
 
     def test_non_focused_monitor_not_eligible(self):
         """Frames on non-focused monitor should not be AX-eligible."""
-        from openrecall.client.accessibility.policy import is_focused_monitor_eligible
+        from myrecall.client.accessibility.policy import is_focused_monitor_eligible
 
         result = is_focused_monitor_eligible(
             target_device_name="monitor_2",
@@ -99,7 +99,7 @@ class TestFocusedMonitorEligibility:
 
     def test_cross_monitor_window_eligibility(self):
         """Windows spanning monitors follow focused-monitor routing."""
-        from openrecall.client.accessibility.policy import is_focused_monitor_eligible
+        from myrecall.client.accessibility.policy import is_focused_monitor_eligible
 
         # Even if a window spans monitors, eligibility follows focused monitor
         result = is_focused_monitor_eligible(
@@ -114,32 +114,32 @@ class TestAccessibilityAdoption:
 
     def test_import_should_adopt_accessibility(self):
         """should_adopt_accessibility should be importable from policy module."""
-        from openrecall.client.accessibility.policy import should_adopt_accessibility
+        from myrecall.client.accessibility.policy import should_adopt_accessibility
 
     def test_adopt_with_non_empty_text(self):
         """Accessibility with non-empty text_content should be adopted."""
-        from openrecall.client.accessibility.policy import should_adopt_accessibility
+        from myrecall.client.accessibility.policy import should_adopt_accessibility
 
         result = should_adopt_accessibility(text_content="Hello World")
         assert result is True
 
     def test_reject_empty_text(self):
         """Accessibility with empty text_content should not be adopted."""
-        from openrecall.client.accessibility.policy import should_adopt_accessibility
+        from myrecall.client.accessibility.policy import should_adopt_accessibility
 
         result = should_adopt_accessibility(text_content="")
         assert result is False
 
     def test_reject_whitespace_only_text(self):
         """Accessibility with whitespace-only text_content should not be adopted."""
-        from openrecall.client.accessibility.policy import should_adopt_accessibility
+        from myrecall.client.accessibility.policy import should_adopt_accessibility
 
         result = should_adopt_accessibility(text_content="   \n\t  ")
         assert result is False
 
     def test_reject_none_text(self):
         """Accessibility with None text_content should not be adopted."""
-        from openrecall.client.accessibility.policy import should_adopt_accessibility
+        from myrecall.client.accessibility.policy import should_adopt_accessibility
 
         result = should_adopt_accessibility(text_content=None)
         assert result is False
@@ -150,12 +150,12 @@ class TestAccessibilityDecisionMapping:
 
     def test_import_make_accessibility_decision(self):
         """make_accessibility_decision should be importable from policy module."""
-        from openrecall.client.accessibility.policy import make_accessibility_decision
+        from myrecall.client.accessibility.policy import make_accessibility_decision
 
     def test_decision_non_focused_monitor(self):
         """Non-focused monitor should produce non_focused_monitor decision."""
-        from openrecall.client.accessibility.policy import make_accessibility_decision
-        from openrecall.client.accessibility.types import REASON_NON_FOCUSED_MONITOR
+        from myrecall.client.accessibility.policy import make_accessibility_decision
+        from myrecall.client.accessibility.types import REASON_NON_FOCUSED_MONITOR
 
         decision = make_accessibility_decision(
             target_device_name="monitor_2",
@@ -171,8 +171,8 @@ class TestAccessibilityDecisionMapping:
 
     def test_decision_app_prefers_ocr(self):
         """Terminal app should produce app_prefers_ocr decision."""
-        from openrecall.client.accessibility.policy import make_accessibility_decision
-        from openrecall.client.accessibility.types import REASON_APP_PREFERS_OCR
+        from myrecall.client.accessibility.policy import make_accessibility_decision
+        from myrecall.client.accessibility.types import REASON_APP_PREFERS_OCR
 
         decision = make_accessibility_decision(
             target_device_name="monitor_1",
@@ -188,8 +188,8 @@ class TestAccessibilityDecisionMapping:
 
     def test_decision_no_focused_window(self):
         """No snapshot should produce no_focused_window decision."""
-        from openrecall.client.accessibility.policy import make_accessibility_decision
-        from openrecall.client.accessibility.types import REASON_NO_FOCUSED_WINDOW
+        from myrecall.client.accessibility.policy import make_accessibility_decision
+        from myrecall.client.accessibility.types import REASON_NO_FOCUSED_WINDOW
 
         decision = make_accessibility_decision(
             target_device_name="monitor_1",
@@ -205,8 +205,8 @@ class TestAccessibilityDecisionMapping:
 
     def test_decision_empty_text(self):
         """Empty text snapshot should produce empty_text decision."""
-        from openrecall.client.accessibility.policy import make_accessibility_decision
-        from openrecall.client.accessibility.types import (
+        from myrecall.client.accessibility.policy import make_accessibility_decision
+        from myrecall.client.accessibility.types import (
             TreeSnapshot,
             REASON_EMPTY_TEXT,
         )
@@ -241,8 +241,8 @@ class TestAccessibilityDecisionMapping:
 
     def test_decision_adopted_accessibility(self):
         """Valid snapshot with text should produce adopted_accessibility decision."""
-        from openrecall.client.accessibility.policy import make_accessibility_decision
-        from openrecall.client.accessibility.types import (
+        from myrecall.client.accessibility.policy import make_accessibility_decision
+        from myrecall.client.accessibility.types import (
             TreeSnapshot,
             REASON_ADOPTED_ACCESSIBILITY,
         )
@@ -281,11 +281,11 @@ class TestBrowserCandidateDetection:
 
     def test_import_is_browser_candidate(self):
         """is_browser_candidate should be importable from policy module."""
-        from openrecall.client.accessibility.policy import is_browser_candidate
+        from myrecall.client.accessibility.policy import is_browser_candidate
 
     def test_safari_is_browser_candidate(self):
         """Safari should be detected as browser candidate."""
-        from openrecall.client.accessibility.policy import is_browser_candidate
+        from myrecall.client.accessibility.policy import is_browser_candidate
 
         assert is_browser_candidate("Safari")
         assert is_browser_candidate("safari")
@@ -293,7 +293,7 @@ class TestBrowserCandidateDetection:
 
     def test_chrome_is_browser_candidate(self):
         """Chrome should be detected as browser candidate."""
-        from openrecall.client.accessibility.policy import is_browser_candidate
+        from myrecall.client.accessibility.policy import is_browser_candidate
 
         assert is_browser_candidate("Google Chrome")
         assert is_browser_candidate("Chrome")
@@ -302,7 +302,7 @@ class TestBrowserCandidateDetection:
 
     def test_non_browser_apps(self):
         """Non-browser apps should not be detected as browser candidates."""
-        from openrecall.client.accessibility.policy import is_browser_candidate
+        from myrecall.client.accessibility.policy import is_browser_candidate
 
         assert not is_browser_candidate("Finder")
         assert not is_browser_candidate("Terminal")
@@ -311,7 +311,7 @@ class TestBrowserCandidateDetection:
 
     def test_edge_cases(self):
         """Edge cases for browser detection."""
-        from openrecall.client.accessibility.policy import is_browser_candidate
+        from myrecall.client.accessibility.policy import is_browser_candidate
 
         # Apps with 'chrome' or 'safari' in name
         assert is_browser_candidate("Chrome Canary")

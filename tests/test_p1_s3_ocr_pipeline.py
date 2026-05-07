@@ -14,9 +14,9 @@ from unittest.mock import patch, MagicMock
 
 import pytest
 
-from openrecall.server.database.frames_store import FramesStore
-from openrecall.server.database.migrations_runner import run_migrations
-from openrecall.server.processing.ocr_processor import OcrResult, OcrStatus, execute_ocr
+from myrecall.server.database.frames_store import FramesStore
+from myrecall.server.database.migrations_runner import run_migrations
+from myrecall.server.processing.ocr_processor import OcrResult, OcrStatus, execute_ocr
 
 
 @pytest.fixture
@@ -25,7 +25,7 @@ def temp_db(tmp_path: Path) -> Path:
     db_path = tmp_path / "test_edge.db"
     conn = sqlite3.connect(str(db_path))
     migrations_dir = Path(__file__).resolve().parent.parent / (
-        "openrecall/server/database/migrations"
+        "myrecall/server/database/migrations"
     )
     run_migrations(conn, migrations_dir)
     conn.close()
@@ -156,7 +156,7 @@ class TestOcrPipeline:
         # Also accept FAILED if OCR models aren't available
         assert result.status in (OcrStatus.SUCCESS, OcrStatus.EMPTY_TEXT, OcrStatus.FAILED)
 
-    @patch("openrecall.server.ocr.rapid_backend.RapidOCRBackend")
+    @patch("myrecall.server.ocr.rapid_backend.RapidOCRBackend")
     def test_ocr_pipeline_exception_propagation(
         self, mock_backend_class, store: FramesStore, tmp_path: Path
     ):

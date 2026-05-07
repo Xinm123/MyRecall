@@ -1,0 +1,1277 @@
+{% extends "layout.html" %}
+
+{% block title %}Search - MyRecall{% endblock %}
+
+{% block extra_head %}
+<style>
+  .search-form {
+    background: var(--bg-card);
+    border-radius: 12px;
+    padding: 20px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+    margin-bottom: 20px;
+    display: flex;
+    gap: 15px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+  
+  .form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+  }
+  
+  .form-group label {
+    font-size: 12px;
+    color: var(--text-secondary);
+    font-weight: 500;
+  }
+  
+  .form-group input {
+    padding: 8px 12px;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    font-size: 14px;
+    font-family: var(--font-stack);
+    background: var(--bg-body);
+    color: var(--text-primary);
+  }
+  
+  .form-group input:focus {
+    outline: none;
+    border-color: var(--accent-color);
+  }
+  
+  .btn-search {
+    padding: 8px 20px;
+    background: var(--accent-color);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: opacity 0.2s;
+    align-self: flex-end;
+  }
+  
+  .btn-search:hover {
+    opacity: 0.8;
+  }
+
+  .btn-search:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  .form-group select {
+    padding: 8px 12px;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    font-size: 14px;
+    font-family: var(--font-stack);
+    background: var(--bg-body);
+    color: var(--text-primary);
+    min-width: 100px;
+  }
+
+  .form-group select:focus {
+    outline: none;
+    border-color: var(--accent-color);
+  }
+
+  /* Spinner Animation */
+  @keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
+  
+  .spinner {
+    display: inline-block;
+    width: 14px;
+    height: 14px;
+    border: 2.5px solid rgba(0, 122, 255, 0.2);
+    border-top-color: var(--accent-color);
+    border-radius: 50%;
+    animation: spin 0.6s linear infinite;
+    flex-shrink: 0;
+  }
+  
+  /* Memory Grid Layout */
+  .results-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 24px;
+    padding: 24px 0;
+  }
+
+  /* Memory Card - aligned with index.html */
+  .memory-card {
+    background: var(--bg-card);
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+    transition: transform 0.2s, box-shadow 0.2s;
+    content-visibility: auto;
+    contain-intrinsic-size: 420px 360px;
+  }
+
+  .memory-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+  }
+
+  /* Card Header V3 - Apple Style Refined Layout (matches index.html) */
+  .card-header-v3 {
+    display: flex;
+    flex-direction: column;
+    padding: 12px 16px;
+    gap: 6px;
+    border-bottom: 1px solid var(--border-color);
+    background: var(--bg-card);
+  }
+
+  .header-row {
+    display: flex;
+    align-items: center;
+    min-height: 20px;
+  }
+
+  .context-row {
+    justify-content: space-between;
+  }
+
+  .context-left {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+    flex: 1;
+  }
+
+  .app-icon {
+    font-size: 14px;
+    width: 20px;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+
+  .app-name {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .trigger-badge {
+    font-size: 10px;
+    font-weight: 500;
+    padding: 2px 8px;
+    border-radius: 10px;
+    text-transform: capitalize;
+    flex-shrink: 0;
+    white-space: nowrap;
+    background: rgba(0, 0, 0, 0.05);
+    color: var(--text-secondary);
+  }
+
+  .trigger-badge[data-trigger="idle"] {
+    background: var(--color-warning-bg, rgba(212, 132, 13, 0.1));
+    color: #D4840D;
+  }
+
+  .trigger-badge[data-trigger="app_switch"] {
+    background: var(--color-primary-bg, rgba(10, 110, 214, 0.1));
+    color: #0A6ED6;
+  }
+
+  .trigger-badge[data-trigger="click"] {
+    background: var(--color-success-bg, rgba(42, 157, 74, 0.1));
+    color: #2A9D4A;
+  }
+
+  .trigger-badge[data-trigger="manual"] {
+    background: rgba(175, 82, 222, 0.1);
+    color: #8E4DB0;
+  }
+
+  .frame-id {
+    font-size: 11px;
+    color: var(--text-tertiary);
+    font-weight: 500;
+    font-family: 'SF Mono', Monaco, Consolas, monospace;
+    flex-shrink: 0;
+  }
+
+  .window-row {
+    min-height: 18px;
+    display: flex;
+    align-items: center;
+  }
+
+  .window-name {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    line-height: 1.4;
+  }
+
+  .meta-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 16px;
+    margin-top: 2px;
+    padding-top: 6px;
+    border-top: 1px solid rgba(0, 0, 0, 0.04);
+  }
+
+  .meta-row .timestamp,
+  .meta-row .relative-time,
+  .meta-row .device-name {
+    font-size: 11px;
+    color: var(--text-tertiary);
+    white-space: nowrap;
+  }
+
+  .meta-row .timestamp {
+    font-family: 'SF Mono', Monaco, Consolas, monospace;
+    letter-spacing: -0.2px;
+  }
+
+  .meta-row .separator {
+    font-size: 11px;
+    color: var(--text-tertiary);
+    opacity: 0.6;
+  }
+
+  .time-row {
+    margin-top: 2px;
+    padding-top: 4px;
+    border-top: 1px dashed rgba(0, 0, 0, 0.06);
+    justify-content: space-between;
+    gap: 8px;
+  }
+
+  /* Card Image Wrapper - fixed height */
+  .card-image-wrapper {
+    width: 100%;
+    height: 200px;
+    overflow: hidden;
+    background: #1a1a1a;
+    position: relative;
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+  }
+
+  .card-image {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: top center;
+    cursor: pointer;
+    transition: transform 0.3s ease;
+  }
+
+  .card-image:hover {
+    transform: scale(1.05);
+  }
+
+  /* Card Footer */
+  .card-footer {
+    padding: 12px 16px;
+    border-top: 1px solid var(--border-color);
+    background: #F9F9FB;
+    min-height: 60px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .rank-info {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .rank-label {
+    font-size: 11px;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+  }
+
+  .rank-value {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--accent-color);
+    font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
+  }
+
+  .result-position {
+    font-size: 12px;
+    color: var(--text-tertiary);
+    font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
+  }
+
+/* Score display */
+  .score-display {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+
+  .score-item {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    font-size: 11px;
+    font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
+  }
+
+  .score-item .score-label {
+    color: var(--text-secondary);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+  }
+
+  .score-item .score-value {
+    color: var(--accent-color);
+    font-weight: 600;
+    font-size: 12px;
+  }
+
+  .score-separator {
+    color: var(--text-tertiary, #8E8E93);
+    font-size: 10px;
+    margin: 0 2px;
+  }
+
+  /* Vertical score display for hybrid mode */
+  .score-display-vertical {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+  }
+
+  .score-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    gap: 12px;
+  }
+
+  .score-rank .score-label {
+    font-size: 9px;
+    color: var(--text-tertiary);
+  }
+
+  .score-rank .score-value {
+    font-size: 10px;
+    color: var(--text-secondary);
+    font-weight: 500;
+  }
+
+  .modal {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(0, 0, 0, 0.9);
+    z-index: 1000;
+    padding: 16px;
+    box-sizing: border-box;
+  }
+  
+  .modal.active {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  
+  .modal-content {
+    width: calc(100vw - 32px);
+    height: calc(100vh - 32px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+  }
+  
+  .modal-content img {
+    max-width: 100%;
+    max-height: 100%;
+    width: auto;
+    height: auto;
+    object-fit: contain;
+    border-radius: 8px;
+  }
+  
+  .modal-close {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    color: white;
+    font-size: 32px;
+    cursor: pointer;
+    z-index: 1001;
+  }
+
+  .modal-meta {
+    position: absolute;
+    top: 16px;
+    left: 16px;
+    max-width: calc(100vw - 160px);
+    padding: 10px 12px;
+    border-radius: 10px;
+    background: rgba(0, 0, 0, 0.35);
+    color: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    z-index: 1001;
+  }
+
+  .modal-meta-line {
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1.25;
+    opacity: 0.92;
+    margin-top: 6px;
+  }
+
+  .modal-meta-line:first-child {
+    margin-top: 0;
+  }
+
+  .modal-nav {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 44px;
+    height: 44px;
+    border-radius: 999px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    background: rgba(0, 0, 0, 0.35);
+    color: white;
+    font-size: 22px;
+    line-height: 1;
+    cursor: pointer;
+    z-index: 1001;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+  }
+
+  .modal-nav:hover {
+    background: rgba(0, 0, 0, 0.5);
+  }
+
+  .modal-nav.prev {
+    left: 16px;
+  }
+
+  .modal-nav.next {
+    right: 16px;
+  }
+
+  .empty-state {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 40px;
+    text-align: center;
+    color: var(--text-secondary);
+  }
+
+  .pagination {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 20px;
+    margin-top: 20px;
+    padding: 20px;
+  }
+
+  .pagination span {
+    color: var(--text-secondary);
+    font-size: 14px;
+  }
+
+  /* Search Mode Pills */
+  .search-mode-pills {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    margin-bottom: 12px;
+    flex-wrap: wrap;
+  }
+
+  .search-mode-pills .pills-label {
+    font-size: 13px;
+    color: var(--text-secondary);
+    margin-right: 4px;
+  }
+
+  /* Search Mode Pills */
+  .search-mode-pills .pill {
+    padding: 6px 14px;
+    border: 1px solid var(--border-color);
+    border-radius: 16px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    background: var(--bg-body);
+    color: var(--text-secondary);
+    transition: all 0.2s ease;
+  }
+
+  .search-mode-pills .pill:hover {
+    border-color: var(--accent-color);
+    color: var(--accent-color);
+  }
+
+  .search-mode-pills .pill.active {
+    background: var(--accent-color);
+    color: white;
+    border-color: var(--accent-color);
+  }
+
+  /* Embedding Status Badge */
+  .embedding-badge {
+    font-size: 12px;
+    margin-left: 6px;
+    cursor: help;
+    opacity: 0.8;
+    transition: opacity 0.2s;
+  }
+
+  .embedding-badge:hover {
+    opacity: 1;
+  }
+
+  .embedding-badge.indexed {
+    filter: drop-shadow(0 0 2px rgba(0, 122, 255, 0.3));
+  }
+
+  /* Semantic Search Warning */
+  .semantic-warning {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 16px;
+    background: rgba(0, 122, 255, 0.08);
+    border: 1px solid rgba(0, 122, 255, 0.2);
+    border-radius: 8px;
+    margin-bottom: 16px;
+    font-size: 13px;
+    color: var(--accent-color);
+  }
+
+  .warning-icon {
+    font-size: 14px;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<form class="search-form" id="searchForm">
+  <div class="form-group">
+    <label for="q">Search Query</label>
+    <input type="text" id="q" name="q" placeholder="Search..." value="{{ request.args.get('q', '') }}">
+  </div>
+  <div class="form-group">
+    <label for="start_time">Start Time</label>
+    <input type="datetime-local" id="start_time" name="start_time" value="{{ request.args.get('start_time', '') }}">
+  </div>
+  <div class="form-group">
+    <label for="end_time">End Time</label>
+    <input type="datetime-local" id="end_time" name="end_time" value="{{ request.args.get('end_time', '') }}">
+  </div>
+  <div class="form-group">
+    <label for="app_name">App Name</label>
+    <input type="text" id="app_name" name="app_name" placeholder="e.g., Safari" value="{{ request.args.get('app_name', '') }}">
+  </div>
+  <div class="form-group">
+    <label for="window_name">Window Name</label>
+    <input type="text" id="window_name" name="window_name" placeholder="e.g., Main Window" value="{{ request.args.get('window_name', '') }}">
+  </div>
+  <div class="form-group">
+    <label for="focused">Focused</label>
+    <select id="focused" name="focused">
+      <option value="">Any</option>
+      <option value="true">Yes</option>
+      <option value="false">No</option>
+    </select>
+  </div>
+  <div class="form-group">
+    <label for="limit">Per Page</label>
+    <select id="limit" name="limit">
+      <option value="10">10</option>
+      <option value="20" selected>20</option>
+      <option value="40">40</option>
+      <option value="80">80</option>
+    </select>
+  </div>
+  <button type="submit" class="btn-search">Search</button>
+</form>
+
+<!-- Search Mode Pills -->
+<div class="search-mode-pills" role="radiogroup" aria-label="搜索模式" id="searchModePills">
+  <span class="pills-label">搜索模式:</span>
+  <button type="button"
+          class="pill"
+          data-mode="fts"
+          role="radio"
+          aria-checked="false"
+          aria-label="全文搜索 - 基于关键词匹配"
+          tabindex="0">全文搜索</button>
+  <button type="button"
+          class="pill"
+          data-mode="vector"
+          role="radio"
+          aria-checked="false"
+          aria-label="语义搜索 - 基于语义理解"
+          tabindex="0">语义搜索</button>
+  <button type="button"
+          class="pill active"
+          data-mode="hybrid"
+          role="radio"
+          aria-checked="true"
+          aria-label="混合搜索 - 结合全文和语义"
+          tabindex="0">混合搜索</button>
+</div>
+
+<!-- Semantic Search Warning -->
+<div class="semantic-warning" id="semantic-warning" style="display: none;">
+  <span class="warning-icon">&#9888;</span>
+  <span id="semantic-warning-text"></span>
+</div>
+
+<div class="results-grid" id="resultsGrid">
+  <!-- Results will be populated by JavaScript -->
+  <div class="empty-state">
+    Enter search criteria and click Search to find results.
+  </div>
+</div>
+
+<div class="pagination" id="pagination" style="display: none;">
+  <button type="button" id="prevPage" class="btn-search" disabled>Previous</button>
+  <span id="pageInfo">Page 1</span>
+  <button type="button" id="nextPage" class="btn-search" disabled>Next</button>
+</div>
+<div id="imageModal" class="modal">
+  <button class="modal-nav prev" type="button" aria-label="Previous image">‹</button>
+  <button class="modal-nav next" type="button" aria-label="Next image">›</button>
+  <div class="modal-meta">
+    <div class="modal-meta-line" data-role="modal-count"></div>
+    <div class="modal-meta-line" data-role="modal-app"></div>
+    <div class="modal-meta-line" data-role="modal-time"></div>
+  </div>
+  <span class="modal-close" role="button" aria-label="Close">&times;</span>
+  <div class="modal-content">
+    <img id="modalImage" alt="Screenshot">
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_body %}
+<script>
+  // Search state
+  let currentResults = [];
+  let currentPagination = { limit: 20, offset: 0, total: 0 };
+
+  // Search mode state
+  let searchMode = 'hybrid';
+
+  // Pending embedding count for semantic search warning
+  let pendingEmbeddingCount = 0;
+
+  // Modal elements
+  const modal = document.getElementById('imageModal');
+  const modalImage = document.getElementById('modalImage');
+  const closeBtn = modal.querySelector('.modal-close');
+  const prevBtn = modal.querySelector('.modal-nav.prev');
+  const nextBtn = modal.querySelector('.modal-nav.next');
+  const modalCount = modal.querySelector('[data-role="modal-count"]');
+  const modalApp = modal.querySelector('[data-role="modal-app"]');
+  const modalTime = modal.querySelector('[data-role="modal-time"]');
+  let currentIndex = 0;
+
+  // Search elements
+  const searchForm = document.getElementById('searchForm');
+  const resultsGrid = document.getElementById('resultsGrid');
+  const paginationDiv = document.getElementById('pagination');
+  const prevPageBtn = document.getElementById('prevPage');
+  const nextPageBtn = document.getElementById('nextPage');
+  const pageInfo = document.getElementById('pageInfo');
+
+  // Search mode pills
+  const searchModePills = document.querySelectorAll('#searchModePills .pill');
+
+  // Initialize search mode from URL
+  function initSearchModeFromUrl() {
+    const params = new URLSearchParams(window.location.search);
+    const urlMode = params.get('mode');
+    if (urlMode && ['fts', 'vector', 'hybrid'].includes(urlMode)) {
+      searchMode = urlMode;
+    }
+    updateSearchModePillState();
+  }
+
+  // Initialize limit from URL
+  function initLimitFromUrl() {
+    const params = new URLSearchParams(window.location.search);
+    const urlLimit = params.get('limit');
+    const limitSelect = document.getElementById('limit');
+    if (urlLimit && limitSelect) {
+      const validLimits = ['10', '20', '40', '80'];
+      if (validLimits.includes(urlLimit)) {
+        limitSelect.value = urlLimit;
+      }
+    }
+  }
+
+  // Set search mode
+  function setSearchMode(mode) {
+    if (mode !== searchMode) {
+      searchMode = mode;
+      updateSearchModePillState();
+      performSearch(0);
+    }
+  }
+
+  // Update search mode pill active state
+  function updateSearchModePillState() {
+    searchModePills.forEach(pill => {
+      const mode = pill.dataset.mode;
+      if (mode === searchMode) {
+        pill.classList.add('active');
+        pill.setAttribute('aria-checked', 'true');
+      } else {
+        pill.classList.remove('active');
+        pill.setAttribute('aria-checked', 'false');
+      }
+    });
+  }
+
+  // Handle search mode pill click
+  searchModePills.forEach(pill => {
+    pill.addEventListener('click', () => {
+      const newMode = pill.dataset.mode;
+      setSearchMode(newMode);
+    });
+  });
+
+  // Keyboard navigation for mode pills
+  searchModePills.forEach(pill => {
+    pill.addEventListener('keydown', (event) => {
+      const modes = ['fts', 'vector', 'hybrid'];
+      const currentMode = pill.dataset.mode;
+      const currentIndex = modes.indexOf(currentMode);
+
+      switch(event.key) {
+        case 'ArrowLeft':
+          event.preventDefault();
+          if (currentIndex > 0) {
+            const prevMode = modes[currentIndex - 1];
+            setSearchMode(prevMode);
+            pill.previousElementSibling?.focus();
+          }
+          break;
+        case 'ArrowRight':
+          event.preventDefault();
+          if (currentIndex < modes.length - 1) {
+            const nextMode = modes[currentIndex + 1];
+            setSearchMode(nextMode);
+            pill.nextElementSibling?.focus();
+          }
+          break;
+        case 'Home':
+          event.preventDefault();
+          setSearchMode(modes[0]);
+          searchModePills[0]?.focus();
+          break;
+        case 'End':
+          event.preventDefault();
+          setSearchMode(modes[modes.length - 1]);
+          searchModePills[searchModePills.length - 1]?.focus();
+          break;
+      }
+    });
+  });
+
+  function isModalOpen() {
+    return modal.classList.contains('active');
+  }
+
+  function normalizeIndex(index) {
+    const n = currentResults.length;
+    return ((index % n) + n) % n;
+  }
+
+  function updateModalImage() {
+    if (!currentResults.length) return;
+    currentIndex = normalizeIndex(currentIndex);
+    const item = currentResults[currentIndex];
+    modalImage.src = `${EDGE_BASE_URL}/v1/frames/${item.frame_id}`;
+    modalCount.textContent = `${currentIndex + 1} / ${currentResults.length}`;
+    modalApp.textContent = item.app_name || 'Unknown';
+    modalTime.textContent = formatTimestamp(item.timestamp);
+  }
+
+  function openModalAt(index) {
+    if (!currentResults.length) return;
+    currentIndex = normalizeIndex(index);
+    updateModalImage();
+    modal.classList.add('active');
+  }
+
+  function closeModal() {
+    modal.classList.remove('active');
+  }
+
+  function showPrev() {
+    openModalAt(currentIndex - 1);
+  }
+
+  function showNext() {
+    openModalAt(currentIndex + 1);
+  }
+
+  // Close modal on background click
+  modal.addEventListener('click', (e) => {
+    if (e.target !== modal) return;
+    closeModal();
+  });
+  
+  // Close modal on Escape key
+  document.addEventListener('keydown', function(e) {
+    if (!isModalOpen()) return;
+    if (e.key === 'Escape') closeModal();
+    if (e.key === 'ArrowLeft') showPrev();
+    if (e.key === 'ArrowRight') showNext();
+  });
+
+  closeBtn.addEventListener('click', closeModal);
+  prevBtn.addEventListener('click', showPrev);
+  nextBtn.addEventListener('click', showNext);
+
+  // Extract shared form filter params to avoid duplication
+  function getFormFilterParams() {
+    const params = new URLSearchParams();
+    const q = document.getElementById('q').value.trim();
+    const startTime = document.getElementById('start_time').value;
+    const endTime = document.getElementById('end_time').value;
+    const appName = document.getElementById('app_name').value.trim();
+    const windowName = document.getElementById('window_name').value.trim();
+    const focused = document.getElementById('focused').value;
+
+    if (q) params.set('q', q);
+    if (startTime) params.set('start_time', startTime + ':00');
+    if (endTime) params.set('end_time', endTime + ':00');
+    if (appName) params.set('app_name', appName);
+    if (windowName) params.set('window_name', windowName);
+    if (focused) params.set('focused', focused);
+
+    return params;
+  }
+
+  // Build query string from form
+  function buildQueryString(offset = 0) {
+    const params = getFormFilterParams();
+
+    // Add search mode (default 'hybrid' is omitted)
+    if (searchMode !== 'hybrid') {
+      params.set('mode', searchMode);
+    }
+
+    // Include text for grid view display
+    params.set('include_text', 'true');
+
+    const limitSelect = document.getElementById('limit');
+    const limitValue = limitSelect ? limitSelect.value : '20';
+    params.set('limit', limitValue);
+    params.set('offset', offset.toString());
+
+    return params.toString();
+  }
+
+  function formatRelativeTime(ts) {
+    if (!ts) return '';
+    const date = parseTimestamp(ts);
+    if (!date || isNaN(date.getTime())) return '';
+    const now = new Date();
+    const diffMs = now - date;
+    const diffSec = Math.floor(diffMs / 1000);
+    const diffMin = Math.floor(diffSec / 60);
+    const diffHour = Math.floor(diffMin / 60);
+    const diffDay = Math.floor(diffHour / 24);
+    if (diffSec < 60) return 'Just now';
+    if (diffMin < 60) return `${diffMin}m ago`;
+    if (diffHour < 24) return `${diffHour}h ago`;
+    if (diffDay < 7) return `${diffDay}d ago`;
+    return '';
+  }
+
+  function formatTimestamp(ts) {
+    if (!ts) return '';
+    const d = parseTimestamp(ts);
+    if (!d || isNaN(d.getTime())) return ts;
+    const pad = (v) => String(v).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+  }
+
+  // Render mode-specific score info
+  function renderScoreInfo(item, idx, pagination) {
+    const offset = pagination.offset;
+    const rank = offset + idx + 1;
+
+    if (searchMode === 'fts') {
+      return `<div class="score-display">
+        <div class="score-item">
+          <span class="score-label">BM25:</span>
+          <span class="score-value">${item.fts_score !== null && item.fts_score !== undefined && !isNaN(Number(item.fts_score)) ? Number(item.fts_score).toFixed(4) : '—'}</span>
+        </div>
+        <span class="score-separator">|</span>
+        <div class="score-item">
+          <span class="score-label">Rank:</span>
+          <span class="score-value">#${rank}</span>
+        </div>
+      </div>`;
+    } else if (searchMode === 'vector') {
+      return `<div class="score-display">
+        <div class="score-item">
+          <span class="score-label">Cosine:</span>
+          <span class="score-value">${item.cosine_score !== null && item.cosine_score !== undefined && !isNaN(Number(item.cosine_score)) ? Number(item.cosine_score).toFixed(4) : '—'}</span>
+        </div>
+        <span class="score-separator">|</span>
+        <div class="score-item">
+          <span class="score-label">Rank:</span>
+          <span class="score-value">#${rank}</span>
+        </div>
+      </div>`;
+    } else if (searchMode === 'hybrid') {
+      const ftsRank = item.fts_rank;
+      const vectorRank = item.vector_rank;
+      const hybridRank = item.hybrid_rank || rank;
+      return `<div class="score-display score-display-vertical">
+        <div class="score-row">
+          <div class="score-item">
+            <span class="score-label">BM25:</span>
+            <span class="score-value">${item.fts_score !== null && item.fts_score !== undefined && !isNaN(Number(item.fts_score)) ? Number(item.fts_score).toFixed(4) : '—'}</span>
+          </div>
+          <div class="score-item score-rank">
+            <span class="score-label">Rank:</span>
+            <span class="score-value">#${ftsRank || '—'}</span>
+          </div>
+        </div>
+        <div class="score-row">
+          <div class="score-item">
+            <span class="score-label">Cosine:</span>
+            <span class="score-value">${item.cosine_score !== null && item.cosine_score !== undefined && !isNaN(Number(item.cosine_score)) ? Number(item.cosine_score).toFixed(4) : '—'}</span>
+          </div>
+          <div class="score-item score-rank">
+            <span class="score-label">Rank:</span>
+            <span class="score-value">#${vectorRank || '—'}</span>
+          </div>
+        </div>
+        <div class="score-row">
+          <div class="score-item">
+            <span class="score-label">Hybrid:</span>
+            <span class="score-value">${item.score !== null && item.score !== undefined && !isNaN(Number(item.score)) ? Number(item.score).toFixed(4) : '—'}</span>
+          </div>
+          <div class="score-item score-rank">
+            <span class="score-label">Rank:</span>
+            <span class="score-value">#${hybridRank}</span>
+          </div>
+        </div>
+      </div>`;
+    }
+    return '';
+  }
+
+  // Get app icon based on app name (matches index.html)
+  function getAppIcon(appName) {
+    const icons = {
+      'Safari': '🧭',
+      'Chrome': '🌐',
+      'Google Chrome': '🌐',
+      'Firefox': '🦊',
+      'Mail': '✉️',
+      'Messages': '💬',
+      'Slack': '💬',
+      'Terminal': '⬛',
+      'iTerm': '⬛',
+      'iTerm2': '⬛',
+      'VSCode': '💻',
+      'Visual Studio Code': '💻',
+      'Code': '💻',
+      'Xcode': '🔨',
+      'Finder': '📁',
+      'Notes': '📝',
+      'Calendar': '📅',
+      'Photos': '🖼️',
+      'Music': '🎵',
+      'Spotify': '🎵',
+      'Zoom': '📹',
+      'Teams': '👥',
+      'Notion': '📓',
+      'Obsidian': '💎',
+      'Preview': '👁️',
+      'Numbers': '📊',
+      'Keynote': '📽️',
+      'Pages': '📄',
+      'Word': '📄',
+      'Excel': '📊',
+      'PowerPoint': '📽️',
+      'PyCharm': '🐍',
+      'IntelliJ': '☕',
+      'WebStorm': '🌊',
+      'Sublime Text': '📝',
+      'Atom': '⚛️',
+      'Typora': '📝',
+      'Bear': '🐻',
+      'Drafts': '✏️',
+      'Things': '✅',
+      'Todoist': '✅',
+      'Reminders': '✅',
+      'Arc': '🌀',
+      'Brave': '🦁',
+      'Edge': '🌊',
+      'WeChat': '💬',
+      'Telegram': '✈️',
+      'Discord': '🎮',
+      'Figma': '🎨',
+      'Sketch': '🎨',
+      'Canva': '🎨',
+      'Final Cut Pro': '🎬',
+      'DaVinci Resolve': '🎬',
+      'Blender': '🎨',
+      'Docker': '🐳',
+      'Postman': '📬',
+      'TablePlus': '🗃️',
+      'Sequel Pro': '🗃️',
+      'Database': '🗃️',
+    };
+    if (!appName) return '🖥️';
+    // Direct match
+    if (icons[appName]) return icons[appName];
+    // Partial match
+    const lowerName = appName.toLowerCase();
+    for (const [key, icon] of Object.entries(icons)) {
+      if (lowerName.includes(key.toLowerCase()) || key.toLowerCase().includes(lowerName)) {
+        return icon;
+      }
+    }
+    return '🖥️';
+  }
+
+  // Render embedding status badge
+  function renderEmbeddingBadge(item) {
+    const status = item.embedding_status;
+    // If frame has cosine_score (appears in vector search results), it's indexed
+    const hasEmbedding = status === 'completed' ||
+                         (item.cosine_score !== null && item.cosine_score !== undefined);
+    if (hasEmbedding) {
+      return '<span class="embedding-badge indexed" title="已生成向量索引">&#128306;</span>';
+    }
+    if (status === 'pending' || status === 'processing') {
+      return '<span class="embedding-badge pending" title="等待向量索引">&#11036;</span>';
+    }
+    return '';
+  }
+
+  // Render search results
+  function renderResults(data, pagination) {
+    currentResults = data;
+    currentPagination = pagination;
+
+    // Count pending embeddings for vector/hybrid modes
+    if (searchMode === 'vector' || searchMode === 'hybrid') {
+      pendingEmbeddingCount = data.filter(item =>
+        item.embedding_status !== 'completed'
+      ).length;
+    } else {
+      pendingEmbeddingCount = 0;
+    }
+
+    // Update semantic warning visibility
+    const warningEl = document.getElementById('semantic-warning');
+    const warningTextEl = document.getElementById('semantic-warning-text');
+    if (warningEl && warningTextEl) {
+      if ((searchMode === 'vector' || searchMode === 'hybrid') && pendingEmbeddingCount > 0) {
+        warningEl.style.display = 'flex';
+        warningTextEl.textContent = pendingEmbeddingCount + ' 个结果尚未生成向量索引，语义搜索可能不完整';
+      } else {
+        warningEl.style.display = 'none';
+      }
+    }
+
+    if (!data || data.length === 0) {
+      resultsGrid.innerHTML = `
+        <div class="empty-state">
+          No results found. Try different search criteria.
+        </div>
+      `;
+      paginationDiv.style.display = 'none';
+      return;
+    }
+
+    const html = data.map((item, idx) => {
+      const frameId = item.frame_id;
+      const timestamp = formatTimestamp(item.timestamp);
+      const relativeTime = formatRelativeTime(item.timestamp);
+      const appName = item.app_name || 'Unknown';
+      const windowName = item.window_name || '';
+      const trigger = item.capture_trigger || '';
+
+      // Build trigger badge HTML
+      const triggerBadgeHtml = trigger
+        ? `<span class="trigger-badge" data-trigger="${trigger}">${trigger}</span>`
+        : '';
+
+      return `
+        <article class="memory-card">
+          <div class="card-header-v3">
+            <!-- Row 1: App + Trigger + Frame ID -->
+            <div class="header-row context-row">
+              <div class="context-left">
+                <span class="app-icon">${getAppIcon(appName)}</span>
+                <span class="app-name" title="${windowName.replace(/"/g, '&quot;')}">${appName}</span>
+                ${triggerBadgeHtml}
+              </div>
+              <span class="frame-id">No.${frameId}</span>
+            </div>
+            <!-- Row 2: Window title -->
+            <div class="header-row window-row">
+              <span class="window-name" title="${windowName.replace(/"/g, '&quot;')}">${windowName}</span>
+            </div>
+            <!-- Row 3: Time info -->
+            <div class="header-row meta-row">
+              <span class="timestamp">${timestamp}</span>
+              <span class="separator">·</span>
+              <span class="relative-time">${relativeTime}</span>
+              <span class="separator" style="display: ${item.device_name ? 'inline' : 'none'}">·</span>
+              <span class="device-name" style="display: ${item.device_name ? 'inline' : 'none'}">${item.device_name || ''}</span>
+            </div>
+          </div>
+          <div class="card-image-wrapper">
+            <img
+              src="${EDGE_BASE_URL}/v1/frames/${frameId}"
+              alt="Screenshot"
+              class="card-image js-open-modal"
+              loading="lazy"
+              data-index="${idx}"
+            >
+          </div>
+          <div class="card-footer">
+            <div class="score-display">${renderScoreInfo(item, idx, pagination)}${renderEmbeddingBadge(item)}</div>
+            <div class="result-position">#${pagination.offset + idx + 1} / ${pagination.total}</div>
+          </div>
+        </article>
+      `;
+    }).join('');
+
+    resultsGrid.innerHTML = html;
+
+    // Attach click handlers to thumbnails
+    const thumbnails = resultsGrid.querySelectorAll('.js-open-modal');
+    thumbnails.forEach((img) => {
+      img.addEventListener('click', () => {
+        const idx = parseInt(img.dataset.index, 10);
+        openModalAt(idx);
+      });
+    });
+
+    // Update pagination
+    const currentPage = Math.floor(pagination.offset / pagination.limit) + 1;
+    const totalPages = Math.ceil(pagination.total / pagination.limit);
+    pageInfo.textContent = `Page ${currentPage} of ${totalPages} (${pagination.total} results)`;
+    
+    prevPageBtn.disabled = pagination.offset === 0;
+    nextPageBtn.disabled = pagination.offset + pagination.limit >= pagination.total;
+    paginationDiv.style.display = 'flex';
+  }
+
+  // Perform search
+  async function performSearch(offset = 0) {
+    const queryString = buildQueryString(offset);
+    const url = `${EDGE_BASE_URL}/v1/search?${queryString}`;
+
+    // Update URL without reloading
+    const newUrl = `${window.location.pathname}?${queryString}`;
+    window.history.replaceState({}, '', newUrl);
+
+    const searchBtn = searchForm.querySelector('.btn-search');
+    searchBtn.disabled = true;
+    searchBtn.textContent = 'Searching...';
+
+    try {
+      const response = await fetch(url);
+      if (!response.ok) {
+        throw new Error(`Search failed: ${response.status}`);
+      }
+      const result = await response.json();
+      renderResults(result.data, result.pagination);
+    } catch (error) {
+      console.error('Search error:', error);
+      resultsGrid.innerHTML = `
+        <div class="empty-state">
+          Error performing search. Please try again.
+        </div>
+      `;
+      paginationDiv.style.display = 'none';
+    } finally {
+      searchBtn.disabled = false;
+      searchBtn.textContent = 'Search';
+    }
+  }
+
+  // Form submit handler
+  searchForm.addEventListener('submit', (e) => {
+    e.preventDefault();
+    performSearch(0);
+  });
+
+  // Pagination handlers
+  prevPageBtn.addEventListener('click', () => {
+    const newOffset = currentPagination.offset - currentPagination.limit;
+    if (newOffset >= 0) {
+      performSearch(newOffset);
+    }
+  });
+
+  nextPageBtn.addEventListener('click', () => {
+    const newOffset = currentPagination.offset + currentPagination.limit;
+    if (newOffset < currentPagination.total) {
+      performSearch(newOffset);
+    }
+  });
+
+  // Initialize search mode and limit from URL
+  initSearchModeFromUrl();
+  initLimitFromUrl();
+
+  // Load initial results if URL has params
+  if (window.location.search) {
+    performSearch(0);
+  }
+</script>
+{% endblock %}

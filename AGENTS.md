@@ -7,8 +7,8 @@ Use it as the operational source of truth for commands and coding conventions.
 
 - MyRecall v3 is a privacy-first local memory system (screenshot capture + AI + search).
 - **Python 3.11+ required**.
-- Architecture is split into `openrecall/client`, `openrecall/server`, and `openrecall/client/events/` (event-driven capture with macOS AX accessibility support).
-- Main entry points are module runs (`python -m openrecall.*`) and wrapper scripts.
+- Architecture is split into `myrecall/client`, `myrecall/server`, and `myrecall/client/events/` (event-driven capture with macOS AX accessibility support).
+- Main entry points are module runs (`python -m myrecall.*`) and wrapper scripts.
 - Reference repo: `_ref/screenpipe`.
 
 ## Build / Run Commands
@@ -61,8 +61,8 @@ pytest -m "not e2e"
 pytest -v
 
 # Coverage
-pytest --cov=openrecall --cov-report=term-missing
-pytest --cov=openrecall --cov-fail-under=80
+pytest --cov=myrecall --cov-report=term-missing
+pytest --cov=myrecall --cov-fail-under=80
 ```
 
 ## Lint / Type Check Reality
@@ -78,9 +78,9 @@ pytest --cov=openrecall --cov-fail-under=80
 Use three import blocks with blank lines:
 1) standard library
 2) third-party libraries
-3) `openrecall.*` local imports
+3) `myrecall.*` local imports
 
-This pattern is used in `openrecall/server/api.py` and `openrecall/client/buffer.py`.
+This pattern is used in `myrecall/server/api.py` and `myrecall/client/buffer.py`.
 
 ### Formatting
 
@@ -143,35 +143,35 @@ This pattern is used in `openrecall/server/api.py` and `openrecall/client/buffer
 
 ## Configuration Conventions
 
-- Runtime config is centralized in `openrecall/shared/config.py` (`pydantic-settings`).
-- Environment variables use `OPENRECALL_*` aliases via `Field(alias=...)`.
+- Runtime config is centralized in `myrecall/shared/config.py` (`pydantic-settings`).
+- Environment variables use `MYRECALL_*` aliases via `Field(alias=...)`.
 - Paths are `Path`-based and expanded/resolved during settings validation.
 
 Common vars:
-- `OPENRECALL_DEBUG`
-- `OPENRECALL_PORT`
-- `OPENRECALL_SERVER_DATA_DIR`
-- `OPENRECALL_CLIENT_DATA_DIR`
-- `OPENRECALL_AI_PROVIDER`
-- `OPENRECALL_DEVICE`
+- `MYRECALL_DEBUG`
+- `MYRECALL_PORT`
+- `MYRECALL_SERVER_DATA_DIR`
+- `MYRECALL_CLIENT_DATA_DIR`
+- `MYRECALL_AI_PROVIDER`
+- `MYRECALL_DEVICE`
 
 Event-Driven Capture (P1-S2a+):
-- `OPENRECALL_TRIGGER_DEBOUNCE_MS` — Debounce for APP_SWITCH/IDLE/MANUAL events (default: 3000)
-- `OPENRECALL_CLICK_DEBOUNCE_MS` — Debounce for CLICK events (default: 3000)
-- `OPENRECALL_CAPTURE_DEBOUNCE_MS` — Global capture debounce (default: 3000)
-- `OPENRECALL_IDLE_CAPTURE_INTERVAL_MS` — Idle fallback interval (default: 60000)
-- `OPENRECALL_PERMISSION_POLL_INTERVAL_SEC` — Permission check interval (default: 10)
-- `OPENRECALL_TRIGGER_QUEUE_CAPACITY` — Trigger queue size (default: 1000)
-- `OPENRECALL_STATS_INTERVAL_SEC` — Stats logging interval (default: 60)
+- `MYRECALL_TRIGGER_DEBOUNCE_MS` — Debounce for APP_SWITCH/IDLE/MANUAL events (default: 3000)
+- `MYRECALL_CLICK_DEBOUNCE_MS` — Debounce for CLICK events (default: 3000)
+- `MYRECALL_CAPTURE_DEBOUNCE_MS` — Global capture debounce (default: 3000)
+- `MYRECALL_IDLE_CAPTURE_INTERVAL_MS` — Idle fallback interval (default: 60000)
+- `MYRECALL_PERMISSION_POLL_INTERVAL_SEC` — Permission check interval (default: 10)
+- `MYRECALL_TRIGGER_QUEUE_CAPACITY` — Trigger queue size (default: 1000)
+- `MYRECALL_STATS_INTERVAL_SEC` — Stats logging interval (default: 60)
 
 Simhash Dedup (P1-S2b+):
-- `OPENRECALL_SIMHASH_DEDUP_ENABLED` — Enable PHash-based dedup (default: true)
-- `OPENRECALL_SIMHASH_DEDUP_THRESHOLD` — Hamming distance threshold (default: 10)
-- `OPENRECALL_SIMHASH_TTL_SECONDS` — TTL for simhash cache entries (default: 60)
-- `OPENRECALL_SIMHASH_CACHE_SIZE` — Number of recent PHash values cached per device (default: 1)
-- `OPENRECALL_SIMHASH_ENABLED_FOR_CLICK` — Dedup for click triggers (default: true)
-- `OPENRECALL_SIMHASH_ENABLED_FOR_APP_SWITCH` — Dedup for app_switch triggers (default: false)
-- `OPENRECALL_MAX_SKIP_DURATION_SEC` — Force capture after N seconds of skipped frames (default: 30)
+- `MYRECALL_SIMHASH_DEDUP_ENABLED` — Enable PHash-based dedup (default: true)
+- `MYRECALL_SIMHASH_DEDUP_THRESHOLD` — Hamming distance threshold (default: 10)
+- `MYRECALL_SIMHASH_TTL_SECONDS` — TTL for simhash cache entries (default: 60)
+- `MYRECALL_SIMHASH_CACHE_SIZE` — Number of recent PHash values cached per device (default: 1)
+- `MYRECALL_SIMHASH_ENABLED_FOR_CLICK` — Dedup for click triggers (default: true)
+- `MYRECALL_SIMHASH_ENABLED_FOR_APP_SWITCH` — Dedup for app_switch triggers (default: false)
+- `MYRECALL_MAX_SKIP_DURATION_SEC` — Force capture after N seconds of skipped frames (default: 30)
 - Note: IDLE triggers always skip simhash (ensures periodic frame capture)
 
 ## Agent Rules from Cursor / Copilot

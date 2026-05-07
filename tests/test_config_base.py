@@ -5,7 +5,7 @@ import tempfile
 
 import pytest
 from dataclasses import dataclass
-from openrecall.shared.config_base import TOMLConfig
+from myrecall.shared.config_base import TOMLConfig
 
 
 @dataclass
@@ -52,10 +52,10 @@ def test_flatten_dict_nested():
 
 
 def test_env_var_fallback(monkeypatch, tmp_path):
-    """OPENRECALL_CONFIG_PATH env var should be used."""
+    """MYRECALL_CONFIG_PATH env var should be used."""
     config_file = tmp_path / "server.toml"
     config_file.write_text('value = "from_env"')
-    monkeypatch.setenv("OPENRECALL_CONFIG_PATH", str(config_file))
+    monkeypatch.setenv("MYRECALL_CONFIG_PATH", str(config_file))
 
     config = ConcreteConfig.from_toml()
     assert config.value == "from_env"

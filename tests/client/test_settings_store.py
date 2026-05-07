@@ -2,7 +2,7 @@
 
 import pytest
 from pathlib import Path
-from openrecall.client.database.settings_store import ClientSettingsStore
+from myrecall.client.database.settings_store import ClientSettingsStore
 
 
 @pytest.fixture

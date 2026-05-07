@@ -4,7 +4,7 @@ import types
 
 import pytest
 
-import openrecall.shared.utils as utils
+import myrecall.shared.utils as utils
 
 
 @pytest.mark.unit

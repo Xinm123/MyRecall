@@ -2,7 +2,7 @@
 from unittest.mock import patch, MagicMock
 import queue
 
-from openrecall.client.chat.service import ChatService
+from myrecall.client.chat.service import ChatService
 
 
 class TestChatService:
@@ -57,7 +57,7 @@ class TestChatService:
         status = service.get_pi_status()
         assert status.running is False
 
-    @patch("openrecall.client.chat.service.PiRpcManager")
+    @patch("myrecall.client.chat.service.PiRpcManager")
     def test_ensure_pi_running_starts_process(self, mock_pi_class, tmp_path):
         """ensure_pi_running starts Pi if not running."""
         mock_pi = MagicMock()
@@ -69,7 +69,7 @@ class TestChatService:
 
         mock_pi.start.assert_called_once()
 
-    @patch("openrecall.client.chat.service.PiRpcManager")
+    @patch("myrecall.client.chat.service.PiRpcManager")
     def test_stream_response_yields_events(self, mock_pi_class, tmp_path):
         """stream_response yields SSE events from Pi."""
         mock_pi = MagicMock()

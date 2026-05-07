@@ -10,8 +10,8 @@ from unittest.mock import patch, MagicMock
 import pytest
 from flask import Flask
 
-from openrecall.server.api_v1 import v1_bp
-from openrecall.server.database.frames_store import FramesStore
+from myrecall.server.api_v1 import v1_bp
+from myrecall.server.database.frames_store import FramesStore
 
 
 @pytest.fixture
@@ -45,7 +45,7 @@ class TestFrameContextAPI:
         """Endpoint returns frame_id, description, text, urls, text_source."""
         mock_store.get_frame_context.return_value = {
             "frame_id": 1,
-            "timestamp": "2026-03-26T10:00:00Z",
+            "timestamp": "2026-03-26T18:00:00.000",
             "app_name": "Claude Code",
             "window_name": "Claude Code — ~/chat",
             "text": "Hello World",
@@ -56,7 +56,7 @@ class TestFrameContextAPI:
             "visibility_status": "queryable",
         }
 
-        with patch("openrecall.server.api_v1._get_frames_store", return_value=mock_store):
+        with patch("myrecall.server.api_v1._get_frames_store", return_value=mock_store):
             client = app_with_context_route.test_client()
             response = client.get("/v1/frames/1/context")
 
@@ -65,18 +65,18 @@ class TestFrameContextAPI:
             assert body["frame_id"] == 1
             assert body["text"] == "Hello World"
             assert body["text_source"] == "accessibility"
-            assert body["timestamp"] == "2026-03-26T10:00:00Z"
+            assert body["timestamp"] == "2026-03-26T18:00:00.000"
             assert body["app_name"] == "Claude Code"
             assert body["window_name"] == "Claude Code — ~/chat"
-            # nodes and description_status are removed
+            # nodes is removed; description_status is included (may be None)
             assert "nodes" not in body
-            assert "description_status" not in body
+            assert body.get("description_status") is None
 
     def test_frame_context_returns_404_for_missing_frame(self, app_with_context_route, mock_store):
         """Endpoint returns 404 for non-existent frame."""
         mock_store.get_frame_context.return_value = None
 
-        with patch("openrecall.server.api_v1._get_frames_store", return_value=mock_store):
+        with patch("myrecall.server.api_v1._get_frames_store", return_value=mock_store):
             client = app_with_context_route.test_client()
             response = client.get("/v1/frames/99999/context")
 
@@ -99,7 +99,7 @@ class TestFrameContextAPI:
             "visibility_status": "queryable",
         }
 
-        with patch("openrecall.server.api_v1._get_frames_store", return_value=mock_store):
+        with patch("myrecall.server.api_v1._get_frames_store", return_value=mock_store):
             client = app_with_context_route.test_client()
             response = client.get("/v1/frames/3/context")
 
@@ -123,7 +123,7 @@ class TestFrameContextAPI:
             "visibility_status": "queryable",
         }
 
-        with patch("openrecall.server.api_v1._get_frames_store", return_value=mock_store):
+        with patch("myrecall.server.api_v1._get_frames_store", return_value=mock_store):
             client = app_with_context_route.test_client()
             response = client.get("/v1/frames/1/context")
 
@@ -135,7 +135,7 @@ class TestFrameContextAPI:
         """Endpoint includes description object when description_status=completed."""
         mock_store.get_frame_context.return_value = {
             "frame_id": 1,
-            "timestamp": "2026-03-26T10:00:00Z",
+            "timestamp": "2026-03-26T18:00:00.000",
             "app_name": "Claude Code",
             "window_name": "Claude Code Window",
             "text": "Test",
@@ -157,9 +157,11 @@ class TestFrameContextAPI:
             "narrative": "User is coding in Claude Code.",
             "summary": "Coding session",
             "tags": ["coding", "claude-code"],
+            "model": "gpt-4o",
+            "generated_at": "2026-03-26T18:05:00.000",
         }
 
-        with patch("openrecall.server.api_v1._get_frames_store", return_value=mock_store):
+        with patch("myrecall.server.api_v1._get_frames_store", return_value=mock_store):
             client = app_with_context_route.test_client()
             response = client.get("/v1/frames/1/context")
 
@@ -169,8 +171,9 @@ class TestFrameContextAPI:
             assert body["description"]["narrative"] == "User is coding in Claude Code."
             assert body["description"]["summary"] == "Coding session"
             assert body["description"]["tags"] == ["coding", "claude-code"]
-            # description_status should NOT be in response
-            assert "description_status" not in body
+            assert body["description"]["model"] == "gpt-4o"
+            assert body["description"]["generated_at"] == "2026-03-26T18:05:00.000"
+            assert body["description_status"] == "completed"
 
     def test_frame_context_omits_description_when_not_completed(self, app_with_context_route, mock_store):
         """Endpoint returns description=null when no description generated."""
@@ -196,14 +199,14 @@ class TestFrameContextAPI:
         mock_store._connect.return_value = mock_conn
         mock_store.get_frame_description.return_value = None
 
-        with patch("openrecall.server.api_v1._get_frames_store", return_value=mock_store):
+        with patch("myrecall.server.api_v1._get_frames_store", return_value=mock_store):
             client = app_with_context_route.test_client()
             response = client.get("/v1/frames/1/context")
 
             assert response.status_code == 200
             body = json.loads(response.data)
             assert body["description"] is None
-            assert "description_status" not in body
+            assert body["description_status"] == "pending"
 
     def test_frame_context_returns_404_for_non_queryable_frame(self, app_with_context_route, mock_store):
         """Endpoint returns 404 NOT_READY when frame is not queryable."""
@@ -220,7 +223,7 @@ class TestFrameContextAPI:
             "visibility_status": "pending",  # Not queryable
         }
 
-        with patch("openrecall.server.api_v1._get_frames_store", return_value=mock_store):
+        with patch("myrecall.server.api_v1._get_frames_store", return_value=mock_store):
             client = app_with_context_route.test_client()
             response = client.get("/v1/frames/1/context")
 
@@ -243,7 +246,7 @@ class TestFrameContextAPI:
             "visibility_status": None,  # NULL visibility
         }
 
-        with patch("openrecall.server.api_v1._get_frames_store", return_value=mock_store):
+        with patch("myrecall.server.api_v1._get_frames_store", return_value=mock_store):
             client = app_with_context_route.test_client()
             response = client.get("/v1/frames/1/context")
 

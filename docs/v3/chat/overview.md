@@ -119,8 +119,8 @@
 
 | 任务 | 描述 | 交付物 |
 |------|------|--------|
-| 1.1 Pi 安装管理 | 自动下载/安装 Pi 到 `~/.myrecall/pi-agent/` | `openrecall/client/chat/pi_manager.py` |
-| 1.2 Skill 创建 | 创建 `myrecall-search` skill 文件 | 内嵌到 `openrecall/client/chat/skills/myrecall-search/SKILL.md` |
+| 1.1 Pi 安装管理 | 自动下载/安装 Pi 到 `~/.myrecall/pi-agent/` | `myrecall/client/chat/pi_manager.py` |
+| 1.2 Skill 创建 | 创建 `myrecall-search` skill 文件 | 内嵌到 `myrecall/client/chat/skills/myrecall-search/SKILL.md` |
 | 1.3 集成测试 | 验证 Pi 可以调用 MyRecall API | `tests/test_chat_pi_integration.py` |
 
 ### 验收标准
@@ -141,11 +141,11 @@
 
 | 任务 | 描述 | 交付物 |
 |------|------|--------|
-| 2.1 Types & Data Models | Conversation, Message, ToolCall, PiStatus 数据结构 | `openrecall/client/chat/types.py` |
-| 2.2 Conversation Manager | 创建/列表/删除/保存对话 | `openrecall/client/chat/conversation.py` |
-| 2.3 Pi RPC Manager | RPC 模式进程管理、stdin/stdout 通信 | `openrecall/client/chat/pi_rpc.py` |
-| 2.4 Chat Service | 流式响应协调、错误恢复 | `openrecall/client/chat/service.py` |
-| 2.5 SSE Routes | `/chat/api/stream` 等端点 + 注册 blueprint | `openrecall/client/chat/routes.py` + `openrecall/client/web/app.py` |
+| 2.1 Types & Data Models | Conversation, Message, ToolCall, PiStatus 数据结构 | `myrecall/client/chat/types.py` |
+| 2.2 Conversation Manager | 创建/列表/删除/保存对话 | `myrecall/client/chat/conversation.py` |
+| 2.3 Pi RPC Manager | RPC 模式进程管理、stdin/stdout 通信 | `myrecall/client/chat/pi_rpc.py` |
+| 2.4 Chat Service | 流式响应协调、错误恢复 | `myrecall/client/chat/service.py` |
+| 2.5 SSE Routes | `/chat/api/stream` 等端点 + 注册 blueprint | `myrecall/client/chat/routes.py` + `myrecall/client/web/app.py` |
 | 2.6 Integration Tests | 端到端测试 | `tests/test_chat_integration.py` |
 
 详细设计见 `phase2-core-service/spec.md` 和 `phase2-core-service/plan.md`。
@@ -174,7 +174,7 @@
 | 任务 | 描述 | 交付物 |
 |------|------|--------|
 | 3.1 Chat 路由 + 导航 | `/chat` 页面路由 + header 导航集成 | `app.py`, `layout.html`, `icons.html` |
-| 3.2 chat.html 模板 | 侧边栏 + 消息展示 + SSE 流式 + Markdown + ToolCall，全部内嵌于单一模板文件 | `openrecall/client/web/templates/chat.html` |
+| 3.2 chat.html 模板 | 侧边栏 + 消息展示 + SSE 流式 + Markdown + ToolCall，全部内嵌于单一模板文件 | `myrecall/client/web/templates/chat.html` |
 | 3.3 UI 测试 | 模板渲染测试 | `tests/test_chat_ui.py` |
 | 3.4 导航集成验证 | 确认 header Chat 链接正常工作 | — |
 
@@ -252,8 +252,8 @@ MyRecall 现有数据目录配置：
 
 | 配置项 | 环境变量 | 默认值 | 用途 |
 |--------|----------|--------|------|
-| Server 数据 | `OPENRECALL_SERVER_DATA_DIR` | `~/MRS` | Edge 数据（DB、frames） |
-| Client 数据 | `OPENRECALL_CLIENT_DATA_DIR` | `~/MRC` | Host 数据（spool、buffer） |
+| Server 数据 | `MYRECALL_SERVER_DATA_DIR` | `~/MRS` | Edge 数据（DB、frames） |
+| Client 数据 | `MYRECALL_CLIENT_DATA_DIR` | `~/MRC` | Host 数据（spool、buffer） |
 
 ### Chat 功能新增目录
 
@@ -280,12 +280,12 @@ MyRecall 现有数据目录配置：
     └── myrecall-search/
         └── SKILL.md             # MyRecall API skill
 
-~/MRS/                           # Server 数据 (OPENRECALL_SERVER_DATA_DIR)
+~/MRS/                           # Server 数据 (MYRECALL_SERVER_DATA_DIR)
 ├── db/
 │   └── edge.db
 └── frames/
 
-~/MRC/                           # Client 数据 (OPENRECALL_CLIENT_DATA_DIR)
+~/MRC/                           # Client 数据 (MYRECALL_CLIENT_DATA_DIR)
 ├── spool/
 ├── chats/                       # Chat: Conversation 存储
 │   ├── conv-uuid-1.json
